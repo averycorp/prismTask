@@ -20,6 +20,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -139,7 +140,7 @@ class TaskRepositoryTest {
     fun addTask_emitsTaskCreatedOntoAutomationEventBus() = kotlinx.coroutines.test.runTest {
         val collected =
             mutableListOf<com.averycorp.prismtask.domain.automation.AutomationEvent>()
-        val collector = kotlinx.coroutines.launch {
+        val collector = this.launch {
             automationEventBus.events.collect { collected += it }
         }
         // Yield once so the collector is subscribed before we emit.
