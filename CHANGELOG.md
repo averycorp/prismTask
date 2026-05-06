@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   defense-in-depth against future interceptor reordering. Adds 2 backend
   pytest cases, 4 Android interceptor cases.
 
+### Changed
+
+- **Allow medications without a slot (as-needed / PRN).** The
+  `MedicationEditorDialog` Save button no longer requires a slot pick
+  when active slots exist. A med saved without any linked slot routes
+  through the existing "Unscheduled" section on the Medication screen
+  (a "Record Taken" button per row writes `slotKey = "anytime"` doses
+  with no toggle semantics, surfacing "Last taken at HH:mm"). The
+  duplicate-name `SQLiteConstraintException` crash protection that PR
+  #1141 originally bundled into the gate stays — `getByNameOnce`
+  pre-flight + outer try/catch in `MedicationViewModel.addMedication`
+  are the load-bearing layer.
+  See `docs/audits/ALLOW_UNSCHEDULED_MEDICATION_AUDIT.md`.
+
 ### Added
 
 - **Cross-device Firestore sync for `task_timings`.** P2-E of the analytics
