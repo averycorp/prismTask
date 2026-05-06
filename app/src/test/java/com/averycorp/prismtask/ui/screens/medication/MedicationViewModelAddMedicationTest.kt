@@ -264,6 +264,7 @@ class MedicationViewModelAddMedicationTest {
             medicationRepository.logDose(
                 medicationId = 7L,
                 slotKey = "anytime",
+                takenAt = any(),
                 doseAmount = null
             )
         }
@@ -286,6 +287,7 @@ class MedicationViewModelAddMedicationTest {
             medicationRepository.logDose(
                 medicationId = 8L,
                 slotKey = "anytime",
+                takenAt = any(),
                 doseAmount = "400 mg"
             )
         }

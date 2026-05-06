@@ -234,8 +234,11 @@ private fun PlanHeader(plan: ImportPlan, asProject: Boolean) {
             "${plan.phases.size} phase${plural(plan.phases.size)}, ${plan.result.risks.size} risk${plural(plan.result.risks.size)}"
         is ImportPlan.FlatProject -> "Project import — ${plan.taskTitles.size} task${plural(plan.taskTitles.size)}"
         is ImportPlan.FlatOrphans ->
-            if (asProject) "Orphan tasks — ${plan.taskTitles.size} task${plural(plan.taskTitles.size)}"
-            else "Orphan tasks — ${plan.taskTitles.size} task${plural(plan.taskTitles.size)} (no project)"
+            if (asProject) {
+                "Orphan tasks — ${plan.taskTitles.size} task${plural(plan.taskTitles.size)}"
+            } else {
+                "Orphan tasks — ${plan.taskTitles.size} task${plural(plan.taskTitles.size)} (no project)"
+            }
     }
     Column {
         Text(plan.projectName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
