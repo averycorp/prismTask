@@ -75,6 +75,30 @@ class AuthManagerSafetyTest {
     }
 
     @Test
+    fun `AuthManager email sign-up and sign-in guard against null Firebase`() {
+        val file = File("app/src/main/java/com/averycorp/prismtask/data/remote/AuthManager.kt")
+        if (!file.exists()) return
+
+        val content = file.readText()
+
+        // Both new email entrypoints must early-return Result.failure when
+        // the constructor's FirebaseAuth.getInstance() threw and `auth` is
+        // null, mirroring the signInWithGoogle pattern. Without this guard
+        // a misconfigured Firebase NPEs on the email path.
+        listOf("signUpWithEmail", "signInWithEmail").forEach { fn ->
+            val fnIndex = content.indexOf("fun $fn(")
+            assertTrue("AuthManager must define $fn(...)", fnIndex >= 0)
+            val fnBody = content.substring(fnIndex, minOf(fnIndex + 500, content.length))
+            assertTrue(
+                "$fn must early-return Result.failure(IllegalStateException) " +
+                    "when auth is null, matching signInWithGoogle's null-Firebase fallback.",
+                fnBody.contains("Firebase Auth not available") &&
+                    fnBody.contains("Result.failure")
+            )
+        }
+    }
+
+    @Test
     fun `SyncService startAutoSync guards against null userId`() {
         val file = File("app/src/main/java/com/averycorp/prismtask/data/remote/SyncService.kt")
         if (!file.exists()) return

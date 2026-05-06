@@ -84,6 +84,28 @@ constructor(
         Result.failure(e)
     }
 
+    suspend fun signUpWithEmail(email: String, password: String): Result<FirebaseUser> = try {
+        val firebaseAuth = auth
+            ?: return Result.failure(IllegalStateException("Firebase Auth not available"))
+        val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+        val user = result.user
+            ?: return Result.failure(IllegalStateException("Sign-up succeeded but user is null"))
+        Result.success(user)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    suspend fun signInWithEmail(email: String, password: String): Result<FirebaseUser> = try {
+        val firebaseAuth = auth
+            ?: return Result.failure(IllegalStateException("Firebase Auth not available"))
+        val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+        val user = result.user
+            ?: return Result.failure(IllegalStateException("Sign-in succeeded but user is null"))
+        Result.success(user)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     suspend fun signOut() {
         // Drop pending sync metadata so cloud_id mappings from this account
         // don't reattach to a different account on next sign-in.

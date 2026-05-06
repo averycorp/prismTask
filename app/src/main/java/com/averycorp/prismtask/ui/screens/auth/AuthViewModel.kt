@@ -81,6 +81,36 @@ constructor(
         }
     }
 
+    fun onEmailSignUp(email: String, password: String) {
+        // TODO(email-verification): call user.sendEmailVerification() and
+        // gate sync until verified once the verification flow lands.
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            val result = authManager.signUpWithEmail(email, password)
+            if (result.isFailure) {
+                _authState.value = AuthState.Error(
+                    result.exceptionOrNull()?.localizedMessage ?: "Sign-up failed"
+                )
+                return@launch
+            }
+            handlePostAuthDeletionGuard()
+        }
+    }
+
+    fun onEmailSignIn(email: String, password: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            val result = authManager.signInWithEmail(email, password)
+            if (result.isFailure) {
+                _authState.value = AuthState.Error(
+                    result.exceptionOrNull()?.localizedMessage ?: "Sign-in failed"
+                )
+                return@launch
+            }
+            handlePostAuthDeletionGuard()
+        }
+    }
+
     /**
      * After Firebase Auth succeeds, check whether the account has been
      * marked for deletion before triggering any sync. Three outcomes:
