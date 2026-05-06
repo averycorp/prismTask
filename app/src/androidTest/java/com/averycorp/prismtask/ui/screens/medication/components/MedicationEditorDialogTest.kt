@@ -11,23 +11,27 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Regression coverage for the [MedicationEditorDialog] Save-button gate
- * shipped in PR #1141. The post-fix gate is
+ * Regression coverage for the [MedicationEditorDialog] Save-button
+ * gate. Post-update the gate is just
  *
- *   `name.isNotBlank() && (selections.isNotEmpty() || activeSlots.isEmpty())`
+ *   `name.isNotBlank()`
  *
- * with the empty-`activeSlots` escape hatch preserving the bootstrap UX
- * (a fresh user with zero slots can still create their first medication;
- * they'd link slots later from the Settings → Medication Slots editor).
+ * — a med with no linked slot is a legitimate as-needed (PRN) entry
+ * that surfaces in the "Unscheduled" section of the Medication screen,
+ * so the historical `(selections.isNotEmpty() || activeSlots.isEmpty())`
+ * clause from PR #1141 was lifted. Crash protection for the original
+ * duplicate-name `SQLiteConstraintException` lives upstream in
+ * `MedicationViewModel.addMedication`'s `getByNameOnce` pre-flight +
+ * outer try/catch (covered by `MedicationViewModelAddMedicationTest`).
  *
- * The ViewModel-layer regression test
- * (`MedicationViewModelAddMedicationTest`) pins what the ViewModel does
+ * The ViewModel-layer regression test pins what the ViewModel does
  * once `onConfirm` fires; this test pins the rendered UI state — i.e.
  * does the Save button refuse the click in the first place. Without
  * this test, a future refactor of `enabled = ...` would not regress
  * the unit tests but would silently regress the dialog.
  *
- * See `docs/audits/F5_MEDICATION_HYGIENE_FOLLOWONS_AUDIT.md` § B.3.
+ * See `docs/audits/ALLOW_UNSCHEDULED_MEDICATION_AUDIT.md` and
+ * `docs/audits/F5_MEDICATION_HYGIENE_FOLLOWONS_AUDIT.md` § B.3.
  */
 @RunWith(AndroidJUnit4::class)
 class MedicationEditorDialogTest {
@@ -65,15 +69,17 @@ class MedicationEditorDialogTest {
     }
 
     @Test
-    fun saveDisabled_whenNamePresentButSelectionsEmpty_andActiveSlotsPresent() {
-        // The PR #1141 regression-prevention case: without the
-        // `selections.isNotEmpty() || activeSlots.isEmpty()` gate, the
-        // dialog would let the user save a med with no slot link, which
-        // matched the operator's "no slot selected" repro for the crash.
+    fun saveEnabled_whenNamePresentButSelectionsEmpty_andActiveSlotsPresent_unscheduled() {
+        // PRN / as-needed medication: a user can save a med without
+        // picking any slot, even when active slots exist. The med
+        // surfaces in the Medication screen's "Unscheduled" section.
+        // The advisory text inside the dialog confirms the routing
+        // ("…will appear in the Unscheduled section as an as-needed
+        // dose."), and the dose-log path uses `slotKey = "anytime"`.
         composeRule.setContent {
             MedicationEditorDialog(
                 title = "Add Medication",
-                initialName = "Lamotrigine",
+                initialName = "Ibuprofen",
                 initialSelections = emptyList(),
                 activeSlots = listOf(morningSlot, eveningSlot),
                 onDismiss = {},
@@ -81,7 +87,7 @@ class MedicationEditorDialogTest {
                 onCreateNewSlot = {}
             )
         }
-        composeRule.onNodeWithText("Save").assertIsNotEnabled()
+        composeRule.onNodeWithText("Save").assertIsEnabled()
     }
 
     @Test

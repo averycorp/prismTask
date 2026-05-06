@@ -223,7 +223,8 @@ fun MedicationEditorDialog(
                 }
                 if (selections.isEmpty() && activeSlots.isNotEmpty()) {
                     Text(
-                        text = "Pick at least one slot so the medication appears on the Today screen.",
+                        text = "No slot picked — this medication will appear in " +
+                            "the Unscheduled section as an as-needed dose.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -252,15 +253,14 @@ fun MedicationEditorDialog(
             }
         },
         confirmButton = {
-            // Gate Save on (a) non-blank name AND (b) at least one slot
-            // picked WHEN slots exist. The empty-`activeSlots` escape hatch
-            // preserves the bootstrap UX (a user with zero slots can still
-            // create a med — they'd link it later from the slot editor).
-            // Without this gate the dialog would happily insert a slot-less
-            // med that's invisible on the Today screen, which matches the
-            // operator's "no slot selected" repro shape — see
-            // `docs/audits/D_MEDICATION_ADD_CRASH_AUDIT.md`.
-            val hasSlotIfRequired = selections.isNotEmpty() || activeSlots.isEmpty()
+            // A blank name is the only Save blocker. A med with no linked
+            // slot is a valid as-needed (PRN) entry — it surfaces in the
+            // "Unscheduled" section of the Medication screen. The
+            // duplicate-name `SQLiteConstraintException` crash that PR
+            // #1141 originally guarded against here is mitigated upstream
+            // by `MedicationViewModel.addMedication`'s `getByNameOnce`
+            // pre-flight + outer try/catch — see
+            // `docs/audits/ALLOW_UNSCHEDULED_MEDICATION_AUDIT.md`.
             Button(
                 onClick = {
                     onConfirm(
@@ -273,7 +273,7 @@ fun MedicationEditorDialog(
                         promptDoseAtLog
                     )
                 },
-                enabled = name.isNotBlank() && hasSlotIfRequired
+                enabled = name.isNotBlank()
             ) {
                 Text("Save")
             }
