@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
@@ -35,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -344,8 +344,11 @@ private fun EmailAuthSection(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                if (registerMode) "Already Have an Account? Sign In"
-                else "New User? Create an Account"
+                if (registerMode) {
+                    "Already Have an Account? Sign In"
+                } else {
+                    "New User? Create an Account"
+                }
             )
         }
     }
