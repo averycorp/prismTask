@@ -234,3 +234,57 @@ Single PR (single coherent scope):
 - One commit, no migration, no test additions (only the existing
   Compose test gets its assertion flipped).
 - Auto-merge squash via `gh pr merge --auto --squash`.
+
+## Phase 3 — Bundle summary
+
+**Shipped (single PR, single coherent scope):**
+
+| # | Item | PR | LOC | Outcome |
+|---|---|---|---|---|
+| 1 | Drop dialog Save gate | #1154 | -1 / +1 | merged once CI green; auto-merge SQUASH enabled at open time |
+| 2 | Update advisory copy | #1154 | -1 / +2 | bundled |
+| 3 | Strip dead comment block | #1154 | -8 / +8 | bundled (replaced with 1-line audit pointer) |
+| 4 | Flip Compose regression test + rename + doc-comment refresh | #1154 | -16 / +20 | bundled |
+| ➕ | CHANGELOG.md "Changed" entry | #1154 | +12 | bundled |
+| ➕ | Phase 1 audit doc | #1154 | +236 | bundled (this file, pre-Phase-3) |
+
+**Per-improvement impact (measurable post-merge):**
+
+- **Workflow:** A user with configured slots can now save an as-needed
+  medication without deleting and re-creating their slot list. The
+  workaround that previously the gate forced is eliminated.
+- **Surface unchanged:** No new entities, DAOs, schedulers, sync
+  fields, widget data, or DB schema. The "Unscheduled" section that
+  already shipped continues to render slot-less meds; the only
+  difference is that more meds can now reach it.
+
+**Re-baselined wall-clock-per-PR estimate:**
+
+This was a "lift a one-line gate" PR with a Phase 1 audit + Phase 3 +
+Phase 4 handoff. End-to-end implementation time (audit doc + 4-file
+diff + CHANGELOG + commit + PR + auto-merge wiring) was on par with
+the gate's original landing in PR #1141 (~3 files, ~50 LOC of code +
+~250 of audit doc). For a "lift a Compose-button gate" template, the
+audit-first overhead is ~80% of total wall-clock — typical for
+tiny-LOC scope-locked changes where the gate's blast-radius
+verification is the load-bearing work, not the diff.
+
+**Memory entry candidates:**
+
+- `feedback_dialog_gate_lifecycle.md` _(non-obvious, candidate-only)_:
+  Compose-dialog Save-button gates frequently land bundled with other
+  crash-protection layers (try/catch + pre-flight name guards), and
+  outlive their original justification. When a future operator-request
+  audit lands on a "let me do X but the dialog won't" scope, check
+  whether the gate was added as a UX shim alongside real crash-protection
+  code — the shim is usually the load-bearing-but-actually-not layer.
+  See PR #1141 (gate added) → PR #1154 (gate lifted) for the
+  archetype.
+- _(no other surprise findings — the rest of this audit is
+  policy-lift mechanics.)_
+
+**Schedule for next audit:** Operator-driven only. No follow-on items
+identified that warrant a proactive sweep.
+
+**STOP-and-report check:** None fired. Premise held; downstream paths
+verified; LOC well under STOP-F's 1500 ceiling; no schema change.
