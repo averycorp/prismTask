@@ -211,3 +211,125 @@ Land items 1–3 + 5–6 in **one PR** on `claude/add-email-signup-option-ifQ9P`
 audit-first fan-out rule, bundle when it's one scope). Item 4 (Firebase
 Console toggle) is operator action surfaced in Phase 3. Items 7, 9, 10
 are documented as deferred follow-ups.
+
+## Phase 3 — Bundle summary
+
+**PR**: [#1155](https://github.com/averycorp/prismTask/pull/1155) — `feat(auth):
+add email/password account option alongside Google`. Bundled items 1, 2, 3, 5, 6
+in a single coherent "add email/password auth" scope.
+
+**Shipped:**
+
+- Item 1 — `AuthManager.signUpWithEmail` / `signInWithEmail` mirroring
+  `signInWithGoogle` shape (Result + null-Firebase fallback).
+- Item 2 — `AuthScreen` collapsible "Use Email Instead" form between the
+  Google button and "Continue Without Account".
+- Item 3 — `AuthViewModel.onEmailSignUp` / `onEmailSignIn` route through
+  the same `handlePostAuthDeletionGuard` → `runPostSignInSync` pipeline.
+- Item 5 — Client-side `Patterns.EMAIL_ADDRESS` check; "At Least 6
+  Characters" supporting text; password rule itself left to Firebase
+  server-side.
+- Item 6 — `AuthManagerSafetyTest` static-text scan extended to assert
+  the new methods early-return `Result.failure(IllegalStateException)`
+  when `auth` is null.
+
+**Operator action (RELEASE-BLOCKING, not code-blocking):**
+
+- Enable **Email/Password** provider in the Firebase Console under
+  *Authentication → Sign-in method* for project `averytask-50dc5`.
+  Without this, `createUserWithEmailAndPassword` returns
+  `OPERATION_NOT_ALLOWED`, which surfaces via `AuthState.Error` (visible
+  failure, not a crash). The PR description repeats this; do not merge
+  to a release branch until the toggle is on.
+
+**Deferred / not shipped:**
+
+- Item 4 — Firebase Console provider toggle (operator action, see above).
+- Item 7 — Onboarding "Already have an account?" still Google-only. The
+  primary `AuthScreen` is reachable from settings post-onboarding, so
+  this is non-urgent.
+- Item 9 — Email verification (`sendEmailVerification`). `TODO(email-verification)`
+  comment lives at `AuthViewModel.onEmailSignUp`. Sync model is UID-keyed
+  so unverified accounts work end-to-end.
+- Item 10 — Password reset (`sendPasswordResetEmail`). Needs its own UI
+  surface; standard v1 omission.
+
+**Anti-patterns flagged (not fixed):**
+
+- Orphaned `BackendAuthDialog` at `ui/components/settings/SettingsDialogs.kt:181`
+  has no callers — out of scope cleanup.
+- Duplicated Credential Manager dance in `OnboardingScreen.kt:342–371`
+  vs `AuthScreen.kt:144–230` — extract-composable refactor for a
+  separate audit.
+
+**Memory entry candidates:** None. The pattern (extend an existing
+`AuthManager` Result-returning method to a new provider; route through
+the existing `handlePostAuthDeletionGuard`) is sufficiently obvious from
+reading the code; no surprise to capture.
+
+**Schedule for next audit:** When the operator wants to ship password
+reset + email verification (items 9, 10), run a follow-up audit covering
+both — they share the "Forgot password?" / "Verify your email" UI surface
+on `AuthScreen`.
+
+## Phase 4 — Claude Chat handoff block
+
+```markdown
+# PrismTask — Email/Password Sign-Up Audit Handoff
+
+## Scope
+PrismTask Android (Kotlin + Compose) only supports Google Sign-In for account
+creation today. Audit + ship a non-Google email/password path so users who
+don't have or don't want to use a Google account can still create an account
+and get cloud sync.
+
+## Verdicts
+| Item | Verdict | One-line finding |
+|------|---------|------------------|
+| 1. `AuthManager` email methods | GREEN — PROCEED | Mirror `signInWithGoogle` shape; same Result/null-Firebase fallback. |
+| 2. `AuthScreen` form UI | GREEN — PROCEED | Collapsible "Use Email Instead" section keeps Google primary. |
+| 3. `AuthViewModel` handlers | GREEN — PROCEED | Routes through existing `handlePostAuthDeletionGuard` pipeline. |
+| 4. Firebase Console toggle | YELLOW — DEFERRED (operator) | Email/Password provider must be enabled in Console for project `averytask-50dc5`. |
+| 5. Validation | GREEN — PROCEED | `Patterns.EMAIL_ADDRESS` client-side; Firebase 6-char minimum server-side. |
+| 6. Tests | GREEN — PROCEED | Extend static-text safety scan to new methods. |
+| 7. Onboarding email link | GREEN — DEFERRED | Out of scope; `AuthScreen` reachable from settings. |
+| 8. Orphaned `BackendAuthDialog` | GREEN — flagged anti-pattern | Dead code at `SettingsDialogs.kt:181`; not the target. |
+| 9. Email verification | YELLOW — DEFERRED | `TODO(email-verification)` left in code. |
+| 10. Password reset | YELLOW — DEFERRED | Needs its own UI surface. |
+
+## Shipped
+- **PR #1155** — `feat(auth): add email/password account option alongside Google`.
+  Bundles items 1, 2, 3, 5, 6. Branch `claude/add-email-signup-option-ifQ9P`.
+
+## Deferred / stopped
+- **Item 4 (Firebase Console)** — operator must enable Email/Password
+  provider before release. Code ships compiled but sign-up surfaces
+  `OPERATION_NOT_ALLOWED` until toggled.
+- **Items 7, 9, 10** — out of scope for this user request; tracked as
+  follow-ups in the audit doc.
+
+## Non-obvious findings
+- All Firestore sync paths are keyed by **Firebase UID**, not provider —
+  email/password users hit `/users/{uid}/...` exactly like Google users
+  with zero schema or branching changes downstream. (`SyncService` +
+  `AuthManager.userId`.)
+- `BackendAuthDialog` at `ui/components/settings/SettingsDialogs.kt:181`
+  is **orphaned dead code** with no callers, despite having a fully
+  styled email/password UI. Reference shape only — do not wire it up
+  in the auth screen; the production form lives in `AuthScreen.kt`.
+- The "Continue Without Account" button on `AuthScreen.kt:250` is a
+  **local-only mode toggle**, not an account creation path; it's
+  separate from this work.
+- `firebase-auth-ktx` was already a dep, so no new dependency was needed —
+  email/password just requires calling existing methods on
+  `FirebaseAuth.getInstance()`.
+
+## Open questions
+- Does the operator want **email verification** gating cloud sync before
+  launch (item 9)? Currently unverified email accounts sync the same as
+  Google accounts because UID is the key.
+- Should the **onboarding welcome page** "Already have an account?" link
+  also offer email sign-in (item 7), or stay Google-only as the primary
+  CTA on that surface?
+```
+
