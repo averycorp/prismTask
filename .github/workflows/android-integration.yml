@@ -7,13 +7,14 @@ name: Android Integration CI
 # current PR-cycle characteristics while this one runs on a more selective
 # trigger matrix.
 #
-# Triggers:
+# Triggers (merge-only):
 #  - push to main — catches regressions after merge, acts as the primary
 #    verification that emulator-backed tests still pass.
 #  - workflow_dispatch — on-demand manual runs (e.g. testing the workflow
 #    itself, or re-running after a transient AVD/emulator failure).
-#  - pull_request labeled `ci:integration` — opt-in for PRs that actually
-#    touch sync/emulator-adjacent code. Default PRs skip the cost.
+#  - No pull_request / merge_group triggers. If branch protection still
+#    requires the `connected-tests` status, drop it from required checks
+#    or PRs will block forever waiting for a status that never posts.
 #
 # Host choice: ubuntu-latest with KVM enabled (the standard AVD setup on
 # GitHub's Linux runners). macOS runners boot AVDs faster but cost 10x
@@ -33,16 +34,6 @@ on:
       - 'firebase.json'
       - '.github/workflows/android-integration.yml'
       - '.github/actions/setup-android/**'
-  # Trigger on every PR lifecycle event — not just `labeled` — so the
-  # `connected-tests` required status always has a chance to post.
-  # Without `opened`/`reopened`, a PR that never gets the `ci:integration`
-  # label would have the workflow never run on the initial open, and
-  # branch protection would block merge forever waiting on the status.
-  # Unlabeled PRs still skip the real work via the job-level `if:` below;
-  # GitHub reports skipped required checks as success (Oct 2022+).
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-  merge_group:
 
 concurrency:
   group: android-integration-${{ github.ref }}
