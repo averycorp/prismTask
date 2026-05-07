@@ -19,6 +19,7 @@ import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.MorningCheckInPreferences
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.WorkLifeBalancePrefs
 import com.averycorp.prismtask.data.repository.HabitRepository
@@ -90,7 +91,8 @@ constructor(
     private val selfCareRepository: SelfCareRepository,
     private val schoolworkRepository: SchoolworkRepository,
     private val leisureRepository: LeisureRepository,
-    private val localDateFlow: LocalDateFlow
+    private val localDateFlow: LocalDateFlow,
+    private val tourCardPreferences: TourCardPreferences
 ) : ViewModel() {
     /**
      * True when the morning check-in banner should render on the Today
@@ -137,6 +139,49 @@ constructor(
     /** Called by the UI after the completion chip animation is done. */
     fun clearCompletionChip() {
         _showCompletionChip.value = false
+    }
+
+    /**
+     * Post-onboarding Guided Tour state. Visible only for users who
+     * finished onboarding via SetupPage (eligibility flag flips in
+     * `OnboardingViewModel.completeOnboarding`); the existing-user skip
+     * path and RestorePending bypass deliberately leave eligibility
+     * false so returning users never see the card. See
+     * [TourCardPreferences].
+     */
+    val tourCardState: StateFlow<TourCardUiState?> = combine(
+        tourCardPreferences.eligible(),
+        tourCardPreferences.dismissed(),
+        tourCardPreferences.stepIndex()
+    ) { eligible, dismissed, step ->
+        if (!eligible || dismissed) null
+        else TourCardUiState(stepIndex = step.coerceAtLeast(0))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun advanceTourCard(totalSteps: Int) {
+        viewModelScope.launch {
+            try {
+                val current = tourCardPreferences.stepIndex().first()
+                val next = current + 1
+                if (next >= totalSteps) {
+                    tourCardPreferences.markDismissed()
+                } else {
+                    tourCardPreferences.setStepIndex(next)
+                }
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to advance tour card", e)
+            }
+        }
+    }
+
+    fun dismissTourCard() {
+        viewModelScope.launch {
+            try {
+                tourCardPreferences.markDismissed()
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to dismiss tour card", e)
+            }
+        }
     }
 
     init {
@@ -1167,3 +1212,10 @@ constructor(
         }
     }
 }
+
+/**
+ * Lightweight UI state for the post-onboarding Guided Tour card.
+ * Only emitted while the user is eligible AND the card is not dismissed;
+ * the screen renders nothing when [TodayViewModel.tourCardState] is null.
+ */
+data class TourCardUiState(val stepIndex: Int)

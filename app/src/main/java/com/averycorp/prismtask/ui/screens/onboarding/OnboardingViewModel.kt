@@ -12,6 +12,7 @@ import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.OnboardingPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.ThemePreferences
+import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.remote.AuthManager
@@ -53,7 +54,8 @@ constructor(
     private val a11yPreferences: A11yPreferences,
     private val notificationPreferences: NotificationPreferences,
     private val voicePreferences: VoicePreferences,
-    private val logger: PrismSyncLogger
+    private val logger: PrismSyncLogger,
+    private val tourCardPreferences: TourCardPreferences
 ) : ViewModel() {
     val hasCompletedOnboarding: StateFlow<Boolean> = onboardingPreferences
         .hasCompletedOnboarding()
@@ -404,6 +406,17 @@ constructor(
                 } catch (e: Exception) {
                     logger.error(operation = "onboarding.canonical_written", throwable = e)
                 }
+            }
+            // Mark the user eligible for the post-onboarding Guided Tour
+            // card on Today. Deliberately set ONLY here (not in
+            // [checkExistingUserAndMaybeSkip]) so returning users with
+            // prior cloud data never see the tour. See
+            // [TourCardPreferences] KDoc.
+            try {
+                tourCardPreferences.markEligible()
+                logger.info(operation = "onboarding.tour_card_eligible", status = "success")
+            } catch (e: Exception) {
+                logger.error(operation = "onboarding.tour_card_eligible", throwable = e)
             }
             // Template selections are non-critical — if viewModelScope is
             // cancelled here the user sees default prefs, not an onboarding loop.
