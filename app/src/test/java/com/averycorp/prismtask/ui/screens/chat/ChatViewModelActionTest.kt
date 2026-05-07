@@ -6,11 +6,11 @@ import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
+import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
-import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.TagRepository
@@ -287,7 +287,12 @@ class ChatViewModelActionTest {
             TagEntity(id = 11L, name = "work", color = "#000000")
         coEvery { tagRepository.getTagByNameOnce("planning") } returns null
         coEvery { tagRepository.addTag("planning") } returns 12L
-        coEvery { taskRepository.addTask(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns 99L
+        coEvery {
+            taskRepository.addTask(
+                any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any()
+            )
+        } returns 99L
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -329,7 +334,12 @@ class ChatViewModelActionTest {
     @Test
     fun create_task_silently_drops_unknown_project_name() = runTest(dispatcher) {
         coEvery { projectDao.getProjectByNameOnce(any()) } returns null
-        coEvery { taskRepository.addTask(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns 50L
+        coEvery {
+            taskRepository.addTask(
+                any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any()
+            )
+        } returns 50L
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -374,7 +384,8 @@ class ChatViewModelActionTest {
         advanceUntilIdle()
 
         viewModel.sendMessage("hello")
-        viewModel.sendMessage("hello")  // second tap — must be silently dropped
+        // second tap — must be silently dropped
+        viewModel.sendMessage("hello")
         advanceUntilIdle()
 
         gate.complete(Unit)

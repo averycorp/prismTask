@@ -163,8 +163,11 @@ constructor(
         tourCardPreferences.dismissed(),
         tourCardPreferences.stepIndex()
     ) { eligible, dismissed, step ->
-        if (!eligible || dismissed) null
-        else TourCardUiState(stepIndex = step.coerceAtLeast(0))
+        if (!eligible || dismissed) {
+            null
+        } else {
+            TourCardUiState(stepIndex = step.coerceAtLeast(0))
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun advanceTourCard(totalSteps: Int) {
