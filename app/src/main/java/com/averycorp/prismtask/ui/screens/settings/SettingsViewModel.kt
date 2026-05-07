@@ -32,6 +32,7 @@ import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.TemplatePreferences
 import com.averycorp.prismtask.data.preferences.ThemePreferences
 import com.averycorp.prismtask.data.preferences.TimerPreferences
+import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UrgencyWeights
 import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.remote.AccountDeletionService
@@ -106,7 +107,8 @@ constructor(
     private val notificationWorkerScheduler: com.averycorp.prismtask.notifications.NotificationWorkerScheduler,
     private val templateSeeder: com.averycorp.prismtask.data.seed.TemplateSeeder,
     private val selfCareRepository: com.averycorp.prismtask.data.repository.SelfCareRepository,
-    private val accountDeletionService: AccountDeletionService
+    private val accountDeletionService: AccountDeletionService,
+    private val tourCardPreferences: TourCardPreferences
 ) : ViewModel() {
     private val _checkInStreak = kotlinx.coroutines.flow.MutableStateFlow(0)
     val checkInStreak: StateFlow<Int> = _checkInStreak
@@ -1495,6 +1497,7 @@ constructor(
                 }
                 if (options.restartOnboarding) {
                     onboardingPreferences.resetOnboarding()
+                    tourCardPreferences.resetTourCard()
                 }
                 _messages.emit("App data has been reset")
                 onDone(options.restartOnboarding)
@@ -1547,6 +1550,12 @@ constructor(
         viewModelScope.launch {
             try {
                 onboardingPreferences.resetOnboarding()
+                // Also wipe the post-onboarding Guided Tour state so the
+                // card re-runs alongside the replayed tutorial. Without
+                // this, a debug reset replays onboarding but skips the
+                // tour because `tour_card_dismissed` was already set
+                // from the prior session.
+                tourCardPreferences.resetTourCard()
                 _messages.emit("Tutorial Reset — Showing Now")
                 onDone()
             } catch (e: Exception) {

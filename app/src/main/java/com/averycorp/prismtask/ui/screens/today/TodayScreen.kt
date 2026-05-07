@@ -76,6 +76,8 @@ import com.averycorp.prismtask.ui.screens.today.components.CollapsibleSection
 import com.averycorp.prismtask.ui.screens.today.components.CompactProgressHeader
 import com.averycorp.prismtask.ui.screens.today.components.CompletedTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.FloatingQuickAddBar
+import com.averycorp.prismtask.ui.screens.today.components.GUIDED_TOUR_STEPS
+import com.averycorp.prismtask.ui.screens.today.components.GuidedTourCard
 import com.averycorp.prismtask.ui.screens.today.components.HabitChipRow
 import com.averycorp.prismtask.ui.screens.today.components.MorningCheckInBanner
 import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
@@ -145,6 +147,7 @@ fun TodayScreen(
     val showCheckInCompleteChip by viewModel.showCompletionChip.collectAsStateWithLifecycle()
     val currentNudge by viewModel.currentNudge.collectAsStateWithLifecycle()
     val dailyEssentials by viewModel.dailyEssentials.collectAsStateWithLifecycle()
+    val tourCardState by viewModel.tourCardState.collectAsStateWithLifecycle()
     var overloadBannerDismissed by remember { mutableStateOf(false) }
 
     // A2 NLP batch ops — listens to BatchUndoEventBus so we can offer
@@ -430,6 +433,24 @@ fun TodayScreen(
                                 workPct = workPctNow,
                                 targetPct = workLifeBalancePrefs.workTarget,
                                 onDismiss = { overloadBannerDismissed = true }
+                            )
+                        }
+                    }
+
+                    // Post-onboarding Guided Tour card. Visible only when
+                    // tourCardState is non-null (eligible AND not yet
+                    // dismissed). Sits below status banners (check-in,
+                    // overload) but above task sections so it surfaces
+                    // breadth without subordinating daily signals.
+                    tourCardState?.let { state ->
+                        val safeIndex = state.stepIndex.coerceIn(0, GUIDED_TOUR_STEPS.size - 1)
+                        item(key = "guided_tour_card") {
+                            GuidedTourCard(
+                                step = GUIDED_TOUR_STEPS[safeIndex],
+                                stepNumber = safeIndex + 1,
+                                totalSteps = GUIDED_TOUR_STEPS.size,
+                                onAdvance = { viewModel.advanceTourCard(GUIDED_TOUR_STEPS.size) },
+                                onDismiss = { viewModel.dismissTourCard() }
                             )
                         }
                     }
