@@ -14,7 +14,6 @@ import com.averycorp.prismtask.ui.screens.automation.library.AutomationTemplateL
 import com.averycorp.prismtask.ui.screens.settings.AccessibilityScreen
 import com.averycorp.prismtask.ui.screens.settings.AccountSyncScreen
 import com.averycorp.prismtask.ui.screens.settings.AdvancedTuningScreen
-import com.averycorp.prismtask.ui.screens.settings.AiFeaturesScreen
 import com.averycorp.prismtask.ui.screens.settings.AppearanceScreen
 import com.averycorp.prismtask.ui.screens.settings.BetaCodeRedemptionScreen
 import com.averycorp.prismtask.ui.screens.settings.BrainModeScreen
@@ -46,7 +45,6 @@ internal fun NavGraphBuilder.settingsSubScreenRoutes(navController: NavHostContr
         "settings/habits_streaks" to { HabitsStreaksScreen(navController) },
         "settings/life_modes" to { LifeModesScreen(navController) },
         "settings/focus_timer" to { FocusTimerScreen(navController) },
-        "settings/ai_features" to { AiFeaturesScreen(navController) },
         "settings/brain_mode" to { BrainModeScreen(navController) },
         "settings/wellbeing" to { WellbeingScreen(navController) },
         "settings/calendar" to { CalendarScreen(navController) },

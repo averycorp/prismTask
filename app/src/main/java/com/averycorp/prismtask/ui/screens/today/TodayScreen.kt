@@ -82,6 +82,7 @@ import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
 import com.averycorp.prismtask.ui.screens.today.components.PlanForTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.ProductivityScoreBadge
 import com.averycorp.prismtask.ui.screens.today.components.SelfCareNudgeCard
+import com.averycorp.prismtask.ui.screens.today.ai.TodayAiHubSheet
 import com.averycorp.prismtask.ui.screens.today.components.SwipeableTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.TodayBalanceSection
 import com.averycorp.prismtask.ui.screens.today.components.TodayCognitiveLoadSection
@@ -200,6 +201,7 @@ fun TodayScreen(
 
     var editorSheetTaskId by remember { mutableStateOf<Long?>(null) }
     var showEditorSheet by remember { mutableStateOf(false) }
+    var showAiHub by remember { mutableStateOf(false) }
     var reschedulePopupTask by remember { mutableStateOf<TaskEntity?>(null) }
     var moveToProjectSheetTask by remember { mutableStateOf<TaskEntity?>(null) }
     var cascadeConfirmState by remember { mutableStateOf<Pair<TaskEntity, Long?>?>(null) }
@@ -499,6 +501,15 @@ fun TodayScreen(
                                 label = { Text("Review") },
                                 leadingIcon = {
                                     Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                                colors = chipColors,
+                                border = chipBorder
+                            )
+                            AssistChip(
+                                onClick = { showAiHub = true },
+                                label = { Text("AI Tools") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
                                 colors = chipColors,
                                 border = chipBorder
@@ -856,6 +867,13 @@ fun TodayScreen(
                 showEditorSheet = false
                 navController.navigate(PrismTaskRoute.TemplateList.route)
             }
+        )
+    }
+
+    if (showAiHub) {
+        TodayAiHubSheet(
+            navController = navController,
+            onDismiss = { showAiHub = false }
         )
     }
 
