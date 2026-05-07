@@ -176,6 +176,83 @@ Respond ONLY with valid JSON (no markdown, no prose):
     raise ValueError(f"Failed to parse AI response: {last_error}")
 
 
+def classify_life_category_text(
+    title: str,
+    description: str | None,
+    tier: str = "FREE",
+) -> dict:
+    """Classify a single task into a Work-Life Balance life category.
+
+    Returns ``{"category": "WORK|PERSONAL|SELF_CARE|HEALTH|UNCATEGORIZED", "reason": "..."}``.
+    Raises ``ValueError`` on malformed AI response, ``RuntimeError`` when the
+    Anthropic client is unavailable — mirrors ``classify_eisenhower_text``.
+
+    The local on-device ``LifeCategoryClassifier`` keyword fallback is what
+    runs synchronously at save time; this endpoint is the AI upgrade
+    invoked from the OrganizeTab "Auto" button. Returning UNCATEGORIZED is
+    legal — the prompt biases toward a real category but never invents
+    one when the title/description genuinely doesn't fit any bucket.
+    """
+    client = _get_client()
+    model = get_model("eisenhower")  # same Haiku tier as other text-classify endpoints
+    task_summary = {
+        "title": title,
+        "description": description or "",
+    }
+    prompt = f"""You are a productivity assistant. Categorize ONE task into a Work-Life Balance life category.
+
+Categories:
+- WORK: paid work, professional output (meetings, deadlines, reports, code, client work, work email).
+- PERSONAL: errands, household, finances, relationships, admin (groceries, bills, calling family, scheduling).
+- SELF_CARE: rest, hobbies, growth, leisure, mindfulness (reading, journaling, hobby, hike, music, nap).
+- HEALTH: medical and physical health (medication, doctor, dentist, therapy, exercise, prescription, symptoms).
+- UNCATEGORIZED: only when the task genuinely fits none of the above. Prefer a real category when there's a defensible signal.
+
+Rules:
+- Pick the single best category. If two could fit (e.g. "morning run with coworker"), choose the one that captures the dominant intent (HEALTH for the run; WORK if the framing is networking).
+- Exercise and physical movement → HEALTH (not SELF_CARE) — keeps Self-Care for restorative / mental-recharge activity.
+- Therapy, counseling, mental-health appointments → HEALTH.
+- Reading, journaling, hobbies, music, downtime → SELF_CARE.
+- Childcare logistics (school pickup, kids' appointments) → PERSONAL.
+- When ambiguous and no real signal, return UNCATEGORIZED with a brief reason.
+
+Task:
+{json.dumps(task_summary, default=str, indent=2)}
+
+Respond ONLY with valid JSON (no markdown, no prose):
+{{"category": "WORK", "reason": "brief reason"}}"""
+
+    last_error = None
+    for attempt in range(2):
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=256,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = message.content[0].text
+            result = _parse_ai_json(content)
+            if not isinstance(result, dict):
+                raise ValueError("Expected a JSON object")
+            category = result.get("category")
+            if category not in {"WORK", "PERSONAL", "SELF_CARE", "HEALTH", "UNCATEGORIZED"}:
+                raise ValueError(f"Invalid category: {category!r}")
+            return {
+                "category": category,
+                "reason": str(result.get("reason", ""))[:500],
+            }
+        except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
+            last_error = e
+            logger.error(f"Failed to parse life-category text-classify response (attempt {attempt + 1}): {e}")
+            if attempt == 0:
+                continue
+            raise ValueError(f"Failed to parse AI response after retry: {e}") from e
+        except Exception as e:
+            logger.error(f"Life-category text-classify AI error: {type(e).__name__}: {e}")
+            raise
+    raise ValueError(f"Failed to parse AI response: {last_error}")
+
+
 def classify_cognitive_load_text(
     title: str,
     description: str | None,

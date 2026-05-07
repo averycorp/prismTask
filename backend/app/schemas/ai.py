@@ -67,6 +67,25 @@ class CognitiveLoadClassifyTextResponse(BaseModel):
     reason: str
 
 
+class LifeCategoryClassifyTextRequest(BaseModel):
+    """Single-task text-based Work-Life Balance category classification.
+
+    Accepts raw task fields so the client can classify from the OrganizeTab
+    "Auto" button without first persisting the task. Mirrors the on-device
+    ``LifeCategoryClassifier.classify(title, description)`` shape — the AI
+    path is the optional, AI-Features-gated upgrade over the keyword
+    classifier.
+    """
+
+    title: str = Field(min_length=1, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=4000)
+
+
+class LifeCategoryClassifyTextResponse(BaseModel):
+    category: str  # "WORK" | "PERSONAL" | "SELF_CARE" | "HEALTH" | "UNCATEGORIZED"
+    reason: str
+
+
 # --- Pomodoro ---
 
 

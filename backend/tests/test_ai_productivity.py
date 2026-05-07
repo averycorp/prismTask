@@ -106,6 +106,75 @@ class TestEisenhowerService:
             assert mock_client.messages.create.call_count == 2
 
 
+class TestLifeCategoryClassifyText:
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_classify_life_category_text_success(self):
+        from app.services.ai_productivity import classify_life_category_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response({
+                "category": "HEALTH",
+                "reason": "Doctor appointment",
+            })
+
+            result = classify_life_category_text(
+                title="Doctor appointment",
+                description=None,
+            )
+
+            assert result["category"] == "HEALTH"
+            assert result["reason"] == "Doctor appointment"
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_classify_life_category_text_invalid_category_retries(self):
+        from app.services.ai_productivity import classify_life_category_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+
+            bad_response = _make_mock_response({"category": "FAMILY", "reason": "x"})
+            good_response = _make_mock_response({"category": "PERSONAL", "reason": "Errand"})
+            mock_client.messages.create.side_effect = [bad_response, good_response]
+
+            result = classify_life_category_text(title="Pick up dry cleaning", description=None)
+            assert result["category"] == "PERSONAL"
+            assert mock_client.messages.create.call_count == 2
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_classify_life_category_text_both_fail_raises(self):
+        from app.services.ai_productivity import classify_life_category_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            bad_response = MagicMock()
+            bad_content = MagicMock()
+            bad_content.text = "{{invalid}}"
+            bad_response.content = [bad_content]
+            mock_client.messages.create.return_value = bad_response
+
+            with pytest.raises(ValueError, match="Failed to parse AI response"):
+                classify_life_category_text(title="Foo", description=None)
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_classify_life_category_text_uncategorized_is_legal(self):
+        from app.services.ai_productivity import classify_life_category_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response({
+                "category": "UNCATEGORIZED",
+                "reason": "Title gives no signal",
+            })
+
+            result = classify_life_category_text(title="xyz", description=None)
+            assert result["category"] == "UNCATEGORIZED"
+
+
 class TestPomodoroService:
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
     def test_plan_pomodoro_success(self):

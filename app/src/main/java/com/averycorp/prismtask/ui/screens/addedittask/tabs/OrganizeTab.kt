@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -148,7 +149,8 @@ internal fun OrganizeTabContent(
     LifeCategorySelector(
         selected = viewModel.lifeCategory,
         onSelect = { viewModel.onLifeCategoryChange(it) },
-        onAuto = { viewModel.autoPickLifeCategory(force = true) }
+        onAuto = { viewModel.autoPickLifeCategory(force = true) },
+        autoLoading = viewModel.lifeCategoryAutoPickInFlight
     )
 
     // ---- Task Mode section (Work / Play / Relax — see docs/WORK_PLAY_RELAX.md) ----
@@ -817,14 +819,15 @@ internal fun ParentTaskIndicator(
 internal fun LifeCategorySelector(
     selected: LifeCategory?,
     onSelect: (LifeCategory?) -> Unit,
-    onAuto: () -> Unit
+    onAuto: () -> Unit,
+    autoLoading: Boolean = false
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        AutoPickButton(onClick = onAuto)
+        AutoPickButton(onClick = onAuto, loading = autoLoading)
         LifeCategoryChip(
             label = LifeCategory.label(LifeCategory.WORK),
             color = LifeCategoryColor.WORK,
@@ -932,9 +935,13 @@ internal fun CognitiveLoadSelector(
  * "Auto" button rendered alongside the classifier-backed chips. Tapping it
  * forces a re-pick (clears any prior manual selection and re-runs the
  * keyword classifier on the current title + description).
+ *
+ * When [loading] is true (a Claude-backed classification is in flight),
+ * the icon swaps to a small spinner so the user can tell that an AI call
+ * is happening on top of the instant local pick.
  */
 @Composable
-private fun AutoPickButton(onClick: () -> Unit) {
+private fun AutoPickButton(onClick: () -> Unit, loading: Boolean = false) {
     val color = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
@@ -945,17 +952,25 @@ private fun AutoPickButton(onClick: () -> Unit) {
                 color = color,
                 shape = RoundedCornerShape(16.dp)
             )
-            .clickable(onClick = onClick)
+            .clickable(enabled = !loading, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Icon(
-            imageVector = Icons.Filled.AutoFixHigh,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(16.dp)
-        )
+        if (loading) {
+            CircularProgressIndicator(
+                color = color,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(16.dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.AutoFixHigh,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(16.dp)
+            )
+        }
         Text(
             text = "Auto",
             style = MaterialTheme.typography.labelLarge,

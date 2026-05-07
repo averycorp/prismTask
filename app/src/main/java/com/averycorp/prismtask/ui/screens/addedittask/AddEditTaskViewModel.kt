@@ -20,6 +20,7 @@ import com.averycorp.prismtask.data.local.entity.TaskDependencyEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.remote.LifeCategoryRemoteClassifier
 import com.averycorp.prismtask.data.repository.AttachmentRepository
 import com.averycorp.prismtask.data.repository.BoundaryRuleRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
@@ -88,6 +89,7 @@ constructor(
     private val parser: NaturalLanguageParser,
     private val parsedTaskResolver: ParsedTaskResolver,
     private val proFeatureGate: ProFeatureGate,
+    private val lifeCategoryRemoteClassifier: LifeCategoryRemoteClassifier,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val boundaryEnforcer = BoundaryEnforcer()
@@ -170,6 +172,18 @@ constructor(
      * "Auto" button forces it back to `false` and re-runs the classifier.
      */
     var lifeCategoryManuallySet by mutableStateOf(false)
+        private set
+
+    /**
+     * True while a Claude-backed life-category classification is in flight
+     * for the current Auto-press. The OrganizeTab swaps the Auto button's
+     * icon for a small spinner while this is set so the user can tell that
+     * a remote call is happening behind the local instant pick. Only the
+     * `force = true` Auto-button path sets this — the implicit
+     * title/description-change auto-press stays local-only to avoid
+     * bursting the AI rate limit on every keystroke.
+     */
+    var lifeCategoryAutoPickInFlight by mutableStateOf(false)
         private set
 
     /**
@@ -665,6 +679,47 @@ constructor(
                 .classify(title, description.ifBlank { null })
         }
         lifeCategory = guess.takeIf { it != LifeCategory.UNCATEGORIZED }
+        if (force) {
+            tryUpgradeLifeCategoryWithClaude()
+        }
+    }
+
+    /**
+     * Fire-and-forget Claude-backed life-category classification. The local
+     * keyword pick has already been written to [lifeCategory] for instant
+     * feedback; this method runs the remote classifier and overwrites the
+     * chip iff (a) AI features are enabled, (b) the remote returns a real
+     * category, and (c) the user has not manually picked in the meantime.
+     *
+     * On any failure (AI features off, no auth, network, 429, 451, 5xx,
+     * malformed response) the local pick stays — never blanks a successful
+     * local chip.
+     */
+    private fun tryUpgradeLifeCategoryWithClaude() {
+        if (title.isBlank()) return
+        val titleSnapshot = title
+        val descriptionSnapshot = description
+        viewModelScope.launch {
+            val aiPrefs = userPreferencesDataStore.aiFeaturePrefsFlow.firstOrNull()
+            if (aiPrefs?.enabled != true) return@launch
+            lifeCategoryAutoPickInFlight = true
+            try {
+                val result = lifeCategoryRemoteClassifier.classify(
+                    titleSnapshot,
+                    descriptionSnapshot.ifBlank { null }
+                )
+                val classification = result.getOrNull() ?: return@launch
+                if (lifeCategoryManuallySet) return@launch
+                if (title != titleSnapshot || description != descriptionSnapshot) return@launch
+                if (classification.category == LifeCategory.UNCATEGORIZED) {
+                    lifeCategory = null
+                } else {
+                    lifeCategory = classification.category
+                }
+            } finally {
+                lifeCategoryAutoPickInFlight = false
+            }
+        }
     }
 
     /** Auto-press the Task Mode chip — see [autoPickLifeCategory]. */
