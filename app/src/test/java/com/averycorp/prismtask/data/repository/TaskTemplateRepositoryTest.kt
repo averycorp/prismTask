@@ -712,6 +712,8 @@ class TaskTemplateRepositoryTest {
 
         override suspend fun getTagByIdOnce(id: Long): TagEntity? = unsupported()
 
+        override suspend fun getTagByNameOnce(name: String): TagEntity? = unsupported()
+
         override suspend fun insert(tag: TagEntity): Long = unsupported()
 
         override suspend fun update(tag: TagEntity) = unsupported()
