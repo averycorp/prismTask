@@ -43,6 +43,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -99,7 +100,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val TOTAL_PAGES = 15
+private const val TOTAL_PAGES = 17
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 
 @Composable
@@ -129,17 +130,19 @@ fun OnboardingScreen(
                 0 -> WelcomePage(viewModel = viewModel)
                 1 -> ThemePickerPage()
                 2 -> SmartTasksPage()
-                3 -> NaturalLanguagePage()
-                4 -> HabitsPage(viewModel = viewModel)
-                5 -> LifeModesPage(viewModel = viewModel)
-                6 -> TemplatesPage(viewModel = viewModel)
-                7 -> ViewsPage()
-                8 -> BrainModePage(viewModel = viewModel)
-                9 -> AccessibilityPage(viewModel = viewModel)
-                10 -> PrivacyPage(viewModel = viewModel)
-                11 -> NotificationsPage(viewModel = viewModel)
-                12 -> DaySetupPage(viewModel = viewModel)
-                13 -> ConnectIntegrationsPage()
+                3 -> ProjectsPage()
+                4 -> NaturalLanguagePage()
+                5 -> HabitsPage(viewModel = viewModel)
+                6 -> LifeModesPage(viewModel = viewModel)
+                7 -> TemplatesPage(viewModel = viewModel)
+                8 -> ViewsPage()
+                9 -> BrainModePage(viewModel = viewModel)
+                10 -> AccessibilityPage(viewModel = viewModel)
+                11 -> AiOverviewPage()
+                12 -> PrivacyPage(viewModel = viewModel)
+                13 -> NotificationsPage(viewModel = viewModel)
+                14 -> DaySetupPage(viewModel = viewModel)
+                15 -> ConnectIntegrationsPage()
                 LAST_PAGE_INDEX -> SetupPage(
                     viewModel = viewModel,
                     onComplete = {
@@ -429,6 +432,66 @@ private fun SmartTasksPage() {
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(task, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectsPage() {
+    var animStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { animStarted = true }
+
+    val projects = listOf(
+        Triple("🎯", "Launch v2", 0.7f),
+        Triple("🏠", "Move apartments", 0.35f),
+        Triple("📚", "Read 12 books", 0.5f)
+    )
+
+    OnboardingPageLayout(
+        emoji = "📁",
+        headline = "Group with Projects",
+        body = "Bundle related tasks into a project, set milestones, and track a forgiveness-friendly streak as you make progress."
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            projects.forEachIndexed { index, (icon, name, progress) ->
+                AnimatedVisibility(
+                    visible = animStarted,
+                    enter = fadeIn(tween(300, delayMillis = index * 150)) +
+                        slideInVertically(tween(300, delayMillis = index * 150)) { it }
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(icon, fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(name, style = MaterialTheme.typography.bodyLarge)
+                                Spacer(modifier = Modifier.weight(1f))
+                                Text(
+                                    text = "${(progress * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(CircleShape)
+                            )
                         }
                     }
                 }
@@ -1410,6 +1473,104 @@ private fun <T> collectAsLocalState(
 // encounters them in-app. Microphone permission is intentionally NOT
 // requested here — it stays gated to first voice-input use so the system
 // dialog only fires when the user is actually trying to use voice.
+
+@Composable
+private fun AiOverviewPage() {
+    var animStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { animStarted = true }
+
+    data class AiBucket(
+        val emoji: String,
+        val title: String,
+        val description: String,
+        val tier: String
+    )
+
+    val buckets = listOf(
+        AiBucket(
+            emoji = "✍️",
+            title = "Capture",
+            description = "Type or speak naturally — NLP parses dates, tags, projects, and priority. Smart suggestions and defaults learn from your history.",
+            tier = "Free"
+        ),
+        AiBucket(
+            emoji = "🗂️",
+            title = "Plan",
+            description = "Eisenhower auto-classify, daily briefing, and smart Pomodoro coaching pick up where you left off.",
+            tier = "Pro"
+        ),
+        AiBucket(
+            emoji = "🪞",
+            title = "Reflect",
+            description = "Mood + energy correlation, burnout scoring, and weekly review aggregator surface patterns over time.",
+            tier = "Free"
+        ),
+        AiBucket(
+            emoji = "🛡️",
+            title = "Protect",
+            description = "Life-category auto-classify and notification profile auto-switching dial back when you're trending toward overload.",
+            tier = "Free"
+        )
+    )
+
+    OnboardingPageLayout(
+        emoji = "🤖",
+        headline = "AI That Helps, Not Hovers",
+        body = "PrismTask's AI runs across four areas. You can disable any of it on the next step."
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 24.dp)
+        ) {
+            buckets.forEachIndexed { index, bucket ->
+                AnimatedVisibility(
+                    visible = animStarted,
+                    enter = fadeIn(tween(300, delayMillis = index * 120)) +
+                        slideInVertically(tween(300, delayMillis = index * 120)) { it }
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(bucket.emoji, fontSize = 22.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = bucket.title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    ChipLabel(
+                                        text = bucket.tier,
+                                        color = if (bucket.tier == "Pro") {
+                                            MaterialTheme.colorScheme.tertiary
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = bucket.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun PrivacyPage(viewModel: OnboardingViewModel) {
