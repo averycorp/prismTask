@@ -21,8 +21,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
 /**
- * Email/password sign-up + sign-in form. Collapsed by default behind a
- * "Use Email Instead" toggle so the Google button stays the primary CTA.
+ * Email/password sign-up + sign-in form. Visible by default — peer to the
+ * Google sign-in button rather than hidden behind a toggle, so users
+ * without a Google account see the option without first interacting with
+ * the Google CTA.
  *
  * Email format is validated client-side via [Patterns.EMAIL_ADDRESS]; the
  * password 6-char minimum is enforced by Firebase server-side and surfaced
@@ -35,20 +37,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun EmailAuthSection(
     onSignUp: (email: String, password: String) -> Unit,
-    onSignIn: (email: String, password: String) -> Unit,
-    expandLabel: String = "Use Email Instead"
+    onSignIn: (email: String, password: String) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
     var registerMode by remember { mutableStateOf(true) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-
-    if (!expanded) {
-        TextButton(onClick = { expanded = true }) {
-            Text(expandLabel)
-        }
-        return
-    }
 
     val emailValid = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     val passwordValid = password.length >= 6

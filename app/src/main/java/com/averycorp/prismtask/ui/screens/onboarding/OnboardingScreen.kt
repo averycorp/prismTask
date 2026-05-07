@@ -372,8 +372,7 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                         }
                         EmailAuthSection(
                             onSignUp = viewModel::onEmailSignUp,
-                            onSignIn = viewModel::onEmailSignIn,
-                            expandLabel = "Sign Up With Email"
+                            onSignIn = viewModel::onEmailSignIn
                         )
                         if (state is SignInState.Error) {
                             Text(
