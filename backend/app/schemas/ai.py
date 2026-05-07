@@ -526,6 +526,12 @@ class ChatActionPayload(BaseModel):
     title: Optional[str] = Field(default=None, max_length=500)
     due: Optional[str] = None
     priority: Optional[str] = Field(default=None, pattern="^(low|medium|high|urgent)$")
+    # B.3 (F8 follow-on): allow ``create_task`` to carry richer fields the
+    # AI extracts from the user's message. Recurrence intentionally NOT
+    # plumbed yet (RecurrenceRule JSON is non-trivial; deferred to F9).
+    description: Optional[str] = Field(default=None, max_length=4000)
+    tags: Optional[list[str]] = Field(default=None, max_length=10)
+    project: Optional[str] = Field(default=None, max_length=200)
 
 
 class ChatTokensUsed(BaseModel):

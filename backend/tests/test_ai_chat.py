@@ -241,6 +241,51 @@ class TestChatEndpoint:
             assert "send_email" not in types
 
     @pytest.mark.asyncio
+    async def test_endpoint_passes_through_rich_create_task_fields(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        """B.3 (F8 follow-on): the create_task action now carries optional
+        description / tags / project the AI extracts from the user's
+        message. The router must accept and pass these through unchanged
+        so the Android client can plumb them onto TaskRepository.addTask."""
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            mock_gen.return_value = {
+                "message": "Got it — I added that.",
+                "actions": [
+                    {
+                        "type": "create_task",
+                        "title": "Draft Q2 OKR doc",
+                        "due": "tomorrow",
+                        "priority": "high",
+                        "description": "Cover team goals + risk register",
+                        "tags": ["work", "planning"],
+                        "project": "Q2 Planning",
+                    },
+                ],
+                "tokens_used": {"input": 1, "output": 1},
+            }
+
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={
+                    "message": "Add a draft Q2 OKR doc to my Q2 Planning project for tomorrow, high priority, tag it work and planning, description: cover team goals + risk register",
+                    "conversation_id": "chat_x",
+                },
+                headers=pro_auth_headers,
+            )
+            assert resp.status_code == 200, resp.text
+            action = resp.json()["actions"][0]
+            assert action["type"] == "create_task"
+            assert action["title"] == "Draft Q2 OKR doc"
+            assert action["description"] == "Cover team goals + risk register"
+            assert action["tags"] == ["work", "planning"]
+            assert action["project"] == "Q2 Planning"
+
+    @pytest.mark.asyncio
     async def test_endpoint_503_when_anthropic_unavailable(
         self, client: AsyncClient, pro_auth_headers: dict
     ):
