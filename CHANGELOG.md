@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- **Morning check-in banner now respects Start-of-Day end-to-end.** The
+  Today-screen banner previously gated visibility on a hardcoded
+  `Calendar.HOUR_OF_DAY < 11` check that ignored the user's configured
+  SoD on both ends: it appeared in the dead-zone between calendar
+  midnight and SoD (the same window where the rest of the Today screen
+  correctly shows "yesterday"), and it ignored the
+  `MorningCheckInPromptCutoff` slider in Settings → Advanced Tuning.
+  Replaced with `MorningCheckInBannerDecider`, a pure-function helper
+  that anchors the visible window on `[todayStart, todayStart + (cutoff
+  - SoD))` with proper wrap-around handling for night-owl SoD values.
+  Banner dismissal now records the SoD-aware logical date instead of
+  `LocalDate.now()`, fixing a self-healing bug where a dismissal made
+  before SoD bounced back until the boundary crossed. Audit:
+  `docs/audits/MORNING_CHECKIN_SOD_BOUNDARY_AUDIT.md`.
+
 ### Privacy
 
 - **Closed Gmail integration AI-features opt-out gap.** Toggling Settings →

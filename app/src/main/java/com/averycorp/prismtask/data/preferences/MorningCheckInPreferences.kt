@@ -54,10 +54,18 @@ constructor(
         return prefs[BANNER_DISMISSED_DATE_KEY] == todayString()
     }
 
-    /** Records today's dismissal so the banner stays hidden until tomorrow. */
-    suspend fun dismissBannerToday() {
+    /**
+     * Records today's dismissal so the banner stays hidden until tomorrow.
+     * Callers that know the user's logical (SoD-aware) date should pass it
+     * in as [logicalDateIso] so the dismissal stays consistent with the
+     * reader-side comparison. Defaults to the wall-clock date for callers
+     * with no SoD context.
+     *
+     * See `docs/audits/MORNING_CHECKIN_SOD_BOUNDARY_AUDIT.md` § 3.
+     */
+    suspend fun dismissBannerToday(logicalDateIso: String = todayString()) {
         context.morningCheckInDataStore.edit { prefs ->
-            prefs[BANNER_DISMISSED_DATE_KEY] = todayString()
+            prefs[BANNER_DISMISSED_DATE_KEY] = logicalDateIso
         }
     }
 
