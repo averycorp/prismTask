@@ -533,6 +533,35 @@ class ChatTokensUsed(BaseModel):
     output: int = Field(ge=0)
 
 
+class ChatHistoryEntry(BaseModel):
+    """One prior turn forwarded by the client so the AI has multi-turn memory.
+
+    The backend is stateless — it does not store conversation history. The
+    Android client owns the rolling window (last N=6 user/assistant pairs)
+    and re-sends it on every turn. Empty history is fine on the first turn.
+    """
+
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class ChatTaskContext(BaseModel):
+    """Snapshot of the task the user is talking about, sent by the client
+    when chat is opened from a specific task.
+
+    Sent alongside ``task_context_id`` so the AI has the actual title /
+    description / due date to ground its reply, instead of a bare opaque
+    integer it cannot dereference.
+    """
+
+    title: str = Field(min_length=1, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    due_date: Optional[str] = Field(default=None, max_length=64)
+    priority: Optional[int] = Field(default=None, ge=0, le=4)
+    project_name: Optional[str] = Field(default=None, max_length=200)
+    is_completed: Optional[bool] = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     conversation_id: str = Field(min_length=1, max_length=128)
@@ -540,9 +569,20 @@ class ChatRequest(BaseModel):
     # it as opaque: it can't dereference the local row, but the AI can
     # echo it back inside actions so the client knows which task to act on.
     task_context_id: Optional[int] = None
+    # When ``task_context_id`` is set, the client also sends a snapshot of
+    # the task fields so the AI can reason about the task. Optional because
+    # the chat surface also opens from a generic entry-point with no task.
+    task_context: Optional[ChatTaskContext] = None
+    # Rolling conversation history (last N=6 user/assistant pairs from the
+    # client). The backend forwards these as proper Anthropic ``messages``
+    # entries so the model has multi-turn memory. Capped at 12 entries to
+    # bound input tokens; the client owns trimming.
+    history: list[ChatHistoryEntry] = Field(default_factory=list, max_length=12)
     # Forwarded from the client for telemetry only — the server uses
     # ``resolve_effective_tier(current_user, db)`` for actual gating
     # (admin override + stored tier + active beta-code redemption).
+    # Accepted for backward compat but ignored: chat always uses Haiku
+    # regardless of tier (see ``ai_productivity.get_model``).
     tier: Optional[str] = None
 
 

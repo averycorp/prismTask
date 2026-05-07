@@ -1,9 +1,17 @@
 package com.averycorp.prismtask.domain
 
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
+import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
 import com.averycorp.prismtask.data.remote.api.ChatTokensUsed
+import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.repository.ChatMessage
+import com.averycorp.prismtask.data.repository.ChatRepository
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -209,17 +217,6 @@ class ChatRepositoryTest {
         assertTrue(id.contains("2026-04-11"))
     }
 
-    // --- shouldRefreshContext ---
-
-    @Test
-    fun `shouldRefreshContext true on first call`() {
-        // A fresh ChatRepository (messagesSinceContextRefresh == 0) should want to refresh.
-        // We can't test this directly without the API, but we can verify
-        // the ChatMessage model works correctly.
-        val msg = ChatMessage(role = ChatMessage.Role.USER, text = "test")
-        assertEquals("test", msg.text)
-    }
-
     // --- ChatActionResponse defaults ---
 
     @Test
@@ -234,5 +231,70 @@ class ChatRepositoryTest {
         assertEquals(null, action.title)
         assertEquals(null, action.due)
         assertEquals(null, action.priority)
+    }
+
+    // --- History forwarding (Phase 2 fix #1: A.1+E.1 context block) ---
+
+    @Test
+    fun `sendMessage forwards no history on the very first turn`() = runTest {
+        val api = mockk<PrismTaskApi>()
+        val captured = slot<ChatRequest>()
+        coEvery { api.aiChat(capture(captured)) } returns ChatResponse(
+            message = "hi", actions = emptyList(), conversationId = "x"
+        )
+        val repo = ChatRepository(api)
+
+        repo.sendMessage(userMessage = "hello")
+
+        coVerify { api.aiChat(any()) }
+        assertTrue(
+            "history must be empty on first turn",
+            captured.captured.history.isEmpty()
+        )
+        assertEquals("hello", captured.captured.message)
+    }
+
+    @Test
+    fun `sendMessage forwards prior turns as chronological history`() = runTest {
+        val api = mockk<PrismTaskApi>()
+        val captured = slot<ChatRequest>()
+        coEvery { api.aiChat(capture(captured)) } returnsMany listOf(
+            ChatResponse(message = "first reply", actions = emptyList(), conversationId = "x"),
+            ChatResponse(message = "second reply", actions = emptyList(), conversationId = "x")
+        )
+        val repo = ChatRepository(api)
+
+        repo.sendMessage(userMessage = "first user message")
+        // After turn 1, repo holds [user, assistant]. The next sendMessage
+        // should forward exactly those two as history.
+        repo.sendMessage(userMessage = "second user message")
+
+        val history = captured.captured.history
+        assertEquals(2, history.size)
+        assertEquals("user", history[0].role)
+        assertEquals("first user message", history[0].content)
+        assertEquals("assistant", history[1].role)
+        assertEquals("first reply", history[1].content)
+        assertEquals("second user message", captured.captured.message)
+    }
+
+    @Test
+    fun `sendMessage caps forwarded history at 12 entries`() = runTest {
+        val api = mockk<PrismTaskApi>()
+        val captured = slot<ChatRequest>()
+        // Reply with a stable shape every time so we can pump a long thread.
+        coEvery { api.aiChat(capture(captured)) } answers {
+            ChatResponse(message = "ok", actions = emptyList(), conversationId = "x")
+        }
+        val repo = ChatRepository(api)
+
+        // 8 turns → after the 8th send, repo would hold 14 messages pre-trim;
+        // the request must still cap forwarded history to 12.
+        repeat(8) { i -> repo.sendMessage(userMessage = "turn $i") }
+
+        assertTrue(
+            "history must not exceed maxLength=12 (server-side guard)",
+            captured.captured.history.size <= 12
+        )
     }
 }

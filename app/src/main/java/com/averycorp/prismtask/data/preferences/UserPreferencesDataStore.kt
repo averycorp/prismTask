@@ -223,6 +223,11 @@ class UserPreferencesDataStore(
         // Master AI-feature opt-out (PII egress audit, 2026-04-26)
         val KEY_AI_FEATURES_ENABLED = booleanPreferencesKey("ai_features_enabled")
 
+        // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1, Phase 2 #2).
+        // Set to true the first time the user dismisses the disclosure
+        // dialog so it is not shown again on subsequent chat opens.
+        val KEY_AI_CHAT_DISCLOSURE_SHOWN = booleanPreferencesKey("ai_chat_disclosure_shown")
+
         // Medication reminder mode global default (v1.6.0)
         val KEY_MED_REMINDER_MODE_DEFAULT = stringPreferencesKey("med_reminder_mode_default")
         val KEY_MED_REMINDER_INTERVAL_DEFAULT_MINUTES =
@@ -486,6 +491,18 @@ class UserPreferencesDataStore(
 
     suspend fun setAiFeaturesEnabled(enabled: Boolean) {
         dataStore.edit { it[KEY_AI_FEATURES_ENABLED] = enabled }
+    }
+
+    /**
+     * Whether the first-run AI chat disclosure has been acknowledged.
+     * Defaults to false so the dialog fires on the first chat open.
+     */
+    val aiChatDisclosureShownFlow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_AI_CHAT_DISCLOSURE_SHOWN] ?: false
+    }
+
+    suspend fun setAiChatDisclosureShown(shown: Boolean) {
+        dataStore.edit { it[KEY_AI_CHAT_DISCLOSURE_SHOWN] = shown }
     }
 
     /**

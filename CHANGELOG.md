@@ -7,7 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- **AI chat surface quality (audit-first sweep).** Closes four P0/P1
+  defects from `docs/audits/CHAT_QUALITY_AUDIT.md`:
+  - **Multi-turn memory + task content (A.1 + E.1).** The chat
+    backend now forwards the rolling N=6 user/assistant pairs and a
+    task-content snapshot (title/description/due/priority/project) to
+    Anthropic. Before this fix the model had total amnesia between
+    turns and was blind to user task content — `task_context_id` was
+    a bare integer it could not dereference.
+  - **First-run AI chat disclosure (C.1).** The disclosure dialog
+    state-flow on `ChatViewModel` was previously declared but never
+    set to true. Added `aiChatDisclosureShownFlow` preference; dialog
+    now fires on first chat open and persists acknowledgement.
+  - **Action chip idempotency + per-item batch UX (B.2).** A double
+    tap on the same chip while the first action is still in flight
+    is silently dropped instead of issuing a duplicate Room mutation.
+    `reschedule_batch` reports per-item success/failure counts.
+  - **Snackbar with Undo on destructive actions (C.2).** Replaces
+    toasts with snackbars carrying an Undo callback for `complete`,
+    `reschedule`, `reschedule_batch`, and `archive`.
+  - Removed dead `tier` plumbing from `generate_chat_response` (A.2)
+    and dead `shouldRefreshContext` / `markContextRefreshed` /
+    `messagesSinceContextRefresh` from `ChatRepository` (E.2).
+  - Adds 6 backend pytest cases and 12 Android unit tests across
+    `ChatRepositoryTest`, `ChatViewModelDisclosureTest`, and
+    `ChatViewModelActionTest`. Streaming (D.1), Room persistence
+    (E.3), and native Anthropic tool-use migration (B.1) deferred
+    with explicit re-trigger criteria — see audit doc § 5.1.
+
 ### Privacy
+
+- **Chat surface PII shape extended (Phase 2 fix #1).** The
+  `POST /api/v1/ai/chat` route now accepts a `task_context` block
+  (title, description, due_date, priority, project_name) when chat
+  is opened from a specific task, and forwards it to Anthropic
+  Claude Haiku alongside the latest user message. Without this the
+  model could only echo the opaque `task_context_id` integer back
+  into actions; with it, the model can ground its replies in the
+  actual task content. Pairs with the existing PR #788 disclosure
+  path; privacy doc + Data Safety form follow-on planned.
 
 - **Closed Gmail integration AI-features opt-out gap.** Toggling Settings →
   AI Features → "Use Claude AI for advanced features" off now also blocks

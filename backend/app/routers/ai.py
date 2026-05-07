@@ -860,11 +860,15 @@ async def chat(
 ):
     """Conversational coaching chat backed by Claude Haiku.
 
-    Stateless from the backend's POV: the client owns rolling history and
-    only sends the latest user message plus an opaque ``conversation_id``
-    used purely for round-trip correlation. Optional ``task_context_id``
-    lets the AI suggest task-scoped actions (complete / reschedule /
-    breakdown / archive) referencing that ID.
+    Stateless from the backend's POV: the client owns the rolling history
+    (last N=6 user/assistant pairs) and re-sends it on every turn via
+    ``data.history``. The backend forwards it as a proper Anthropic
+    ``messages`` array so the model has actual multi-turn memory.
+
+    ``data.task_context`` carries a snapshot (title, description, due,
+    priority, project) of the task the chat was opened from, when set —
+    so the AI can ground its reply in the task content rather than the
+    opaque integer ``task_context_id`` it cannot dereference.
     """
     chat_rate_limiter.check(request)
     tier = await resolve_effective_tier(current_user, db)
@@ -877,7 +881,12 @@ async def chat(
             message=data.message,
             conversation_id=data.conversation_id,
             task_context_id=data.task_context_id,
-            tier=tier,
+            task_context=(
+                data.task_context.model_dump(exclude_none=True)
+                if data.task_context is not None
+                else None
+            ),
+            history=[h.model_dump() for h in data.history],
         )
     except RuntimeError:
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable")

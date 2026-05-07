@@ -538,11 +538,35 @@ data class BatchParseResponse(
 
 // region AI Chat
 
+/**
+ * One prior turn forwarded by the client so the AI has multi-turn memory.
+ * Role is "user" or "assistant"; the backend rejects anything else.
+ */
+data class ChatHistoryEntry(
+    val role: String,
+    val content: String
+)
+
+/**
+ * Snapshot of the task the user is talking about, sent when chat is
+ * opened from a specific task. Without this the AI only sees the opaque
+ * [taskContextId] integer it cannot dereference.
+ */
+data class ChatTaskContext(
+    val title: String,
+    val description: String? = null,
+    @SerializedName("due_date") val dueDate: String? = null,
+    val priority: Int? = null,
+    @SerializedName("project_name") val projectName: String? = null,
+    @SerializedName("is_completed") val isCompleted: Boolean? = null
+)
+
 data class ChatRequest(
     val message: String,
     @SerializedName("conversation_id") val conversationId: String,
     @SerializedName("task_context_id") val taskContextId: Long? = null,
-    val tier: String = "PRO"
+    @SerializedName("task_context") val taskContext: ChatTaskContext? = null,
+    val history: List<ChatHistoryEntry> = emptyList()
 )
 
 data class ChatActionResponse(
