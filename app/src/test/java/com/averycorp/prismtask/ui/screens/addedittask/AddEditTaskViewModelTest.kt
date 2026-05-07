@@ -745,7 +745,7 @@ class AddEditTaskViewModelTest {
         vm.initialize(taskId = null, projectId = null, initialDate = null)
         vm.onTitleChange("Email project status update to manager")
 
-        vm.autoPickLifeCategory()  // implicit auto-press from title-change LaunchedEffect
+        vm.autoPickLifeCategory() // implicit auto-press from title-change LaunchedEffect
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Local pick wins; remote NEVER called for the implicit path because

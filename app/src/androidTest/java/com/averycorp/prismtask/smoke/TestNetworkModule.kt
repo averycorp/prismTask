@@ -188,6 +188,11 @@ class FakePrismTaskApi : PrismTaskApi {
     ): com.averycorp.prismtask.data.remote.api.EisenhowerClassifyTextResponse =
         error("Not used in offline tests")
 
+    override suspend fun classifyLifeCategoryText(
+        request: com.averycorp.prismtask.data.remote.api.LifeCategoryClassifyTextRequest
+    ): com.averycorp.prismtask.data.remote.api.LifeCategoryClassifyTextResponse =
+        error("Not used in offline tests")
+
     override suspend fun planPomodoro(
         request: com.averycorp.prismtask.data.remote.api.PomodoroRequest
     ) = error("Not used in offline tests")
