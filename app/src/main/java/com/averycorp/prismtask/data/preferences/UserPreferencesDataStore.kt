@@ -226,7 +226,20 @@ class UserPreferencesDataStore(
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1, Phase 2 #2).
         // Set to true the first time the user dismisses the disclosure
         // dialog so it is not shown again on subsequent chat opens.
+        //
+        // V1 is intentionally retained (not deleted) so back-revved
+        // clients don't crash on the missing key. The V2 bump below
+        // (F8_CHAT_PRIVACY_DOC_UPDATE_AUDIT § A.5 Option A) re-fires
+        // the dialog once for existing users when the disclosure copy
+        // is materially expanded.
         val KEY_AI_CHAT_DISCLOSURE_SHOWN = booleanPreferencesKey("ai_chat_disclosure_shown")
+
+        // F8 chat privacy doc update — V2 bump fires the disclosure
+        // dialog once for every user (new + existing) so the new copy
+        // enumerating the task-context snapshot fields and rolling
+        // conversation history is acknowledged.
+        val KEY_AI_CHAT_DISCLOSURE_SHOWN_V2 =
+            booleanPreferencesKey("ai_chat_disclosure_shown_v2")
 
         // Medication reminder mode global default (v1.6.0)
         val KEY_MED_REMINDER_MODE_DEFAULT = stringPreferencesKey("med_reminder_mode_default")
@@ -496,6 +509,9 @@ class UserPreferencesDataStore(
     /**
      * Whether the first-run AI chat disclosure has been acknowledged.
      * Defaults to false so the dialog fires on the first chat open.
+     *
+     * V1 is retained for back-revved clients. V2 (below) is the
+     * load-bearing flag the chat surface checks today.
      */
     val aiChatDisclosureShownFlow: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEY_AI_CHAT_DISCLOSURE_SHOWN] ?: false
@@ -503,6 +519,21 @@ class UserPreferencesDataStore(
 
     suspend fun setAiChatDisclosureShown(shown: Boolean) {
         dataStore.edit { it[KEY_AI_CHAT_DISCLOSURE_SHOWN] = shown }
+    }
+
+    /**
+     * V2 of the first-run AI chat disclosure (F8 chat privacy doc
+     * update). Defaults to false so the dialog fires once for every
+     * user — including users who already dismissed V1 — after the
+     * disclosure copy was materially expanded to enumerate the
+     * task-context snapshot fields and rolling conversation history.
+     */
+    val aiChatDisclosureShownV2Flow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_AI_CHAT_DISCLOSURE_SHOWN_V2] ?: false
+    }
+
+    suspend fun setAiChatDisclosureShownV2(shown: Boolean) {
+        dataStore.edit { it[KEY_AI_CHAT_DISCLOSURE_SHOWN_V2] = shown }
     }
 
     /**

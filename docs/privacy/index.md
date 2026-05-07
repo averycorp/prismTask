@@ -6,7 +6,7 @@ description: How PrismTask collects, uses, and protects your data.
 # PrismTask — Privacy Policy
 
 **Effective date:** 2026-04-24
-**Last updated:** 2026-04-26
+**Last updated:** 2026-05-07
 
 ## Who we are
 
@@ -22,7 +22,7 @@ This policy describes what data PrismTask collects when you use the Android app 
 
 - PrismTask works fully offline. If you never sign in, no data ever leaves your device.
 - If you sign in with Google, your tasks, habits, and related data sync across your devices via Firebase Firestore. We do not sell or share that data.
-- Natural-language task parsing and AI features (Eisenhower, Pomodoro planner, daily briefing, weekly review, NLP batch commands) send the relevant text — including medication names you have entered, when batch NLP commands operate on them — through our backend to Anthropic's Claude API. You can disable all AI processing in **Settings → AI Features → Use Claude AI for advanced features**.
+- Natural-language task parsing and AI features (Eisenhower, Pomodoro planner, daily briefing, weekly review, NLP batch commands, AI Coach chat) send the relevant text — including medication names you have entered, when batch NLP commands operate on them, and your chat messages plus a snapshot of any task you open chat from — through our backend to Anthropic's Claude API. You can disable all AI processing in **Settings → AI Features → Use Claude AI for advanced features**.
 - Crash reports are collected via Firebase Crashlytics to keep the app stable. There is no advertising SDK, no analytics tracker, and no data reseller in the loop.
 - You can export all of your data as JSON/CSV from the app at any time. To delete all of your synced data, email `privacy@prismtask.app` (in-app one-tap account deletion is in active development).
 
@@ -48,7 +48,7 @@ This policy describes what data PrismTask collects when you use the Android app 
 ## How we use your data
 
 - **Core functionality:** store your tasks/habits/etc., run reminders and Pomodoro sessions, compute streaks and analytics, and keep everything synchronized across your signed-in devices.
-- **AI-powered features (Pro tier, on by default but disable-able):** when you use natural-language quick-add, the Eisenhower matrix auto-classification, AI time blocking, the daily briefing, the weekly review aggregator, the smart Pomodoro planner, or the NLP batch-command feature, the relevant text is sent through our backend to Anthropic's Claude API (Claude Haiku for fast NLP; Claude Sonnet for the weekly planner and review). For NLP batch commands such as "skip my medication today", the names of your medications are included in the request so Claude can match the phrase you typed to the correct entity. Per [Anthropic's Commercial Terms](https://www.anthropic.com/legal/commercial-terms), Anthropic does not train models on inputs from API customers, and per Anthropic's [API data retention policy](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-personal-data) inputs and outputs are deleted within 30 days of receipt (up to 2 years if a request is flagged for Anthropic's Trust & Safety review). You can turn off all AI processing in **Settings → AI Features → Use Claude AI for advanced features**; when disabled, no PrismTask data is sent to Anthropic and the AI-powered features become unavailable until you re-enable the toggle.
+- **AI-powered features (Pro tier, on by default but disable-able):** when you use natural-language quick-add, the Eisenhower matrix auto-classification, AI time blocking, the daily briefing, the weekly review aggregator, the smart Pomodoro planner, the NLP batch-command feature, or the AI Coach chat surface, the relevant text is sent through our backend to Anthropic's Claude API (Claude Haiku for fast NLP and chat; Claude Sonnet for the weekly planner and review). For NLP batch commands such as "skip my medication today", the names of your medications are included in the request so Claude can match the phrase you typed to the correct entity. For AI Coach chat, your chat messages and the last few turns of conversation are forwarded so the AI has multi-turn memory; when chat is opened from a specific task, a snapshot of that task — title, description, due date, priority, project name, and completion state — is also forwarded so the AI can ground its replies in the actual task content. Per [Anthropic's Commercial Terms](https://www.anthropic.com/legal/commercial-terms), Anthropic does not train models on inputs from API customers, and per Anthropic's [API data retention policy](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-personal-data) inputs and outputs are deleted within 30 days of receipt (up to 2 years if a request is flagged for Anthropic's Trust & Safety review). You can turn off all AI processing in **Settings → AI Features → Use Claude AI for advanced features**; when disabled, no PrismTask data is sent to Anthropic and the AI-powered features become unavailable until you re-enable the toggle.
 - **Crash diagnostics:** Firebase Crashlytics uses crash reports to help us fix bugs.
 - **Voice input (opt-in):** when you tap the microphone, Android's `SpeechRecognizer` processes your speech via Google Speech Services and returns a transcript. PrismTask does not record or retain audio.
 - **Calendar sync (opt-in):** when you connect Google Calendar in Settings, the app reads and writes events to your own Google Calendar account.
@@ -68,7 +68,7 @@ This policy describes what data PrismTask collects when you use the Android app 
 | Processor | Role | What they see |
 |---|---|---|
 | Google LLC (Firebase Auth, Firestore, Crashlytics, Cloud Storage, Sign-In, Speech Services, Calendar API, Play Billing) | Authentication, cloud sync, crash diagnostics, voice transcription, calendar sync, billing | Your account email, synced content, crash traces, voice audio during recognition, Calendar events you choose to sync, purchase tokens |
-| Anthropic, PBC (Claude API) | AI-feature processing | Text you submit for parsing or AI analysis: task titles, descriptions, project names, habit names, schedule data, free-text you paste into NLP / extraction surfaces, and — for NLP batch commands — your medication names (id + name only; not dosage, frequency, or prescriber) |
+| Anthropic, PBC (Claude API) | AI-feature processing | Text you submit for parsing or AI analysis: task titles, descriptions, project names, habit names, schedule data, free-text you paste into NLP / extraction surfaces; for NLP batch commands, your medication names (id + name only; not dosage, frequency, or prescriber); for AI Coach chat, your chat messages plus the last few turns of conversation history, and — when chat is opened from a specific task — a snapshot of that task (title, description, due date, priority, project name, completion state) |
 | Railway Corporation | Backend hosting | HTTPS traffic in transit to the FastAPI backend |
 
 No processor listed above is authorized to sell or resell your data. We do not share data with advertisers, data brokers, or analytics firms.
@@ -111,6 +111,17 @@ When this policy changes, the "Last updated" date at the top of this page change
 
 ## Changelog
 
+- **2026-05-07** — Disclosed that AI Coach chat now forwards your chat
+  messages, the last few turns of conversation history, and — when
+  chat is opened from a specific task — a snapshot of that task
+  (title, description, due date, priority, project name, completion
+  state) to Anthropic's Claude API. This egress shipped in PR #1164;
+  this update enumerates the specifics in the privacy policy and the
+  Data Safety form, and re-fires the in-app first-run AI Chat
+  disclosure dialog so existing users see the updated wording once.
+  No change to what data is collected — disclosure update only. As
+  with all AI features, the egress can be disabled in
+  Settings → AI Features → "Use Claude AI for advanced features".
 - **2026-04-26** — Disclosed that medication names are included in
   Anthropic Claude API requests for the NLP batch-command feature
   (e.g. "skip my Adderall today"). Corrected the prior text that

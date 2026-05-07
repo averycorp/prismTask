@@ -133,8 +133,12 @@ constructor(
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1).
         // Show the dialog the first time chat opens; once dismissed,
         // the persisted flag prevents it from appearing again.
+        //
+        // F8 chat privacy doc update bumped the flag from V1 to V2
+        // so the expanded copy (enumerating task-context fields +
+        // rolling history) is re-acknowledged once by every user.
         viewModelScope.launch {
-            val alreadyShown = userPreferencesDataStore.aiChatDisclosureShownFlow.first()
+            val alreadyShown = userPreferencesDataStore.aiChatDisclosureShownV2Flow.first()
             if (!alreadyShown) {
                 _showDisclosure.value = true
             }
@@ -148,7 +152,7 @@ constructor(
     fun dismissDisclosure() {
         _showDisclosure.value = false
         viewModelScope.launch {
-            userPreferencesDataStore.setAiChatDisclosureShown(true)
+            userPreferencesDataStore.setAiChatDisclosureShownV2(true)
         }
     }
 

@@ -81,6 +81,7 @@ class ChatViewModelActionTest {
         taskBehaviorPreferences = mockk(relaxed = true)
         userPreferencesDataStore = mockk(relaxed = true) {
             coEvery { aiChatDisclosureShownFlow } returns flowOf(true)
+            coEvery { aiChatDisclosureShownV2Flow } returns flowOf(true)
         }
     }
 

@@ -63,6 +63,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   actual task content. Pairs with the existing PR #788 disclosure
   path; privacy doc + Data Safety form follow-on planned.
 
+- **F8 chat privacy doc + disclosure follow-on.** Closes the
+  follow-on item flagged above. `docs/privacy/index.md` and
+  `docs/store-listing/compliance/data-safety-form.md` now enumerate
+  the chat egress shape: chat messages, rolling user/assistant
+  conversation history (last few turns), and — when chat is opened
+  from a specific task — a task-content snapshot covering title,
+  description, due date, priority, project name, and completion
+  state. The in-app first-run AI Chat disclosure dialog copy was
+  expanded to mirror the docs (`ChatScreen.kt`), and the dismissal
+  flag was bumped from `KEY_AI_CHAT_DISCLOSURE_SHOWN` (V1) to
+  `KEY_AI_CHAT_DISCLOSURE_SHOWN_V2` so every existing user sees the
+  expanded disclosure once on first chat open after this update.
+  No change to what data is collected — disclosure update only.
+  Audit: `docs/audits/F8_CHAT_PRIVACY_DOC_UPDATE_AUDIT.md`.
+  Schema bidirectional verification surfaced that the actual
+  `ChatTaskContext` has six fields, not the five originally listed
+  in the post-PR #1164 handoff (the sixth, `is_completed`, is now
+  enumerated in the doc + dialog copy). Adds 2 unit tests pinning
+  the V2 re-fire path (`ChatViewModelDisclosureTest`).
+
 - **Closed Gmail integration AI-features opt-out gap.** Toggling Settings →
   AI Features → "Use Claude AI for advanced features" off now also blocks
   `POST /integrations/gmail/scan` on both the Android client (the
