@@ -162,10 +162,21 @@ Single-item audit — no anti-pattern list this round.
 
 ## Phase 3 — Bundle summary
 
-_Filled in after Phase 2 PR is opened._
-
-- PR: _(filled in after open)_
-- Memory candidates: none anticipated — the change is a localised
-  bug-fill rather than a new convention.
-- Schedule for next audit: ad-hoc; nothing in this scope blocks
-  follow-up work.
+- PR: [#1175](https://github.com/averycorp/prismTask/pull/1175) —
+  `fix(timer): auto-switch work/break tab outside Pomodoro Mode`.
+  Branch `claude/auto-switch-timers-OdeXy`.
+  Includes `TimerViewModelTest` (6 tests: 4 non-Pomodoro flows + CUSTOM
+  no-op + Pomodoro regression lock-in).
+- Measured impact (per occurrence): one tap saved per timer-end in
+  non-Pomodoro mode, plus the elimination of the "where did the timer
+  go?" pause that the dead-stop on completion previously caused.
+  Re-baselined wall-clock: ~30 min audit + implementation, matches the
+  estimate in the ranking table.
+- Memory candidates: none — the change is a localised bug-fill rather
+  than a new convention. The pre-existing `autoStartBreaks` /
+  `autoStartWork` prefs already had the right shape and toggle UI; the
+  only thing missing was wiring them through the non-Pomodoro completion
+  path.
+- Schedule for next audit: ad-hoc. Nothing in this scope blocks
+  follow-up work, and no other Timer-related items were surfaced
+  during the sweep.
