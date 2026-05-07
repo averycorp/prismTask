@@ -216,8 +216,109 @@ defer (the reused `AiSection` is already exercised indirectly).
 
 ## Phase 3 — Bundle summary
 
-(To be appended after the implementation PR is opened.)
+### Shipped
+
+- **PR #1165** (`feat(today): host AI hub on Today, remove Settings -> AI
+  Features`) bundles both PROCEED items into a single PR on the assigned
+  branch `claude/ai-features-today-page-5bQWs` per the operator's branch
+  directive — single coherent scope, fan-out not required.
+
+### Per-improvement detail
+
+| # | Improvement | Files | Net |
+|---|-------------|-------|-----|
+| 1 | Today AI hub (sparkle chip + bottom sheet) | `TodayScreen.kt` (+18), `TodayAiHubSheet.kt` (new, +82) | +100 |
+| 2 | Settings AI hub removal | `SettingsScreen.kt` (-7), `SettingsRoutes.kt` (-2), `AiFeaturesScreen.kt` (deleted, -73) | -82 |
+
+Total: **+103 / -83**, 1 file deleted, 1 file added.
+
+### Deviations from Phase 1 plan
+
+None. The single-PR shape, the chip-as-trigger choice, and the verbatim
+reuse of `AiSection` all match the audit recommendation.
+
+### Memory entry candidates
+
+None — relocation pattern (settings → today bottom sheet) is one-shot
+UX work, not a generalizable harness lesson.
+
+### Schedule for next audit
+
+After PR #1165 merges: re-baseline the chip-row width on small phones
+(now seven chips wide) and decide whether to migrate to a stacked /
+collapsible "More" affordance if usage data shows the AI Tools chip
+sitting offscreen in the default scroll position.
+
+---
 
 ## Phase 4 — Claude Chat handoff
 
-(To be emitted after Phase 3 is appended.)
+```markdown
+# AI Features → Today relocation (PrismTask)
+
+**Scope.** Operator directive on `averycorp/prismTask`: "All AI features
+should be available from the today page, not settings." Relocate the
+AI hub from Settings → AI Features onto the Today screen.
+
+**Verdicts table**
+
+| Item | Class | One-line finding |
+|------|-------|------------------|
+| Settings → AI Features nav row | RED | Single source removed (`SettingsScreen.kt:257-264`); no other callers |
+| `settings/ai_features` route | RED | Removed from `SettingsRoutes.kt:49`; grep confirmed zero deep-link references |
+| `AiFeaturesScreen.kt` wrapper | RED | Deleted; was a 74-line Scaffold around `AiSection` |
+| `AiSection.kt` composable | YELLOW | Reused verbatim from new Today host; package label still under `settings/sections/` (cosmetic only) |
+| Master AI privacy toggle | YELLOW | Relocated to Today hub sheet (parity audit `ANDROID_WEB_PARITY_AUDIT.md:522` blocks deletion) |
+| Today AI hub trigger | RED→done | New "AI Tools" sparkle `AssistChip` appended to existing chip row |
+| `TodayAiHubSheet.kt` | RED→done | New `ModalBottomSheet` host, uses `hiltViewModel<SettingsViewModel>()` for toggle state |
+| Timeline + Mood Analytics chips | DEFERRED | Hub covers them; standalone chip promotion is a future call |
+| Tests for removed surfaces | GREEN | None existed (verified via grep) |
+| Free-tier AI Coach FAB visibility | DEFERRED | Pricing decision, not access |
+
+**Shipped**
+
+- **PR #1165** — Today AI hub + Settings removal, single PR on
+  `claude/ai-features-today-page-5bQWs`. +103 / -83.
+
+**Deferred / stopped**
+
+- Standalone Timeline / Mood chips: hub already covers them; chip-row
+  real estate is tight at 7 entries.
+- `AiSection.kt` package rename to `today/ai/`: cosmetic, would force
+  import churn for zero behavior change.
+- Extract `AiPrefsViewModel`: over-engineering; the hub reaching into
+  `SettingsViewModel` is a label, not a coupling.
+- AI Coach FAB Free-tier visibility: pricing decision, separate audit.
+
+**Non-obvious findings**
+
+- The Today chip row was already at 6 chips and 6 of the 9 nav rows
+  in `AiSection` were already one-tap-from-Today via those chips
+  (Briefing / Focus / Plan Week / Matrix / Extract / Review). The
+  relocation's actual delta is the **two toggles + privacy
+  disclosure + Timeline + Mood Analytics** that had no
+  unconditional Today path before.
+- AI Coach Chat sits on a Pro-only `SmallFloatingActionButton`
+  (`TodayScreen.kt:262-275`), not a chip. The hub's "AI Coach Chat"
+  row gives Pro users a second path and gives Free users a visible
+  upgrade affordance for the first time.
+- The master AI toggle is a **legal/PII opt-out** flagged in
+  `ANDROID_WEB_PARITY_AUDIT.md:522` with a SHIP-BEFORE-MAY-15
+  deadline. Today is 2026-05-07, so the relocation must keep the
+  toggle reachable, not delete it. The hub satisfies that.
+- A prior audit `AI_TODAY_ACCESS_AUDIT.md` (PR #1145) already
+  surfaced AI features onto Today via chips while keeping Settings
+  as the canonical hub. The new directive supersedes that
+  positioning.
+
+**Open questions**
+
+- Should the chip row migrate to a horizontally-scrollable strip with
+  a "More AI…" affordance instead of seven chips? Re-evaluate after
+  small-phone usage data lands.
+- Free-tier visibility for AI Coach Chat: still gated by
+  `if (viewModel.isPro)` on the FAB; the hub's "AI Coach Chat" row
+  also navigates without the gate, so Free users see it but tap →
+  paywall. Deliberate or accidental?
+```
+
