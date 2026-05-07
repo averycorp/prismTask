@@ -21,6 +21,8 @@ import com.averycorp.prismtask.data.remote.api.EveningSummaryResponse
 import com.averycorp.prismtask.data.remote.api.FirebaseTokenRequest
 import com.averycorp.prismtask.data.remote.api.HabitCorrelationsResponse
 import com.averycorp.prismtask.data.remote.api.ImportResponse
+import com.averycorp.prismtask.data.remote.api.LifeCategoryClassifyTextRequest
+import com.averycorp.prismtask.data.remote.api.LifeCategoryClassifyTextResponse
 import com.averycorp.prismtask.data.remote.api.LoginRequest
 import com.averycorp.prismtask.data.remote.api.ParseChecklistRequest
 import com.averycorp.prismtask.data.remote.api.ParseChecklistResponse
@@ -141,6 +143,11 @@ class NaturalLanguageParserTest {
         override suspend fun classifyEisenhowerText(
             request: EisenhowerClassifyTextRequest
         ): EisenhowerClassifyTextResponse =
+            error("not used in offline parser tests")
+
+        override suspend fun classifyLifeCategoryText(
+            request: LifeCategoryClassifyTextRequest
+        ): LifeCategoryClassifyTextResponse =
             error("not used in offline parser tests")
 
         override suspend fun planPomodoro(request: PomodoroRequest): PomodoroResponse =
