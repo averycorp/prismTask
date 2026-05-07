@@ -172,9 +172,16 @@ constructor(
             return
         }
 
+        // Flip _isTyping synchronously — BEFORE viewModelScope.launch — so
+        // a second sendMessage call landing in the same dispatch tick
+        // sees the flag set and bails at the guard above. Setting it
+        // inside the launch left the dedup window open for as long as
+        // the launch was queued; the test in
+        // ChatViewModelActionTest.rapid_double_send_only_dispatches_one_request
+        // exercises exactly that race.
+        _isTyping.value = true
+        _error.value = null
         viewModelScope.launch {
-            _isTyping.value = true
-            _error.value = null
             try {
                 chatRepository.sendMessage(
                     userMessage = text,
