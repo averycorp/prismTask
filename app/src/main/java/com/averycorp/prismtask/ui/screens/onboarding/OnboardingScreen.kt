@@ -82,6 +82,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.ui.a11y.asHeading
 import com.averycorp.prismtask.ui.a11y.politeLiveRegion
+import com.averycorp.prismtask.ui.screens.auth.EmailAuthSection
 import com.averycorp.prismtask.ui.screens.templates.TemplatePickerContent
 import com.averycorp.prismtask.ui.screens.templates.TemplateSelections
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
@@ -369,6 +370,11 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+                        EmailAuthSection(
+                            onSignUp = viewModel::onEmailSignUp,
+                            onSignIn = viewModel::onEmailSignIn,
+                            expandLabel = "Sign Up With Email"
+                        )
                         if (state is SignInState.Error) {
                             Text(
                                 text = "Sign-in failed. Tap to try again.",

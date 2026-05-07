@@ -272,6 +272,37 @@ reset + email verification (items 9, 10), run a follow-up audit covering
 both — they share the "Forgot password?" / "Verify your email" UI surface
 on `AuthScreen`.
 
+### Phase 3 addendum — Item 7 scope correction
+
+The original Phase 1 verdict on item 7 ("Onboarding 'Already have an
+account?' link") was DEFERRED with the rationale that *"the AuthScreen
+is the canonical sign-in entry point and is reachable from settings
+post-onboarding."*
+
+**That rationale was wrong.** Verified after PR #1155 opened: a brand-new
+install routes to `OnboardingScreen` (`NavGraph.kt:563`,
+`startDest = if (hasCompletedOnboarding) MainTabs else Onboarding`) and
+`AuthScreen` is **only** reachable via Settings → Account & Sync → Sign
+In. A user without a Google account and no prior knowledge of the
+Settings path would never see the email option — making the feature
+effectively invisible on the path users actually take.
+
+Per the Phase 1 stop-and-report-on-wrong-premise rule, the deferral was
+corrected mid-PR rather than left for a follow-up:
+
+- Extracted `EmailAuthSection` from `AuthScreen.kt` into shared
+  `ui/screens/auth/EmailAuthSection.kt` (internal, parameterized
+  `expandLabel`).
+- Added `OnboardingViewModel.onEmailSignUp` / `onEmailSignIn` mirroring
+  `onGoogleSignIn`'s `Loading → SignedIn → checkExistingUserAndMaybeSkip`
+  flow — same routing, no new state.
+- Wired `EmailAuthSection` into `OnboardingScreen` welcome page below
+  the "Already have an account? Sign in" Google link, with
+  `expandLabel = "Sign Up With Email"` to match the create-account
+  intent of that surface.
+
+Updated verdict for item 7: **PROCEED, shipped in PR #1155**.
+
 ## Phase 4 — Claude Chat handoff block
 
 ```markdown
