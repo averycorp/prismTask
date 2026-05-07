@@ -17,8 +17,13 @@ import com.averycorp.prismtask.data.repository.TaskTimingRepository
 import com.averycorp.prismtask.domain.model.CognitiveLoad
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.model.TaskMode
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTask
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
+import com.averycorp.prismtask.domain.usecase.ResolvedTask
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,6 +63,8 @@ class AddEditTaskViewModelTest {
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+    private lateinit var parser: NaturalLanguageParser
+    private lateinit var parsedTaskResolver: ParsedTaskResolver
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
@@ -91,6 +98,30 @@ class AddEditTaskViewModelTest {
             flowOf(com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords())
         coEvery { advancedTuningPreferences.getCognitiveLoadCustomKeywords() } returns
             flowOf(com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords())
+        // Default NLP wiring: parser echoes the input as-is and the resolver
+        // returns a no-extraction ResolvedTask. The "nothing extracted" guard
+        // in AddEditTaskViewModel.enrichWithNlp then short-circuits, so
+        // existing tests behave exactly as before. Tests that want to
+        // exercise the NLP enrichment path override these stubs.
+        parser = mockk(relaxed = true)
+        parsedTaskResolver = mockk(relaxed = true)
+        every { parser.parse(any()) } answers {
+            ParsedTask(title = firstArg<String>())
+        }
+        coEvery { parsedTaskResolver.resolve(any()) } answers {
+            val parsed = firstArg<ParsedTask>()
+            ResolvedTask(
+                title = parsed.title,
+                dueDate = null,
+                dueTime = null,
+                tagIds = emptyList(),
+                projectId = null,
+                priority = 0,
+                recurrenceRule = null,
+                unmatchedTags = emptyList(),
+                unmatchedProject = null
+            )
+        }
         savedStateHandle = SavedStateHandle()
 
         // Default StateFlow seeds so the VM init doesn't crash on relaxed mocks.
@@ -121,6 +152,8 @@ class AddEditTaskViewModelTest {
         userPreferencesDataStore,
         taskBehaviorPreferences,
         advancedTuningPreferences,
+        parser,
+        parsedTaskResolver,
         savedStateHandle
     )
 
@@ -304,6 +337,122 @@ class AddEditTaskViewModelTest {
                 estimatedDuration = any()
             )
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // NLP enrichment on create
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun saveTask_createMode_enrichesEmptyFieldsFromNlp() = runTest {
+        // Parser yields a stripped title + due date + priority + a tag, as
+        // it would for input like "Buy milk tomorrow !2 #shop". Resolver
+        // resolves to a known tag id; verify the form's empty fields get
+        // filled and the title gets stripped.
+        every { parser.parse(any()) } returns ParsedTask(
+            title = "Buy milk",
+            dueDate = 1_700_000_000_000L,
+            priority = 2,
+            tags = listOf("shop")
+        )
+        coEvery { parsedTaskResolver.resolve(any()) } returns ResolvedTask(
+            title = "Buy milk",
+            dueDate = 1_700_000_000_000L,
+            dueTime = null,
+            tagIds = listOf(42L),
+            projectId = null,
+            priority = 2,
+            recurrenceRule = null,
+            unmatchedTags = emptyList(),
+            unmatchedProject = null
+        )
+        coEvery {
+            taskRepository.addTask(
+                any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any()
+            )
+        } returns 100L
+        coEvery { taskRepository.getTaskById(100L) } returns flowOf(
+            TaskEntity(id = 100L, title = "Buy milk")
+        )
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Buy milk tomorrow !2 #shop")
+
+        assertTrue(vm.saveTask())
+        assertEquals("Buy milk", vm.title)
+        assertEquals(1_700_000_000_000L, vm.dueDate)
+        assertEquals(2, vm.priority)
+        assertTrue(vm.selectedTagIds.contains(42L))
+    }
+
+    @Test
+    fun saveTask_createMode_doesNotOverrideManuallySetFields() = runTest {
+        // User manually picked priority=4 + dueDate. NLP says priority=2 and
+        // a different date. Manual values must win.
+        every { parser.parse(any()) } returns ParsedTask(
+            title = "Call vendor",
+            dueDate = 1_111_111_111_111L,
+            priority = 2
+        )
+        coEvery { parsedTaskResolver.resolve(any()) } returns ResolvedTask(
+            title = "Call vendor",
+            dueDate = 1_111_111_111_111L,
+            dueTime = null,
+            tagIds = emptyList(),
+            projectId = null,
+            priority = 2,
+            recurrenceRule = null,
+            unmatchedTags = emptyList(),
+            unmatchedProject = null
+        )
+        coEvery {
+            taskRepository.addTask(
+                any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any()
+            )
+        } returns 101L
+        coEvery { taskRepository.getTaskById(101L) } returns flowOf(
+            TaskEntity(id = 101L, title = "Call vendor")
+        )
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Call vendor tomorrow !2")
+        vm.onPriorityChange(4)
+        vm.onDueDateChange(2_222_222_222_222L)
+
+        assertTrue(vm.saveTask())
+        assertEquals(4, vm.priority)
+        assertEquals(2_222_222_222_222L, vm.dueDate)
+    }
+
+    @Test
+    fun saveTask_editMode_skipsNlpEnrichment() = runTest {
+        // Editing an existing task must never re-parse — re-parsing a
+        // saved title would clobber edits.
+        coEvery { taskRepository.getTaskById(7L) } returns flowOf(
+            TaskEntity(id = 7L, title = "Old title", priority = 1)
+        )
+        val vm = newViewModel()
+        vm.initialize(taskId = 7L, projectId = null, initialDate = null)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Even if the parser is poised to extract structure, edit mode
+        // must not call it. Set a noisy stub that would alter state if
+        // applied.
+        every { parser.parse(any()) } returns ParsedTask(
+            title = "DIFFERENT",
+            priority = 4
+        )
+
+        vm.onTitleChange("Old title tomorrow !4")
+        assertTrue(vm.saveTask())
+        // The title field is whatever the user typed; it must not be
+        // stripped to "DIFFERENT" because NLP wasn't run.
+        assertEquals("Old title tomorrow !4", vm.title)
+        assertEquals(1, vm.priority)
     }
 
     // ---------------------------------------------------------------------

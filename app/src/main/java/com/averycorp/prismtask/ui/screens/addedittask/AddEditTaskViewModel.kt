@@ -36,6 +36,8 @@ import com.averycorp.prismtask.domain.usecase.BoundaryDecision
 import com.averycorp.prismtask.domain.usecase.BoundaryEnforcer
 import com.averycorp.prismtask.domain.usecase.CognitiveLoadClassifier
 import com.averycorp.prismtask.domain.usecase.LifeCategoryClassifier
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.TaskModeClassifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -82,6 +84,8 @@ constructor(
     private val userPreferencesDataStore: com.averycorp.prismtask.data.preferences.UserPreferencesDataStore,
     taskBehaviorPreferences: TaskBehaviorPreferences,
     private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences,
+    private val parser: NaturalLanguageParser,
+    private val parsedTaskResolver: ParsedTaskResolver,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val boundaryEnforcer = BoundaryEnforcer()
@@ -715,6 +719,94 @@ constructor(
         return classifier.classify(title, description.ifBlank { null }).name
     }
 
+    private data class NlpEnrichment(
+        val title: String,
+        val dueDate: Long?,
+        val dueTime: Long?,
+        val priority: Int,
+        val projectId: Long?,
+        val tagIds: List<Long>,
+        val recurrenceRule: RecurrenceRule?,
+        val lifeCategory: String?,
+        val taskMode: String?,
+        val cognitiveLoad: String?
+    )
+
+    /**
+     * Runs [rawTitle] through [NaturalLanguageParser.parse] (offline only —
+     * the form save stays offline-safe; Pro backend NLP remains scoped to
+     * the Quick Add bar) and resolves it via [ParsedTaskResolver]. Returns
+     * null when the parser extracted nothing actionable so callers can
+     * skip the merge cheaply. Auto-creates unmatched tags / projects so
+     * `selectedTagIds` and `projectId` can land on the new task — mirrors
+     * QuickAddViewModel.onSubmit exactly.
+     */
+    private suspend fun enrichWithNlp(rawTitle: String): NlpEnrichment? {
+        if (rawTitle.isBlank()) return null
+        val parsed = parser.parse(rawTitle)
+        val resolved = parsedTaskResolver.resolve(parsed)
+        val nothingExtracted = resolved.title == rawTitle &&
+            resolved.dueDate == null &&
+            resolved.dueTime == null &&
+            resolved.priority == 0 &&
+            resolved.projectId == null &&
+            resolved.unmatchedProject == null &&
+            resolved.tagIds.isEmpty() &&
+            resolved.unmatchedTags.isEmpty() &&
+            resolved.recurrenceRule == null &&
+            resolved.lifeCategory == null &&
+            resolved.taskMode == null &&
+            resolved.cognitiveLoad == null
+        if (nothingExtracted) return null
+
+        val newTagIds = resolved.unmatchedTags.map { tagRepository.addTag(name = it) }
+        val effectiveProjectId = resolved.projectId
+            ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) }
+        return NlpEnrichment(
+            title = resolved.title,
+            dueDate = resolved.dueDate,
+            dueTime = resolved.dueTime,
+            priority = resolved.priority,
+            projectId = effectiveProjectId,
+            tagIds = resolved.tagIds + newTagIds,
+            recurrenceRule = resolved.recurrenceRule,
+            lifeCategory = resolved.lifeCategory,
+            taskMode = resolved.taskMode,
+            cognitiveLoad = resolved.cognitiveLoad
+        )
+    }
+
+    /**
+     * Merges [enrichment] into the form's manual values. Manual values win
+     * on conflict so a user who picked a date in the picker isn't silently
+     * overridden by NLP. Title is always replaced with the stripped form
+     * (the user can see the field — leaving raw NLP tokens in the title
+     * after submit would be the bigger surprise).
+     */
+    private fun applyNlpEnrichment(enrichment: NlpEnrichment) {
+        title = enrichment.title
+        if (dueDate == null) dueDate = enrichment.dueDate
+        if (dueTime == null) dueTime = enrichment.dueTime
+        if (priority == 0 && enrichment.priority != 0) priority = enrichment.priority
+        if (projectId == null) projectId = enrichment.projectId
+        if (recurrenceRule == null) recurrenceRule = enrichment.recurrenceRule
+        if (lifeCategory == null && enrichment.lifeCategory != null) {
+            runCatching { LifeCategory.valueOf(enrichment.lifeCategory) }
+                .onSuccess { lifeCategory = it }
+        }
+        if (taskMode == null && enrichment.taskMode != null) {
+            runCatching { TaskMode.valueOf(enrichment.taskMode) }
+                .onSuccess { taskMode = it }
+        }
+        if (cognitiveLoad == null && enrichment.cognitiveLoad != null) {
+            runCatching { CognitiveLoad.valueOf(enrichment.cognitiveLoad) }
+                .onSuccess { cognitiveLoad = it }
+        }
+        if (enrichment.tagIds.isNotEmpty()) {
+            selectedTagIds = selectedTagIds + enrichment.tagIds.toSet()
+        }
+    }
+
     /**
      * Appends a new pending subtask with the supplied [title] and returns
      * the generated id. Subtasks are kept in VM state until [saveTask]
@@ -945,6 +1037,17 @@ constructor(
         }
 
         return try {
+            // On the create path only, run the title through the same NLP
+            // pipeline Quick Add uses so the form picks up `tomorrow`, `#tag`,
+            // `@project`, `!priority`, and recurrence hints typed into the
+            // title field. Manual picks always win — NLP fills only fields
+            // the user left empty. See
+            // docs/audits/NLP_FOR_ALL_TASK_ADDITIONS_AUDIT.md for the design.
+            val existing = existingTask
+            if (existing == null) {
+                enrichWithNlp(title.trim())?.let { applyNlpEnrichment(it) }
+            }
+
             val trimmedTitle = title.trim()
             val trimmedDesc = description.trim().ifEmpty { null }
             val trimmedNotes = notes.trim().ifEmpty { null }
@@ -952,7 +1055,6 @@ constructor(
             val resolvedLifeCategory = resolveLifeCategoryForSave()
             val resolvedTaskMode = resolveTaskModeForSave()
             val resolvedCognitiveLoad = resolveCognitiveLoadForSave()
-            val existing = existingTask
             val savedId: Long
             if (existing != null) {
                 taskRepository.updateTask(
@@ -995,20 +1097,36 @@ constructor(
             // Save tags
             tagRepository.setTagsForTask(savedId, selectedTagIds.toList())
 
-            // Flush any pending subtasks (e.g. from a template) into real rows.
+            // Flush any pending subtasks (e.g. from a template) into real
+            // rows. Each subtask title also runs through the NLP pipeline so
+            // typing `call vendor !2 #work` as a subtask picks up the same
+            // priority + tags it would in Quick Add. Subtasks inherit the
+            // parent's project implicitly via parentTaskId so we don't carry
+            // an NLP-resolved projectId for them.
             if (pendingSubtasks.isNotEmpty()) {
                 val now = System.currentTimeMillis()
                 pendingSubtasks.forEachIndexed { index, sub ->
+                    val subEnrichment = enrichWithNlp(sub.title)
                     val subtask = TaskEntity(
-                        title = sub.title,
+                        title = subEnrichment?.title ?: sub.title,
                         parentTaskId = savedId,
                         isCompleted = sub.isCompleted,
                         completedAt = if (sub.isCompleted) now else null,
                         sortOrder = index,
+                        dueDate = subEnrichment?.dueDate,
+                        dueTime = subEnrichment?.dueTime,
+                        priority = subEnrichment?.priority ?: 0,
+                        lifeCategory = subEnrichment?.lifeCategory,
+                        taskMode = subEnrichment?.taskMode,
+                        cognitiveLoad = subEnrichment?.cognitiveLoad,
                         createdAt = now,
                         updatedAt = now
                     )
-                    taskRepository.insertTask(subtask)
+                    val subId = taskRepository.insertTask(subtask)
+                    val subTagIds = subEnrichment?.tagIds.orEmpty()
+                    if (subTagIds.isNotEmpty()) {
+                        tagRepository.setTagsForTask(subId, subTagIds)
+                    }
                 }
                 pendingSubtasks.clear()
             }
