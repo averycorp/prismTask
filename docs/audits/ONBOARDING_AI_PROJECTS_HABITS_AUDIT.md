@@ -172,3 +172,45 @@ Three independent PRs, in this order so review queues stack cleanly:
 3. **`feat/onboarding-ai-projects-habits-ai-overview-page`** — new `AiOverviewPage` composable + bump `TOTAL_PAGES` to 17. Three or four buckets (Capture / Plan / Reflect / Coach), each with Free / Pro chip and a one-sentence what-it-does line. Update `PrivacyPage` AI subtitle to stay consistent.
 
 Each PR is small enough to land in its own squash-merge with required CI green.
+
+---
+
+## Phase 3 — Bundle summary
+
+**Branch directive override.** The operator-assigned branch
+`claude/onboarding-ai-features-overview-0rusm` collapsed the planned three-PR
+fan-out into one PR (#1161) with three commits. The Phase 2 plan above was
+right in spirit — three coherent units of work — but the branch directive
+beat the skill's default fan-out. Worth a memory entry candidate:
+*"GitHub-task-automation branch directives outrank the audit-first skill's
+fan-out default — bundle into one PR on the assigned branch."*
+
+| Improvement | Verdict | Landed in |
+|-------------|---------|-----------|
+| `QuickAddBar` `CircularProgressIndicator` while `isSubmitting` | PROCEED | PR #1161 (commit `ebde218`) |
+| `ProjectsPage` onboarding page (index 3) | PROCEED | PR #1161 (commit `ebde218`) |
+| `AiOverviewPage` onboarding page (index 11, 4-bucket layout w/ Free/Pro chips) | PROCEED | PR #1161 (commit `ebde218`) |
+| Habits onboarding coverage | STOP-no-work-needed | n/a — already comprehensive |
+| Spinners on synchronous AI features (Suggestions / Defaults / Conversation Extract / Mood / Burnout / Life-Category) | DEFERRED | n/a — would introduce flicker without informing user |
+
+**Re-baselined estimates.** Total wall-clock for the implementation phase
+across all three commits: ~25 min (audit + edits + push). The original
+"S–M ~180 LOC" estimate for `AiOverviewPage` came in at 99 LOC; the
+"S ~120 LOC" for `ProjectsPage` came in at 60 LOC. Visual polish (4-bucket
+layout, animated cards) was cheaper than expected because `OnboardingPageLayout`
++ `ChipLabel` were already extracted helpers. Calibration: when an audit
+identifies "match shape of existing page X," halve the LOC estimate.
+
+**Memory entry candidates (only if surprising).**
+- *Branch-directive vs fan-out:* see above. Worth recording.
+- *`OnboardingScreen.kt` size:* file is now 2,191 lines. The "extract pages
+  into `pages/` subdirectory" anti-pattern flag in the audit is now closer
+  to crossing the 2,500-line threshold — file the extraction audit before
+  the next onboarding feature lands, not after.
+
+**Schedule for next audit.** No follow-up audit needed for this scope —
+the four operator items are addressed. A separate audit on
+*"per-feature granular AI controls in Settings"* (anti-pattern #1 from the
+table above) would be the natural next step if the user wants to disable
+Eisenhower while keeping NLP enabled.
+
