@@ -169,6 +169,46 @@ constructor(
         }
     }
 
+    fun onEmailSignUp(email: String, password: String) {
+        // TODO(email-verification): call user.sendEmailVerification() and
+        // gate sync until verified once the verification flow lands.
+        viewModelScope.launch {
+            _signInState.value = SignInState.Loading
+            val result = authManager.signUpWithEmail(email, password)
+            result.fold(
+                onSuccess = { user ->
+                    _signInState.value = SignInState.SignedIn(user.email ?: email)
+                    syncService.startAutoSync()
+                    checkExistingUserAndMaybeSkip()
+                },
+                onFailure = {
+                    _signInState.value = SignInState.Error(
+                        it.localizedMessage ?: "Sign-up failed"
+                    )
+                }
+            )
+        }
+    }
+
+    fun onEmailSignIn(email: String, password: String) {
+        viewModelScope.launch {
+            _signInState.value = SignInState.Loading
+            val result = authManager.signInWithEmail(email, password)
+            result.fold(
+                onSuccess = { user ->
+                    _signInState.value = SignInState.SignedIn(user.email ?: email)
+                    syncService.startAutoSync()
+                    checkExistingUserAndMaybeSkip()
+                },
+                onFailure = {
+                    _signInState.value = SignInState.Error(
+                        it.localizedMessage ?: "Sign-in failed"
+                    )
+                }
+            )
+        }
+    }
+
     private suspend fun checkExistingUserAndMaybeSkip() {
         val uid = authManager.userId ?: return
         val signedInEmail = (_signInState.value as? SignInState.SignedIn)?.email
