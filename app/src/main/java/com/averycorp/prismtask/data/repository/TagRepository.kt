@@ -19,6 +19,9 @@ constructor(
 
     fun searchTags(query: String): Flow<List<TagEntity>> = tagDao.searchTags(query)
 
+    /** Exact-match (case-insensitive) lookup. Used by chat find-or-create. */
+    suspend fun getTagByNameOnce(name: String): TagEntity? = tagDao.getTagByNameOnce(name)
+
     suspend fun addTag(name: String, color: String = "#6B7280"): Long {
         val id = tagDao.insert(TagEntity(name = name, color = color))
         syncTracker.trackCreate(id, "tag")

@@ -45,6 +45,10 @@ interface TagDao {
     @Query("SELECT * FROM tags WHERE name LIKE '%' || :query || '%'")
     fun searchTags(query: String): Flow<List<TagEntity>>
 
+    /** Exact-match lookup (case-insensitive via SQLite NOCASE). */
+    @Query("SELECT * FROM tags WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun getTagByNameOnce(name: String): TagEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addTagToTask(crossRef: TaskTagCrossRef)
 
