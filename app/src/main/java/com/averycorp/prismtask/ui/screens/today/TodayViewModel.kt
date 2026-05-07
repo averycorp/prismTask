@@ -13,6 +13,7 @@ import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
+import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
@@ -43,6 +44,7 @@ import com.averycorp.prismtask.domain.usecase.CognitiveLoadBalanceTracker
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUiState
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUseCase
 import com.averycorp.prismtask.domain.usecase.HabitTodayVisibilityResolver
+import com.averycorp.prismtask.domain.usecase.MorningCheckInBannerDecider
 import com.averycorp.prismtask.domain.usecase.SelfCareNudge
 import com.averycorp.prismtask.domain.usecase.SelfCareNudgeEngine
 import com.averycorp.prismtask.ui.components.QuickRescheduleFormatter
@@ -86,6 +88,7 @@ constructor(
     private val checkInLogRepository: com.averycorp.prismtask.data.repository.CheckInLogRepository,
     private val medicationRefillRepository: MedicationRefillRepository,
     private val morningCheckInPreferences: MorningCheckInPreferences,
+    private val advancedTuningPreferences: AdvancedTuningPreferences,
     private val dailyEssentialsUseCase: DailyEssentialsUseCase,
     private val dailyEssentialsPreferences: DailyEssentialsPreferences,
     private val selfCareRepository: SelfCareRepository,
@@ -127,7 +130,13 @@ constructor(
         _showCheckInPrompt.value = false
         viewModelScope.launch {
             try {
-                morningCheckInPreferences.dismissBannerToday()
+                // Use the SoD-aware logical date so the dismissal stays
+                // consistent with the comparison done in the visibility
+                // pipeline (which keys off `logicalDate.toString()`).
+                val logicalDate = localDateFlow
+                    .observe(taskBehaviorPreferences.getStartOfDay())
+                    .first()
+                morningCheckInPreferences.dismissBannerToday(logicalDate.toString())
             } catch (
                 e: Exception
             ) {
@@ -210,6 +219,7 @@ constructor(
                     localDateFlow.observe(taskBehaviorPreferences.getStartOfDay())
                 ) { enabled, dismissedDate, logs, logicalDate ->
                     val sod = taskBehaviorPreferences.getStartOfDay().first()
+                    val cutoff = advancedTuningPreferences.getMorningCheckInPromptCutoff().first()
                     val todayStart = logicalDate
                         .atTime(sod.hour, sod.minute)
                         .atZone(ZoneId.systemDefault())
@@ -217,10 +227,6 @@ constructor(
                         .toEpochMilli()
                     val todayIso = logicalDate.toString()
                     val alreadyCheckedInToday = logs.any { it.date >= todayStart }
-                    val hour = java.util.Calendar
-                        .getInstance()
-                        .get(java.util.Calendar.HOUR_OF_DAY)
-                    val beforePromptHour = hour < 11
                     val dismissedToday = dismissedDate == todayIso
 
                     // Track first-seen state so we can distinguish "already
@@ -236,7 +242,16 @@ constructor(
                         }
                     }
 
-                    enabled && beforePromptHour && !alreadyCheckedInToday && !dismissedToday
+                    MorningCheckInBannerDecider.shouldShow(
+                        now = System.currentTimeMillis(),
+                        todayStart = todayStart,
+                        sodHour = sod.hour,
+                        sodMinute = sod.minute,
+                        cutoffHour = cutoff.latestHour,
+                        featureEnabled = enabled,
+                        alreadyCheckedInToday = alreadyCheckedInToday,
+                        dismissedToday = dismissedToday
+                    )
                 }.distinctUntilChanged().collect { shouldShow ->
                     _showCheckInPrompt.value = shouldShow
                 }

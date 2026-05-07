@@ -3,10 +3,12 @@ package com.averycorp.prismtask.ui.screens.today
 import com.averycorp.prismtask.core.time.LocalDateFlow
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
+import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.MorningCheckInPreferences
+import com.averycorp.prismtask.data.preferences.MorningCheckInPromptCutoff
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.StartOfDay
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
@@ -69,6 +71,7 @@ class TodayViewModelTest {
     private lateinit var checkInLogRepository: CheckInLogRepository
     private lateinit var medicationRefillRepository: MedicationRefillRepository
     private lateinit var morningCheckInPreferences: MorningCheckInPreferences
+    private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
     private lateinit var dailyEssentialsUseCase: DailyEssentialsUseCase
     private lateinit var dailyEssentialsPreferences: DailyEssentialsPreferences
     private lateinit var selfCareRepository: SelfCareRepository
@@ -96,6 +99,7 @@ class TodayViewModelTest {
         checkInLogRepository = mockk(relaxed = true)
         medicationRefillRepository = mockk(relaxed = true)
         morningCheckInPreferences = mockk(relaxed = true)
+        advancedTuningPreferences = mockk(relaxed = true)
         dailyEssentialsUseCase = mockk(relaxed = true)
         dailyEssentialsPreferences = mockk(relaxed = true)
         selfCareRepository = mockk(relaxed = true)
@@ -146,6 +150,8 @@ class TodayViewModelTest {
         coEvery { medicationRefillRepository.observeAll() } returns flowOf(emptyList())
         coEvery { morningCheckInPreferences.featureEnabled() } returns flowOf(true)
         coEvery { morningCheckInPreferences.bannerDismissedDate() } returns flowOf("")
+        coEvery { advancedTuningPreferences.getMorningCheckInPromptCutoff() } returns
+            flowOf(MorningCheckInPromptCutoff(latestHour = 11))
     }
 
     @After
@@ -170,6 +176,7 @@ class TodayViewModelTest {
         checkInLogRepository,
         medicationRefillRepository,
         morningCheckInPreferences,
+        advancedTuningPreferences,
         dailyEssentialsUseCase,
         dailyEssentialsPreferences,
         selfCareRepository,
