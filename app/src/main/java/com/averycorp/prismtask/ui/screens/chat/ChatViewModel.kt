@@ -9,6 +9,7 @@ import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.repository.ChatMessage
@@ -43,7 +44,8 @@ constructor(
     private val habitRepository: HabitRepository,
     private val habitCompletionDao: HabitCompletionDao,
     private val proFeatureGate: ProFeatureGate,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val userPreferencesDataStore: UserPreferencesDataStore
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
     val messages: StateFlow<List<ChatMessage>> = chatRepository.messages
@@ -75,6 +77,15 @@ constructor(
                 _contextTask.value = taskDao.getTaskByIdOnce(taskContextId)
             }
         }
+        // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1).
+        // Show the dialog the first time chat opens; once dismissed,
+        // the persisted flag prevents it from appearing again.
+        viewModelScope.launch {
+            val alreadyShown = userPreferencesDataStore.aiChatDisclosureShownFlow.first()
+            if (!alreadyShown) {
+                _showDisclosure.value = true
+            }
+        }
     }
 
     fun dismissUpgradePrompt() {
@@ -83,6 +94,9 @@ constructor(
 
     fun dismissDisclosure() {
         _showDisclosure.value = false
+        viewModelScope.launch {
+            userPreferencesDataStore.setAiChatDisclosureShown(true)
+        }
     }
 
     fun sendMessage(text: String) {
