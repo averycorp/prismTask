@@ -275,3 +275,139 @@ stripping UX in #1 is genuinely a design choice. The audit recommends
 but a stricter "off by default, opt in via a settings toggle" is
 defensible if the goal is zero surprise. Implementer should make the
 call when wiring #1.
+
+---
+
+## Phase 3 — Bundle summary
+
+Bundled #1 + #2 + #3 into a single PR (single coherent scope per the
+fan-out bundling rule) on branch `claude/nlp-task-additions-EgKhA`:
+
+- **PR #1173** — `feat(nlp): run editor + paste-conversation through
+  Quick Add NLP`. Touches:
+  - `AddEditTaskViewModel.kt` — injects `NaturalLanguageParser` +
+    `ParsedTaskResolver`; adds `enrichWithNlp` (offline only,
+    auto-creates unmatched tags/projects, returns null on no
+    extraction) + `applyNlpEnrichment` (manual-wins merge); calls
+    them on the create path of `saveTask` and per-subtask in the
+    pending-subtask flush block.
+  - `PasteConversationViewModel.kt` — injects parser + resolver +
+    tag/project repos; pipes each extracted candidate through
+    `parser.parse()` + `parsedTaskResolver.resolve()` before insert.
+  - `AddEditTaskViewModelTest.kt` — adds default no-extraction NLP
+    stubs in `setUp()` (so existing tests don't regress) plus three
+    new cases: empty-field enrichment, manual-wins on conflict,
+    edit-mode skip.
+
+**Implementation choices worth recording:**
+
+1. **Offline parser only on the form.** `parser.parse()` is used
+   instead of `parser.parseRemote()` so form save stays offline-safe.
+   Quick Add still uses `parseRemote()` for Pro users — this PR
+   doesn't change that. Trade-off: Pro users typing in the form get
+   the regex parser, not Haiku. Acceptable because the form's
+   structured pickers cover most of what the backend parser would
+   add, and the form is not the high-volume entry point.
+
+2. **Edit-mode skip is unconditional.** Re-parsing a saved title
+   that has already been stripped at first save is almost never what
+   the user wants. No setting toggle — if a future user wants
+   re-parse-on-edit, they can ask for it.
+
+3. **Title is always replaced, even when other fields are kept
+   manual.** This was the load-bearing UX call. Rationale: the user
+   sees the title field; leaving raw NLP tokens in the title after
+   submit (e.g. `"Buy milk tomorrow #shop"` lingering as the
+   persisted title) would be the bigger surprise than the strip.
+
+4. **Subtasks don't carry an NLP-resolved `projectId`.** Subtasks
+   inherit the parent's project implicitly via `parentTaskId`;
+   passing a different project from a subtask's NLP would split a
+   parent and its child across projects. Tags + priority + dates +
+   life-category are still applied per-subtask.
+
+**No re-baselining of the wall-clock-per-PR estimate.** This PR is
+a single bundle; the 3-PR fan-out estimate from Phase 1's ranked
+table doesn't apply. The bundle approach was the right call here —
+the three sites share the same enrichment helper, and splitting
+would have triplicated the helper or added a new shared module.
+
+**Memory entry candidates.** None. Nothing surprising —
+`parsedTaskResolver` was already designed for re-use from any
+caller (it's `@Singleton @Inject`-able), so this followed the path
+of least resistance.
+
+**Schedule for next audit.** No follow-up audit scheduled. Watch for
+user feedback on (a) the edit-mode skip — if users expect re-parse
+on edit, revisit; (b) the offline-only choice for the form — if Pro
+users complain that their backend NLP doesn't apply on the form,
+revisit and gate on `proFeatureGate.hasAccess(AI_NLP)` mirroring
+Quick Add's branch.
+
+---
+
+## Phase 4 — Claude Chat handoff
+
+```markdown
+# PrismTask: NLP for all task additions — handoff
+
+**Scope.** Wired every user-typed task-title entry point in the
+PrismTask Android app through the same `NaturalLanguageParser` +
+`ParsedTaskResolver` pipeline that Quick Add has used since v1.0,
+because the operator wanted UX consistency: typing
+`"Buy milk tomorrow !2 #shop"` should produce the same parsed result
+no matter which surface they typed it into.
+
+**Verdicts.**
+
+| Item | Verdict | Finding |
+|------|---------|---------|
+| Add/Edit task form (`AddEditTaskViewModel.saveTask`) | RED → PROCEED | Title field never ran through NLP; biggest gap |
+| Pending subtasks flush (same VM) | YELLOW → PROCEED | Subtask titles inserted as literal strings |
+| Paste Conversation (`PasteConversationViewModel`) | YELLOW → PROCEED | `ConversationTaskExtractor` output went straight to insert without `NaturalLanguageParser` |
+| Chat screen | YELLOW → DEFER | Chat AI is strictly more capable than the regex parser; re-parsing would regress |
+| Voice / Multi-Create / Widget Quick-Add | GREEN | Already use Quick Add pipeline |
+| Templates / Recurrence / Sync / Import / Calendar / Onboarding / Self-Care nudge / Undo | GREEN | No user-typed free text — running NLP would mutate structured data |
+
+**Shipped.**
+- PR #1173 (`feat(nlp): run editor + paste-conversation through
+  Quick Add NLP`) on branch `claude/nlp-task-additions-EgKhA`.
+  Bundles all three PROCEED items in a single coherent PR.
+
+**Deferred / stopped.**
+- Chat screen: chat AI already produces structured output; piping its
+  title through the regex parser would either no-op or destroy
+  AI-extracted readability. Right fix lives in chat-AI prompt, not
+  here.
+- ~12 internal / sync / template / recurrence / import paths:
+  premise mismatch — they don't take user-typed free text, and NLP
+  on structured data is a corruption risk (calendar event titles
+  getting their dates re-overridden, JSON imports getting fields
+  silently mutated, etc.).
+
+**Non-obvious findings.**
+- `parser.parseRemote()` (backend NLP, used by Quick Add for Pro)
+  has a built-in fallback to `parser.parse()` (offline regex), so
+  the Pro/Free if/else in `QuickAddViewModel` is a routing choice,
+  not a graceful-degrade requirement.
+- `ParsedTaskResolver` is already `@Singleton @Inject`-able and
+  was designed for reuse from any caller, which is why all three
+  PROCEED sites could share one `enrichWithNlp` helper without
+  refactoring the resolver.
+- The form's `title` / `dueDate` / `priority` / etc. all have
+  `private set` — assigning them from inside the VM works fine,
+  no public setter needed.
+- Subtasks intentionally do **not** carry an NLP-resolved project
+  id; subtasks inherit the parent's project via `parentTaskId`, so
+  letting a subtask title pull a different project from `@foo`
+  would split parent and child across projects. Tags + priority +
+  dates + life-category are still applied per-subtask.
+
+**Open questions.**
+- Form save uses offline `parser.parse()` only — Pro users typing
+  in the form don't get backend Haiku NLP. Reconsider if Pro users
+  complain. Quick Add bar still uses `parseRemote()`.
+- Edit-mode unconditionally skips NLP. If users expect re-parse on
+  edit, revisit.
+```
+
