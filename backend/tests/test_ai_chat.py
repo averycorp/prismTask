@@ -189,6 +189,9 @@ class TestChatEndpoint:
                 "title": None,
                 "due": None,
                 "priority": None,
+                "description": None,
+                "tags": None,
+                "project": None,
             }]
             assert body["tokens_used"] == {"input": 50, "output": 20}
 
