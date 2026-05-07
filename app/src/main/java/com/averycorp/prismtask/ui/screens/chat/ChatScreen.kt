@@ -74,6 +74,7 @@ import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.ui.components.ProFeature
 import com.averycorp.prismtask.ui.components.UpgradePrompt
+import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +90,7 @@ fun ChatScreen(
     val userTier by viewModel.userTier.collectAsStateWithLifecycle()
     val contextTask by viewModel.contextTask.collectAsStateWithLifecycle()
     val showDisclosure by viewModel.showDisclosure.collectAsStateWithLifecycle()
+    val showClearConfirm by viewModel.showClearConfirm.collectAsStateWithLifecycle()
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -135,6 +137,19 @@ fun ChatScreen(
         }
     }
 
+    // B.4 (F8 follow-on): handle nav requests emitted by chat actions.
+    // start_timer asks the screen to open the Timer screen at the user's
+    // configured default duration; the AI-suggested duration is already
+    // surfaced in the snackbar text by the ViewModel.
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvents.collect { event ->
+            when (event) {
+                is ChatViewModel.ChatNavEvent.OpenTimer ->
+                    navController.navigate(PrismTaskRoute.Timer.route)
+            }
+        }
+    }
+
     if (showUpgradePrompt) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissUpgradePrompt() },
@@ -172,6 +187,29 @@ fun ChatScreen(
         )
     }
 
+    // C.3 (F8 follow-on): confirm before dropping the conversation. The
+    // DeleteSweep button used to single-tap-clear with no undo path, so
+    // a misplaced thumb wiped active discussions.
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissClearConfirm() },
+            title = { Text("Clear Chat?") },
+            text = {
+                Text("This will delete all messages in the current conversation. This can't be undone.")
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearConversation() }) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissClearConfirm() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
@@ -204,7 +242,7 @@ fun ChatScreen(
                 },
                 actions = {
                     if (messages.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearConversation() }) {
+                        IconButton(onClick = { viewModel.requestClearConversation() }) {
                             Icon(
                                 Icons.Default.DeleteSweep,
                                 contentDescription = "Clear Chat"
@@ -233,7 +271,9 @@ fun ChatScreen(
                 // Welcome message if empty
                 if (messages.isEmpty()) {
                     item(key = "welcome") {
-                        WelcomeCard()
+                        WelcomeCard(
+                            onStarterPrompt = { prompt -> viewModel.sendMessage(prompt) }
+                        )
                     }
                 }
 
@@ -271,8 +311,28 @@ fun ChatScreen(
     }
 }
 
+/**
+ * C.5 (F8 follow-on): four starter prompts seed the empty welcome
+ * card. Tapping a chip sends the prompt straight to chat (rather than
+ * pre-filling the input), so the user gets a useful response without an
+ * extra Send tap. Each prompt maps to an existing chat capability —
+ * "what should I focus on" routes through the daily-briefing-shaped
+ * reasoning, "reschedule overdue" produces a reschedule_batch action,
+ * "break down my biggest task" produces a breakdown action, "25-min
+ * focus session" produces a start_timer action wired to B.4.
+ */
+private val STARTER_PROMPTS = listOf(
+    "What should I focus on today?",
+    "Help me reschedule overdue tasks",
+    "Break down my biggest task",
+    "Suggest a 25-minute focus session"
+)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WelcomeCard() {
+private fun WelcomeCard(
+    onStarterPrompt: (String) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -296,6 +356,28 @@ private fun WelcomeCard() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                STARTER_PROMPTS.forEach { prompt ->
+                    AssistChip(
+                        onClick = { onStarterPrompt(prompt) },
+                        label = {
+                            Text(
+                                text = prompt,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -362,6 +444,13 @@ private fun ActionChip(
     action: ChatActionResponse,
     onClick: () -> Unit
 ) {
+    // C.4 (F8 follow-on): enrich the visible label with task/duration
+    // context for chips whose payload carries it. TalkBack reads these
+    // labels out of bubble order, so a static "Add Task" / "Start a
+    // Timer" leaves blind users without context. The fields used here
+    // are the same ones already on the action payload — no extra
+    // threading needed for context-task chips because their parent
+    // bubble carries the task title visually + via TalkBack proximity.
     val label = when (action.type) {
         "complete" -> "Mark Complete"
         "reschedule" -> when (action.to) {
@@ -373,8 +462,14 @@ private fun ActionChip(
         "reschedule_batch" -> "Reschedule ${action.taskIds?.size ?: ""} Tasks"
         "breakdown" -> "Break It Down"
         "archive" -> "Just Drop It"
-        "start_timer" -> "Start a Timer"
-        "create_task" -> "Add Task"
+        "start_timer" -> {
+            val minutes = action.minutes?.takeIf { it in 1..480 }
+            if (minutes != null) "Start a $minutes-Min Timer" else "Start a Timer"
+        }
+        "create_task" -> {
+            val title = action.title?.takeIf { it.isNotBlank() }
+            if (title != null) "Add Task: $title" else "Add Task"
+        }
         else -> action.type.replaceFirstChar { it.uppercase() }
     }
 
