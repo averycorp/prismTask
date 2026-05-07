@@ -90,8 +90,11 @@ internal fun EmailAuthSection(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                if (registerMode) "Already Have an Account? Sign In"
-                else "New User? Create an Account"
+                if (registerMode) {
+                    "Already Have an Account? Sign In"
+                } else {
+                    "New User? Create an Account"
+                }
             )
         }
     }
