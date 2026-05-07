@@ -327,7 +327,8 @@ constructor(
             "reengagement_prefs",
             "sync_device_prefs",
             "advanced_tuning_prefs",
-            "productive_streak_prefs"
+            "productive_streak_prefs",
+            "tour_card_prefs"
         )
     }
 }
