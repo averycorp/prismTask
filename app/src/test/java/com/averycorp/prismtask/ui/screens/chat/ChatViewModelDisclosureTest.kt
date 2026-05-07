@@ -32,10 +32,14 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Phase 2 fix #2 (audit C.1): the first-run AI chat disclosure was wired
- * but never set to true. These tests pin the new behavior: dialog fires
- * when the persisted flag is false; dismiss persists true; subsequent
- * opens skip the dialog.
+ * Phase 2 fix #2 (CHAT_QUALITY_AUDIT C.1): the first-run AI chat
+ * disclosure was wired but never set to true. These tests pin the
+ * behavior: dialog fires when the persisted flag is false; dismiss
+ * persists true; subsequent opens skip the dialog.
+ *
+ * F8 chat privacy doc update bumped the flag from V1 to V2 so the
+ * expanded copy is re-acknowledged once by every user. Tests pin the
+ * V2 contract; the V1 setter must never be called from `dismiss`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelDisclosureTest {
@@ -94,7 +98,7 @@ class ChatViewModelDisclosureTest {
 
     @Test
     fun showDisclosure_fires_on_first_chat_open() = runTest(dispatcher) {
-        coEvery { userPreferencesDataStore.aiChatDisclosureShownFlow } returns flowOf(false)
+        coEvery { userPreferencesDataStore.aiChatDisclosureShownV2Flow } returns flowOf(false)
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -107,20 +111,20 @@ class ChatViewModelDisclosureTest {
 
     @Test
     fun showDisclosure_skipped_after_prior_dismissal() = runTest(dispatcher) {
-        coEvery { userPreferencesDataStore.aiChatDisclosureShownFlow } returns flowOf(true)
+        coEvery { userPreferencesDataStore.aiChatDisclosureShownV2Flow } returns flowOf(true)
 
         val viewModel = newViewModel()
         advanceUntilIdle()
 
         assertFalse(
-            "disclosure must NOT surface once persisted flag is true",
+            "disclosure must NOT surface once persisted V2 flag is true",
             viewModel.showDisclosure.value
         )
     }
 
     @Test
     fun dismissDisclosure_persists_flag_and_hides_dialog() = runTest(dispatcher) {
-        coEvery { userPreferencesDataStore.aiChatDisclosureShownFlow } returns flowOf(false)
+        coEvery { userPreferencesDataStore.aiChatDisclosureShownV2Flow } returns flowOf(false)
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -130,6 +134,41 @@ class ChatViewModelDisclosureTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.showDisclosure.value)
-        coVerify { userPreferencesDataStore.setAiChatDisclosureShown(true) }
+        coVerify { userPreferencesDataStore.setAiChatDisclosureShownV2(true) }
+    }
+
+    /**
+     * F8 re-fire path: existing user who already dismissed V1 must
+     * still see the dialog once after the V2 bump.
+     */
+    @Test
+    fun existingUser_with_v1_set_true_still_sees_v2_dialog_once() = runTest(dispatcher) {
+        coEvery { userPreferencesDataStore.aiChatDisclosureShownFlow } returns flowOf(true)
+        coEvery { userPreferencesDataStore.aiChatDisclosureShownV2Flow } returns flowOf(false)
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(
+            "existing user with V1 dismissed must still see V2 dialog after bump",
+            viewModel.showDisclosure.value
+        )
+    }
+
+    /**
+     * F8 invariant: dismiss writes V2 only — V1 stays untouched so
+     * back-revved clients keep their dismissal state.
+     */
+    @Test
+    fun dismissDisclosure_persists_v2_only_and_leaves_v1_alone() = runTest(dispatcher) {
+        coEvery { userPreferencesDataStore.aiChatDisclosureShownV2Flow } returns flowOf(false)
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        viewModel.dismissDisclosure()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { userPreferencesDataStore.setAiChatDisclosureShownV2(true) }
+        coVerify(exactly = 0) { userPreferencesDataStore.setAiChatDisclosureShown(any()) }
     }
 }
