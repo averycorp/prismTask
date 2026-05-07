@@ -268,3 +268,75 @@ KDoc and `CLAUDE.md`. (b) is the lower-cost choice.
   blocks Item 1's narrow scope. After Items 1 + 2 ship, the third
   copy is the pivot point for an abstraction (one
   `AutoPickRunner<T>(local, remote, ...)` instead of three).
+
+---
+
+## Phase 3 — Bundle summary
+
+**Item 1 (PROCEED, RED) — Claude-backed Life Category Auto button.**
+Shipped as PR #1176 (`feat(ai): route OrganizeTab Auto button on Life
+Category through Claude`). Single coherent scope, single PR — no
+fan-out. Branch `claude/fix-auto-categorization-E1cOH`.
+
+Files touched (11):
+
+- Backend (4):
+  - `backend/app/services/ai_productivity.py` — new
+    `classify_life_category_text()` mirroring
+    `classify_cognitive_load_text` exactly (Haiku, 256 tokens,
+    retry-once-on-malformed).
+  - `backend/app/routers/ai.py` — new
+    `POST /ai/life-category/classify_text` endpoint, rate-limited
+    20/min via `life_category_classify_text_rate_limiter`, gated by
+    `require_ai_features_enabled`.
+  - `backend/app/schemas/ai.py` — new
+    `LifeCategoryClassifyTextRequest` / `LifeCategoryClassifyTextResponse`.
+  - `backend/tests/test_ai_productivity.py` — 4 new tests
+    (`TestLifeCategoryClassifyText`).
+- Android (6):
+  - `app/.../data/remote/LifeCategoryRemoteClassifier.kt` (new) —
+    offline-safe `Result<Classification>` mirroring
+    `EisenhowerClassifier`.
+  - `app/.../data/remote/api/ApiModels.kt` — DTOs.
+  - `app/.../data/remote/api/PrismTaskApi.kt` — `classifyLifeCategoryText`.
+  - `app/.../ui/screens/addedittask/AddEditTaskViewModel.kt` —
+    inject classifier, add `lifeCategoryAutoPickInFlight` state,
+    add `tryUpgradeLifeCategoryWithClaude()` private method called
+    from `autoPickLifeCategory(force = true)`.
+  - `app/.../ui/screens/addedittask/tabs/OrganizeTab.kt` —
+    `AutoPickButton` swaps icon for spinner while `loading = true`.
+  - `app/src/test/.../AddEditTaskViewModelTest.kt` — 5 new tests
+    covering all branches (force-fires-Claude, non-force-skips-Claude,
+    AI-features-off, remote-failure-preserves-local, mid-flight-manual-pick-wins).
+- `CHANGELOG.md` — Added entry under Unreleased.
+
+**Items 2–4 (DEFER / STOP-no-work-needed).** Not shipped this batch by
+design. Ranked table at the top of this doc captures the cost/value
+case for picking them up later.
+
+**Re-baselined wall-clock-per-PR estimate.** Audit doc Phase 1 + Phase
+2 implementation + Phase 2 tests + Phase 3 doc-back-fill, single
+session: roughly 30 minutes of agent wall-clock for a one-item audit
+when an analogous backend endpoint (`classify_eisenhower_text`,
+`classify_cognitive_load_text`) and an analogous Android remote
+classifier (`EisenhowerClassifier`) already prescribe every line.
+That's the "cheap end" of the audit-first envelope; mega-audits
+(`PRE_PHASE_F_MEGA_AUDIT.md`) are the expensive end.
+
+**Memory entry candidate (surprising / non-obvious).**
+The backend already shipped a `classify_cognitive_load_text` endpoint
+(`backend/app/routers/ai.py:255`) that the Android client never wired
+up. Two independent "AI upgrade over keyword classifier" features
+(Cognitive Load, Life Category) were both half-built — backend ready,
+Android local-only. Worth a memory entry: when you're about to add a
+Claude-backed classifier endpoint, grep `routers/ai.py` first — it
+may already exist.
+
+**Schedule for next audit.** Open question Item 2 (Task Mode +
+Cognitive Load Auto buttons): operator should explicitly say "yes,
+same fix" or "no, leave them" before scheduling. If yes, batch them
+into one follow-up audit (single doc, two PROCEED items, one PR per
+backend endpoint + one combined Android PR — three PRs total) to
+avoid relitigating the rationale per item.
+
+---
