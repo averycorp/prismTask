@@ -438,7 +438,9 @@ constructor(
          * (create_task, start_timer).
          */
         val DESTRUCTIVE_TYPES_NEED_TASK_ID = setOf(
-            "complete", "reschedule", "archive"
+            "complete",
+            "reschedule",
+            "archive"
         )
 
         /**

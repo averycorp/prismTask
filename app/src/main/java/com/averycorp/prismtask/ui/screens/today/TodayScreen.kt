@@ -69,6 +69,7 @@ import com.averycorp.prismtask.ui.components.sync.SyncIndicatorHost
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.addedittask.AddEditTaskSheetHost
 import com.averycorp.prismtask.ui.screens.coaching.CoachingViewModel
+import com.averycorp.prismtask.ui.screens.today.ai.TodayAiHubSheet
 import com.averycorp.prismtask.ui.screens.today.components.AllCaughtUpCard
 import com.averycorp.prismtask.ui.screens.today.components.BookableHabitReminderCard
 import com.averycorp.prismtask.ui.screens.today.components.CheckInCompleteChip
@@ -84,7 +85,6 @@ import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
 import com.averycorp.prismtask.ui.screens.today.components.PlanForTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.ProductivityScoreBadge
 import com.averycorp.prismtask.ui.screens.today.components.SelfCareNudgeCard
-import com.averycorp.prismtask.ui.screens.today.ai.TodayAiHubSheet
 import com.averycorp.prismtask.ui.screens.today.components.SwipeableTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.TodayBalanceSection
 import com.averycorp.prismtask.ui.screens.today.components.TodayCognitiveLoadSection
