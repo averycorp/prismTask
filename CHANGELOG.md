@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Focus Timer auto-switches the work/break tab on completion outside
+  Pomodoro Mode.** When Pomodoro Mode was off, the Focus Timer's
+  segmented Work / Break / Custom selector stayed put when the active
+  countdown hit zero — the user had to manually re-tap a tab and press
+  Start to begin the next phase. `TimerViewModel.onTimerCompleted` now
+  flips Work → Break (and vice versa) at completion time and respects
+  the existing **Auto-Start Breaks** / **Auto-Start Focus** prefs (which
+  were previously only honoured inside Pomodoro Mode). `CUSTOM` is
+  excluded — it has no natural counterpart and stays put. Audit:
+  `docs/audits/TIMER_AUTO_SWITCH_TAB_AUDIT.md`.
 - **Morning check-in banner now respects Start-of-Day end-to-end.** The
   Today-screen banner previously gated visibility on a hardcoded
   `Calendar.HOUR_OF_DAY < 11` check that ignored the user's configured

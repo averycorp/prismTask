@@ -207,9 +207,42 @@ constructor(
         }
     }
 
-    private fun onTimerCompleted() {
+    @androidx.annotation.VisibleForTesting
+    internal fun onTimerCompleted() {
         val state = _uiState.value
-        if (!state.pomodoroEnabled) return
+
+        if (!state.pomodoroEnabled) {
+            // Non-Pomodoro: auto-switch the work/break tab when the active
+            // timer runs out, gated by the same auto-start prefs the
+            // Pomodoro branch uses below. CUSTOM has no natural counterpart
+            // and stays put.
+            when (state.mode) {
+                TimerMode.WORK -> {
+                    val breakDuration = breakDurationSeconds.value
+                    _uiState.value = state.copy(
+                        mode = TimerMode.BREAK,
+                        isLongBreak = false,
+                        remainingSeconds = breakDuration,
+                        totalSeconds = breakDuration,
+                        isRunning = false
+                    )
+                    if (state.autoStartBreaks) start()
+                }
+                TimerMode.BREAK -> {
+                    val workDuration = workDurationSeconds.value
+                    _uiState.value = state.copy(
+                        mode = TimerMode.WORK,
+                        isLongBreak = false,
+                        remainingSeconds = workDuration,
+                        totalSeconds = workDuration,
+                        isRunning = false
+                    )
+                    if (state.autoStartWork) start()
+                }
+                TimerMode.CUSTOM -> Unit
+            }
+            return
+        }
 
         if (state.mode == TimerMode.WORK) {
             val newCompleted = state.completedSessions + 1
