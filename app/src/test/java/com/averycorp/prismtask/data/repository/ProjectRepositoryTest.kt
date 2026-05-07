@@ -344,6 +344,9 @@ class ProjectRepositoryTest {
         override suspend fun getProjectByIdOnce(id: Long): ProjectEntity? =
             projects.firstOrNull { it.id == id }
 
+        override suspend fun getProjectByNameOnce(name: String): ProjectEntity? =
+            projects.firstOrNull { it.name.equals(name, ignoreCase = true) }
+
         override fun getProjectWithTaskCount(): Flow<List<ProjectWithCount>> = flowOf(
             projects.map {
                 ProjectWithCount(

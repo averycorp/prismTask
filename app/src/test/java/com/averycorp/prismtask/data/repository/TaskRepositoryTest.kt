@@ -1017,6 +1017,8 @@ class TaskRepositoryTest {
 
         override suspend fun getTagByIdOnce(id: Long): TagEntity? = null
 
+        override suspend fun getTagByNameOnce(name: String): TagEntity? = null
+
         override suspend fun insert(tag: TagEntity): Long = 0L
 
         override suspend fun update(tag: TagEntity) {}

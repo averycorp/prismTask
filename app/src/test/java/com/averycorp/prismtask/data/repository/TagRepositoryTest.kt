@@ -165,6 +165,9 @@ class TagRepositoryTest {
         override suspend fun getTagByIdOnce(id: Long): TagEntity? =
             tags.firstOrNull { it.id == id }
 
+        override suspend fun getTagByNameOnce(name: String): TagEntity? =
+            tags.firstOrNull { it.name.equals(name, ignoreCase = true) }
+
         override suspend fun getTagIdsForTaskOnce(taskId: Long): List<Long> =
             crossRefs.filter { it.taskId == taskId }.map { it.tagId }
 

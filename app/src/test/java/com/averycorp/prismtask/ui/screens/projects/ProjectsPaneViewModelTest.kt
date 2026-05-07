@@ -165,6 +165,9 @@ class ProjectsPaneViewModelTest {
         override suspend fun getProjectByIdOnce(id: Long): ProjectEntity? =
             projects.firstOrNull { it.id == id }
 
+        override suspend fun getProjectByNameOnce(name: String): ProjectEntity? =
+            projects.firstOrNull { it.name.equals(name, ignoreCase = true) }
+
         override fun getProjectWithTaskCount(): Flow<List<ProjectWithCount>> = flowOf(emptyList())
 
         override fun searchProjects(query: String): Flow<List<ProjectEntity>> = flowOf(emptyList())
