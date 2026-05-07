@@ -249,10 +249,145 @@ high-stakes (PII, user data mutation) and warrants the gate.
 
 ## Phase 3 — Bundle summary
 
-(*Will be appended in-place when Phase 2 PRs are opened, per CLAUDE.md
-"Phase 3+4 fire pre-merge" override.*)
+Phase 2 implementation landed as a stack on PR #1164 (per task-prompt
+instruction "DEVELOP all your changes on the designated branch above").
+Each fix is a separate commit on `claude/audit-chat-quality-e9GAd`:
+
+| # | Fix | Commit | Files | Net LOC | Tests added |
+|---|---|---|---|---|---|
+| 1 | A.1 + E.1 server-side context block + A.2 + E.2 dead-code cleanup | `7408a30` | 8 (3 backend + 4 Android + 1 test) | +450 / -40 | 6 pytest + 3 Android unit |
+| 2 | C.1 first-run AI chat disclosure | `1f9a16c` | 3 | +163 / -1 | 3 Android unit |
+| 3 + 4 | B.2 idempotency + per-item batch UX + C.2 snackbar-with-undo | `6feb4b5` | 3 | +480 / -59 | 6 Android unit |
+| **Total** | — | — | **14 unique files** | **+1093 / -100** | **18 new tests** |
+
+Net LOC came in at ~990 against the audit's ~492 estimate — drift
+trace: per-item batch undo (Fix #3) required snapshotting original
+dueDates via TaskDao for each id, plus the executeAction refactor into
+typed `handle*` helpers added structure but cost lines. This is within
+the audit's 1.9-14× discovery-heavy drift envelope (memory #LOC
+calibration), but worth flagging for the next chat-area audit's
+estimate.
+
+Verification status (CI is the gate):
+- Backend: 6 new pytest cases under `tests/test_ai_chat.py`. Local
+  Python smoke test (stubbed Anthropic) confirmed history is
+  forwarded as proper `messages` array, invalid-role entries are
+  dropped, and `task_context` is included in the user payload. CI
+  pytest pending on push.
+- Android: 9 new unit tests under
+  `ui/screens/chat/ChatViewModelDisclosureTest.kt` and
+  `ChatViewModelActionTest.kt`. Local sandbox lacks the Android SDK
+  / Gradle 9.3.1 (Linux env vs. project's Windows-flavored CLAUDE.md
+  paths); ktlint + detekt + tests run on CI.
+
+Memory entry candidates (only if surprising):
+- **Stale "rolling history" comments**: a feature can have a comment
+  describing intended behavior ("client owns rolling 10-pair history")
+  without the wire actually carrying that history to the model. The
+  audit-first sweep caught this only because the actual `messages=[...]`
+  array was inspected. **Lesson**: when a comment claims memory is
+  preserved, grep for what's actually sent on the network call.
+
+Filed-but-deferred status:
+- D.1 streaming, E.3 Room persistence, B.1 native tool-use, B.3, B.4,
+  C.3-C.5, D.2-D.3, E.4: all unchanged from §5.1. None promoted, none
+  closed, all retain their original re-trigger criteria. To check on
+  next monthly audit pass.
+
+Next audit: schedule for the v1.9 cycle — re-evaluate streaming and
+Room persistence against the criteria in §5.1.
 
 ## Phase 4 — Claude Chat handoff
 
-(*Will be emitted as the final block of this audit doc PR's session,
-per CLAUDE.md override.*)
+```markdown
+# PrismTask chat-quality audit-first mega — Phase 4 handoff (Phase 1 + 2 complete)
+
+## Scope
+Audit + fix bundle for the conversational AI chat surface across
+backend (`POST /api/v1/ai/chat`) and Android
+(`ChatScreen`/`ChatViewModel`/`ChatRepository`). Web has no chat UI
+today. Five-axis sweep: reply quality, tool-call reliability, UI/UX,
+latency/streaming, conversation memory.
+
+## Repo state at handoff
+- **Branch:** `claude/audit-chat-quality-e9GAd`
+- **PR:** https://github.com/averycorp/prismTask/pull/1164 (Phase 1
+  audit doc + Phase 2 implementation stacked, awaiting CI + merge).
+- **App:** 1.8.46 / vc 844 (no version bump; no migrations) ·
+  **Room:** v76 unchanged · **Backend alembic head:**
+  `024_add_beta_codes` unchanged · **Web:** 1.6.0 unchanged.
+- **Commits on branch:** `bd97dbe` (audit) · `7408a30` (fix #1) ·
+  `1f9a16c` (fix #2) · `6feb4b5` (fixes #3+#4).
+
+## Verdicts
+- **Premise 1 (web parity):** YELLOW reframe — web has no chat UI.
+- **Premise 2 (rough enumerable):** GREEN — two root causes drove
+  ≥80% of "rough" complaints (A.1 task-content blindness, E.1 zero
+  multi-turn memory).
+- **Premise 3 (8-day window):** GREEN — fits.
+- **Premise 4 (AI gate):** GREEN — both halves wired post-#1128.
+- **Premise 5 (Ultra=Sonnet tier):** RED — no Ultra tier in code;
+  dead `tier` param removed in fix #1.
+
+## Shipped (Phase 2)
+1. **#1 — A.1+E.1 server-side context block + A.2+E.2 cleanup.**
+   Backend now forwards rolling N=6 user/assistant pairs and a
+   task_context snapshot (title/description/due/priority/project) to
+   Anthropic. The model finally has multi-turn memory and grounded
+   task content.
+2. **#2 — C.1 first-run AI chat disclosure.** New
+   `aiChatDisclosureShownFlow` preference. Dialog now actually fires
+   on first chat open and persists acknowledgement.
+3. **#3 — B.2 idempotency + per-item batch UX.** Action chip
+   double-tap now silently no-ops while first call is in flight.
+   `reschedule_batch` reports "Rescheduled X of Y (Z Failed)".
+4. **#4 — C.2 snackbar-with-undo on destructive ops.** Replaces toast
+   feedback with snackbar. Each destructive type carries an undo
+   callback (uncompleteTask / unarchiveTask / restore-prior-dueDate).
+
+## Deferred / stopped
+- **D.1 streaming** — exceeds 8-day window. Re-trigger ≥ 5/wk
+  blank-screen reports by 2026-06-15.
+- **E.3 Room persistence + Firestore sync** — needs migration during
+  Phase F gate; risk too high. Re-trigger Crashlytics process-death
+  loss > 1% or 5 reports/wk.
+- **B.1 native Anthropic tool-use migration** — re-trigger on
+  action-type fan-out > 10 or any input schema > 5 fields.
+- **B.3, B.4, C.3-C.5, D.2-D.3, E.4** — P2 polish, criterion-tracked.
+
+## Non-obvious findings
+- The privacy posture *was* less leaky than the audit prompt assumed:
+  conversation history was never forwarded to Anthropic. Fix #1
+  introduces a new (intended, disclosed) PII shape: task title +
+  description + due_date + priority + project_name now egress on
+  every chat turn that opens from a task. Privacy doc update required
+  per the existing PR #788 disclosure path — not a fresh privacy
+  re-audit.
+- Fixes #2, #3, #4 each surfaced ≥ 1 dead-code branch that was
+  declared but never wired (`_showDisclosure` flow, `tier` param,
+  `shouldRefreshContext`). This is consistent with a planned
+  context-injection design that started but never finished. Fix #1
+  effectively completes that intent.
+- Net LOC drift: audit estimated ~492, shipped ~990. Driver: per-item
+  batch undo required snapshotting original dueDates via TaskDao,
+  plus the per-type `handle*` helper extraction added structure at
+  the cost of lines.
+
+## Open questions for operator
+1. Privacy doc update for the new task-content PII shape — single PR
+   to `docs/privacy/index.md` § AI features and
+   `docs/store-listing/compliance/data-safety-form.md` per PR #788
+   pattern? (Recommended.)
+2. Fix #2's disclosure dialog will fire once for every existing user
+   on first chat open after this lands — is that the intended
+   re-disclosure behavior given the broadened PII shape? (Audit
+   assumed yes; flagging for operator confirmation.)
+3. Should the disclosure copy be updated to enumerate the new task
+   fields? Current copy: "Your messages are processed by AI to
+   provide coaching. Chat resets daily and isn't stored permanently."
+   — does NOT mention task title/description forwarding.
+
+## Audit-first track record update
+This session reframed 2 of 5 operator premises (Premise 1 web parity,
+Premise 5 Ultra tier). Counts to the running statistic per memory #13.
+```
