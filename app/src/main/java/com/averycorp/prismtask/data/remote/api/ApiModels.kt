@@ -578,7 +578,13 @@ data class ChatActionResponse(
     val minutes: Int? = null,
     val title: String? = null,
     val due: String? = null,
-    val priority: String? = null
+    val priority: String? = null,
+    // B.3 (F8 follow-on): rich create_task fields. The backend prompt
+    // emits these only when the user named or strongly implied them;
+    // any subset is valid.
+    val description: String? = null,
+    val tags: List<String>? = null,
+    val project: String? = null
 )
 
 data class ChatTokensUsed(

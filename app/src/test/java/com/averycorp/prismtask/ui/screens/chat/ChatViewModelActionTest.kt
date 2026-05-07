@@ -10,8 +10,10 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
+import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import io.mockk.coEvery
@@ -50,6 +52,7 @@ class ChatViewModelActionTest {
 
     private lateinit var chatRepository: ChatRepository
     private lateinit var taskRepository: TaskRepository
+    private lateinit var tagRepository: TagRepository
     private lateinit var taskDao: TaskDao
     private lateinit var projectDao: ProjectDao
     private lateinit var habitRepository: HabitRepository
@@ -65,6 +68,7 @@ class ChatViewModelActionTest {
             every { messages } returns MutableStateFlow(emptyList())
         }
         taskRepository = mockk(relaxed = true)
+        tagRepository = mockk(relaxed = true)
         taskDao = mockk(relaxed = true) {
             coEvery { getTaskByIdOnce(any()) } returns null
         }
@@ -89,6 +93,7 @@ class ChatViewModelActionTest {
         savedStateHandle = SavedStateHandle(),
         chatRepository = chatRepository,
         taskRepository = taskRepository,
+        tagRepository = tagRepository,
         taskDao = taskDao,
         projectDao = projectDao,
         habitRepository = habitRepository,
@@ -228,21 +233,175 @@ class ChatViewModelActionTest {
     }
 
     @Test
-    fun start_timer_emits_result_with_no_undo() = runTest(dispatcher) {
+    fun start_timer_with_minutes_surfaces_duration_and_emits_open_timer_nav_event() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.navigationEvents.test navTest@{
+            viewModel.actionResults.test {
+                viewModel.executeAction(ChatActionResponse(type = "start_timer", minutes = 25))
+                advanceUntilIdle()
+
+                val result = awaitItem()
+                // B.4 (F8 follow-on): the AI-suggested duration is surfaced
+                // in the snackbar text. The Timer screen still opens at the
+                // user's configured default; we don't deep-link the duration.
+                assertEquals("Starting Timer (25 min)", result.message)
+                assertNull("non-destructive ops carry no undo", result.undoLabel)
+                assertNull(result.undoAction)
+
+                val navEvent = this@navTest.awaitItem()
+                assertEquals(ChatViewModel.ChatNavEvent.OpenTimer(minutes = 25), navEvent)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun start_timer_without_minutes_falls_back_to_generic_message() = runTest(dispatcher) {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.actionResults.test {
-            viewModel.executeAction(ChatActionResponse(type = "start_timer", minutes = 25))
+            viewModel.executeAction(ChatActionResponse(type = "start_timer"))
             advanceUntilIdle()
 
             val result = awaitItem()
             assertEquals("Timer Started", result.message)
-            assertNull("non-destructive ops carry no undo", result.undoLabel)
-            assertNull(result.undoAction)
-
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun create_task_plumbs_description_project_and_tags_through_addtask() = runTest(dispatcher) {
+        // Project name resolves to id; one existing tag, one new tag.
+        coEvery { projectDao.getProjectByNameOnce("Q2 Planning") } returns
+            com.averycorp.prismtask.data.local.entity.ProjectEntity(
+                id = 77L,
+                name = "Q2 Planning"
+            )
+        coEvery { tagRepository.getTagByNameOnce("work") } returns
+            TagEntity(id = 11L, name = "work", color = "#000000")
+        coEvery { tagRepository.getTagByNameOnce("planning") } returns null
+        coEvery { tagRepository.addTag("planning") } returns 12L
+        coEvery { taskRepository.addTask(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns 99L
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.actionResults.test {
+            viewModel.executeAction(
+                ChatActionResponse(
+                    type = "create_task",
+                    title = "Draft Q2 OKR doc",
+                    due = "tomorrow",
+                    priority = "high",
+                    description = "Cover team goals + risk register",
+                    tags = listOf("work", "planning"),
+                    project = "Q2 Planning"
+                )
+            )
+            advanceUntilIdle()
+
+            val result = awaitItem()
+            assertEquals("Task Created: Draft Q2 OKR doc", result.message)
+
+            coVerify(exactly = 1) {
+                taskRepository.addTask(
+                    title = "Draft Q2 OKR doc",
+                    description = "Cover team goals + risk register",
+                    dueDate = any(),
+                    priority = 3,
+                    projectId = 77L
+                )
+            }
+            // Existing tag re-used, new tag created, both linked to the new task.
+            coVerify(exactly = 1) { tagRepository.addTagToTask(99L, 11L) }
+            coVerify(exactly = 1) { tagRepository.addTag("planning") }
+            coVerify(exactly = 1) { tagRepository.addTagToTask(99L, 12L) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun create_task_silently_drops_unknown_project_name() = runTest(dispatcher) {
+        coEvery { projectDao.getProjectByNameOnce(any()) } returns null
+        coEvery { taskRepository.addTask(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns 50L
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.actionResults.test {
+            viewModel.executeAction(
+                ChatActionResponse(
+                    type = "create_task",
+                    title = "Random task",
+                    project = "Nonexistent Project"
+                )
+            )
+            advanceUntilIdle()
+            awaitItem()
+
+            // We never auto-create projects from chat — projectId must be null.
+            coVerify(exactly = 1) {
+                taskRepository.addTask(
+                    title = "Random task",
+                    description = null,
+                    dueDate = null,
+                    priority = 0,
+                    projectId = null
+                )
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun rapid_double_send_only_dispatches_one_request() = runTest(dispatcher) {
+        // First sendMessage suspends until we release the gate, mirroring the
+        // ~16ms recompose window where Compose's `enabled = !isTyping` hasn't
+        // caught up yet and a second tap could land.
+        val gate = CompletableDeferred<Unit>()
+        coEvery { chatRepository.sendMessage(any(), any(), any()) } coAnswers {
+            gate.await()
+            mockk(relaxed = true)
+        }
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.sendMessage("hello")
+        viewModel.sendMessage("hello")  // second tap — must be silently dropped
+        advanceUntilIdle()
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { chatRepository.sendMessage(any(), any(), any()) }
+    }
+
+    @Test
+    fun request_clear_conversation_does_not_drop_messages_until_confirmed() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        // Tap the DeleteSweep button → only flips the confirm-flag, no clear yet.
+        viewModel.requestClearConversation()
+        assertEquals(true, viewModel.showClearConfirm.value)
+        coVerify(exactly = 0) { chatRepository.clearConversation() }
+
+        // User cancels the dialog.
+        viewModel.dismissClearConfirm()
+        assertEquals(false, viewModel.showClearConfirm.value)
+        coVerify(exactly = 0) { chatRepository.clearConversation() }
+
+        // Tap again, this time confirm → repository clears.
+        viewModel.requestClearConversation()
+        viewModel.clearConversation()
+        assertEquals(false, viewModel.showClearConfirm.value)
+        coVerify(exactly = 1) { chatRepository.clearConversation() }
     }
 
     @Test

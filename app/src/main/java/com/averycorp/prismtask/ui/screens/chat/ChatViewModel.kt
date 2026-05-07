@@ -15,6 +15,7 @@ import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.toCalendarDayOfWeek
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
@@ -39,6 +40,7 @@ constructor(
     savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository,
     private val taskRepository: TaskRepository,
+    private val tagRepository: TagRepository,
     private val taskDao: TaskDao,
     private val projectDao: ProjectDao,
     private val habitRepository: HabitRepository,
@@ -91,6 +93,31 @@ constructor(
     private val _showDisclosure = MutableStateFlow(false)
     val showDisclosure: StateFlow<Boolean> = _showDisclosure.asStateFlow()
 
+    /**
+     * Asks the screen to confirm a destructive bulk action (currently
+     * only Clear Chat). Phase 2 audit fix C.3: the DeleteSweep button
+     * used to drop the conversation on a single tap with no undo path,
+     * making accidental clears unrecoverable.
+     */
+    private val _showClearConfirm = MutableStateFlow(false)
+    val showClearConfirm: StateFlow<Boolean> = _showClearConfirm.asStateFlow()
+
+    /**
+     * One-shot navigation requests emitted by chat actions that need to
+     * leave the screen (B.4: start_timer opens the Timer screen). Kept
+     * separate from [ChatActionResult] because nav events bypass the
+     * snackbar plumbing — the screen layer collects this flow and calls
+     * navController.navigate directly.
+     */
+    sealed interface ChatNavEvent {
+        data class OpenTimer(val minutes: Int?) : ChatNavEvent
+    }
+
+    private val _navigationEvents = MutableSharedFlow<ChatNavEvent>(
+        extraBufferCapacity = 1
+    )
+    val navigationEvents: SharedFlow<ChatNavEvent> = _navigationEvents.asSharedFlow()
+
     /** Task ID if chat was opened from a specific task. */
     val taskContextId: Long? = savedStateHandle.get<Long>("taskId")?.takeIf { it > 0 }
 
@@ -127,6 +154,14 @@ constructor(
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
+
+        // D.3 (F8 follow-on): leading idempotency guard. Compose's
+        // `enabled = !isTyping` on the send button blocks most double
+        // taps, but there is a ~16ms window between the user tap and
+        // the next recomposition where a second tap can land. Reading
+        // the StateFlow value here is synchronous and races with
+        // nothing — closes the gap cheaply.
+        if (_isTyping.value) return
 
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_CONVERSATIONAL)) {
             _showUpgradePrompt.value = true
@@ -169,7 +204,22 @@ constructor(
         _error.value = null
     }
 
+    /** Show the C.3 confirm dialog before actually clearing chat. */
+    fun requestClearConversation() {
+        _showClearConfirm.value = true
+    }
+
+    /** User cancelled the C.3 confirm dialog; do nothing. */
+    fun dismissClearConfirm() {
+        _showClearConfirm.value = false
+    }
+
+    /**
+     * Drop the conversation. Wired both directly (tests) and via
+     * [requestClearConversation] → confirm dialog → here (UI).
+     */
     fun clearConversation() {
+        _showClearConfirm.value = false
         chatRepository.clearConversation()
     }
 
@@ -200,7 +250,7 @@ constructor(
                     "reschedule_batch" -> handleRescheduleBatch(action)
                     "breakdown" -> handleBreakdown(action)
                     "archive" -> handleArchive(action)
-                    "start_timer" -> ChatActionResult("Timer Started")
+                    "start_timer" -> handleStartTimer(action)
                     "create_task" -> handleCreateTask(action)
                     else -> null
                 }
@@ -321,19 +371,62 @@ constructor(
         )
     }
 
+    /**
+     * B.4 (F8 follow-on): emit a navigation request so the screen layer
+     * can route to the Timer screen. We deliberately do NOT pass
+     * [ChatActionResponse.minutes] through the nav route — the timer
+     * screen reads its duration from user preferences and we don't want
+     * an AI-suggested duration to silently override the user's
+     * configured length. The minutes value is surfaced in the snackbar
+     * so the user knows what AI suggested.
+     */
+    private suspend fun handleStartTimer(action: ChatActionResponse): ChatActionResult {
+        _navigationEvents.emit(ChatNavEvent.OpenTimer(minutes = action.minutes))
+        val message = action.minutes
+            ?.takeIf { it in 1..480 }
+            ?.let { "Starting Timer ($it min)" }
+            ?: "Timer Started"
+        return ChatActionResult(message)
+    }
+
+    /**
+     * B.3 (F8 follow-on): plumb the rich create_task fields. Switches
+     * from [TaskRepository.insertTask] to [TaskRepository.addTask] for
+     * behavior parity with QuickAdd / AddEditTask save-new — the latter
+     * accepts description / projectId and runs the same emit / classify
+     * / widget-update sequence. Tags are find-or-created by name and
+     * applied post-insert through [TagRepository.addTagToTask].
+     * Project name resolves to id via [ProjectDao.getProjectByNameOnce];
+     * a name the user invented (no matching project) is silently dropped
+     * — we never auto-create projects from chat.
+     */
     private suspend fun handleCreateTask(action: ChatActionResponse): ChatActionResult? {
         val title = action.title?.takeIf { it.isNotBlank() } ?: return null
         val dueDate = resolveDate(action.due)
         val priority = resolvePriority(action.priority)
-        val now = System.currentTimeMillis()
-        val task = TaskEntity(
+        val description = action.description?.takeIf { it.isNotBlank() }
+        val projectId = action.project
+            ?.takeIf { it.isNotBlank() }
+            ?.let { projectDao.getProjectByNameOnce(it.trim())?.id }
+
+        val taskId = taskRepository.addTask(
             title = title,
+            description = description,
             dueDate = dueDate,
             priority = priority,
-            createdAt = now,
-            updatedAt = now
+            projectId = projectId
         )
-        taskRepository.insertTask(task)
+
+        action.tags
+            ?.mapNotNull { it.trim().takeIf(String::isNotBlank) }
+            ?.distinctBy { it.lowercase() }
+            ?.take(MAX_CHAT_CREATE_TASK_TAGS)
+            ?.forEach { tagName ->
+                val existing = tagRepository.getTagByNameOnce(tagName)
+                val tagId = existing?.id ?: tagRepository.addTag(tagName)
+                tagRepository.addTagToTask(taskId, tagId)
+            }
+
         return ChatActionResult("Task Created: $title")
     }
 
@@ -347,6 +440,13 @@ constructor(
         val DESTRUCTIVE_TYPES_NEED_TASK_ID = setOf(
             "complete", "reschedule", "archive"
         )
+
+        /**
+         * Cap applied client-side; the backend schema also caps at 10.
+         * Defends against an AI response that hallucinates a long tag
+         * list and exhausts insertions.
+         */
+        const val MAX_CHAT_CREATE_TASK_TAGS = 10
     }
 
     /**

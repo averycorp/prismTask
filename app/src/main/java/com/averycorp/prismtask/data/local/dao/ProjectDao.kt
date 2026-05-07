@@ -66,6 +66,10 @@ interface ProjectDao {
     @Query("SELECT * FROM projects WHERE id = :id")
     suspend fun getProjectByIdOnce(id: Long): ProjectEntity?
 
+    /** Exact-match lookup (case-insensitive via SQLite NOCASE). */
+    @Query("SELECT * FROM projects WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun getProjectByNameOnce(name: String): ProjectEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(project: ProjectEntity): Long
 

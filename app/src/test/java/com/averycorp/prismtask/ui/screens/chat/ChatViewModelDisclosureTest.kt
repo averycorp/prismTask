@@ -9,6 +9,7 @@ import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import io.mockk.coEvery
@@ -42,6 +43,7 @@ class ChatViewModelDisclosureTest {
 
     private lateinit var chatRepository: ChatRepository
     private lateinit var taskRepository: TaskRepository
+    private lateinit var tagRepository: TagRepository
     private lateinit var taskDao: TaskDao
     private lateinit var projectDao: ProjectDao
     private lateinit var habitRepository: HabitRepository
@@ -57,6 +59,7 @@ class ChatViewModelDisclosureTest {
             every { messages } returns MutableStateFlow(emptyList())
         }
         taskRepository = mockk(relaxed = true)
+        tagRepository = mockk(relaxed = true)
         taskDao = mockk(relaxed = true) {
             coEvery { getTaskByIdOnce(any()) } returns null
         }
@@ -79,6 +82,7 @@ class ChatViewModelDisclosureTest {
         savedStateHandle = SavedStateHandle(),
         chatRepository = chatRepository,
         taskRepository = taskRepository,
+        tagRepository = tagRepository,
         taskDao = taskDao,
         projectDao = projectDao,
         habitRepository = habitRepository,
