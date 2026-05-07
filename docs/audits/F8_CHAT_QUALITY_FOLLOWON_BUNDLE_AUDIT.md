@@ -429,3 +429,51 @@ keeps the test suite GREEN.
 
 _Phase 1 complete. Proceeding to Phase 2 implementation per audit-first
 default (no checkpoint gate)._
+
+---
+
+## 12. Phase 3 — Bundle summary (pre-merge)
+
+**PR #1168** — `fix(chat): F8 follow-on bundle — B.3/B.4/C.3/C.4/C.5/D.3` —
+opened against `main` from `claude/audit-f8-chat-followon-Ptqzs`.
+Branch HEAD `40c6acd`, base `f44d1bd` (PR #1164 squash-merge).
+
+| # | Item | Commit | Files | LOC | Notes |
+|---|---|---|---|---|---|
+| 1 | Audit doc | `35da43f` | 1 | +431 | Phase 1 single-pass, under cap |
+| 2 | B.3 backend | `c813daa` | 3 | +53 / -1 | Schema fields + prompt + pytest |
+| 3 | B.3 + B.4 + D.3 + C.3-state | `f3c466e` | 7 | +291 / -11 | ViewModel rewrites + 5 unit tests |
+| 4 | C.3 + C.4 + C.5 + B.4 UI | `40c6acd` | 1 | +100 / -5 | ChatScreen polish + nav collector |
+| **Total** | | **4 commits** | **9 unique files** | **+875 / -17** | **6 new tests** |
+
+**LOC vs Phase 1 estimate.** Audit forecast ~385 LOC; shipped ~875
+including audit doc + tests. Calibration: PR #1164 ran 1.6× over its
+~600 estimate; this PR ran 2.3× over ~385 (excluding the 431-line
+audit doc, 1.2× over). Audit-doc lines should be excluded from future
+LOC ceiling forecasts — they're not feature LOC.
+
+**Verdict re-baseline.** All six items closed by audit. No additional
+STOPs surfaced during implementation beyond the two anticipated
+(STOP-A4 + STOP-C, both default-applied). Zero scope creep.
+
+**Memory entry candidates** (per audit-first hard rule on
+non-obvious-only):
+- _Possible_: chat-action-handler convention (per-type `handle*` +
+  `ChatActionResult` + `_actionsInFlight` + `ChatNavEvent`) reaches a
+  2nd PR data point (PR #1164 + PR #1168). Per memory wait-for-third
+  rule, NOT memorized yet — flag for next chat-touching session.
+- _Possible_: dead-code-completion pattern reaches a 2nd post-audit
+  data point (PR #1164 closed 3 dead-code branches; this PR closes
+  `ChatActionResponse.minutes` via B.4). Wait-for-third still applies.
+- _Skip_: sibling AI-feature destructive-tap pattern — only 1 candidate
+  (`PasteConversationViewModel.reset`), unverified.
+
+**Schedule for next audit.** None until F9. Re-trigger criteria filed
+in § 9 above and PR #1168 description.
+
+---
+
+## 13. Phase 4 — Claude Chat handoff (pre-merge)
+
+See the run output for the paste-ready handoff block. PR #1168 link
+recorded above.
