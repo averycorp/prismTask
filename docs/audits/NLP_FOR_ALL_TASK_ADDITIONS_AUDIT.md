@@ -301,13 +301,15 @@ fan-out bundling rule) on branch `claude/nlp-task-additions-EgKhA`:
 
 **Implementation choices worth recording:**
 
-1. **Offline parser only on the form.** `parser.parse()` is used
-   instead of `parser.parseRemote()` so form save stays offline-safe.
-   Quick Add still uses `parseRemote()` for Pro users — this PR
-   doesn't change that. Trade-off: Pro users typing in the form get
-   the regex parser, not Haiku. Acceptable because the form's
-   structured pickers cover most of what the backend parser would
-   add, and the form is not the high-volume entry point.
+1. **Pro users get Haiku NLP on every entry point.** The first cut of
+   this PR used offline `parser.parse()` only on the form and the
+   paste-conversation flow. Operator pushed back: Pro users pay for
+   AI parsing and should get it everywhere, not just in Quick Add.
+   Updated to mirror Quick Add's `proFeatureGate.hasAccess(AI_NLP)`
+   branch — Pro → `parseRemote` (Haiku, with built-in fallback to
+   `parse` on backend failure), Free → `parse`. Form save stays
+   offline-safe because `parseRemote` falls back to local `parse`
+   on any error.
 
 2. **Edit-mode skip is unconditional.** Re-parsing a saved title
    that has already been stripped at first save is almost never what
@@ -404,9 +406,6 @@ no matter which surface they typed it into.
   dates + life-category are still applied per-subtask.
 
 **Open questions.**
-- Form save uses offline `parser.parse()` only — Pro users typing
-  in the form don't get backend Haiku NLP. Reconsider if Pro users
-  complain. Quick Add bar still uses `parseRemote()`.
 - Edit-mode unconditionally skips NLP. If users expect re-parse on
   edit, revisit.
 ```

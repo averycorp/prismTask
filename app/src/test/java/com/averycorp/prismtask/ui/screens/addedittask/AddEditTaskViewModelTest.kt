@@ -20,6 +20,7 @@ import com.averycorp.prismtask.domain.model.TaskMode
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
 import com.averycorp.prismtask.domain.usecase.ParsedTask
 import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
+import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.averycorp.prismtask.domain.usecase.ResolvedTask
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -65,6 +66,7 @@ class AddEditTaskViewModelTest {
     private lateinit var advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
     private lateinit var parser: NaturalLanguageParser
     private lateinit var parsedTaskResolver: ParsedTaskResolver
+    private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
@@ -105,7 +107,14 @@ class AddEditTaskViewModelTest {
         // exercise the NLP enrichment path override these stubs.
         parser = mockk(relaxed = true)
         parsedTaskResolver = mockk(relaxed = true)
+        proFeatureGate = mockk(relaxed = true)
+        // Default tier = Free, so enrichWithNlp uses the offline parser.
+        // Pro-NLP tests override this to true.
+        every { proFeatureGate.hasAccess(ProFeatureGate.AI_NLP) } returns false
         every { parser.parse(any()) } answers {
+            ParsedTask(title = firstArg<String>())
+        }
+        coEvery { parser.parseRemote(any()) } answers {
             ParsedTask(title = firstArg<String>())
         }
         coEvery { parsedTaskResolver.resolve(any()) } answers {
@@ -154,6 +163,7 @@ class AddEditTaskViewModelTest {
         advancedTuningPreferences,
         parser,
         parsedTaskResolver,
+        proFeatureGate,
         savedStateHandle
     )
 
@@ -426,6 +436,47 @@ class AddEditTaskViewModelTest {
         assertTrue(vm.saveTask())
         assertEquals(4, vm.priority)
         assertEquals(2_222_222_222_222L, vm.dueDate)
+    }
+
+    @Test
+    fun saveTask_createMode_proTier_routesThroughParseRemote() = runTest {
+        // Pro users get backend Haiku NLP — verify the create path calls
+        // parseRemote and not the offline parse(). Mirrors Quick Add's
+        // proFeatureGate.hasAccess(AI_NLP) branch.
+        every { proFeatureGate.hasAccess(ProFeatureGate.AI_NLP) } returns true
+        coEvery { parser.parseRemote(any()) } returns ParsedTask(
+            title = "Wire dishwasher",
+            dueDate = 1_700_000_000_000L
+        )
+        coEvery { parsedTaskResolver.resolve(any()) } returns ResolvedTask(
+            title = "Wire dishwasher",
+            dueDate = 1_700_000_000_000L,
+            dueTime = null,
+            tagIds = emptyList(),
+            projectId = null,
+            priority = 0,
+            recurrenceRule = null,
+            unmatchedTags = emptyList(),
+            unmatchedProject = null
+        )
+        coEvery {
+            taskRepository.addTask(
+                any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any()
+            )
+        } returns 200L
+        coEvery { taskRepository.getTaskById(200L) } returns flowOf(
+            TaskEntity(id = 200L, title = "Wire dishwasher")
+        )
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Wire dishwasher tomorrow")
+
+        assertTrue(vm.saveTask())
+        assertEquals(1_700_000_000_000L, vm.dueDate)
+        coVerify { parser.parseRemote("Wire dishwasher tomorrow") }
+        coVerify(exactly = 0) { parser.parse(any()) }
     }
 
     @Test
