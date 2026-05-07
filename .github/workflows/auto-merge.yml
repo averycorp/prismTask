@@ -33,6 +33,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  # Cancel any older in-progress run for the same PR — `gh pr merge --auto`
+  # is idempotent, so a rapid burst of synchronize events doesn't need each
+  # run to finish; the latest one will (re)enable auto-merge correctly.
+  group: auto-merge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write
