@@ -43,9 +43,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -1490,7 +1490,8 @@ private fun AiOverviewPage() {
         AiBucket(
             emoji = "✍️",
             title = "Capture",
-            description = "Type or speak naturally — NLP parses dates, tags, projects, and priority. Smart suggestions and defaults learn from your history.",
+            description = "Type or speak naturally — NLP parses dates, tags, projects, and priority. " +
+                "Smart suggestions and defaults learn from your history.",
             tier = "Free"
         ),
         AiBucket(
@@ -1508,7 +1509,8 @@ private fun AiOverviewPage() {
         AiBucket(
             emoji = "🛡️",
             title = "Protect",
-            description = "Life-category auto-classify and notification profile auto-switching dial back when you're trending toward overload.",
+            description = "Life-category auto-classify and notification profile auto-switching dial back " +
+                "when you're trending toward overload.",
             tier = "Free"
         )
     )
