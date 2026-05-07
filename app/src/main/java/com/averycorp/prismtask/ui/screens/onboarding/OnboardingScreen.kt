@@ -274,12 +274,14 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                         MaterialTheme.colorScheme.surface
                     )
                 )
-            ),
-        contentAlignment = Alignment.Center
+            )
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 32.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp, vertical = 64.dp)
         ) {
             Text(
                 text = "\uD83D\uDD73",
