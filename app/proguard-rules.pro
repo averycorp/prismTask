@@ -104,3 +104,4 @@
 # Preserve generic type info for Gson reflection
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
+-keepattributes Signature
