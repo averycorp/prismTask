@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
+import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
+import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
@@ -37,6 +39,7 @@ constructor(
     private val chatRepository: ChatRepository,
     private val taskRepository: TaskRepository,
     private val taskDao: TaskDao,
+    private val projectDao: ProjectDao,
     private val habitRepository: HabitRepository,
     private val habitCompletionDao: HabitCompletionDao,
     private val proFeatureGate: ProFeatureGate,
@@ -96,7 +99,8 @@ constructor(
             try {
                 chatRepository.sendMessage(
                     userMessage = text,
-                    taskContextId = taskContextId
+                    taskContextId = taskContextId,
+                    taskContext = buildTaskContextSnapshot(_contextTask.value)
                 )
             } catch (e: java.net.UnknownHostException) {
                 _error.value = "I need an internet connection to chat. Your tasks are still available offline."
@@ -198,6 +202,30 @@ constructor(
                 _toastMessage.emit("Action failed")
             }
         }
+    }
+
+    /**
+     * Builds the [ChatTaskContext] snapshot the backend forwards to Anthropic.
+     * Resolves the project name when [TaskEntity.projectId] is set so the AI
+     * can refer to the task's project rather than an opaque integer id.
+     */
+    private suspend fun buildTaskContextSnapshot(task: TaskEntity?): ChatTaskContext? {
+        if (task == null) return null
+        val dueIso = task.dueDate?.let { millis ->
+            val cal = Calendar.getInstance().apply { timeInMillis = millis }
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
+        }
+        val projectName = task.projectId?.let { pid ->
+            projectDao.getProjectByIdOnce(pid)?.name
+        }
+        return ChatTaskContext(
+            title = task.title,
+            description = task.description?.takeIf { it.isNotBlank() },
+            dueDate = dueIso,
+            priority = task.priority.takeIf { it > 0 },
+            projectName = projectName,
+            isCompleted = task.isCompleted
+        )
     }
 
     private suspend fun resolveDate(dateStr: String?): Long? {

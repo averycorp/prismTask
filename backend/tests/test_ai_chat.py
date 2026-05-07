@@ -425,3 +425,216 @@ class TestChatEndpoint:
             )
             assert resp.status_code == 200, resp.text
             assert mock_gen.call_args.kwargs["task_context_id"] == 9876
+
+
+class TestChatContextBlock:
+    """Phase 2 fix #1 (audit Axes A.1 + E.1): the backend now forwards
+    rolling user/assistant history and a task_context snapshot to Anthropic
+    so the model has multi-turn memory and grounded task content instead of
+    an opaque integer it cannot dereference."""
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_service_forwards_history_as_messages_array(self):
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"message": "ok", "actions": []}
+            )
+
+            generate_chat_response(
+                message="and what about today?",
+                conversation_id="chat_x",
+                history=[
+                    {"role": "user", "content": "what's overdue?"},
+                    {"role": "assistant", "content": "two tasks are overdue."},
+                ],
+            )
+            sent = mock_client.messages.create.call_args.kwargs["messages"]
+            # 2 history entries + 1 latest user turn carrying the structured
+            # context block = 3 total.
+            assert len(sent) == 3
+            assert sent[0] == {"role": "user", "content": "what's overdue?"}
+            assert sent[1] == {"role": "assistant", "content": "two tasks are overdue."}
+            assert sent[2]["role"] == "user"
+            assert "and what about today?" in sent[2]["content"]
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_service_drops_invalid_history_entries(self):
+        """Defensive: the schema layer caps role to user|assistant and
+        forces non-empty content, but the service must not blow up if a
+        unit test or future caller bypasses the schema."""
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"message": "ok", "actions": []}
+            )
+
+            generate_chat_response(
+                message="hi",
+                conversation_id="chat_x",
+                history=[
+                    {"role": "system", "content": "should be dropped"},
+                    {"role": "user", "content": ""},  # empty content dropped
+                    {"role": "user", "content": "kept"},
+                ],
+            )
+            sent = mock_client.messages.create.call_args.kwargs["messages"]
+            # 1 valid history entry + 1 latest user turn = 2.
+            assert len(sent) == 2
+            assert sent[0] == {"role": "user", "content": "kept"}
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_service_includes_task_context_in_user_payload(self):
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"message": "ok", "actions": []}
+            )
+
+            generate_chat_response(
+                message="how do I start?",
+                conversation_id="chat_x",
+                task_context_id=42,
+                task_context={
+                    "title": "Finish thesis chapter 3",
+                    "description": "Discussion section, literature review",
+                    "due_date": "2026-05-12",
+                    "priority": 3,
+                    "project_name": "Thesis",
+                    "is_completed": False,
+                },
+            )
+            sent_payload = mock_client.messages.create.call_args.kwargs["messages"][-1]["content"]
+            payload = json.loads(sent_payload)
+            assert payload["task_context_id"] == 42
+            assert payload["task_context"]["title"] == "Finish thesis chapter 3"
+            assert payload["task_context"]["project_name"] == "Thesis"
+            assert payload["task_context"]["priority"] == 3
+
+    @pytest.mark.asyncio
+    async def test_endpoint_forwards_history_and_task_context(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        """Router → service plumbing test: history + task_context arrive at
+        the service layer without losing fields or shape."""
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            mock_gen.return_value = {
+                "message": "Got it.",
+                "actions": [],
+                "tokens_used": {"input": 1, "output": 1},
+            }
+
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={
+                    "message": "and what about now?",
+                    "conversation_id": "chat_x",
+                    "task_context_id": 7,
+                    "task_context": {
+                        "title": "Pay rent",
+                        "due_date": "2026-05-10",
+                        "priority": 4,
+                    },
+                    "history": [
+                        {"role": "user", "content": "what's due tomorrow?"},
+                        {"role": "assistant", "content": "rent is."},
+                    ],
+                },
+                headers=pro_auth_headers,
+            )
+            assert resp.status_code == 200, resp.text
+            kwargs = mock_gen.call_args.kwargs
+            assert kwargs["task_context_id"] == 7
+            assert kwargs["task_context"]["title"] == "Pay rent"
+            assert kwargs["task_context"]["priority"] == 4
+            assert len(kwargs["history"]) == 2
+            assert kwargs["history"][0] == {
+                "role": "user",
+                "content": "what's due tomorrow?",
+            }
+
+    @pytest.mark.asyncio
+    async def test_endpoint_rejects_invalid_history_role(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        resp = await client.post(
+            "/api/v1/ai/chat",
+            json={
+                "message": "hi",
+                "conversation_id": "chat_x",
+                "history": [{"role": "system", "content": "bad"}],
+            },
+            headers=pro_auth_headers,
+        )
+        # Pydantic's pattern validator on ChatHistoryEntry.role rejects this.
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_endpoint_rejects_history_over_cap(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        # 13 entries — one over the schema's max_length=12.
+        oversized = [{"role": "user", "content": str(i)} for i in range(13)]
+        resp = await client.post(
+            "/api/v1/ai/chat",
+            json={
+                "message": "hi",
+                "conversation_id": "chat_x",
+                "history": oversized,
+            },
+            headers=pro_auth_headers,
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_endpoint_still_accepts_legacy_tier_field(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        """Back-compat: in-flight Android builds still send `tier` even
+        though the server no longer reads it for chat. The schema must
+        silently accept the field so older clients don't 422 mid-rollout."""
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            mock_gen.return_value = {
+                "message": "ok",
+                "actions": [],
+                "tokens_used": {"input": 1, "output": 1},
+            }
+
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={
+                    "message": "hi",
+                    "conversation_id": "chat_x",
+                    "tier": "PRO",
+                },
+                headers=pro_auth_headers,
+            )
+            assert resp.status_code == 200, resp.text
+            # `tier` must NOT be forwarded to the service — it's been
+            # removed from the function signature.
+            assert "tier" not in mock_gen.call_args.kwargs
