@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -274,7 +275,14 @@ fun QuickAddBar(
                             },
                             enabled = inputText.isNotBlank() && !isSubmitting
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Submit task")
+                            if (isSubmitting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Submit task")
+                            }
                         }
                     },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
