@@ -77,6 +77,7 @@ class ChatViewModelActionTest {
         habitCompletionDao = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true) {
             every { userTier } returns MutableStateFlow(UserTier.PRO)
+            every { hasAccess(any()) } returns true
         }
         taskBehaviorPreferences = mockk(relaxed = true)
         userPreferencesDataStore = mockk(relaxed = true) {
