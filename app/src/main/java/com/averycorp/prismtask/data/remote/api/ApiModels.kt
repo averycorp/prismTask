@@ -178,6 +178,23 @@ data class EisenhowerClassifyTextResponse(
     val reason: String
 )
 
+/**
+ * Single-task text-based Work-Life Balance category classification. Invoked
+ * from the OrganizeTab "Auto" button — the on-device keyword
+ * [com.averycorp.prismtask.domain.usecase.LifeCategoryClassifier] runs first
+ * for instant feedback; this AI path overwrites the on-device guess when the
+ * remote call succeeds.
+ */
+data class LifeCategoryClassifyTextRequest(
+    val title: String,
+    val description: String? = null
+)
+
+data class LifeCategoryClassifyTextResponse(
+    val category: String,
+    val reason: String
+)
+
 data class PomodoroRequest(
     @SerializedName("available_minutes") val availableMinutes: Int = 120,
     @SerializedName("session_length") val sessionLength: Int = 25,

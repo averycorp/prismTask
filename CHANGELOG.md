@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- **Auto button on Life Category now uses Claude.** When AI features are
+  enabled, tapping the OrganizeTab "Auto" button next to the Life
+  Category chips fires a Claude Haiku-backed classification on top of
+  the on-device keyword classifier. The local pick still runs first
+  for instant feedback; the AI call upgrades it when Claude returns a
+  more confident category. Offline, logged-out, AI-features-off, and
+  any backend failure (429 / 451 / 5xx) silently fall back to the local
+  pick — never blanks a successful local chip. Mirrors the Eisenhower
+  text-classify pattern. New backend endpoint
+  `POST /ai/life-category/classify_text`. Audit:
+  `docs/audits/AUTO_BUTTON_CLAUDE_BACKED_CLASSIFIER_AUDIT.md`.
+
 ### Fixed
 
 - **Morning check-in banner now respects Start-of-Day end-to-end.** The

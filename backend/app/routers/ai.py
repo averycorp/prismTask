@@ -27,6 +27,8 @@ from app.schemas.ai import (
     CognitiveLoadClassifyTextResponse,
     EisenhowerClassifyTextRequest,
     EisenhowerClassifyTextResponse,
+    LifeCategoryClassifyTextRequest,
+    LifeCategoryClassifyTextResponse,
     EisenhowerRequest,
     EisenhowerResponse,
     EisenhowerSummary,
@@ -82,6 +84,11 @@ eisenhower_classify_text_rate_limiter = RateLimiter(max_requests=20, window_seco
 # Cognitive-load text-classify mirrors Eisenhower's per-task creation flow,
 # so the same 20/min ceiling applies — burst-tolerant for normal task entry.
 cognitive_load_classify_text_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
+# Life-category text-classify is invoked from the OrganizeTab "Auto" button
+# (manual user tap, not background fire-and-forget), so 20/min comfortably
+# absorbs a user iterating on a task title and re-pressing Auto.
+life_category_classify_text_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
 # Rate limiters for new AI endpoints
 briefing_rate_limiter = RateLimiter(max_requests=1, window_seconds=3600)  # 1 per hour
@@ -291,6 +298,47 @@ async def classify_cognitive_load_text(
 
     return CognitiveLoadClassifyTextResponse(
         load=result["load"],
+        reason=result["reason"],
+    )
+
+
+@router.post("/life-category/classify_text", response_model=LifeCategoryClassifyTextResponse)
+async def classify_life_category_text(
+    data: LifeCategoryClassifyTextRequest,
+    request: Request,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-task text-based Work-Life Balance category classification.
+
+    Invoked from the Android task editor's OrganizeTab "Auto" button
+    (manual user tap). The on-device ``LifeCategoryClassifier`` keyword
+    fallback runs synchronously to give instant feedback; this endpoint
+    is the AI upgrade that overwrites the on-device guess when AI
+    Features are enabled. Rate-limited via
+    ``life_category_classify_text_rate_limiter``.
+    """
+    life_category_classify_text_rate_limiter.check(request)
+    tier = await resolve_effective_tier(current_user, db)
+    daily_ai_rate_limiter.check(current_user.id, tier)
+
+    try:
+        from app.services.ai_productivity import (
+            classify_life_category_text as ai_classify_life,
+        )
+
+        result = ai_classify_life(
+            title=data.title,
+            description=data.description,
+            tier=tier,
+        )
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
+    except ValueError:
+        raise HTTPException(status_code=500, detail="AI returned an invalid response")
+
+    return LifeCategoryClassifyTextResponse(
+        category=result["category"],
         reason=result["reason"],
     )
 

@@ -3,9 +3,11 @@ package com.averycorp.prismtask.ui.screens.addedittask
 import androidx.lifecycle.SavedStateHandle
 import com.averycorp.prismtask.data.local.entity.TaskDependencyEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
+import com.averycorp.prismtask.data.preferences.AiFeaturePrefs
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
+import com.averycorp.prismtask.data.remote.LifeCategoryRemoteClassifier
 import com.averycorp.prismtask.data.repository.AttachmentRepository
 import com.averycorp.prismtask.data.repository.BoundaryRuleRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
@@ -67,6 +69,7 @@ class AddEditTaskViewModelTest {
     private lateinit var parser: NaturalLanguageParser
     private lateinit var parsedTaskResolver: ParsedTaskResolver
     private lateinit var proFeatureGate: ProFeatureGate
+    private lateinit var lifeCategoryRemoteClassifier: LifeCategoryRemoteClassifier
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
@@ -108,6 +111,17 @@ class AddEditTaskViewModelTest {
         parser = mockk(relaxed = true)
         parsedTaskResolver = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
+        lifeCategoryRemoteClassifier = mockk(relaxed = true)
+        // Default: Auto-button remote classifier returns failure (offline /
+        // logged-out). Tests that exercise the Claude-backed upgrade path
+        // override this stub.
+        coEvery { lifeCategoryRemoteClassifier.classify(any(), any()) } returns
+            Result.failure(IllegalStateException("offline"))
+        // Default: AI features OFF so the remote classifier is not invoked
+        // by tests that don't care about it. Tests that exercise the
+        // Claude-backed upgrade path override this.
+        every { userPreferencesDataStore.aiFeaturePrefsFlow } returns
+            flowOf(AiFeaturePrefs(enabled = false))
         // Default tier = Free, so enrichWithNlp uses the offline parser.
         // Pro-NLP tests override this to true.
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_NLP) } returns false
@@ -164,6 +178,7 @@ class AddEditTaskViewModelTest {
         parser,
         parsedTaskResolver,
         proFeatureGate,
+        lifeCategoryRemoteClassifier,
         savedStateHandle
     )
 
@@ -692,6 +707,112 @@ class AddEditTaskViewModelTest {
         // Force resets manualSet and re-picks from the classifier.
         assertEquals(LifeCategory.WORK, vm.lifeCategory)
         assertFalse(vm.lifeCategoryManuallySet)
+    }
+
+    @Test
+    fun `autoPickLifeCategory force fires Claude when AI features enabled`() = runTest {
+        every { userPreferencesDataStore.aiFeaturePrefsFlow } returns
+            flowOf(AiFeaturePrefs(enabled = true))
+        coEvery { lifeCategoryRemoteClassifier.classify(any(), any()) } returns
+            Result.success(
+                LifeCategoryRemoteClassifier.Classification(
+                    category = LifeCategory.HEALTH,
+                    reason = "Doctor appointment"
+                )
+            )
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("schedule annual checkup")
+
+        vm.autoPickLifeCategory(force = true)
+        // Local keyword classifier doesn't match "checkup" with default
+        // keywords beyond HEALTH — but the AI path should overwrite to
+        // HEALTH regardless. Drain the testDispatcher so the suspend
+        // remote classifier finishes.
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LifeCategory.HEALTH, vm.lifeCategory)
+        coVerify(exactly = 1) { lifeCategoryRemoteClassifier.classify(any(), any()) }
+    }
+
+    @Test
+    fun `autoPickLifeCategory non-force does NOT fire Claude`() = runTest {
+        every { userPreferencesDataStore.aiFeaturePrefsFlow } returns
+            flowOf(AiFeaturePrefs(enabled = true))
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Email project status update to manager")
+
+        vm.autoPickLifeCategory()  // implicit auto-press from title-change LaunchedEffect
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Local pick wins; remote NEVER called for the implicit path because
+        // it would burst the AI rate limit on every keystroke.
+        assertEquals(LifeCategory.WORK, vm.lifeCategory)
+        coVerify(exactly = 0) { lifeCategoryRemoteClassifier.classify(any(), any()) }
+    }
+
+    @Test
+    fun `autoPickLifeCategory force skips Claude when AI features disabled`() = runTest {
+        // Default setUp() already disables AI features.
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Email project status update to manager")
+
+        vm.autoPickLifeCategory(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LifeCategory.WORK, vm.lifeCategory)
+        coVerify(exactly = 0) { lifeCategoryRemoteClassifier.classify(any(), any()) }
+    }
+
+    @Test
+    fun `autoPickLifeCategory remote failure preserves local pick`() = runTest {
+        every { userPreferencesDataStore.aiFeaturePrefsFlow } returns
+            flowOf(AiFeaturePrefs(enabled = true))
+        coEvery { lifeCategoryRemoteClassifier.classify(any(), any()) } returns
+            Result.failure(IllegalStateException("HTTP 503"))
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Email project status update to manager")
+
+        vm.autoPickLifeCategory(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Remote failed; the local WORK pick must remain — never blanked.
+        assertEquals(LifeCategory.WORK, vm.lifeCategory)
+    }
+
+    @Test
+    fun `autoPickLifeCategory remote does not overwrite a manual pick made mid-flight`() = runTest {
+        every { userPreferencesDataStore.aiFeaturePrefsFlow } returns
+            flowOf(AiFeaturePrefs(enabled = true))
+        coEvery { lifeCategoryRemoteClassifier.classify(any(), any()) } coAnswers {
+            // Simulate a slow Claude call. The user manually picks
+            // PERSONAL while we're "in flight," and the remote answer
+            // (HEALTH) must NOT clobber that pick.
+            Result.success(
+                LifeCategoryRemoteClassifier.Classification(
+                    category = LifeCategory.HEALTH,
+                    reason = "Doctor appointment"
+                )
+            )
+        }
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("schedule appointment")
+
+        vm.autoPickLifeCategory(force = true)
+        // Before the suspending remote completes, user manually picks.
+        vm.onLifeCategoryChange(LifeCategory.PERSONAL)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LifeCategory.PERSONAL, vm.lifeCategory)
+        assertTrue(vm.lifeCategoryManuallySet)
     }
 
     @Test
