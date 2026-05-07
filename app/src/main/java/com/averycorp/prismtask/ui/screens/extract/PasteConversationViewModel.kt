@@ -10,6 +10,7 @@ import com.averycorp.prismtask.domain.usecase.ConversationTaskExtractor
 import com.averycorp.prismtask.domain.usecase.ExtractedTask
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
 import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
+import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +33,8 @@ constructor(
     private val tagRepository: TagRepository,
     private val projectRepository: ProjectRepository,
     private val parser: NaturalLanguageParser,
-    private val parsedTaskResolver: ParsedTaskResolver
+    private val parsedTaskResolver: ParsedTaskResolver,
+    private val proFeatureGate: ProFeatureGate
 ) : ViewModel() {
     private val extractor = ConversationTaskExtractor()
 
@@ -82,14 +84,20 @@ constructor(
     fun createSelected() {
         viewModelScope.launch {
             val selected = _candidates.value.filter { it.selected && it.title.isNotBlank() }
+            // Pro users get backend Haiku NLP per candidate; Free users get
+            // the offline regex parser. `parseRemote` falls back to `parse`
+            // on backend failure so the batch insert stays resilient.
+            val proAi = proFeatureGate.hasAccess(ProFeatureGate.AI_NLP)
             for (candidate in selected) {
                 // Pipe each extracted candidate through the same NLP pipeline
                 // Quick Add uses so a title like `send report by Friday !2`
                 // pulled out of chat prose lands with the parsed due date and
-                // priority instead of as a literal string. Offline parser
-                // only — N×backend cost would be prohibitive on a multi-task
-                // batch insert.
-                val parsed = parser.parse(candidate.title)
+                // priority instead of as a literal string.
+                val parsed = if (proAi) {
+                    parser.parseRemote(candidate.title)
+                } else {
+                    parser.parse(candidate.title)
+                }
                 val resolved = parsedTaskResolver.resolve(parsed)
                 val newTagIds = resolved.unmatchedTags.map { tagRepository.addTag(name = it) }
                 val projectId = resolved.projectId

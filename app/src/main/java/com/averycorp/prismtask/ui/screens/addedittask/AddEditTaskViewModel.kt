@@ -38,6 +38,7 @@ import com.averycorp.prismtask.domain.usecase.CognitiveLoadClassifier
 import com.averycorp.prismtask.domain.usecase.LifeCategoryClassifier
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
 import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
+import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.averycorp.prismtask.domain.usecase.TaskModeClassifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -86,6 +87,7 @@ constructor(
     private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences,
     private val parser: NaturalLanguageParser,
     private val parsedTaskResolver: ParsedTaskResolver,
+    private val proFeatureGate: ProFeatureGate,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val boundaryEnforcer = BoundaryEnforcer()
@@ -733,17 +735,23 @@ constructor(
     )
 
     /**
-     * Runs [rawTitle] through [NaturalLanguageParser.parse] (offline only —
-     * the form save stays offline-safe; Pro backend NLP remains scoped to
-     * the Quick Add bar) and resolves it via [ParsedTaskResolver]. Returns
-     * null when the parser extracted nothing actionable so callers can
-     * skip the merge cheaply. Auto-creates unmatched tags / projects so
-     * `selectedTagIds` and `projectId` can land on the new task — mirrors
-     * QuickAddViewModel.onSubmit exactly.
+     * Runs [rawTitle] through [NaturalLanguageParser] (Haiku-backed
+     * `parseRemote` for Pro users, offline `parse` for Free) and resolves
+     * it via [ParsedTaskResolver]. Returns null when the parser extracted
+     * nothing actionable so callers can skip the merge cheaply.
+     * Auto-creates unmatched tags / projects so `selectedTagIds` and
+     * `projectId` can land on the new task — mirrors
+     * `QuickAddViewModel.onSubmit` exactly. `parseRemote` already falls
+     * back to local `parse` on backend failure, so the form save stays
+     * resilient to backend outages.
      */
     private suspend fun enrichWithNlp(rawTitle: String): NlpEnrichment? {
         if (rawTitle.isBlank()) return null
-        val parsed = parser.parse(rawTitle)
+        val parsed = if (proFeatureGate.hasAccess(ProFeatureGate.AI_NLP)) {
+            parser.parseRemote(rawTitle)
+        } else {
+            parser.parse(rawTitle)
+        }
         val resolved = parsedTaskResolver.resolve(parsed)
         val nothingExtracted = resolved.title == rawTitle &&
             resolved.dueDate == null &&
