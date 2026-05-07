@@ -146,3 +146,49 @@ post-merge to confirm green.
   `pull_request`-triggered fast-path CI for `compileDebugUnitTestKotlin`
   against the original merge-only rationale — but again, separate
   audit.
+
+---
+
+## Phase 3 — Bundle summary
+
+**Item 1 (PROCEED, RED) — DAO fake-stubs compilation fix.** Shipped as
+PR #1177 (`fix(test): add missing DAO-fake overrides to unbreak main
+lint+test`). Branched from main as `fix/dao-fake-stubs` after the
+worktree path failed signing (signing service rejected commits issued
+from the worktree gitdir with HTTP 400 "missing source"; same edits
+applied directly on a main-rooted branch in the canonical repo
+committed cleanly — flag for follow-up if it reproduces).
+
+Files touched (6):
+
+- `app/src/test/.../ProjectRepositoryTest.kt` — added `getProjectByNameOnce` override mirroring existing `firstOrNull { id == … }` style.
+- `app/src/test/.../TagRepositoryTest.kt` — added `getTagByNameOnce` (in-memory filter).
+- `app/src/test/.../TaskRepositoryTest.kt` — added `getTagByNameOnce` returning `null` (matches `getTagByIdOnce`'s style in this fake).
+- `app/src/test/.../TaskTemplateRepositoryTest.kt` — added `getTagByNameOnce` returning `unsupported()` (matches `getTagByIdOnce`'s style).
+- `app/src/test/.../ProjectsPaneViewModelTest.kt` — added `getProjectByNameOnce` (in-memory filter).
+- `docs/audits/DAO_FAKE_STUBS_COMPILATION_AUDIT.md` — this doc.
+
+**Re-baselined wall-clock-per-PR estimate.** ~10 minutes from log-tail
+investigation → root-cause → 5-file edit → audit doc → PR. Cheaper than
+PR #1176 because there's no implementation surface — it's pure
+compile-error patching.
+
+**Memory entry candidate (surprising / non-obvious).**
+
+- The signing service (`/tmp/code-sign`) fails commits issued from a
+  git worktree with HTTP 400 "missing source", but accepts commits
+  on regular branches in the canonical clone. Don't burn cycles
+  setting up a worktree for fixes here unless it gets fixed; commit
+  on a branch in the main checkout instead. **Worth a memory entry.**
+- The CI's "Failed steps: lint-and-test: #13 Unit tests" + "All 221
+  JUnit XML reports clean" is a misleading combo that masks
+  compile-time errors in unit-test source. Don't trust the "JUnit
+  XML clean" line alone — always tail the log for `> Task … FAILED`
+  / `BUILD FAILED`. **Worth a memory entry.**
+
+**Schedule for next audit.** None scheduled. The two anti-patterns
+flagged above (hand-rolled DAO fakes drifting; merge-only CI letting
+test-compile errors land on main) are real but require operator
+sign-off before opening a structural-change audit.
+
+---
