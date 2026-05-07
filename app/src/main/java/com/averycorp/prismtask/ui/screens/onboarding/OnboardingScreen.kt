@@ -342,7 +342,7 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                     }
                     else -> {
                         Spacer(modifier = Modifier.height(20.dp))
-                        TextButton(
+                        Button(
                             onClick = {
                                 val activity = run {
                                     var ctx = context
@@ -350,7 +350,7 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                                         ctx = ctx.baseContext
                                     }
                                     ctx as? Activity
-                                } ?: return@TextButton
+                                } ?: return@Button
                                 coroutineScope.launch {
                                     try {
                                         val option = GetSignInWithGoogleOption.Builder(BuildConfig.WEB_CLIENT_ID).build()
@@ -364,14 +364,12 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                                         // Credential error — leave state unchanged.
                                     }
                                 }
-                            }
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = "Already have an account? Sign in",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Text("Sign In with Google")
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
                         EmailAuthSection(
                             onSignUp = viewModel::onEmailSignUp,
                             onSignIn = viewModel::onEmailSignIn
