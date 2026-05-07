@@ -2,6 +2,10 @@ name: Android CI
 
 on:
   workflow_dispatch:
+  # Merge-only: CI runs on push to main (post-merge) and manual dispatch.
+  # No pull_request / merge_group triggers — if branch protection requires
+  # the `lint-and-test` status, drop it from required checks or PRs will
+  # block forever waiting for a status that never posts.
   push:
     branches: [main]
     paths:
@@ -13,15 +17,6 @@ on:
       - 'settings.gradle.kts'
       - '.github/workflows/android-ci.yml'
       - '.github/actions/setup-android/**'
-  # Pull-request trigger is intentionally unfiltered: branch protection
-  # requires the `lint-and-test` status to post, and if `paths:` filters
-  # the workflow out the status never posts and the PR blocks forever.
-  # Relevance is re-checked *inside* the job via dorny/paths-filter so
-  # an unrelated PR short-circuits after a few seconds rather than
-  # running the full Gradle suite.
-  pull_request:
-    branches: [main]
-  merge_group:
 
 concurrency:
   group: android-ci-${{ github.ref }}
