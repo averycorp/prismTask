@@ -2,9 +2,14 @@ package com.averycorp.prismtask.ui.screens.extract
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.local.converter.RecurrenceConverter
+import com.averycorp.prismtask.data.repository.ProjectRepository
+import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ConversationTaskExtractor
 import com.averycorp.prismtask.domain.usecase.ExtractedTask
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +28,11 @@ import javax.inject.Inject
 class PasteConversationViewModel
 @Inject
 constructor(
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val tagRepository: TagRepository,
+    private val projectRepository: ProjectRepository,
+    private val parser: NaturalLanguageParser,
+    private val parsedTaskResolver: ParsedTaskResolver
 ) : ViewModel() {
     private val extractor = ConversationTaskExtractor()
 
@@ -74,7 +83,33 @@ constructor(
         viewModelScope.launch {
             val selected = _candidates.value.filter { it.selected && it.title.isNotBlank() }
             for (candidate in selected) {
-                taskRepository.addTask(title = candidate.title)
+                // Pipe each extracted candidate through the same NLP pipeline
+                // Quick Add uses so a title like `send report by Friday !2`
+                // pulled out of chat prose lands with the parsed due date and
+                // priority instead of as a literal string. Offline parser
+                // only — N×backend cost would be prohibitive on a multi-task
+                // batch insert.
+                val parsed = parser.parse(candidate.title)
+                val resolved = parsedTaskResolver.resolve(parsed)
+                val newTagIds = resolved.unmatchedTags.map { tagRepository.addTag(name = it) }
+                val projectId = resolved.projectId
+                    ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) }
+                val recurrenceJson = resolved.recurrenceRule?.let { RecurrenceConverter.toJson(it) }
+                val taskId = taskRepository.addTask(
+                    title = resolved.title,
+                    dueDate = resolved.dueDate,
+                    dueTime = resolved.dueTime,
+                    priority = resolved.priority,
+                    projectId = projectId,
+                    lifeCategory = resolved.lifeCategory,
+                    taskMode = resolved.taskMode,
+                    cognitiveLoad = resolved.cognitiveLoad,
+                    recurrenceRule = recurrenceJson
+                )
+                val allTagIds = resolved.tagIds + newTagIds
+                if (allTagIds.isNotEmpty()) {
+                    tagRepository.setTagsForTask(taskId, allTagIds)
+                }
             }
             _createdCount.value = selected.size
         }
