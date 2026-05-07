@@ -59,8 +59,34 @@ constructor(
     private val _showUpgradePrompt = MutableStateFlow(false)
     val showUpgradePrompt: StateFlow<Boolean> = _showUpgradePrompt.asStateFlow()
 
-    private val _toastMessage = MutableSharedFlow<String>()
-    val toastMessage: SharedFlow<String> = _toastMessage.asSharedFlow()
+    /**
+     * Result of an [executeAction] call, surfaced to the screen as a
+     * snackbar. When [undoLabel] is non-null the snackbar renders an
+     * action button which calls [undoAction]. Phase 2 audit fix #4 (C.2):
+     * destructive ops (complete / reschedule / reschedule_batch / archive)
+     * carry an undo callback; non-destructive ops (start_timer,
+     * create_task) leave [undoAction] null.
+     */
+    data class ChatActionResult(
+        val message: String,
+        val undoLabel: String? = null,
+        val undoAction: (suspend () -> Unit)? = null
+    )
+
+    private val _actionResults = MutableSharedFlow<ChatActionResult>(
+        extraBufferCapacity = 4
+    )
+    val actionResults: SharedFlow<ChatActionResult> = _actionResults.asSharedFlow()
+
+    /**
+     * Idempotency guard for chat action chips. A signature like
+     * "complete:42" or "reschedule_batch:1,2,3" is added on tap, removed
+     * on completion. Phase 2 audit fix #3 (B.2): a fast double-tap on the
+     * same chip used to issue duplicate Room mutations; now the second
+     * tap silently no-ops while the first is still in flight.
+     */
+    private val _actionsInFlight = MutableStateFlow<Set<String>>(emptySet())
+    val actionsInFlight: StateFlow<Set<String>> = _actionsInFlight.asStateFlow()
 
     private val _showDisclosure = MutableStateFlow(false)
     val showDisclosure: StateFlow<Boolean> = _showDisclosure.asStateFlow()
@@ -149,73 +175,178 @@ constructor(
 
     /**
      * Executes an action from a chat AI response (inline action button tap).
+     *
+     * Idempotency: a duplicate tap on the same chip while the first is
+     * still in flight is silently dropped. The signature is removed in a
+     * `finally` block so a chip becomes tappable again after success or
+     * failure (see Phase 2 audit fix #3 / B.2).
+     *
+     * Undo: destructive ops emit a [ChatActionResult] with an [undoAction]
+     * that reverses the mutation. The screen layer renders this as a
+     * snackbar with an action button (see Phase 2 audit fix #4 / C.2).
      */
     fun executeAction(action: ChatActionResponse) {
+        val signature = actionSignature(action) ?: return
+        if (_actionsInFlight.value.contains(signature)) {
+            return
+        }
+        _actionsInFlight.value = _actionsInFlight.value + signature
+
         viewModelScope.launch {
             try {
-                when (action.type) {
-                    "complete" -> {
-                        val taskId = action.taskId?.toLongOrNull() ?: return@launch
-                        taskRepository.completeTask(taskId)
-                        _toastMessage.emit("Task Completed")
-                    }
-
-                    "reschedule" -> {
-                        val taskId = action.taskId?.toLongOrNull() ?: return@launch
-                        val newDate = resolveDate(action.to)
-                        taskRepository.rescheduleTask(taskId, newDate)
-                        _toastMessage.emit("Task Rescheduled")
-                    }
-
-                    "reschedule_batch" -> {
-                        val ids = action.taskIds?.mapNotNull { it.toLongOrNull() } ?: return@launch
-                        val newDate = resolveDate(action.to)
-                        for (id in ids) {
-                            taskRepository.rescheduleTask(id, newDate)
-                        }
-                        _toastMessage.emit("${ids.size} tasks rescheduled")
-                    }
-
-                    "breakdown" -> {
-                        val taskId = action.taskId?.toLongOrNull() ?: return@launch
-                        val subtasks = action.subtasks ?: return@launch
-                        for (title in subtasks) {
-                            taskRepository.addSubtask(title, taskId)
-                        }
-                        _toastMessage.emit("${subtasks.size} subtasks added")
-                    }
-
-                    "archive" -> {
-                        val taskId = action.taskId?.toLongOrNull() ?: return@launch
-                        taskRepository.archiveTask(taskId)
-                        _toastMessage.emit("Task Archived")
-                    }
-
-                    "start_timer" -> {
-                        // Timer launch is handled by the UI layer via navigation
-                        _toastMessage.emit("Timer started")
-                    }
-
-                    "create_task" -> {
-                        val title = action.title ?: return@launch
-                        val dueDate = resolveDate(action.due)
-                        val priority = resolvePriority(action.priority)
-                        val now = System.currentTimeMillis()
-                        val task = TaskEntity(
-                            title = title,
-                            dueDate = dueDate,
-                            priority = priority,
-                            createdAt = now,
-                            updatedAt = now
-                        )
-                        taskRepository.insertTask(task)
-                        _toastMessage.emit("Task Created: $title")
-                    }
+                val result = when (action.type) {
+                    "complete" -> handleComplete(action)
+                    "reschedule" -> handleReschedule(action)
+                    "reschedule_batch" -> handleRescheduleBatch(action)
+                    "breakdown" -> handleBreakdown(action)
+                    "archive" -> handleArchive(action)
+                    "start_timer" -> ChatActionResult("Timer Started")
+                    "create_task" -> handleCreateTask(action)
+                    else -> null
+                }
+                if (result != null) {
+                    _actionResults.emit(result)
                 }
             } catch (e: Exception) {
-                _toastMessage.emit("Action failed")
+                _actionResults.emit(ChatActionResult("Action failed"))
+            } finally {
+                _actionsInFlight.value = _actionsInFlight.value - signature
             }
         }
+    }
+
+    private fun actionSignature(action: ChatActionResponse): String? {
+        return when (action.type) {
+            "reschedule_batch" -> {
+                val ids = action.taskIds?.takeIf { it.isNotEmpty() } ?: return null
+                "reschedule_batch:${ids.sorted().joinToString(",")}"
+            }
+            "create_task" -> "create_task:${action.title.orEmpty()}:${action.due.orEmpty()}"
+            "breakdown" -> {
+                val taskId = action.taskId ?: return null
+                "breakdown:$taskId"
+            }
+            else -> {
+                val taskId = action.taskId
+                if (action.type in DESTRUCTIVE_TYPES_NEED_TASK_ID && taskId == null) return null
+                "${action.type}:${taskId.orEmpty()}"
+            }
+        }
+    }
+
+    private suspend fun handleComplete(action: ChatActionResponse): ChatActionResult? {
+        val taskId = action.taskId?.toLongOrNull() ?: return null
+        taskRepository.completeTask(taskId)
+        return ChatActionResult(
+            message = "Task Completed",
+            undoLabel = "Undo",
+            undoAction = { taskRepository.uncompleteTask(taskId) }
+        )
+    }
+
+    private suspend fun handleReschedule(action: ChatActionResponse): ChatActionResult? {
+        val taskId = action.taskId?.toLongOrNull() ?: return null
+        val originalDueDate = taskDao.getTaskByIdOnce(taskId)?.dueDate
+        val newDate = resolveDate(action.to)
+        taskRepository.rescheduleTask(taskId, newDate)
+        return ChatActionResult(
+            message = "Task Rescheduled",
+            undoLabel = "Undo",
+            undoAction = { taskRepository.rescheduleTask(taskId, originalDueDate) }
+        )
+    }
+
+    private suspend fun handleRescheduleBatch(action: ChatActionResponse): ChatActionResult? {
+        val ids = action.taskIds?.mapNotNull { it.toLongOrNull() }?.takeIf { it.isNotEmpty() }
+            ?: return null
+        val newDate = resolveDate(action.to)
+
+        // Snapshot original due dates BEFORE mutation so undo can restore
+        // each task's prior schedule even if some succeed and some fail.
+        val originalDueDates = ids.associateWith { id ->
+            taskDao.getTaskByIdOnce(id)?.dueDate
+        }
+
+        var succeeded = 0
+        var failed = 0
+        for (id in ids) {
+            try {
+                taskRepository.rescheduleTask(id, newDate)
+                succeeded++
+            } catch (_: Exception) {
+                failed++
+            }
+        }
+
+        val message = when {
+            failed == 0 -> "$succeeded Tasks Rescheduled"
+            succeeded == 0 -> "Reschedule Failed"
+            else -> "Rescheduled $succeeded of ${ids.size} Tasks ($failed Failed)"
+        }
+        // Only offer undo when at least one task moved; nothing to undo
+        // when every reschedule failed.
+        return if (succeeded > 0) {
+            ChatActionResult(
+                message = message,
+                undoLabel = "Undo",
+                undoAction = {
+                    for (id in ids) {
+                        runCatching {
+                            taskRepository.rescheduleTask(id, originalDueDates[id])
+                        }
+                    }
+                }
+            )
+        } else {
+            ChatActionResult(message = message)
+        }
+    }
+
+    private suspend fun handleBreakdown(action: ChatActionResponse): ChatActionResult? {
+        val taskId = action.taskId?.toLongOrNull() ?: return null
+        val subtasks = action.subtasks?.takeIf { it.isNotEmpty() } ?: return null
+        for (title in subtasks) {
+            taskRepository.addSubtask(title, taskId)
+        }
+        return ChatActionResult("${subtasks.size} Subtasks Added")
+    }
+
+    private suspend fun handleArchive(action: ChatActionResponse): ChatActionResult? {
+        val taskId = action.taskId?.toLongOrNull() ?: return null
+        taskRepository.archiveTask(taskId)
+        return ChatActionResult(
+            message = "Task Archived",
+            undoLabel = "Undo",
+            undoAction = { taskRepository.unarchiveTask(taskId) }
+        )
+    }
+
+    private suspend fun handleCreateTask(action: ChatActionResponse): ChatActionResult? {
+        val title = action.title?.takeIf { it.isNotBlank() } ?: return null
+        val dueDate = resolveDate(action.due)
+        val priority = resolvePriority(action.priority)
+        val now = System.currentTimeMillis()
+        val task = TaskEntity(
+            title = title,
+            dueDate = dueDate,
+            priority = priority,
+            createdAt = now,
+            updatedAt = now
+        )
+        taskRepository.insertTask(task)
+        return ChatActionResult("Task Created: $title")
+    }
+
+    private companion object {
+        /**
+         * Action types whose [ChatActionResponse.taskId] must be present
+         * for the chip tap to be acted on. Other types either carry
+         * [ChatActionResponse.taskIds] (batch) or no id at all
+         * (create_task, start_timer).
+         */
+        val DESTRUCTIVE_TYPES_NEED_TASK_ID = setOf(
+            "complete", "reschedule", "archive"
+        )
     }
 
     /**

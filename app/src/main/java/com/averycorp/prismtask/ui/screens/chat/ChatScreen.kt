@@ -45,8 +45,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,6 +74,7 @@ import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.ui.components.ProFeature
 import com.averycorp.prismtask.ui.components.UpgradePrompt
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +89,7 @@ fun ChatScreen(
     val userTier by viewModel.userTier.collectAsStateWithLifecycle()
     val contextTask by viewModel.contextTask.collectAsStateWithLifecycle()
     val showDisclosure by viewModel.showDisclosure.collectAsStateWithLifecycle()
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var inputText by remember { mutableStateOf("") }
@@ -98,10 +102,28 @@ fun ChatScreen(
         }
     }
 
-    // Show toast messages from action execution
+    // Show snackbar (with optional Undo) for executed actions.
+    // Phase 2 audit fix #4 (C.2): destructive ops carry an undoAction
+    // callback the snackbar surfaces as an action button.
     LaunchedEffect(Unit) {
-        viewModel.toastMessage.collect { msg ->
-            snackbarHostState.showSnackbar(msg)
+        viewModel.actionResults.collect { result ->
+            val undoLabel = result.undoLabel
+            val undoAction = result.undoAction
+            if (undoLabel != null && undoAction != null) {
+                val outcome = snackbarHostState.showSnackbar(
+                    message = result.message,
+                    actionLabel = undoLabel,
+                    duration = SnackbarDuration.Short,
+                    withDismissAction = true
+                )
+                if (outcome == SnackbarResult.ActionPerformed) {
+                    coroutineScope.launch {
+                        runCatching { undoAction() }
+                    }
+                }
+            } else {
+                snackbarHostState.showSnackbar(result.message)
+            }
         }
     }
 
