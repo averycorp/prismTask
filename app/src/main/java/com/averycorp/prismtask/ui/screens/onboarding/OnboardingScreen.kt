@@ -100,7 +100,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val TOTAL_PAGES = 17
+private const val TOTAL_PAGES = 16
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 
 @Composable
@@ -142,7 +142,6 @@ fun OnboardingScreen(
                 12 -> PrivacyPage(viewModel = viewModel)
                 13 -> NotificationsPage(viewModel = viewModel)
                 14 -> DaySetupPage(viewModel = viewModel)
-                15 -> ConnectIntegrationsPage()
                 LAST_PAGE_INDEX -> SetupPage(
                     viewModel = viewModel,
                     onComplete = {
@@ -1843,114 +1842,6 @@ private fun DaySetupPage(viewModel: OnboardingViewModel) {
                     onValueChange = { viewModel.setStartOfDay(hour, (it.toInt() * 5).coerceIn(0, 55)) },
                     valueRange = 0f..11f,
                     steps = 10
-                )
-            }
-        }
-    }
-}
-
-// ─── Connect Integrations Page ────────────────────────────────────────────
-//
-// Awareness-only page surfacing two integrations the user would otherwise
-// only discover by spelunking Settings: Google Calendar two-way sync and
-// Google Drive backup. Both are off by default and require scope grants;
-// rather than break the onboarding flow with an Activity-result detour,
-// this page just tells the user where to find each. The user lands in the
-// fully-functional app a moment later and can navigate to either screen.
-
-@Composable
-private fun ConnectIntegrationsPage() {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { 30 }
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "🔗", fontSize = 48.sp)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Connect More Later",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.asHeading()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Two integrations live in Settings — both off by default " +
-                        "and ready when you want them.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-
-        IntegrationInfoCard(
-            emoji = "📅",
-            title = "Google Calendar",
-            subtitle = "Two-way sync between PrismTask tasks and your calendar events.",
-            location = "Settings → Calendar"
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        IntegrationInfoCard(
-            emoji = "💾",
-            title = "Google Drive Backup",
-            subtitle = "Encrypted manual + scheduled backups of your task data.",
-            location = "Settings → Data & Backup"
-        )
-    }
-}
-
-@Composable
-private fun IntegrationInfoCard(
-    emoji: String,
-    title: String,
-    subtitle: String,
-    location: String
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(emoji, fontSize = 28.sp)
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = location,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

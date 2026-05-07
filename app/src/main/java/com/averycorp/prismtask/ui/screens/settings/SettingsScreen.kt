@@ -254,14 +254,8 @@ fun SettingsScreen(
                 // Productivity — STANDARD+
                 item {
                     SettingsGroup(label = "Productivity") {
-                        SettingsNavRow(
-                            title = "AI Features",
-                            subtitle = "Eisenhower, Smart Pomodoro, briefing",
-                            iconEmoji = "\u2728",
-                            iconBgColor = ColAi,
-                            isPro = true,
-                            onClick = { navController.navigate("settings/ai_features") }
-                        )
+                        // AI Features moved to the Today "AI Tools" hub sheet
+                        // (docs/audits/AI_FEATURES_TO_TODAY_RELOCATION_AUDIT.md).
                         SettingsNavRow(
                             title = "Brain Mode",
                             subtitle = "ADHD, Calm, Focus Release",

@@ -76,12 +76,15 @@ import com.averycorp.prismtask.ui.screens.today.components.CollapsibleSection
 import com.averycorp.prismtask.ui.screens.today.components.CompactProgressHeader
 import com.averycorp.prismtask.ui.screens.today.components.CompletedTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.FloatingQuickAddBar
+import com.averycorp.prismtask.ui.screens.today.components.GUIDED_TOUR_STEPS
+import com.averycorp.prismtask.ui.screens.today.components.GuidedTourCard
 import com.averycorp.prismtask.ui.screens.today.components.HabitChipRow
 import com.averycorp.prismtask.ui.screens.today.components.MorningCheckInBanner
 import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
 import com.averycorp.prismtask.ui.screens.today.components.PlanForTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.ProductivityScoreBadge
 import com.averycorp.prismtask.ui.screens.today.components.SelfCareNudgeCard
+import com.averycorp.prismtask.ui.screens.today.ai.TodayAiHubSheet
 import com.averycorp.prismtask.ui.screens.today.components.SwipeableTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.TodayBalanceSection
 import com.averycorp.prismtask.ui.screens.today.components.TodayCognitiveLoadSection
@@ -144,6 +147,7 @@ fun TodayScreen(
     val showCheckInCompleteChip by viewModel.showCompletionChip.collectAsStateWithLifecycle()
     val currentNudge by viewModel.currentNudge.collectAsStateWithLifecycle()
     val dailyEssentials by viewModel.dailyEssentials.collectAsStateWithLifecycle()
+    val tourCardState by viewModel.tourCardState.collectAsStateWithLifecycle()
     var overloadBannerDismissed by remember { mutableStateOf(false) }
 
     // A2 NLP batch ops — listens to BatchUndoEventBus so we can offer
@@ -200,6 +204,7 @@ fun TodayScreen(
 
     var editorSheetTaskId by remember { mutableStateOf<Long?>(null) }
     var showEditorSheet by remember { mutableStateOf(false) }
+    var showAiHub by remember { mutableStateOf(false) }
     var reschedulePopupTask by remember { mutableStateOf<TaskEntity?>(null) }
     var moveToProjectSheetTask by remember { mutableStateOf<TaskEntity?>(null) }
     var cascadeConfirmState by remember { mutableStateOf<Pair<TaskEntity, Long?>?>(null) }
@@ -432,6 +437,24 @@ fun TodayScreen(
                         }
                     }
 
+                    // Post-onboarding Guided Tour card. Visible only when
+                    // tourCardState is non-null (eligible AND not yet
+                    // dismissed). Sits below status banners (check-in,
+                    // overload) but above task sections so it surfaces
+                    // breadth without subordinating daily signals.
+                    tourCardState?.let { state ->
+                        val safeIndex = state.stepIndex.coerceIn(0, GUIDED_TOUR_STEPS.size - 1)
+                        item(key = "guided_tour_card") {
+                            GuidedTourCard(
+                                step = GUIDED_TOUR_STEPS[safeIndex],
+                                stepNumber = safeIndex + 1,
+                                totalSteps = GUIDED_TOUR_STEPS.size,
+                                onAdvance = { viewModel.advanceTourCard(GUIDED_TOUR_STEPS.size) },
+                                onDismiss = { viewModel.dismissTourCard() }
+                            )
+                        }
+                    }
+
                     // Quick action chips — STANDARD+
                     // Horizontally scrollable so the row scales as more AI
                     // entry points are added without breaking small-screen
@@ -499,6 +522,15 @@ fun TodayScreen(
                                 label = { Text("Review") },
                                 leadingIcon = {
                                     Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                                colors = chipColors,
+                                border = chipBorder
+                            )
+                            AssistChip(
+                                onClick = { showAiHub = true },
+                                label = { Text("AI Tools") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
                                 colors = chipColors,
                                 border = chipBorder
@@ -856,6 +888,13 @@ fun TodayScreen(
                 showEditorSheet = false
                 navController.navigate(PrismTaskRoute.TemplateList.route)
             }
+        )
+    }
+
+    if (showAiHub) {
+        TodayAiHubSheet(
+            navController = navController,
+            onDismiss = { showAiHub = false }
         )
     }
 

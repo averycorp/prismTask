@@ -12,6 +12,7 @@ import com.averycorp.prismtask.data.preferences.MorningCheckInPromptCutoff
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.StartOfDay
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.CheckInLogRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
@@ -77,6 +78,7 @@ class TodayViewModelTest {
     private lateinit var schoolworkRepository: SchoolworkRepository
     private lateinit var leisureRepository: LeisureRepository
     private lateinit var localDateFlow: LocalDateFlow
+    private lateinit var tourCardPreferences: TourCardPreferences
 
     @Before
     fun setUp() {
@@ -103,6 +105,10 @@ class TodayViewModelTest {
         selfCareRepository = mockk(relaxed = true)
         schoolworkRepository = mockk(relaxed = true)
         leisureRepository = mockk(relaxed = true)
+        tourCardPreferences = mockk(relaxed = true)
+        coEvery { tourCardPreferences.eligible() } returns flowOf(false)
+        coEvery { tourCardPreferences.dismissed() } returns flowOf(false)
+        coEvery { tourCardPreferences.stepIndex() } returns flowOf(0)
         // Mock LocalDateFlow so `observe()` returns a single-emission flow that
         // completes. The real production flow re-emits forever via an internal
         // `delay(timeUntilNextBoundary)` loop — which would keep `runTest`'s
@@ -176,7 +182,8 @@ class TodayViewModelTest {
         selfCareRepository,
         schoolworkRepository,
         leisureRepository,
-        localDateFlow
+        localDateFlow,
+        tourCardPreferences
     )
 
     @Test

@@ -1083,6 +1083,8 @@ _CHAT_SYSTEM_PROMPT = """You are PrismTask's conversational productivity coach. 
 
 You can suggest inline action buttons that the app will render under your reply. Only emit actions that map to a real user need expressed in the most recent message. NEVER invent task IDs or fabricate references the user did not give you.
 
+When the user opens chat from a specific task, the latest user turn carries a `task_context` block with the actual title, description, due date, and priority. Ground your reply in those concrete fields — refer to the task by its title, not the opaque id. The `task_context_id` integer is the handle the action buttons must echo back; only the user-facing reply text should mention the task by title.
+
 Allowed action shapes (use exactly these `type` values; omit any unused fields):
 - {"type": "create_task", "title": "...", "due": "today|tomorrow|next_week|YYYY-MM-DD", "priority": "low|medium|high|urgent"}
 - {"type": "start_timer", "minutes": 25}
@@ -1108,9 +1110,20 @@ def generate_chat_response(
     message: str,
     conversation_id: str,
     task_context_id: int | None = None,
-    tier: str = "PRO",
+    task_context: dict | None = None,
+    history: list[dict] | None = None,
 ) -> dict:
     """Call Claude Haiku to produce a conversational chat reply + optional actions.
+
+    The backend is stateless from the conversation's POV: the client owns
+    the rolling history and forwards it on every turn via ``history``. The
+    list arrives as ``[{"role": "user"|"assistant", "content": "..."}]``
+    in chronological order, capped to 12 entries (last 6 user/assistant
+    pairs) by ``ChatRequest`` validation.
+
+    ``task_context`` is the snapshot of the task the user is talking about,
+    forwarded by the client when chat is opened from a task. Without it the
+    AI has only the opaque ``task_context_id`` integer to echo into actions.
 
     Returns a dict with shape::
 
@@ -1127,12 +1140,27 @@ def generate_chat_response(
     client = _get_client()
     model = get_model("chat")
 
-    user_block = {
+    user_block: dict = {
         "conversation_id": conversation_id,
         "task_context_id": task_context_id,
         "user_message": message,
     }
+    if task_context:
+        user_block["task_context"] = task_context
     user_payload = json.dumps(user_block, default=str, indent=2)
+
+    # Build the Anthropic messages array: rolling history pairs first
+    # (chronological), then the latest user turn carrying the structured
+    # context block. The server-side validation already capped history to
+    # 12 entries; we still defensively trim here in case a future caller
+    # bypasses the schema (e.g. a unit test).
+    anthropic_messages: list[dict] = []
+    for entry in (history or [])[-12:]:
+        role = entry.get("role")
+        content = entry.get("content")
+        if role in ("user", "assistant") and isinstance(content, str) and content:
+            anthropic_messages.append({"role": role, "content": content})
+    anthropic_messages.append({"role": "user", "content": user_payload})
 
     last_error: Exception | None = None
     for attempt in range(2):
@@ -1141,7 +1169,7 @@ def generate_chat_response(
                 model=model,
                 max_tokens=1024,
                 system=_CHAT_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_payload}],
+                messages=anthropic_messages,
             )
             content = ai_message.content[0].text
             result = _parse_ai_json(content)

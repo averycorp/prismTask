@@ -1,8 +1,10 @@
 package com.averycorp.prismtask.data.repository
 
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
+import com.averycorp.prismtask.data.remote.api.ChatHistoryEntry
 import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
+import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,10 +36,9 @@ constructor(
 
     private var conversationId: String = generateConversationId()
     private var conversationDate: LocalDate = LocalDate.now()
-    private var messagesSinceContextRefresh = 0
 
-    /** Maximum conversation pairs kept in history (spec: 10). */
-    private val maxHistoryPairs = 10
+    /** Maximum conversation pairs kept and forwarded to the backend (spec: 6). */
+    private val maxHistoryPairs = 6
 
     /**
      * Returns the current conversation ID, resetting if the day has changed.
@@ -48,37 +49,43 @@ constructor(
     }
 
     /**
-     * Returns whether the user context block should be refreshed
-     * (every 5 messages per spec).
-     */
-    fun shouldRefreshContext(): Boolean = messagesSinceContextRefresh >= 5 || messagesSinceContextRefresh == 0
-
-    fun markContextRefreshed() {
-        messagesSinceContextRefresh = 0
-    }
-
-    /**
      * Sends a message to the AI chat backend and returns the response.
-     * Manages conversation history, trimming to max pairs.
+     *
+     * Forwards the rolling N=6 user/assistant pairs the repository is
+     * already holding so the model has actual multi-turn memory; trims
+     * locally afterwards.
      */
     suspend fun sendMessage(
         userMessage: String,
-        taskContextId: Long? = null
+        taskContextId: Long? = null,
+        taskContext: ChatTaskContext? = null
     ): ChatResponse {
         resetIfNewDay()
+
+        // Snapshot history BEFORE appending the new user turn — the latest
+        // user message becomes ChatRequest.message, not history.
+        val historyPayload = _messages.value
+            .takeLast(maxHistoryPairs * 2)
+            .map {
+                ChatHistoryEntry(
+                    role = if (it.role == ChatMessage.Role.USER) "user" else "assistant",
+                    content = it.text
+                )
+            }
 
         val userMsg = ChatMessage(
             role = ChatMessage.Role.USER,
             text = userMessage
         )
         _messages.value = _messages.value + userMsg
-        messagesSinceContextRefresh++
 
         val response = api.aiChat(
             ChatRequest(
                 message = userMessage,
                 conversationId = conversationId,
-                taskContextId = taskContextId
+                taskContextId = taskContextId,
+                taskContext = taskContext,
+                history = historyPayload
             )
         )
 
@@ -98,7 +105,6 @@ constructor(
         _messages.value = emptyList()
         conversationId = generateConversationId()
         conversationDate = LocalDate.now()
-        messagesSinceContextRefresh = 0
     }
 
     private fun resetIfNewDay() {
