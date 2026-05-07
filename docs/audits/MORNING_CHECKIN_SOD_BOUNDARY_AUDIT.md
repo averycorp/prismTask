@@ -380,3 +380,62 @@ Test cases (covering all four edge cases the audit surfaced):
 Co-locate the helper next to `MorningCheckInResolver`, write the test,
 then have `TodayViewModel` consume the helper inside `combine(...)`.
 
+---
+
+## Phase 3 — bundle summary
+
+| # | Item | Verdict | PR |
+|---|------|---------|-----|
+| 1 | `TodayViewModel.beforePromptHour = hour < 11` | RED | [#1166](https://github.com/averycorp/prismtask/pull/1166) |
+| 2 | Hardcoded `11` ignores `MorningCheckInPromptCutoff` slider | RED | [#1166](https://github.com/averycorp/prismtask/pull/1166) (bundled) |
+| 3 | `dismissBannerToday()` uses wall-clock `LocalDate.now()` | YELLOW | [#1166](https://github.com/averycorp/prismtask/pull/1166) (bundled) |
+| 4 | `MorningCheckInResolver.plan().shouldPrompt` ignores SoD | YELLOW | DEFER — dead field in production; cleanup PR |
+| 5 | `MorningCheckInViewModel` time/window math | GREEN | n/a |
+| 6 | `LocalDateFlow` SoD-aware ticker | GREEN | n/a |
+
+**PR #1166** ships items 1+2+3 as a single coherent fix:
+
+- New pure-function `MorningCheckInBannerDecider` with 11-case test
+  suite covering pre-SoD, in-window, at-SoD/at-cutoff, past-cutoff,
+  user-tightened cutoff, feature-disabled, already-checked-in,
+  dismissed, wrap-around (SoD past noon), and minute-precision SoD.
+- `TodayViewModel` injects `AdvancedTuningPreferences`, swaps the
+  inline `hour < 11` predicate for `MorningCheckInBannerDecider.shouldShow(...)`,
+  and routes the SoD-aware logical date into
+  `morningCheckInPreferences.dismissBannerToday(logicalDateIso)`.
+- `MorningCheckInPreferences.dismissBannerToday()` accepts an optional
+  `logicalDateIso: String` (defaults to wall-clock for callers
+  without SoD context — none today, but defensive).
+- `TodayViewModelTest` fixture updated for the new
+  `advancedTuningPreferences` constructor parameter.
+- CHANGELOG entry under `## Unreleased / ### Fixed`.
+
+**Wall-clock-per-PR estimate (re-baselined):** ~45 minutes.
+Audit + structural repro test + fix + tests + PR description.
+Faster than the audit-first baseline because all three items
+share a single `combine(...)` lambda — bundling didn't add
+coordination cost.
+
+**Memory entry candidates:**
+
+- *None new.* The fix re-applies an established pattern
+  (`feedback_repro_first_for_time_boundary_bugs.md` already covers the
+  "structural repro test first" rule, and the SoD/wall-clock split is
+  documented in `MEDICATION_SOD_BOUNDARY_AUDIT.md` and
+  `TODAY_LABEL_SOD_BOUNDARY_AUDIT.md`). No surprise findings worth a
+  fresh memory entry.
+
+**Schedule for next audit:**
+
+- Item 4 (`MorningCheckInResolver.plan().shouldPrompt` cleanup) — single
+  small PR, ~15 minutes. Either delete the field + its 4 tests, or
+  fold the resolver into `TodayViewModel` as the single visibility
+  source. The latter is the more durable answer but also overlaps
+  with future work on the `MorningCheckInScreen` itself; defer until
+  that screen needs touched.
+- Anti-pattern sweep for `Calendar.getInstance().get(HOUR_OF_DAY)`
+  used as a "is it morning?" gate. `TodayViewModel.computeGreeting()`
+  and `TodayViewModel.refreshNudge()` are the two recurrences. Lower
+  stakes (greeting + nudge selection), but worth a small dedicated
+  audit if either surface starts to misbehave.
+
