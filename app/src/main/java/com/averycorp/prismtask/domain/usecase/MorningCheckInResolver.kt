@@ -2,8 +2,6 @@ package com.averycorp.prismtask.domain.usecase
 
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.repository.HabitWithStatus
-import java.time.LocalTime
-import java.time.ZoneId
 
 /**
  * A single step in the Morning Check-In guided flow (v1.4.0 V4).
@@ -29,7 +27,6 @@ enum class CheckInStep {
  */
 data class MorningCheckInConfig(
     val enabled: Boolean = true,
-    val promptBeforeHour: Int = 11,
     val includeMoodEnergy: Boolean = true,
     val includeMedications: Boolean = true,
     val includeTopTasks: Boolean = true,
@@ -39,12 +36,12 @@ data class MorningCheckInConfig(
 )
 
 /**
- * Snapshot of whether a check-in should be offered and which steps
- * should appear. The ViewModel layer uses this to decide whether to
- * show the "Start Your Morning Check-In?" prompt on the Today screen.
+ * Snapshot of which check-in steps should appear and the task / habit
+ * data each step renders. The Today-screen banner-visibility decision
+ * lives in [MorningCheckInBannerDecider]; this plan describes only the
+ * body of the guided flow once the user opens it.
  */
 data class CheckInPlan(
-    val shouldPrompt: Boolean,
     val steps: List<CheckInStep>,
     val topTasks: List<TaskEntity>,
     val todayHabits: List<HabitWithStatus>
@@ -54,37 +51,23 @@ data class CheckInPlan(
  * Pure-function planner for the morning check-in (v1.4.0 V4).
  *
  * Doesn't touch any state — feed it the raw snapshot of today's tasks,
- * habits, config, last completion date, and "now", and it returns a
- * ready-to-render [CheckInPlan]. Repositories and ViewModels wire
- * this up with their own Flows.
+ * habits, and config, and it returns a ready-to-render [CheckInPlan].
+ * Repositories and ViewModels wire this up with their own Flows.
  */
 class MorningCheckInResolver {
     fun plan(
         tasks: List<TaskEntity>,
         habits: List<HabitWithStatus>,
         config: MorningCheckInConfig,
-        // midnight-normalized millis of the last completed check-in
-        lastCompletedDate: Long?,
-        todayStart: Long,
-        now: Long = System.currentTimeMillis(),
-        zone: ZoneId = ZoneId.systemDefault()
+        todayStart: Long
     ): CheckInPlan {
         if (!config.enabled) {
             return CheckInPlan(
-                shouldPrompt = false,
                 steps = emptyList(),
                 topTasks = emptyList(),
                 todayHabits = emptyList()
             )
         }
-
-        val localNow = java.time.Instant
-            .ofEpochMilli(now)
-            .atZone(zone)
-            .toLocalTime()
-        val beforeThreshold = localNow.isBefore(LocalTime.of(config.promptBeforeHour, 0))
-        val alreadyToday = lastCompletedDate != null && lastCompletedDate >= todayStart
-        val shouldPrompt = beforeThreshold && !alreadyToday
 
         // Top 3 tasks due today by highest urgency proxy (priority then due date).
         val topTasks = tasks
@@ -104,7 +87,6 @@ class MorningCheckInResolver {
         }
 
         return CheckInPlan(
-            shouldPrompt = shouldPrompt,
             steps = steps,
             topTasks = topTasks,
             todayHabits = habits

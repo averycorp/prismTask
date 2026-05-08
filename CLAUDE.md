@@ -116,6 +116,7 @@ current sub-package contents (it drifts faster than this file is updated).
 - **ND-Friendly Modes**: `NdFeatureGate` + `NdPreferences` gate Brain Mode, UI Complexity, Forgiveness Streak, and Focus Release (`FocusReleaseLogEntity`, `GoodEnoughTimerManager`, `EnergyAwarePomodoro`, `ShipItCelebrationManager`)
 - **Medication Refills + Clinical Report**: `MedicationRefillEntity` + `RefillCalculator` project refill dates; `ClinicalReportGenerator` exports a therapist-friendly summary
 - **Conversation Extraction**: `ConversationTaskExtractor` pulls tasks from chat transcripts into a dedicated review inbox
+- **Chat Persistence (D11 E.3)**: AI Coach chat is server-authoritative. The `/api/v1/ai/chat` handler writes both user + assistant turns to a `chat_messages` table on commit; clients read via `GET /api/v1/ai/chat/history` (paginated, user-scoped) and mirror into Room (`ChatMessageEntity` + `ChatMessageDao`). Conversation IDs follow the `chat_{ISO_DATE}_{UUID8}` pattern minted client-side; daily rollover is a UI filter, not a destructive event — old conversations remain queryable. Disclosure flag is at V3 (`KEY_AI_CHAT_DISCLOSURE_SHOWN_V3`) per the retention shape change. No Firestore — chat follows the BackendSyncService precedent
 
 ## CI Failure Logs
 

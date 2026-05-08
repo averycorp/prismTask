@@ -1,16 +1,19 @@
 package com.averycorp.prismtask.ui.screens.timer
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.notifications.NotificationHelper
+import com.averycorp.prismtask.notifications.PomodoroTimerService
 import com.averycorp.prismtask.widget.TimerWidgetState
 import com.averycorp.prismtask.widget.WidgetUpdateManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,9 +65,38 @@ constructor(
     private val _uiState = MutableStateFlow(TimerUiState())
     val uiState: StateFlow<TimerUiState> = _uiState.asStateFlow()
 
-    private var tickJob: Job? = null
+    private var ticksSinceWidgetUpdate: Int = 0
+
+    /**
+     * Listens for tick / pause / resume / complete broadcasts from
+     * [PomodoroTimerService]. Filters on
+     * [PomodoroTimerService.EXTRA_OWNER] == [PomodoroTimerService.OWNER_TIMER]
+     * so a SmartPomodoroViewModel session running concurrently doesn't bleed
+     * into our state.
+     */
+    private val timerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val incomingOwner = intent?.getStringExtra(PomodoroTimerService.EXTRA_OWNER)
+            if (incomingOwner != PomodoroTimerService.OWNER_TIMER) return
+            when (intent.action) {
+                PomodoroTimerService.ACTION_TICK -> {
+                    val seconds = intent.getIntExtra(
+                        PomodoroTimerService.EXTRA_SECONDS_REMAINING,
+                        -1
+                    )
+                    if (seconds >= 0) onTick(seconds)
+                }
+                PomodoroTimerService.ACTION_PAUSED -> onServicePaused()
+                PomodoroTimerService.ACTION_RESUMED -> onServiceResumed()
+                PomodoroTimerService.ACTION_COMPLETE -> onServiceComplete()
+            }
+        }
+    }
+
+    private var receiverRegistered = false
 
     init {
+        registerTimerReceiver()
         // Sync pomodoro preferences. Also push the new value into
         // TimerStateDataStore so widget consumers see the toggle without
         // waiting for a control tap to flush the snapshot.
@@ -149,61 +181,134 @@ constructor(
         }
     }
 
+    private fun registerTimerReceiver() {
+        if (receiverRegistered) return
+        try {
+            val filter = IntentFilter().apply {
+                addAction(PomodoroTimerService.ACTION_TICK)
+                addAction(PomodoroTimerService.ACTION_PAUSED)
+                addAction(PomodoroTimerService.ACTION_RESUMED)
+                addAction(PomodoroTimerService.ACTION_COMPLETE)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(timerReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                appContext.registerReceiver(timerReceiver, filter)
+            }
+            receiverRegistered = true
+        } catch (_: Exception) {
+            // Test contexts and edge cases (e.g. early in Application lifecycle)
+            // may reject receiver registration; the service still delivers
+            // the completion notification via the system notification manager
+            // so UI sync is best-effort.
+        }
+    }
+
+    private fun unregisterTimerReceiver() {
+        if (!receiverRegistered) return
+        try {
+            appContext.unregisterReceiver(timerReceiver)
+        } catch (_: Exception) {
+            // Already unregistered or context invalid.
+        }
+        receiverRegistered = false
+    }
+
     fun toggleStartPause() {
         val state = _uiState.value
-        if (state.isRunning) {
-            pause()
-        } else {
-            start()
+        when {
+            state.isRunning -> pause()
+            // Paused mid-session: remainingSeconds < totalSeconds. Resume the
+            // existing service-side countdown rather than starting a fresh
+            // session that would reset to totalSeconds.
+            state.remainingSeconds in 1 until state.totalSeconds -> resume()
+            else -> start()
         }
     }
 
     private fun start() {
         val state = _uiState.value
         if (state.remainingSeconds <= 0) return
+        ticksSinceWidgetUpdate = 0
         _uiState.value = state.copy(isRunning = true)
         syncWidgetState()
-        tickJob?.cancel()
-        var ticksSinceWidgetUpdate = 0
-        tickJob = viewModelScope.launch {
-            widgetUpdateManager.updateTimerWidget()
-            while (true) {
-                delay(1000L)
-                val current = _uiState.value
-                if (!current.isRunning) break
-                val next = current.remainingSeconds - 1
-                ticksSinceWidgetUpdate++
-                if (next <= 0) {
-                    _uiState.value = current.copy(remainingSeconds = 0, isRunning = false)
-                    syncWidgetState()
-                    widgetUpdateManager.updateTimerWidget()
-                    // TODO: migrate countdown to PomodoroTimerService-style
-                    //  foreground service so the timer survives backgrounding
-                    //  (currently the viewModelScope coroutine is cancelled
-                    //  when the ViewModel is cleared).
-                    NotificationHelper.showTimerCompleteNotification(
-                        appContext,
-                        current.mode.name
-                    )
-                    onTimerCompleted()
-                    // onTimerCompleted flips mode (WORK -> BREAK or BREAK ->
-                    // WORK) and isLongBreak; resync so the widget reflects
-                    // the post-completion state even when both auto-start
-                    // flags are off.
-                    syncWidgetState()
-                    widgetUpdateManager.updateTimerWidget()
-                    break
-                } else {
-                    _uiState.value = current.copy(remainingSeconds = next)
-                    // Update widget every 30 seconds for sub-minute accuracy
-                    if (ticksSinceWidgetUpdate >= 30) {
-                        ticksSinceWidgetUpdate = 0
-                        syncWidgetState()
-                        widgetUpdateManager.updateTimerWidget()
-                    }
-                }
-            }
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+        PomodoroTimerService.start(
+            context = appContext,
+            durationSeconds = state.remainingSeconds,
+            sessionIndex = state.completedSessions,
+            sessionType = sessionTypeFor(state),
+            owner = PomodoroTimerService.OWNER_TIMER
+        )
+    }
+
+    private fun resume() {
+        val state = _uiState.value
+        if (state.remainingSeconds <= 0) return
+        _uiState.value = state.copy(isRunning = true)
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+        PomodoroTimerService.resume(appContext)
+    }
+
+    private fun pause() {
+        _uiState.value = _uiState.value.copy(isRunning = false)
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+        PomodoroTimerService.pause(appContext)
+    }
+
+    private fun onTick(secondsRemaining: Int) {
+        val current = _uiState.value
+        ticksSinceWidgetUpdate++
+        // The first tick after a resume / start may set isRunning to true if
+        // the service caught up before our optimistic flip. Keep both in
+        // sync.
+        _uiState.value = current.copy(
+            remainingSeconds = secondsRemaining,
+            isRunning = secondsRemaining > 0
+        )
+        // Widget update cadence mirrors the legacy in-memory timer:
+        // every 30 ticks for sub-minute accuracy without a flood.
+        if (ticksSinceWidgetUpdate >= 30) {
+            ticksSinceWidgetUpdate = 0
+            syncWidgetState()
+            viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
         }
+    }
+
+    private fun onServicePaused() {
+        _uiState.value = _uiState.value.copy(isRunning = false)
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+    }
+
+    private fun onServiceResumed() {
+        _uiState.value = _uiState.value.copy(isRunning = true)
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+    }
+
+    private fun onServiceComplete() {
+        val state = _uiState.value
+        _uiState.value = state.copy(remainingSeconds = 0, isRunning = false)
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+        // Mirror the in-app completion notification the previous
+        // in-memory tick loop fired. The service already shows its own
+        // ongoing notification; this surfaces the alert sound/vibration the
+        // user expects regardless of which path delivers it.
+        viewModelScope.launch {
+            NotificationHelper.showTimerCompleteNotification(appContext, state.mode.name)
+        }
+        onTimerCompleted()
+        // onTimerCompleted flips mode (WORK -> BREAK or BREAK ->
+        // WORK) and isLongBreak; resync so the widget reflects
+        // the post-completion state even when both auto-start
+        // flags are off.
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }
 
     @androidx.annotation.VisibleForTesting
@@ -280,8 +385,7 @@ constructor(
     fun skipToNext() {
         val state = _uiState.value
         if (!state.pomodoroEnabled) return
-        tickJob?.cancel()
-        tickJob = null
+        PomodoroTimerService.stop(appContext)
 
         if (state.mode == TimerMode.WORK) {
             val newCompleted = state.completedSessions + 1
@@ -311,17 +415,8 @@ constructor(
         }
     }
 
-    private fun pause() {
-        tickJob?.cancel()
-        tickJob = null
-        _uiState.value = _uiState.value.copy(isRunning = false)
-        syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
-    }
-
     fun reset() {
-        tickJob?.cancel()
-        tickJob = null
+        PomodoroTimerService.stop(appContext)
         val state = _uiState.value
         val total = when {
             state.mode == TimerMode.WORK -> workDurationSeconds.value
@@ -339,8 +434,7 @@ constructor(
     }
 
     fun resetPomodoro() {
-        tickJob?.cancel()
-        tickJob = null
+        PomodoroTimerService.stop(appContext)
         val workDuration = workDurationSeconds.value
         _uiState.value = _uiState.value.copy(
             mode = TimerMode.WORK,
@@ -354,8 +448,7 @@ constructor(
 
     fun setMode(mode: TimerMode) {
         if (_uiState.value.mode == mode) return
-        tickJob?.cancel()
-        tickJob = null
+        PomodoroTimerService.stop(appContext)
         val total = when (mode) {
             TimerMode.WORK -> workDurationSeconds.value
             TimerMode.BREAK -> breakDurationSeconds.value
@@ -398,6 +491,13 @@ constructor(
         }
     }
 
+    private fun sessionTypeFor(state: TimerUiState): String = when {
+        state.mode == TimerMode.BREAK && state.isLongBreak ->
+            PomodoroTimerService.SESSION_TYPE_LONG_BREAK
+        state.mode == TimerMode.BREAK -> PomodoroTimerService.SESSION_TYPE_BREAK
+        else -> PomodoroTimerService.SESSION_TYPE_WORK
+    }
+
     /** Syncs the current timer UI state to the widget DataStore. */
     private fun syncWidgetState() {
         val s = _uiState.value
@@ -431,12 +531,15 @@ constructor(
 
     override fun onCleared() {
         super.onCleared()
-        tickJob?.cancel()
-        // Always clear widget state on close: tickJob has just been
-        // cancelled, so any "running" flag in the DataStore would now be
-        // a lie and the widget would show a frozen clock. Routed through
-        // an application-scoped scope because viewModelScope is already
-        // cancelled by the time onCleared runs.
-        widgetUpdateManager.clearTimerStateAndUpdate()
+        unregisterTimerReceiver()
+        // Don't stop the foreground service here: the whole point of the
+        // migration is for the countdown to survive the ViewModel being
+        // cleared (process backgrounded, navigation away, configuration
+        // change). Same applies to widget state: only clear it if no
+        // session is currently running, so the widget keeps showing the
+        // active session even after the ViewModel goes away.
+        if (!_uiState.value.isRunning) {
+            widgetUpdateManager.clearTimerStateAndUpdate()
+        }
     }
 }

@@ -3,6 +3,7 @@ import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Column,
@@ -794,4 +795,35 @@ class BetaCodeRedemption(Base):
     grants_pro_until = Column(DateTime(timezone=True), nullable=True)
 
     code_row = relationship("BetaCode", back_populates="redemptions")
+    user = relationship("User")
+
+
+class ChatMessage(Base):
+    """Persisted conversational-coach chat turn.
+
+    Per ``docs/audits/D11_E3_CHAT_PERSISTENCE_AUDIT.md`` (Item 1 = Shape A).
+    Both user and assistant turns land in this table with role
+    discrimination; ``conversation_id`` is the day-keyed grouping the
+    Android client already mints (``chat_{ISO_DATE}_{UUID8}``). Server
+    is the sole writer — clients call ``/chat`` and the handler appends
+    rows; clients read via ``GET /chat/history``.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    conversation_id = Column(String(128), nullable=False)
+    role = Column(String(16), nullable=False)
+    content = Column(Text, nullable=False)
+    actions = Column(JSON, nullable=True)
+    task_context_snapshot = Column(JSON, nullable=True)
+    tokens_input = Column(Integer, nullable=True)
+    tokens_output = Column(Integer, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
     user = relationship("User")

@@ -1,17 +1,21 @@
 import json
 import logging
+import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.ai_gate import require_ai_features_enabled
 from app.middleware.auth import get_active_user
 from app.middleware.rate_limit import RateLimiter, daily_ai_rate_limiter
-from app.models import Habit, User
+from app.models import ChatMessage as ChatMessageModel, Habit, User
 from app.schemas.ai import (
     AutomationCompleteRequest,
     AutomationCompleteResponse,
@@ -20,8 +24,11 @@ from app.schemas.ai import (
     BatchParseRequest,
     BatchParseResponse,
     ChatActionPayload,
+    ChatHistoryResponse,
+    ChatMessageRecord,
     ChatRequest,
     ChatResponse,
+    ChatTaskContext,
     ChatTokensUsed,
     DailyBriefingRequest,
     DailyBriefingResponse,
@@ -967,6 +974,49 @@ async def chat(
         output=int(tokens.get("output", 0) or 0),
     )
 
+    # D11 E.3 — persist both turns to chat_messages. Server-authored writes
+    # land here so cross-device GET /chat/history returns a consistent view.
+    # Failures are logged but never bubble up to the user — the AI response
+    # already returned successfully and the next history pull will reconcile.
+    try:
+        now = datetime.now(timezone.utc)
+        user_row = ChatMessageModel(
+            id=uuid.uuid4().hex,
+            user_id=current_user.id,
+            conversation_id=data.conversation_id,
+            role="user",
+            content=data.message,
+            task_context_snapshot=(
+                data.task_context.model_dump(exclude_none=True)
+                if data.task_context is not None
+                else None
+            ),
+            created_at=now,
+        )
+        assistant_row = ChatMessageModel(
+            id=uuid.uuid4().hex,
+            user_id=current_user.id,
+            conversation_id=data.conversation_id,
+            role="assistant",
+            content=result["message"],
+            actions=[a.model_dump() for a in validated_actions] or None,
+            tokens_input=tokens_used.input,
+            tokens_output=tokens_used.output,
+            # +1µs so chronological retrieval orders user-then-assistant
+            # even when wall-clock collapses to identical timestamps.
+            created_at=now + timedelta(microseconds=1),
+        )
+        db.add(user_row)
+        db.add(assistant_row)
+        await db.commit()
+    except Exception:
+        logger.exception(
+            "Failed to persist chat turn for user_id=%s conversation_id=%s",
+            current_user.id,
+            data.conversation_id,
+        )
+        await db.rollback()
+
     return ChatResponse(
         message=result["message"],
         actions=validated_actions,
@@ -1073,6 +1123,91 @@ async def chat_stream(
             "Cache-Control": "no-cache",
         },
     )
+
+@router.get("/chat/history", response_model=ChatHistoryResponse)
+async def chat_history(
+    conversation_id: str | None = Query(default=None, max_length=128),
+    limit: int = Query(default=50, ge=1, le=200),
+    before: str | None = Query(
+        default=None,
+        description="ISO-8601 cursor; returns messages strictly before this timestamp.",
+    ),
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return persisted chat turns for the current user.
+
+    Per ``docs/audits/D11_E3_CHAT_PERSISTENCE_AUDIT.md`` (Item 3). Reads
+    are filtered to the current user (multi-tenant isolation enforced
+    at the WHERE clause; never trust the client to scope itself). When
+    ``conversation_id`` is provided, only that day's thread is returned;
+    otherwise messages from all conversations are returned in reverse
+    chronological order, suitable for an archive-style listing.
+    """
+    stmt = select(ChatMessageModel).where(
+        ChatMessageModel.user_id == current_user.id
+    )
+    if conversation_id is not None:
+        stmt = stmt.where(ChatMessageModel.conversation_id == conversation_id)
+    if before is not None:
+        try:
+            before_dt = datetime.fromisoformat(before)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid 'before' cursor")
+        stmt = stmt.where(ChatMessageModel.created_at < before_dt)
+
+    # Pull (limit + 1) so we can detect a next page without a separate
+    # COUNT. The extra row, if present, becomes the cursor for the next
+    # call and is dropped from the response.
+    stmt = stmt.order_by(desc(ChatMessageModel.created_at)).limit(limit + 1)
+    rows = (await db.execute(stmt)).scalars().all()
+
+    has_more = len(rows) > limit
+    page = rows[:limit]
+
+    # Return chronological order (oldest first) so the client appends
+    # naturally to its existing list. ``next_before`` carries the oldest
+    # message's created_at — passing it back walks one page earlier.
+    page_chrono = list(reversed(page))
+    next_before = page[-1].created_at.isoformat() if has_more and page else None
+
+    records: list[ChatMessageRecord] = []
+    for row in page_chrono:
+        actions_payload = row.actions or []
+        validated_actions: list[ChatActionPayload] = []
+        for raw in actions_payload:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                validated_actions.append(ChatActionPayload(**raw))
+            except ValidationError:
+                continue
+        ctx = None
+        if isinstance(row.task_context_snapshot, dict):
+            try:
+                ctx = ChatTaskContext(**row.task_context_snapshot)
+            except ValidationError:
+                ctx = None
+        tokens = None
+        if row.tokens_input is not None or row.tokens_output is not None:
+            tokens = ChatTokensUsed(
+                input=row.tokens_input or 0,
+                output=row.tokens_output or 0,
+            )
+        records.append(
+            ChatMessageRecord(
+                id=row.id,
+                conversation_id=row.conversation_id,
+                role=row.role,
+                content=row.content,
+                actions=validated_actions,
+                task_context_snapshot=ctx,
+                tokens_used=tokens,
+                created_at=row.created_at.isoformat(),
+            )
+        )
+
+    return ChatHistoryResponse(messages=records, next_before=next_before)
 
 
 # ---------------------------------------------------------------------------

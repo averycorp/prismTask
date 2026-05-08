@@ -32,11 +32,17 @@ import kotlinx.coroutines.runBlocking
  * process alive and guarantees the ongoing + completion notifications are
  * delivered even if the user switches apps or locks the screen.
  *
- * The service emits two kinds of broadcast to the in-app UI so the ViewModel
- * can keep [com.averycorp.prismtask.ui.screens.pomodoro.SmartPomodoroViewModel]
- * state in sync:
+ * The service emits four kinds of broadcast to the in-app UI so the
+ * ViewModel layer can keep its state in sync:
  *  - [ACTION_TICK] every second with [EXTRA_SECONDS_REMAINING]
+ *  - [ACTION_PAUSED] when a [ACTION_PAUSE] command is honored
+ *  - [ACTION_RESUMED] when an [ACTION_RESUME] command is honored
  *  - [ACTION_COMPLETE] once when the countdown reaches zero
+ *
+ * Every outbound broadcast carries [EXTRA_OWNER] so multiple consumers
+ * (TimerViewModel + SmartPomodoroViewModel) can filter on the start
+ * intent's owner and avoid cross-talk when both VMs happen to be alive at
+ * once.
  */
 class PomodoroTimerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -44,6 +50,8 @@ class PomodoroTimerService : Service() {
     private var secondsRemaining: Int = 0
     private var sessionIndex: Int = 0
     private var sessionType: String = SESSION_TYPE_WORK
+    private var owner: String = OWNER_TIMER
+    private var isPaused: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -51,6 +59,8 @@ class PomodoroTimerService : Service() {
         Log.d("PomodoroService", "onStartCommand: action=${intent?.action}")
         when (intent?.action) {
             ACTION_START -> startCountdown(intent)
+            ACTION_PAUSE -> pauseCountdown()
+            ACTION_RESUME -> resumeCountdown()
             ACTION_STOP -> {
                 stopCountdown()
                 stopSelf()
@@ -67,7 +77,12 @@ class PomodoroTimerService : Service() {
         secondsRemaining = intent.getIntExtra(EXTRA_DURATION_SECONDS, 0)
         sessionIndex = intent.getIntExtra(EXTRA_SESSION_INDEX, 0)
         sessionType = intent.getStringExtra(EXTRA_SESSION_TYPE) ?: SESSION_TYPE_WORK
-        Log.d("PomodoroService", "startCountdown: seconds=$secondsRemaining type=$sessionType")
+        owner = intent.getStringExtra(EXTRA_OWNER) ?: OWNER_TIMER
+        isPaused = false
+        Log.d(
+            "PomodoroService",
+            "startCountdown: seconds=$secondsRemaining type=$sessionType owner=$owner"
+        )
 
         val notification = buildOngoingNotification(secondsRemaining)
         try {
@@ -85,6 +100,10 @@ class PomodoroTimerService : Service() {
             Log.e("PomodoroService", "startForeground FAILED", e)
         }
 
+        runTickLoop()
+    }
+
+    private fun runTickLoop() {
         tickJob?.cancel()
         tickJob = serviceScope.launch {
             // Emit an initial tick so the UI picks up the starting value even
@@ -93,17 +112,54 @@ class PomodoroTimerService : Service() {
             broadcastTick(secondsRemaining)
             while (secondsRemaining > 0) {
                 delay(1000)
+                if (isPaused) break
                 secondsRemaining -= 1
                 updateOngoingNotification(secondsRemaining)
                 broadcastTick(secondsRemaining)
             }
-            onCountdownComplete()
+            if (!isPaused && secondsRemaining <= 0) {
+                onCountdownComplete()
+            }
         }
+    }
+
+    private fun pauseCountdown() {
+        if (isPaused || tickJob == null) return
+        isPaused = true
+        tickJob?.cancel()
+        tickJob = null
+        updateOngoingNotification(secondsRemaining)
+        sendBroadcast(
+            Intent(ACTION_PAUSED).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_SECONDS_REMAINING, secondsRemaining)
+                putExtra(EXTRA_SESSION_INDEX, sessionIndex)
+                putExtra(EXTRA_SESSION_TYPE, sessionType)
+                putExtra(EXTRA_OWNER, owner)
+            }
+        )
+    }
+
+    private fun resumeCountdown() {
+        if (!isPaused) return
+        isPaused = false
+        updateOngoingNotification(secondsRemaining)
+        sendBroadcast(
+            Intent(ACTION_RESUMED).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_SECONDS_REMAINING, secondsRemaining)
+                putExtra(EXTRA_SESSION_INDEX, sessionIndex)
+                putExtra(EXTRA_SESSION_TYPE, sessionType)
+                putExtra(EXTRA_OWNER, owner)
+            }
+        )
+        runTickLoop()
     }
 
     private fun stopCountdown() {
         tickJob?.cancel()
         tickJob = null
+        isPaused = false
     }
 
     private fun onCountdownComplete() {
@@ -127,6 +183,7 @@ class PomodoroTimerService : Service() {
                 setPackage(packageName)
                 putExtra(EXTRA_SESSION_INDEX, sessionIndex)
                 putExtra(EXTRA_SESSION_TYPE, sessionType)
+                putExtra(EXTRA_OWNER, owner)
             }
         )
 
@@ -160,12 +217,26 @@ class PomodoroTimerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val pauseResumeIntent = Intent(this, PomodoroTimerService::class.java).apply {
+            action = if (isPaused) ACTION_RESUME else ACTION_PAUSE
+        }
+        val pauseResumePending = PendingIntent.getService(
+            this,
+            3,
+            pauseResumeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val title = when (sessionType) {
             SESSION_TYPE_BREAK -> "Break"
             SESSION_TYPE_LONG_BREAK -> "Long Break"
             else -> "Focus Session"
         }
-        val content = "$title \u2014 ${formatRemaining(seconds)} remaining"
+        val content = if (isPaused) {
+            "$title — Paused at ${formatRemaining(seconds)}"
+        } else {
+            "$title — ${formatRemaining(seconds)} remaining"
+        }
 
         return NotificationCompat
             .Builder(this, CHANNEL_ID_ONGOING)
@@ -178,6 +249,15 @@ class PomodoroTimerService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setContentIntent(tapPending)
+            .addAction(
+                if (isPaused) {
+                    android.R.drawable.ic_media_play
+                } else {
+                    android.R.drawable.ic_media_pause
+                },
+                if (isPaused) "Resume" else "Pause",
+                pauseResumePending
+            )
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "Stop",
@@ -204,7 +284,7 @@ class PomodoroTimerService : Service() {
             buzzUntilDismissed -> TimerBuzzerDismissReceiver.BUZZ_BODY_TEXT
             sessionType == SESSION_TYPE_BREAK ||
                 sessionType == SESSION_TYPE_LONG_BREAK -> "Ready to get back to focus?"
-            else -> "Nice work \u2014 time for a break."
+            else -> "Nice work — time for a break."
         }
 
         val builder = NotificationCompat
@@ -242,6 +322,7 @@ class PomodoroTimerService : Service() {
                 putExtra(EXTRA_SECONDS_REMAINING, seconds)
                 putExtra(EXTRA_SESSION_INDEX, sessionIndex)
                 putExtra(EXTRA_SESSION_TYPE, sessionType)
+                putExtra(EXTRA_OWNER, owner)
             }
         )
     }
@@ -254,18 +335,26 @@ class PomodoroTimerService : Service() {
 
     companion object {
         const val ACTION_START = "com.averycorp.prismtask.pomodoro.START"
+        const val ACTION_PAUSE = "com.averycorp.prismtask.pomodoro.PAUSE"
+        const val ACTION_RESUME = "com.averycorp.prismtask.pomodoro.RESUME"
         const val ACTION_STOP = "com.averycorp.prismtask.pomodoro.STOP"
         const val ACTION_TICK = "com.averycorp.prismtask.pomodoro.TICK"
+        const val ACTION_PAUSED = "com.averycorp.prismtask.pomodoro.PAUSED"
+        const val ACTION_RESUMED = "com.averycorp.prismtask.pomodoro.RESUMED"
         const val ACTION_COMPLETE = "com.averycorp.prismtask.pomodoro.COMPLETE"
 
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_SESSION_INDEX = "session_index"
         const val EXTRA_SESSION_TYPE = "session_type"
         const val EXTRA_SECONDS_REMAINING = "seconds_remaining"
+        const val EXTRA_OWNER = "owner"
 
         const val SESSION_TYPE_WORK = "WORK"
         const val SESSION_TYPE_BREAK = "BREAK"
         const val SESSION_TYPE_LONG_BREAK = "LONG_BREAK"
+
+        const val OWNER_TIMER = "TIMER"
+        const val OWNER_SMART_POMODORO = "SMART_POMODORO"
 
         const val CHANNEL_ID_ONGOING = "pomodoro_timer"
         private const val CHANNEL_NAME_ONGOING = "Pomodoro Timer"
@@ -279,7 +368,8 @@ class PomodoroTimerService : Service() {
             context: Context,
             durationSeconds: Int,
             sessionIndex: Int,
-            sessionType: String
+            sessionType: String,
+            owner: String = OWNER_SMART_POMODORO
         ) {
             // Wrap the full body so plain-JVM unit tests (which back Context
             // with MockK and resolve Android framework calls against android.jar
@@ -292,6 +382,7 @@ class PomodoroTimerService : Service() {
                     putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
                     putExtra(EXTRA_SESSION_INDEX, sessionIndex)
                     putExtra(EXTRA_SESSION_TYPE, sessionType)
+                    putExtra(EXTRA_OWNER, owner)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
@@ -309,10 +400,22 @@ class PomodoroTimerService : Service() {
             }
         }
 
+        fun pause(context: Context) {
+            dispatchControl(context, ACTION_PAUSE)
+        }
+
+        fun resume(context: Context) {
+            dispatchControl(context, ACTION_RESUME)
+        }
+
         fun stop(context: Context) {
+            dispatchControl(context, ACTION_STOP)
+        }
+
+        private fun dispatchControl(context: Context, controlAction: String) {
             try {
                 val intent = Intent(context, PomodoroTimerService::class.java).apply {
-                    action = ACTION_STOP
+                    action = controlAction
                 }
                 context.startService(intent)
             } catch (_: Exception) {

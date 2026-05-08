@@ -780,7 +780,6 @@ Memory updates flagged for review:
 ```
 
 ---
-
 ## Appendix — operator-decided defaults applied
 
 Per prompt § "Operator pre-decisions (locked)": Path A (SSE) per § Item 1;

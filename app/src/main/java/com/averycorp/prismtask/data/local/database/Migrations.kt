@@ -2362,7 +2362,40 @@ val MIGRATION_75_76 = object : Migration(75, 76) {
     }
 }
 
-const val CURRENT_DB_VERSION = 76
+// D11 E.3 — chat conversation persistence (Path A, forward-only).
+// Per docs/audits/D11_E3_CHAT_PERSISTENCE_AUDIT.md (Item 5): adds the
+// `chat_messages` Room cache backing the GET /chat/history sync. No
+// data migration: existing in-memory chat state is ephemeral by design
+// and sole-user pre-beta means no user-data preservation requirement.
+val MIGRATION_76_77 = object : Migration(76, 77) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `chat_messages` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `conversation_id` TEXT NOT NULL,
+                `role` TEXT NOT NULL,
+                `content` TEXT NOT NULL,
+                `actions_json` TEXT,
+                `task_context_json` TEXT,
+                `tokens_input` INTEGER,
+                `tokens_output` INTEGER,
+                `created_at` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_chat_messages_conversation_id_created_at` " +
+                "ON `chat_messages` (`conversation_id`, `created_at`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_chat_messages_created_at` " +
+                "ON `chat_messages` (`created_at`)"
+        )
+    }
+}
+
+const val CURRENT_DB_VERSION = 77
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2439,5 +2472,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_72_73,
     MIGRATION_73_74,
     MIGRATION_74_75,
-    MIGRATION_75_76
+    MIGRATION_75_76,
+    MIGRATION_76_77
 )
