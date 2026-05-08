@@ -134,6 +134,16 @@ class TimerViewModelTest {
         val state = vm.uiState.value
         assertEquals(TimerMode.BREAK, state.mode)
         assertTrue(state.isRunning)
+
+        // Pause the timer BEFORE returning. runTest's implicit cleanup
+        // calls advanceUntilIdle on the scheduler, which would otherwise
+        // burn through the entire 25-min tick loop into
+        // NotificationHelper.showTimerCompleteNotification(appContext,
+        // ...) — and `appContext` is a mockk with no real filesDir, so
+        // NotificationPreferences.from(context).timerAlertsEnabled.first()
+        // NPEs deep inside DataStore. Cancelling tickJob here keeps
+        // runTest's idle-flush a no-op.
+        vm.toggleStartPause()
     }
 
     @Test
@@ -167,6 +177,10 @@ class TimerViewModelTest {
         val state = vm.uiState.value
         assertEquals(TimerMode.WORK, state.mode)
         assertTrue(state.isRunning)
+
+        // See sibling test — pause before returning so runTest's
+        // implicit advanceUntilIdle cleanup doesn't run the tick loop.
+        vm.toggleStartPause()
     }
 
     @Test
