@@ -1,5 +1,6 @@
 package com.averycorp.prismtask.data.repository
 
+import android.database.sqlite.SQLiteConstraintException
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.entity.MedicationDoseEntity
@@ -64,11 +65,33 @@ constructor(
     suspend fun getAllOnce(): List<MedicationEntity> =
         medicationDao.getAllOnce()
 
+    /**
+     * Insert a medication, recovering from a `medications.name` UNIQUE
+     * collision by adopting the existing same-name row. Callers (the
+     * Medication / Refill viewmodels) pre-flight a `getByNameOnce` check,
+     * but two concurrent `viewModelScope.launch` calls — or a sync pull
+     * landing between the pre-flight and the insert — can still race the
+     * unique index and throw `SQLiteConstraintException`. Without this
+     * recovery, that exception propagated out of the otherwise-uncaught
+     * Room insert lambda and crashed the app (Crashlytics signature:
+     * `MedicationDao_Impl.insert$lambda$0` →
+     * `UNIQUE constraint failed: medications.name`).
+     *
+     * On collision: look up the existing row by name and return its id
+     * so the caller's downstream slot-link / override writes still land
+     * on the surviving medication. Tracking emits `trackCreate` only on
+     * a true insert; the adopt branch leaves the existing row untouched
+     * so its sync state stays accurate.
+     */
     suspend fun insert(medication: MedicationEntity): Long {
         val now = System.currentTimeMillis()
-        val id = medicationDao.insert(
-            medication.copy(createdAt = now, updatedAt = now)
-        )
+        val toInsert = medication.copy(createdAt = now, updatedAt = now)
+        val id = try {
+            medicationDao.insert(toInsert)
+        } catch (e: SQLiteConstraintException) {
+            val existing = medicationDao.getByNameOnce(toInsert.name) ?: throw e
+            return existing.id
+        }
         syncTracker.trackCreate(id, "medication")
         return id
     }

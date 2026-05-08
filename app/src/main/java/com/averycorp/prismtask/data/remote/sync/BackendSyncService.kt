@@ -590,58 +590,77 @@ constructor(
     private suspend fun applyMedicationChanges(changes: List<SyncChange>): Int {
         var applied = 0
         for (change in changes) {
-            val data = change.data ?: continue
-            val cloudId = data.optString("cloud_id") ?: continue
-            val existing = medicationDao.getByCloudIdOnce(cloudId)
-                ?: data.optString("name")?.let { medicationDao.getByNameOnce(it) }
+            // Per-change try/catch: a single bad change (e.g. a name that
+            // races the medications.name UNIQUE index against a concurrent
+            // local insert) must not abort the rest of the pull. Mirrors
+            // SyncService.pullCollection's per-doc isolation.
+            try {
+                val data = change.data ?: continue
+                val cloudId = data.optString("cloud_id") ?: continue
+                val existing = medicationDao.getByCloudIdOnce(cloudId)
+                    ?: data.optString("name")?.let { medicationDao.getByNameOnce(it) }
 
-            if (change.operation == "delete") {
-                if (existing != null) {
-                    medicationDao.deleteById(existing.id)
-                    applied++
+                if (change.operation == "delete") {
+                    if (existing != null) {
+                        medicationDao.deleteById(existing.id)
+                        applied++
+                    }
+                    continue
                 }
-                continue
-            }
 
-            val remoteUpdatedAt = data.optString("updated_at")
-                ?.let { isoToMillisOrNull(it) }
-                ?: change.timestamp?.let { isoToMillisOrNull(it) }
-                ?: System.currentTimeMillis()
-            if (existing != null && existing.updatedAt >= remoteUpdatedAt) continue
+                val remoteUpdatedAt = data.optString("updated_at")
+                    ?.let { isoToMillisOrNull(it) }
+                    ?: change.timestamp?.let { isoToMillisOrNull(it) }
+                    ?: System.currentTimeMillis()
+                if (existing != null && existing.updatedAt >= remoteUpdatedAt) continue
 
-            val name = data.optString("name") ?: existing?.name ?: continue
-            val notes = data.optString("notes") ?: existing?.notes ?: ""
-            val isArchived = data.optBool("is_active")?.let { !it }
-                ?: existing?.isArchived
-                ?: false
-            val createdAt = data.optString("created_at")?.let { isoToMillisOrNull(it) }
-                ?: existing?.createdAt
-                ?: System.currentTimeMillis()
+                val name = data.optString("name") ?: existing?.name ?: continue
+                val notes = data.optString("notes") ?: existing?.notes ?: ""
+                val isArchived = data.optBool("is_active")?.let { !it }
+                    ?: existing?.isArchived
+                    ?: false
+                val createdAt = data.optString("created_at")?.let { isoToMillisOrNull(it) }
+                    ?: existing?.createdAt
+                    ?: System.currentTimeMillis()
 
-            if (existing != null) {
-                medicationDao.update(
-                    existing.copy(
-                        cloudId = cloudId,
-                        name = name,
-                        notes = notes,
-                        isArchived = isArchived,
-                        createdAt = createdAt,
-                        updatedAt = remoteUpdatedAt
+                if (existing != null) {
+                    medicationDao.update(
+                        existing.copy(
+                            cloudId = cloudId,
+                            name = name,
+                            notes = notes,
+                            isArchived = isArchived,
+                            createdAt = createdAt,
+                            updatedAt = remoteUpdatedAt
+                        )
                     )
-                )
-            } else {
-                medicationDao.insert(
-                    MedicationEntity(
-                        cloudId = cloudId,
-                        name = name,
-                        notes = notes,
-                        isArchived = isArchived,
-                        createdAt = createdAt,
-                        updatedAt = remoteUpdatedAt
+                } else {
+                    medicationDao.insert(
+                        MedicationEntity(
+                            cloudId = cloudId,
+                            name = name,
+                            notes = notes,
+                            isArchived = isArchived,
+                            createdAt = createdAt,
+                            updatedAt = remoteUpdatedAt
+                        )
                     )
+                }
+                applied++
+            } catch (e: Exception) {
+                logger.error(
+                    operation = "pull.apply",
+                    entity = "medication",
+                    id = change.entityId.toString(),
+                    throwable = e
                 )
+                try {
+                    com.google.firebase.crashlytics.FirebaseCrashlytics
+                        .getInstance()
+                        .recordException(e)
+                } catch (_: Exception) {
+                }
             }
-            applied++
         }
         return applied
     }
