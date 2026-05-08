@@ -23,10 +23,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -51,6 +53,11 @@ constructor(
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
     val messages: StateFlow<List<ChatMessage>> = chatRepository.messages
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
 
     private val _isTyping = MutableStateFlow(false)
     val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
@@ -134,14 +141,21 @@ constructor(
         // Show the dialog the first time chat opens; once dismissed,
         // the persisted flag prevents it from appearing again.
         //
-        // F8 chat privacy doc update bumped the flag from V1 to V2
-        // so the expanded copy (enumerating task-context fields +
-        // rolling history) is re-acknowledged once by every user.
+        // V1 -> V2 (F8 chat privacy doc update) expanded the copy.
+        // V2 -> V3 (D11 E.3) flags the retention change: chat content
+        // is now persisted on backend Postgres + local Room until the
+        // user deletes it, vs the prior "stateless per-turn" behaviour.
         viewModelScope.launch {
-            val alreadyShown = userPreferencesDataStore.aiChatDisclosureShownV2Flow.first()
+            val alreadyShown = userPreferencesDataStore.aiChatDisclosureShownV3Flow.first()
             if (!alreadyShown) {
                 _showDisclosure.value = true
             }
+        }
+        // Reconcile any history written from another device. Errors are
+        // swallowed — a failed pull just leaves the local Room cache as
+        // the source-of-truth for this session; next pull retries.
+        viewModelScope.launch {
+            runCatching { chatRepository.pullHistory() }
         }
     }
 
@@ -152,7 +166,12 @@ constructor(
     fun dismissDisclosure() {
         _showDisclosure.value = false
         viewModelScope.launch {
+            // V3 supersedes V2; setting V3 also implicitly satisfies the
+            // V2 gate because V3 copy is a superset of V2 (it covers the
+            // same task-context-fields + rolling history claims plus
+            // the retention change).
             userPreferencesDataStore.setAiChatDisclosureShownV2(true)
+            userPreferencesDataStore.setAiChatDisclosureShownV3(true)
         }
     }
 

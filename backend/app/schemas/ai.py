@@ -618,6 +618,37 @@ class ChatResponse(BaseModel):
     tokens_used: Optional[ChatTokensUsed] = None
 
 
+class ChatMessageRecord(BaseModel):
+    """A persisted chat turn returned by ``GET /chat/history``.
+
+    Per ``docs/audits/D11_E3_CHAT_PERSISTENCE_AUDIT.md`` (Item 2). One
+    row covers either the user turn or the assistant turn — both share
+    the same shape with role discrimination. Server-authored writes land
+    inside the ``/chat`` handler.
+    """
+
+    id: str
+    conversation_id: str
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str
+    actions: list[ChatActionPayload] = Field(default_factory=list)
+    task_context_snapshot: Optional[ChatTaskContext] = None
+    tokens_used: Optional[ChatTokensUsed] = None
+    created_at: str  # ISO-8601 timestamp
+
+
+class ChatHistoryResponse(BaseModel):
+    """Paginated chat history payload.
+
+    ``next_before`` is the ISO-8601 ``created_at`` of the oldest message
+    in this page when more history exists, or null when the page covered
+    everything. Clients pass it back as ``before=`` to walk earlier.
+    """
+
+    messages: list[ChatMessageRecord] = Field(default_factory=list)
+    next_before: Optional[str] = None
+
+
 # --- Automation Action AI (A7) ---
 #
 # Two endpoints invoked by the on-device automation engine when a rule's
