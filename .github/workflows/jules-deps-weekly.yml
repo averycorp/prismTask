@@ -1,0 +1,63 @@
+name: Weekly Dependency Updates (Jules)
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  gradle-deps:
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Jules for Gradle dependency updates
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            Check app/build.gradle.kts and gradle/libs.versions.toml for dependencies
+            that have minor or patch updates available. Update only minor and patch
+            versions, never major. After each update, run `./gradlew compileDebugKotlin`
+            to verify compilation. If compilation fails, revert that specific update
+            and continue with the rest. Do NOT modify versionCode or versionName. Open
+            a PR titled 'deps(android): weekly minor/patch bumps' with a body listing
+            each bumped dependency, old version, new version.
+
+  npm-deps:
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Jules for npm dependency updates
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            In the web/ directory, check package.json for dependencies that have minor
+            or patch updates available. Update only minor and patch versions. After all
+            updates, run `npm install && npm run lint && npm run test:run && npm run build`
+            to verify. If any command fails, revert the breaking dependency and
+            continue. Open a PR titled 'deps(web): weekly minor/patch bumps' with a
+            similar body.
+
+  pip-deps:
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Jules for pip dependency updates
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            In the backend/ directory, check requirements.txt or pyproject.toml for
+            dependencies with minor or patch updates available. Update only minor and
+            patch. After updates, run `pip install -r requirements.txt && pytest` to
+            verify. If a test breaks, revert that specific dependency and continue.
+            Do NOT modify alembic versions or migration files. Open a PR titled
+            'deps(backend): weekly minor/patch bumps'.
