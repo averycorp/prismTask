@@ -25,6 +25,13 @@ import org.junit.Test
  * Unit tests for [TimerViewModel]. Focused on the non-Pomodoro
  * work/break auto-switch behaviour; the Pomodoro branch is exercised by
  * a single regression test to lock the existing flow in.
+ *
+ * Post-D6: TimerViewModel no longer runs an in-memory tick loop — it
+ * delegates the countdown to PomodoroTimerService and consumes broadcasts.
+ * The earlier tickJob-leak mitigations (toggleStartPauseIfRunning in
+ * @After, "pause before returning to avoid runTest burning through the
+ * 25-minute loop") are no longer needed; start() is now a pure
+ * fire-and-forget service-start call that returns synchronously.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimerViewModelTest {
@@ -33,7 +40,6 @@ class TimerViewModelTest {
     private lateinit var appContext: Context
     private lateinit var timerPreferences: TimerPreferences
     private lateinit var widgetUpdateManager: WidgetUpdateManager
-    private val activeViewModels = mutableListOf<TimerViewModel>()
 
     private val workSeconds = 25 * 60
     private val breakSeconds = 5 * 60
@@ -61,21 +67,7 @@ class TimerViewModelTest {
 
     @After
     fun tearDown() {
-        // Pause every VM created during this test before resetting Main.
-        // start() launches a viewModelScope tickJob that suspends on
-        // delay(1000); without an explicit pause, the suspended
-        // continuation is bound to the about-to-be-discarded test
-        // dispatcher and bleeds into the next test as a Dispatchers.Main
-        // race or a DataStore actor NPE attributed to whichever test
-        // JUnit happens to be running when the leaked exception
-        // resolves.
-        activeViewModels.forEach { it.toggleStartPauseIfRunning() }
-        activeViewModels.clear()
         Dispatchers.resetMain()
-    }
-
-    private fun TimerViewModel.toggleStartPauseIfRunning() {
-        if (uiState.value.isRunning) toggleStartPause()
     }
 
     private fun newViewModel(
@@ -87,7 +79,6 @@ class TimerViewModelTest {
         every { timerPreferences.getAutoStartBreaks() } returns flowOf(autoStartBreaks)
         every { timerPreferences.getAutoStartWork() } returns flowOf(autoStartWork)
         return TimerViewModel(appContext, timerPreferences, widgetUpdateManager)
-            .also(activeViewModels::add)
     }
 
     private fun TimerViewModel.seedMode(mode: TimerMode) {
@@ -120,30 +111,11 @@ class TimerViewModelTest {
         vm.seedMode(TimerMode.WORK)
 
         vm.onTimerCompleted()
-        // Skip both runCurrent and advanceUntilIdle — onTimerCompleted +
-        // start() flip _uiState synchronously. Running the tickJob's
-        // body (which calls a suspending mocked widgetUpdateManager
-        // followed by `delay(1000)`) captures a real continuation
-        // bound to the test dispatcher; that continuation outlives
-        // tickJob.cancel() in @After and bleeds into the next test as
-        // a Dispatchers.Main / DataStore-actor NPE attributed to
-        // whichever test JUnit happens to be running. Reading
-        // _uiState.value immediately verifies the synchronous flip
-        // without launching the body.
+        advanceUntilIdle()
 
         val state = vm.uiState.value
         assertEquals(TimerMode.BREAK, state.mode)
         assertTrue(state.isRunning)
-
-        // Pause the timer BEFORE returning. runTest's implicit cleanup
-        // calls advanceUntilIdle on the scheduler, which would otherwise
-        // burn through the entire 25-min tick loop into
-        // NotificationHelper.showTimerCompleteNotification(appContext,
-        // ...) — and `appContext` is a mockk with no real filesDir, so
-        // NotificationPreferences.from(context).timerAlertsEnabled.first()
-        // NPEs deep inside DataStore. Cancelling tickJob here keeps
-        // runTest's idle-flush a no-op.
-        vm.toggleStartPause()
     }
 
     @Test
@@ -169,18 +141,11 @@ class TimerViewModelTest {
         vm.seedMode(TimerMode.BREAK)
 
         vm.onTimerCompleted()
-        // See sibling test — skip runCurrent so the tickJob body never
-        // executes. Reading _uiState.value verifies the synchronous
-        // start() flip without capturing a real continuation that
-        // would outlive @After.
+        advanceUntilIdle()
 
         val state = vm.uiState.value
         assertEquals(TimerMode.WORK, state.mode)
         assertTrue(state.isRunning)
-
-        // See sibling test — pause before returning so runTest's
-        // implicit advanceUntilIdle cleanup doesn't run the tick loop.
-        vm.toggleStartPause()
     }
 
     @Test
@@ -210,6 +175,47 @@ class TimerViewModelTest {
         val state = vm.uiState.value
         assertEquals(TimerMode.BREAK, state.mode)
         assertEquals(1, state.completedSessions)
+        assertFalse(state.isRunning)
+    }
+
+    @Test
+    fun toggleStartPause_idle_setsRunningTrue() = runTest(dispatcher) {
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.toggleStartPause()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.isRunning)
+    }
+
+    @Test
+    fun toggleStartPause_running_setsRunningFalse() = runTest(dispatcher) {
+        val vm = newViewModel()
+        advanceUntilIdle()
+        vm.toggleStartPause()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isRunning)
+
+        vm.toggleStartPause()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isRunning)
+    }
+
+    @Test
+    fun reset_returnsRemainingToTotal() = runTest(dispatcher) {
+        val vm = newViewModel()
+        advanceUntilIdle()
+        vm.toggleStartPause()
+        advanceUntilIdle()
+
+        vm.reset()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(workSeconds, state.remainingSeconds)
+        assertEquals(workSeconds, state.totalSeconds)
         assertFalse(state.isRunning)
     }
 }
