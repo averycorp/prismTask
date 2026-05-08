@@ -97,7 +97,8 @@ class Migration76To77Test {
 
         var count = -1
         db.query("SELECT COUNT(*) FROM chat_messages").use { c ->
-            c.moveToFirst(); count = c.getInt(0)
+            c.moveToFirst()
+            count = c.getInt(0)
         }
         assertEquals(2, count)
 
