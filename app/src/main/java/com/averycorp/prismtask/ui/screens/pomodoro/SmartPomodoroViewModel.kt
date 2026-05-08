@@ -255,10 +255,11 @@ constructor(
      */
     private val timerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
             // Filter on owner so a TimerViewModel session running on the same
             // PomodoroTimerService instance doesn't bleed its ticks into our
             // smart-Pomodoro flow.
-            val incomingOwner = intent?.getStringExtra(PomodoroTimerService.EXTRA_OWNER)
+            val incomingOwner = intent.getStringExtra(PomodoroTimerService.EXTRA_OWNER)
                 ?: PomodoroTimerService.OWNER_SMART_POMODORO
             if (incomingOwner != PomodoroTimerService.OWNER_SMART_POMODORO) return
             when (intent.action) {
