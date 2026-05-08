@@ -168,6 +168,9 @@ constructor(
     }
 
     suspend fun launchPurchaseFlow(activity: Activity, period: BillingPeriod): Result<Unit> {
+        if (activity.isFinishing || activity.isDestroyed) {
+            return Result.failure(Exception("Activity is no longer valid"))
+        }
         if (!billingClient.isReady) {
             val connected = connectBillingClient()
             if (!connected) return Result.failure(Exception("Could not connect to Google Play"))
@@ -192,7 +195,12 @@ constructor(
             .newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
             .build()
-        val result = billingClient.launchBillingFlow(activity, billingFlowParams)
+        val result = try {
+            billingClient.launchBillingFlow(activity, billingFlowParams)
+        } catch (e: Exception) {
+            Log.e("BillingManager", "launchBillingFlow threw", e)
+            return Result.failure(e)
+        }
         return if (result.responseCode == BillingClient.BillingResponseCode.OK) {
             Result.success(Unit)
         } else {
