@@ -241,6 +241,15 @@ class UserPreferencesDataStore(
         val KEY_AI_CHAT_DISCLOSURE_SHOWN_V2 =
             booleanPreferencesKey("ai_chat_disclosure_shown_v2")
 
+        // D11 E.3 — V3 bump fires the disclosure once for every user
+        // (new + existing) when chat conversation persistence ships.
+        // V2 covered "we send chat content to backend per turn"; V3
+        // adds "...and we now retain it on backend Postgres + local
+        // Room until you delete it" — a material retention change that
+        // requires re-acknowledgement before the persistence path runs.
+        val KEY_AI_CHAT_DISCLOSURE_SHOWN_V3 =
+            booleanPreferencesKey("ai_chat_disclosure_shown_v3")
+
         // Medication reminder mode global default (v1.6.0)
         val KEY_MED_REMINDER_MODE_DEFAULT = stringPreferencesKey("med_reminder_mode_default")
         val KEY_MED_REMINDER_INTERVAL_DEFAULT_MINUTES =
@@ -534,6 +543,22 @@ class UserPreferencesDataStore(
 
     suspend fun setAiChatDisclosureShownV2(shown: Boolean) {
         dataStore.edit { it[KEY_AI_CHAT_DISCLOSURE_SHOWN_V2] = shown }
+    }
+
+    /**
+     * V3 of the first-run AI chat disclosure (D11 E.3). Defaults to
+     * false so the dialog fires once for every user — including users
+     * who already dismissed V1/V2 — after chat conversation persistence
+     * ships. V3 copy must call out that chat content is now retained on
+     * backend Postgres and mirrored to local Room, vs the V2-era
+     * "stateless, per-turn-only" behaviour.
+     */
+    val aiChatDisclosureShownV3Flow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_AI_CHAT_DISCLOSURE_SHOWN_V3] ?: false
+    }
+
+    suspend fun setAiChatDisclosureShownV3(shown: Boolean) {
+        dataStore.edit { it[KEY_AI_CHAT_DISCLOSURE_SHOWN_V3] = shown }
     }
 
     /**

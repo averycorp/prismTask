@@ -616,6 +616,31 @@ data class ChatResponse(
     @SerializedName("tokens_used") val tokensUsed: ChatTokensUsed? = null
 )
 
+/**
+ * One persisted chat turn returned by `GET /api/v1/ai/chat/history`.
+ * Mirrors `ChatMessageRecord` on the backend (per D11 E.3 audit Item 2).
+ */
+data class ChatMessageRecord(
+    val id: String,
+    @SerializedName("conversation_id") val conversationId: String,
+    val role: String,
+    val content: String,
+    val actions: List<ChatActionResponse> = emptyList(),
+    @SerializedName("task_context_snapshot") val taskContextSnapshot: ChatTaskContext? = null,
+    @SerializedName("tokens_used") val tokensUsed: ChatTokensUsed? = null,
+    @SerializedName("created_at") val createdAt: String
+)
+
+/**
+ * Paginated response from `GET /api/v1/ai/chat/history`. `nextBefore`
+ * is the ISO-8601 cursor for the previous page, or null when the page
+ * already covered everything.
+ */
+data class ChatHistoryResponse(
+    val messages: List<ChatMessageRecord> = emptyList(),
+    @SerializedName("next_before") val nextBefore: String? = null
+)
+
 // region AI Evening Summary
 
 data class EveningSummaryRequest(

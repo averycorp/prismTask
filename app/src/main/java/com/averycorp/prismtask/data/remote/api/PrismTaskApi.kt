@@ -146,6 +146,13 @@ interface PrismTaskApi {
         @Body request: ChatRequest
     ): ChatResponse
 
+    @GET("api/v1/ai/chat/history")
+    suspend fun aiChatHistory(
+        @Query("conversation_id") conversationId: String? = null,
+        @Query("limit") limit: Int = 50,
+        @Query("before") before: String? = null
+    ): ChatHistoryResponse
+
     @POST("api/v1/tasks/parse-import")
     suspend fun parseImport(
         @Body request: ParseImportRequest

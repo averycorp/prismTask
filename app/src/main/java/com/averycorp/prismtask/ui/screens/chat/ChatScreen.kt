@@ -179,8 +179,11 @@ fun ChatScreen(
                         "along with the last few turns of conversation for context. " +
                         "When chat is opened from a task, the AI also sees that " +
                         "task's title, description, due date, priority, project " +
-                        "name, and completion state. Chat resets daily and isn't " +
-                        "stored permanently."
+                        "name, and completion state. Conversations are now saved " +
+                        "to your PrismTask account so you can pick up the thread " +
+                        "on any signed-in device, and stay until you delete them. " +
+                        "The AI service itself doesn't keep your messages beyond " +
+                        "answering your prompt."
                 )
             },
             confirmButton = {

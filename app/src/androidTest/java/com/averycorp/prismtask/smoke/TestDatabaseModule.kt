@@ -172,6 +172,13 @@ object TestDatabaseModule {
     @Provides
     fun provideExternalAnchorDao(database: PrismTaskDatabase) = database.externalAnchorDao()
 
+    // D11 E.3 — production DatabaseModule gained `chatMessageDao()`
+    // when chat conversation persistence shipped. Mirror it here per
+    // memory #17/#21 so compileDebugAndroidTestKotlin keeps the
+    // androidTest Hilt graph buildable.
+    @Provides
+    fun provideChatMessageDao(database: PrismTaskDatabase) = database.chatMessageDao()
+
     @Provides
     @Singleton
     fun provideGson(): com.google.gson.Gson = com.google.gson.Gson()

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Chat conversation persistence (D11 E.3).** AI Coach chat history
+  is now stored on the PrismTask backend (Postgres) and mirrored to
+  local Room so conversations survive process death and re-render
+  instantly across signed-in devices. Backend writes both turns inside
+  the existing `/api/v1/ai/chat` handler; new `GET /api/v1/ai/chat/history`
+  returns paginated history scoped to the requesting user. Daily
+  conversation rollover is now a UI filter (old conversations remain
+  in storage). The first-run AI chat disclosure bumps from V2 to V3
+  to re-acknowledge the retention change. Audit:
+  `docs/audits/D11_E3_CHAT_PERSISTENCE_AUDIT.md`. Alembic 025; Room
+  migration 76 → 77 (Path A, forward-only).
 - **Auto button on Life Category now uses Claude.** When AI features are
   enabled, tapping the OrganizeTab "Auto" button next to the Life
   Category chips fires a Claude Haiku-backed classification on top of
