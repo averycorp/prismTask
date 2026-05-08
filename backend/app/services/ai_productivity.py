@@ -1168,6 +1168,10 @@ Allowed action shapes (use exactly these `type` values; omit any unused fields):
 - {"type": "create_task", "title": "...", "due": "today|tomorrow|next_week|YYYY-MM-DD", "priority": "low|medium|high|urgent", "description": "...", "tags": ["tag1", "tag2"], "project": "Project Name"}
   - `description`, `tags`, and `project` are OPTIONAL. Only include them when the user actually named or strongly implied that detail. Never invent a project name the user hasn't mentioned. Tags are short single-word labels (no `#` prefix). Maximum 10 tags.
 - {"type": "start_timer", "minutes": 25}
+- {"type": "batch_command", "command_text": "<the user's natural-language batch phrasing, verbatim>"}
+  - Use ONLY when the user clearly wants to mutate MULTIPLE tasks/projects/habits/medications in one breath, beyond what the single-entity actions above can express. Examples that warrant `batch_command`: "complete all tasks tagged #errands", "move every overdue work task to next Monday", "archive my Q1 projects", "skip my vitamins this week", "set everything in #blocked to high priority".
+  - DO NOT use `batch_command` for a single task — emit `complete` / `reschedule` / `archive` instead. DO NOT use it for the existing batch action `reschedule_batch` (when you already know the specific task IDs from context).
+  - Echo the user's own phrasing as `command_text`. Do not paraphrase, do not invent task IDs, and do not pre-resolve project or tag names — the Android client routes the phrase to a preview screen that resolves it safely.
 - When the user is talking about a specific task and you have been given a `task_context_id`, you MAY suggest:
   - {"type": "complete", "task_id": "<task_context_id>"}
   - {"type": "reschedule", "task_id": "<task_context_id>", "to": "today|tomorrow|next_week|YYYY-MM-DD"}

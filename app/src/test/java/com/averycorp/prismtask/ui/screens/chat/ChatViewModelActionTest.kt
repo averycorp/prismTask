@@ -263,6 +263,48 @@ class ChatViewModelActionTest {
     }
 
     @Test
+    fun batch_command_emits_open_batch_preview_nav_event_with_command_text() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.navigationEvents.test navTest@{
+            viewModel.executeAction(
+                ChatActionResponse(
+                    type = "batch_command",
+                    commandText = "complete every task tagged #errands"
+                )
+            )
+            advanceUntilIdle()
+
+            val navEvent = awaitItem()
+            assertEquals(
+                ChatViewModel.ChatNavEvent.OpenBatchPreview(
+                    commandText = "complete every task tagged #errands"
+                ),
+                navEvent
+            )
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun batch_command_with_blank_command_text_is_silently_dropped() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        // No nav event, no result — handler returns null on blank/missing
+        // command_text rather than navigating to an empty preview screen.
+        viewModel.executeAction(ChatActionResponse(type = "batch_command", commandText = "   "))
+        advanceUntilIdle()
+
+        viewModel.navigationEvents.test {
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun start_timer_without_minutes_falls_back_to_generic_message() = runTest(dispatcher) {
         val viewModel = newViewModel()
         advanceUntilIdle()

@@ -527,7 +527,8 @@ class BatchParseResponse(BaseModel):
 
 
 _CHAT_ACTION_TYPE_PATTERN = (
-    "^(complete|reschedule|reschedule_batch|breakdown|archive|start_timer|create_task)$"
+    "^(complete|reschedule|reschedule_batch|breakdown|archive|start_timer|"
+    "create_task|batch_command)$"
 )
 
 
@@ -551,6 +552,11 @@ class ChatActionPayload(BaseModel):
     description: Optional[str] = Field(default=None, max_length=4000)
     tags: Optional[list[str]] = Field(default=None, max_length=10)
     project: Optional[str] = Field(default=None, max_length=200)
+    # ``batch_command``: the user's natural-language phrasing that the
+    # Android client hands to BatchPreviewScreen, which calls
+    # ``/batch-parse`` to resolve mutations. Length cap mirrors the
+    # batch-parse request's command_text constraint.
+    command_text: Optional[str] = Field(default=None, max_length=500)
 
 
 class ChatTokensUsed(BaseModel):

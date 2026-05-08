@@ -601,7 +601,11 @@ data class ChatActionResponse(
     // any subset is valid.
     val description: String? = null,
     val tags: List<String>? = null,
-    val project: String? = null
+    val project: String? = null,
+    // `batch_command`: natural-language batch phrasing the chat AI passes
+    // through verbatim. Tapping the chip routes to BatchPreviewScreen,
+    // which calls `/batch-parse` to resolve it into a previewable plan.
+    @SerializedName("command_text") val commandText: String? = null
 )
 
 data class ChatTokensUsed(

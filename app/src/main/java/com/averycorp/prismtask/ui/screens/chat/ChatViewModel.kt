@@ -147,6 +147,13 @@ constructor(
      */
     sealed interface ChatNavEvent {
         data class OpenTimer(val minutes: Int?) : ChatNavEvent
+        /**
+         * Hand the user's natural-language batch phrasing off to
+         * BatchPreviewScreen. The destination screen calls
+         * `/api/v1/ai/batch-parse` to resolve [commandText] into a
+         * previewable mutation plan with full undo + history support.
+         */
+        data class OpenBatchPreview(val commandText: String) : ChatNavEvent
     }
 
     private val _navigationEvents = MutableSharedFlow<ChatNavEvent>(
@@ -373,6 +380,7 @@ constructor(
                     "archive" -> handleArchive(action)
                     "start_timer" -> handleStartTimer(action)
                     "create_task" -> handleCreateTask(action)
+                    "batch_command" -> handleBatchCommand(action)
                     else -> null
                 }
                 if (result != null) {
@@ -393,6 +401,10 @@ constructor(
                 "reschedule_batch:${ids.sorted().joinToString(",")}"
             }
             "create_task" -> "create_task:${action.title.orEmpty()}:${action.due.orEmpty()}"
+            "batch_command" -> {
+                val cmd = action.commandText?.takeIf { it.isNotBlank() } ?: return null
+                "batch_command:${cmd.trim().lowercase()}"
+            }
             "breakdown" -> {
                 val taskId = action.taskId ?: return null
                 "breakdown:$taskId"
@@ -501,6 +513,22 @@ constructor(
      * configured length. The minutes value is surfaced in the snackbar
      * so the user knows what AI suggested.
      */
+    /**
+     * Hand the user's natural-language batch phrasing off to
+     * BatchPreviewScreen via [ChatNavEvent.OpenBatchPreview]. The
+     * destination screen calls `/api/v1/ai/batch-parse` to resolve the
+     * phrasing into a previewable mutation plan with full undo +
+     * history support, reusing the QuickAdd batch pipeline.
+     *
+     * No snackbar — the user lands on the preview screen and decides
+     * there. Returning null keeps the result flow silent.
+     */
+    private suspend fun handleBatchCommand(action: ChatActionResponse): ChatActionResult? {
+        val commandText = action.commandText?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        _navigationEvents.emit(ChatNavEvent.OpenBatchPreview(commandText = commandText))
+        return null
+    }
+
     private suspend fun handleStartTimer(action: ChatActionResponse): ChatActionResult {
         _navigationEvents.emit(ChatNavEvent.OpenTimer(minutes = action.minutes))
         val message = action.minutes

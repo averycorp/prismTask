@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Batch adjustments through AI Chat.** The Coach can now propose a
+  `batch_command` inline action when a user asks for multi-entity
+  changes that go beyond the existing single-task / `reschedule_batch`
+  shapes — e.g. *"complete every task tagged #errands"*, *"move all
+  overdue work tasks to next Monday"*, *"archive my Q1 projects"*.
+  Tapping the **Preview Batch** chip routes to the existing
+  BatchPreviewScreen, which calls `/api/v1/ai/batch-parse` to resolve
+  the phrase into a previewable mutation plan with full undo + history
+  support. Reuses the QuickAdd batch pipeline end-to-end — no new
+  mutation primitives. Audit:
+  `docs/audits/AI_CHAT_BATCH_ADJUSTMENTS_AUDIT.md`.
 - **Chat conversation persistence (D11 E.3).** AI Coach chat history
   is now stored on the PrismTask backend (Postgres) and mirrored to
   local Room so conversations survive process death and re-render
