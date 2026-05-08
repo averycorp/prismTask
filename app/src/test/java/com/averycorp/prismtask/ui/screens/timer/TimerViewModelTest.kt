@@ -34,6 +34,7 @@ class TimerViewModelTest {
     private lateinit var appContext: Context
     private lateinit var timerPreferences: TimerPreferences
     private lateinit var widgetUpdateManager: WidgetUpdateManager
+    private val activeViewModels = mutableListOf<TimerViewModel>()
 
     private val workSeconds = 25 * 60
     private val breakSeconds = 5 * 60
@@ -61,7 +62,21 @@ class TimerViewModelTest {
 
     @After
     fun tearDown() {
+        // Pause every VM created during this test before resetting Main.
+        // start() launches a viewModelScope tickJob that suspends on
+        // delay(1000); without an explicit pause, the suspended
+        // continuation is bound to the about-to-be-discarded test
+        // dispatcher and bleeds into the next test as a Dispatchers.Main
+        // race or a DataStore actor NPE attributed to whichever test
+        // JUnit happens to be running when the leaked exception
+        // resolves.
+        activeViewModels.forEach { it.toggleStartPauseIfRunning() }
+        activeViewModels.clear()
         Dispatchers.resetMain()
+    }
+
+    private fun TimerViewModel.toggleStartPauseIfRunning() {
+        if (uiState.value.isRunning) toggleStartPause()
     }
 
     private fun newViewModel(
@@ -73,6 +88,7 @@ class TimerViewModelTest {
         every { timerPreferences.getAutoStartBreaks() } returns flowOf(autoStartBreaks)
         every { timerPreferences.getAutoStartWork() } returns flowOf(autoStartWork)
         return TimerViewModel(appContext, timerPreferences, widgetUpdateManager)
+            .also(activeViewModels::add)
     }
 
     private fun TimerViewModel.seedMode(mode: TimerMode) {
