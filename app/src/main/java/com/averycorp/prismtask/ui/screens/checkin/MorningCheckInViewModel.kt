@@ -6,7 +6,6 @@ import com.averycorp.prismtask.data.calendar.CalendarEventInfo
 import com.averycorp.prismtask.data.calendar.CalendarManager
 import com.averycorp.prismtask.data.local.entity.MedicationRefillEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
-import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.WorkLifeBalancePrefs
@@ -69,8 +68,7 @@ constructor(
     private val calendarManager: CalendarManager,
     private val calendarEventRepository: CalendarEventRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences,
-    private val advancedTuningPreferences: AdvancedTuningPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences
 ) : ViewModel() {
     private val resolver = MorningCheckInResolver()
     private val balanceTracker = BalanceTracker()
@@ -162,14 +160,11 @@ constructor(
             val todayStart = DayBoundary.startOfCurrentDay(dayStartHour)
             val tasks = taskRepository.getAllTasks().first()
             val habits = habitRepository.getHabitsWithTodayStatus().first()
-            val cutoff = advancedTuningPreferences.getMorningCheckInPromptCutoff().first()
             val plan = resolver.plan(
                 tasks = tasks,
                 habits = habits,
-                config = MorningCheckInConfig(promptBeforeHour = cutoff.latestHour),
-                lastCompletedDate = null,
-                todayStart = todayStart,
-                now = System.currentTimeMillis()
+                config = MorningCheckInConfig(),
+                todayStart = todayStart
             )
             _plan.value = CheckInScreenState(
                 steps = plan.steps,
