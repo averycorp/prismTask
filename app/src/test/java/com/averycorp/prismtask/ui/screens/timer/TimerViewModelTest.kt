@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -104,7 +105,12 @@ class TimerViewModelTest {
         vm.seedMode(TimerMode.WORK)
 
         vm.onTimerCompleted()
-        advanceUntilIdle()
+        // runCurrent (not advanceUntilIdle) — start() launches a tick
+        // loop with `while(true) { delay(1000) ... }`, and
+        // advanceUntilIdle would burn through the full duration in
+        // virtual time, ending with isRunning=false. We only need to
+        // observe that start() flipped the flag synchronously.
+        runCurrent()
 
         val state = vm.uiState.value
         assertEquals(TimerMode.BREAK, state.mode)
@@ -134,7 +140,9 @@ class TimerViewModelTest {
         vm.seedMode(TimerMode.BREAK)
 
         vm.onTimerCompleted()
-        advanceUntilIdle()
+        // See sibling test — runCurrent avoids running the tick loop to
+        // completion, which would flip isRunning back to false.
+        runCurrent()
 
         val state = vm.uiState.value
         assertEquals(TimerMode.WORK, state.mode)
