@@ -14,6 +14,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -190,16 +191,76 @@ private fun TimerWidgetContent(
             }
             Spacer(modifier = GlanceModifier.height(6.dp))
 
-            // No pause/resume/skip controls here: the live countdown lives
-            // in TimerViewModel.viewModelScope, which doesn't observe this
-            // DataStore, so any widget-side mutation is overwritten by the
-            // next ViewModel sync. The whole widget is clickable to open
-            // the Timer screen, where the in-app controls work.
-            Text(
-                text = if (state.isPaused) "Tap to resume" else "Tap to manage",
-                style = WidgetTextStyles.caption(palette.onSurfaceVariant)
+            // Pause/Resume + Stop. Routed through
+            // TimerControlFromWidgetAction → PomodoroTimerService so the
+            // running foreground service is the single source of truth.
+            // TimerViewModel observes the service's broadcasts and refreshes
+            // the widget DataStore, so the button state flips on the next
+            // tick.
+            TimerControlRow(
+                isPaused = state.isPaused,
+                accentColor = accentColor,
+                palette = palette
             )
         }
+    }
+}
+
+@Composable
+private fun TimerControlRow(
+    isPaused: Boolean,
+    accentColor: androidx.glance.unit.ColorProvider,
+    palette: WidgetThemePalette
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TimerControlButton(
+            label = if (isPaused) "▶ Resume" else "❚❚ Pause",
+            background = accentColor,
+            foreground = palette.onPrimary,
+            params = timerControlParams(
+                if (isPaused) {
+                    WidgetActionKeys.TIMER_CONTROL_RESUME
+                } else {
+                    WidgetActionKeys.TIMER_CONTROL_PAUSE
+                }
+            )
+        )
+        Spacer(modifier = GlanceModifier.width(6.dp))
+        TimerControlButton(
+            label = "■ Stop",
+            background = palette.surfaceVariant,
+            foreground = palette.onSurfaceVariant,
+            params = timerControlParams(WidgetActionKeys.TIMER_CONTROL_STOP)
+        )
+    }
+}
+
+@Composable
+private fun TimerControlButton(
+    label: String,
+    background: androidx.glance.unit.ColorProvider,
+    foreground: androidx.glance.unit.ColorProvider,
+    params: androidx.glance.action.ActionParameters
+) {
+    Box(
+        modifier = GlanceModifier
+            .cornerRadius(16.dp)
+            .background(background)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .clickable(
+                actionRunCallback<TimerControlFromWidgetAction>(
+                    parameters = params
+                )
+            )
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = foreground
+            )
+        )
     }
 }
 
