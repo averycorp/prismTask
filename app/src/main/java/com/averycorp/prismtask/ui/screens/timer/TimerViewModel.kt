@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.notifications.NotificationHelper
-import com.averycorp.prismtask.widget.TimerStateDataStore
 import com.averycorp.prismtask.widget.TimerWidgetState
 import com.averycorp.prismtask.widget.WidgetUpdateManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -402,36 +401,32 @@ constructor(
     /** Syncs the current timer UI state to the widget DataStore. */
     private fun syncWidgetState() {
         val s = _uiState.value
-        viewModelScope.launch {
-            // DataStore writes can fail (disk pressure, file-system errors,
-            // and most loudly: tests running with a mocked Context that has
-            // no real applicationContext.filesDir to back the underlying
-            // file). Widget state is best-effort UX — a write failure
-            // leaves the widget showing the last successful snapshot but
-            // must NEVER take the timer ViewModel down.
-            try {
-                TimerStateDataStore.write(
-                    appContext,
-                    TimerWidgetState(
-                        isRunning = s.isRunning,
-                        isPaused = !s.isRunning && s.remainingSeconds < s.totalSeconds && s.remainingSeconds > 0,
-                        remainingSeconds = s.remainingSeconds,
-                        totalSeconds = s.totalSeconds,
-                        sessionType = when (s.mode) {
-                            TimerMode.WORK -> "work"
-                            TimerMode.BREAK -> "break"
-                            TimerMode.CUSTOM -> "custom"
-                        },
-                        currentSession = s.completedSessions + if (s.mode == TimerMode.WORK) 1 else 0,
-                        totalSessions = s.sessionsUntilLongBreak,
-                        isLongBreak = s.isLongBreak,
-                        pomodoroEnabled = s.pomodoroEnabled
-                    )
-                )
-            } catch (e: Exception) {
-                android.util.Log.w("TimerViewModel", "Widget DataStore write failed", e)
-            }
-        }
+        // Routed through WidgetUpdateManager (which wraps the write in
+        // try/catch on its own app-scoped SupervisorJob) so that:
+        //   - Real-world DataStore failures (disk pressure, FS errors)
+        //     don't take the timer ViewModel down.
+        //   - Unit tests with a mocked Context don't NPE on
+        //     `Context.filesDir = null`, and the underlying actor
+        //     coroutine doesn't leak `Dispatchers.Main` references
+        //     across `Dispatchers.setMain` / `resetMain` boundaries
+        //     between tests.
+        widgetUpdateManager.writeTimerState(
+            TimerWidgetState(
+                isRunning = s.isRunning,
+                isPaused = !s.isRunning && s.remainingSeconds < s.totalSeconds && s.remainingSeconds > 0,
+                remainingSeconds = s.remainingSeconds,
+                totalSeconds = s.totalSeconds,
+                sessionType = when (s.mode) {
+                    TimerMode.WORK -> "work"
+                    TimerMode.BREAK -> "break"
+                    TimerMode.CUSTOM -> "custom"
+                },
+                currentSession = s.completedSessions + if (s.mode == TimerMode.WORK) 1 else 0,
+                totalSessions = s.sessionsUntilLongBreak,
+                isLongBreak = s.isLongBreak,
+                pomodoroEnabled = s.pomodoroEnabled
+            )
+        )
     }
 
     override fun onCleared() {

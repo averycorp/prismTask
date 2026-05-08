@@ -122,6 +122,28 @@ constructor(
     }
 
     /** Refreshes the TimerWidget only (debounced). */
+    /**
+     * Push a fresh [TimerWidgetState] snapshot into the timer widget's
+     * DataStore. Wraps the write in try/catch so a write failure (disk
+     * pressure, file-system errors, mocked-Context unit tests) leaves the
+     * widget showing the last successful snapshot but never takes the
+     * caller down. Routed through [scope] (the manager's app-scoped
+     * SupervisorJob) so the call is decoupled from the caller's
+     * lifecycle — a unit test that resets `Dispatchers.Main` between
+     * runs no longer leaks a half-completed DataStore continuation
+     * back into the next test's `Dispatchers.Main` access.
+     */
+    fun writeTimerState(state: TimerWidgetState) {
+        if (!BuildConfig.WIDGETS_ENABLED) return
+        scope.launch {
+            try {
+                TimerStateDataStore.write(context, state)
+            } catch (e: Exception) {
+                Log.w(TAG, "TimerStateDataStore.write failed: ${e.message}")
+            }
+        }
+    }
+
     suspend fun updateTimerWidget() {
         if (!BuildConfig.WIDGETS_ENABLED) return
         timerWidgetJob?.cancel()
