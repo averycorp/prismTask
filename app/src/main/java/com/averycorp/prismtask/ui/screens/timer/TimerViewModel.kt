@@ -299,7 +299,9 @@ constructor(
         // in-memory tick loop fired. The service already shows its own
         // ongoing notification; this surfaces the alert sound/vibration the
         // user expects regardless of which path delivers it.
-        NotificationHelper.showTimerCompleteNotification(appContext, state.mode.name)
+        viewModelScope.launch {
+            NotificationHelper.showTimerCompleteNotification(appContext, state.mode.name)
+        }
         onTimerCompleted()
         // onTimerCompleted flips mode (WORK -> BREAK or BREAK ->
         // WORK) and isLongBreak; resync so the widget reflects
