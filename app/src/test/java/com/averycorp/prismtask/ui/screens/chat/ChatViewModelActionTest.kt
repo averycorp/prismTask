@@ -83,6 +83,7 @@ class ChatViewModelActionTest {
         userPreferencesDataStore = mockk(relaxed = true) {
             coEvery { aiChatDisclosureShownFlow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV2Flow } returns flowOf(true)
+            coEvery { aiChatDisclosureShownV3Flow } returns flowOf(true)
         }
     }
 

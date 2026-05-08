@@ -34,8 +34,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -82,6 +80,7 @@ class ChatViewModelStreamingTest {
         userPreferencesDataStore = mockk(relaxed = true) {
             coEvery { aiChatDisclosureShownFlow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV2Flow } returns flowOf(true)
+            coEvery { aiChatDisclosureShownV3Flow } returns flowOf(true)
         }
     }
 
@@ -230,7 +229,7 @@ class ChatViewModelStreamingTest {
             )
         }
         assertEquals("Here is your plan (cancelled)", textSlot.captured)
-        assertTrue("cancelled commit drops actions", actionsSlot.captured.isEmpty())
+        assertEquals("cancelled commit drops actions", true, actionsSlot.captured.isEmpty())
     }
 
     @Test

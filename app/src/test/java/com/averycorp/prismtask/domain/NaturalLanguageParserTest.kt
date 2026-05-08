@@ -6,6 +6,7 @@ import com.averycorp.prismtask.data.remote.api.BatchParseRequest
 import com.averycorp.prismtask.data.remote.api.BatchParseResponse
 import com.averycorp.prismtask.data.remote.api.BugReportMirrorResponse
 import com.averycorp.prismtask.data.remote.api.BugReportStatusUpdateRequest
+import com.averycorp.prismtask.data.remote.api.ChatHistoryResponse
 import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
 import com.averycorp.prismtask.data.remote.api.CoachingRequest
@@ -171,6 +172,13 @@ class NaturalLanguageParserTest {
             error("not used in offline parser tests")
 
         override suspend fun aiChat(request: ChatRequest): ChatResponse =
+            error("not used in offline parser tests")
+
+        override suspend fun aiChatHistory(
+            conversationId: String?,
+            limit: Int,
+            before: String?
+        ): ChatHistoryResponse =
             error("not used in offline parser tests")
 
         override suspend fun getEveningSummary(request: EveningSummaryRequest): EveningSummaryResponse =

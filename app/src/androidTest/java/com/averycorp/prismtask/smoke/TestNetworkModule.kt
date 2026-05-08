@@ -222,6 +222,13 @@ class FakePrismTaskApi : PrismTaskApi {
         request: com.averycorp.prismtask.data.remote.api.ChatRequest
     ) = error("Not used in offline tests")
 
+    override suspend fun aiChatHistory(
+        conversationId: String?,
+        limit: Int,
+        before: String?
+    ): com.averycorp.prismtask.data.remote.api.ChatHistoryResponse =
+        error("Not used in offline tests")
+
     override suspend fun parseImport(
         request: com.averycorp.prismtask.data.remote.api.ParseImportRequest
     ) = error("Not used in offline tests")
