@@ -289,6 +289,43 @@ class TestChatEndpoint:
             assert action["project"] == "Q2 Planning"
 
     @pytest.mark.asyncio
+    async def test_endpoint_passes_through_batch_command_action(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        """`batch_command` carries the user's natural-language batch
+        phrasing through to the Android client, which routes it to
+        BatchPreviewScreen. The router must accept the new action type
+        and forward `command_text` unchanged."""
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            mock_gen.return_value = {
+                "message": "Sure — preview these changes before I apply them.",
+                "actions": [
+                    {
+                        "type": "batch_command",
+                        "command_text": "complete every task tagged #errands",
+                    },
+                ],
+                "tokens_used": {"input": 1, "output": 1},
+            }
+
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={
+                    "message": "complete every task tagged #errands",
+                    "conversation_id": "chat_x",
+                },
+                headers=pro_auth_headers,
+            )
+            assert resp.status_code == 200, resp.text
+            action = resp.json()["actions"][0]
+            assert action["type"] == "batch_command"
+            assert action["command_text"] == "complete every task tagged #errands"
+
+    @pytest.mark.asyncio
     async def test_endpoint_503_when_anthropic_unavailable(
         self, client: AsyncClient, pro_auth_headers: dict
     ):

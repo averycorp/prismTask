@@ -148,6 +148,10 @@ fun ChatScreen(
             when (event) {
                 is ChatViewModel.ChatNavEvent.OpenTimer ->
                     navController.navigate(PrismTaskRoute.Timer.route)
+                is ChatViewModel.ChatNavEvent.OpenBatchPreview ->
+                    navController.navigate(
+                        PrismTaskRoute.BatchPreview.createRoute(event.commandText)
+                    )
             }
         }
     }
@@ -498,6 +502,7 @@ private fun ActionChip(
             val title = action.title?.takeIf { it.isNotBlank() }
             if (title != null) "Add Task: $title" else "Add Task"
         }
+        "batch_command" -> "Preview Batch"
         else -> action.type.replaceFirstChar { it.uppercase() }
     }
 
