@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import re
 from datetime import date, timedelta
+from typing import Any, Iterator
 
 from app.config import settings
 
@@ -1184,6 +1186,143 @@ Hard rules:
 If the user message is small talk or unclear, just reply with `{"message": "<friendly short reply>", "actions": []}`."""
 
 
+def _build_chat_messages_array(
+    message: str,
+    conversation_id: str,
+    task_context_id: int | None,
+    task_context: dict | None,
+    history: list[dict] | None,
+) -> list[dict]:
+    """Build the Anthropic ``messages`` array for a chat turn.
+
+    Shared by the single-shot and streaming chat handlers so both follow
+    the same history-then-latest-turn shape with the structured user
+    payload (conversation_id + task_context_id + user_message + optional
+    task_context snapshot). History is defensively re-trimmed to the
+    last 12 entries even though ``ChatRequest`` validation already caps
+    it — keeps the helper safe for unit tests that bypass the schema.
+    """
+    user_block: dict = {
+        "conversation_id": conversation_id,
+        "task_context_id": task_context_id,
+        "user_message": message,
+    }
+    if task_context:
+        user_block["task_context"] = task_context
+    user_payload = json.dumps(user_block, default=str, indent=2)
+
+    anthropic_messages: list[dict] = []
+    for entry in (history or [])[-12:]:
+        role = entry.get("role")
+        content = entry.get("content")
+        if role in ("user", "assistant") and isinstance(content, str) and content:
+            anthropic_messages.append({"role": role, "content": content})
+    anthropic_messages.append({"role": "user", "content": user_payload})
+    return anthropic_messages
+
+
+def _finalize_chat_payload(
+    raw_text: str,
+    usage: Any,
+) -> dict:
+    """Parse + validate the chat AI's JSON output, returning the canonical dict.
+
+    Shared by the single-shot and streaming chat handlers so both surface
+    the same shape and raise the same errors on malformed responses.
+    """
+    result = _parse_ai_json(raw_text)
+    if not isinstance(result, dict):
+        raise ValueError("Expected a JSON object at top level")
+    reply = result.get("message")
+    if not isinstance(reply, str) or not reply.strip():
+        raise ValueError("Response missing required string 'message'")
+    actions_raw = result.get("actions") or []
+    if not isinstance(actions_raw, list):
+        raise ValueError("'actions' must be a list when present")
+    tokens_used = {
+        "input": int(getattr(usage, "input_tokens", 0) or 0),
+        "output": int(getattr(usage, "output_tokens", 0) or 0),
+    }
+    return {
+        "message": reply.strip(),
+        "actions": actions_raw,
+        "tokens_used": tokens_used,
+    }
+
+
+_PARTIAL_MESSAGE_KEY_RE = re.compile(r'"message"\s*:\s*"')
+
+
+def _extract_partial_message_field(s: str) -> str | None:
+    """Extract the (possibly partial) value of the top-level ``"message"`` key.
+
+    Used by the streaming chat handler to forward only the user-visible
+    reply text to the SSE consumer as it accumulates, without leaking the
+    surrounding JSON envelope (``{"message": ...``, ``"actions": ...``)
+    into the chat bubble.
+
+    Returns the value collected so far, or ``None`` if the ``"message":"``
+    opener has not yet appeared in the stream. Honors basic JSON string
+    escapes (``\\"`` ``\\\\`` ``\\n`` ``\\t`` ``\\r`` ``\\b`` ``\\f`` ``\\/``) and
+    decodes ``\\uXXXX`` when the four hex digits have arrived. A trailing
+    partial escape (e.g. raw text ending in ``\\``) is dropped from the
+    returned value and re-emitted on the next delta.
+    """
+    match = _PARTIAL_MESSAGE_KEY_RE.search(s)
+    if not match:
+        return None
+    i = match.end()
+    out: list[str] = []
+    n = len(s)
+    while i < n:
+        c = s[i]
+        if c == '\\':
+            if i + 1 >= n:
+                break  # partial escape — drop trailing backslash
+            nxt = s[i + 1]
+            if nxt == '"':
+                out.append('"')
+                i += 2
+            elif nxt == '\\':
+                out.append('\\')
+                i += 2
+            elif nxt == '/':
+                out.append('/')
+                i += 2
+            elif nxt == 'n':
+                out.append('\n')
+                i += 2
+            elif nxt == 't':
+                out.append('\t')
+                i += 2
+            elif nxt == 'r':
+                out.append('\r')
+                i += 2
+            elif nxt == 'b':
+                out.append('\b')
+                i += 2
+            elif nxt == 'f':
+                out.append('\f')
+                i += 2
+            elif nxt == 'u':
+                if i + 6 > n:
+                    break  # partial \uXXXX — drop and resume next delta
+                try:
+                    out.append(chr(int(s[i + 2:i + 6], 16)))
+                except ValueError:
+                    out.append(s[i + 1:i + 6])
+                i += 6
+            else:
+                out.append(nxt)
+                i += 2
+        elif c == '"':
+            break  # closing quote — end of value
+        else:
+            out.append(c)
+            i += 1
+    return ''.join(out)
+
+
 def generate_chat_response(
     message: str,
     conversation_id: str,
@@ -1217,28 +1356,9 @@ def generate_chat_response(
     """
     client = _get_client()
     model = get_model("chat")
-
-    user_block: dict = {
-        "conversation_id": conversation_id,
-        "task_context_id": task_context_id,
-        "user_message": message,
-    }
-    if task_context:
-        user_block["task_context"] = task_context
-    user_payload = json.dumps(user_block, default=str, indent=2)
-
-    # Build the Anthropic messages array: rolling history pairs first
-    # (chronological), then the latest user turn carrying the structured
-    # context block. The server-side validation already capped history to
-    # 12 entries; we still defensively trim here in case a future caller
-    # bypasses the schema (e.g. a unit test).
-    anthropic_messages: list[dict] = []
-    for entry in (history or [])[-12:]:
-        role = entry.get("role")
-        content = entry.get("content")
-        if role in ("user", "assistant") and isinstance(content, str) and content:
-            anthropic_messages.append({"role": role, "content": content})
-    anthropic_messages.append({"role": "user", "content": user_payload})
+    anthropic_messages = _build_chat_messages_array(
+        message, conversation_id, task_context_id, task_context, history
+    )
 
     last_error: Exception | None = None
     for attempt in range(2):
@@ -1250,26 +1370,7 @@ def generate_chat_response(
                 messages=anthropic_messages,
             )
             content = ai_message.content[0].text
-            result = _parse_ai_json(content)
-            if not isinstance(result, dict):
-                raise ValueError("Expected a JSON object at top level")
-            reply = result.get("message")
-            if not isinstance(reply, str) or not reply.strip():
-                raise ValueError("Response missing required string 'message'")
-            actions_raw = result.get("actions") or []
-            if not isinstance(actions_raw, list):
-                raise ValueError("'actions' must be a list when present")
-
-            usage = getattr(ai_message, "usage", None)
-            tokens_used = {
-                "input": int(getattr(usage, "input_tokens", 0) or 0),
-                "output": int(getattr(usage, "output_tokens", 0) or 0),
-            }
-            return {
-                "message": reply.strip(),
-                "actions": actions_raw,
-                "tokens_used": tokens_used,
-            }
+            return _finalize_chat_payload(content, getattr(ai_message, "usage", None))
         except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
             last_error = e
             logger.error(
@@ -1284,6 +1385,88 @@ def generate_chat_response(
             logger.error(f"Chat AI error: {type(e).__name__}: {e}")
             raise
     raise ValueError(f"Failed to parse chat response: {last_error}")
+
+
+def generate_chat_response_stream(
+    message: str,
+    conversation_id: str,
+    task_context_id: int | None = None,
+    task_context: dict | None = None,
+    history: list[dict] | None = None,
+) -> Iterator[dict]:
+    """Stream a conversational chat reply token-by-token.
+
+    Yields event dicts with a ``type`` discriminator the route layer
+    formats into SSE frames:
+
+    - ``{"type": "token", "text": "<delta>"}`` — each new chunk of the
+      ``message`` field as the JSON envelope accumulates upstream.
+    - ``{"type": "done", "message": "<final>", "actions": [...],
+      "tokens_used": {"input": int, "output": int}}`` — once the upstream
+      stream completes and the JSON parses + actions validate.
+    - ``{"type": "error", "message": "<...>", "code": "<short>"}`` — on
+      Anthropic upstream failure or parse failure. Stream then closes.
+
+    Unlike :func:`generate_chat_response` this function does NOT retry on
+    parse failure: a streamed response that fails to parse is rare and
+    re-running the whole stream would double Anthropic billing. Surfaces
+    the ``error`` event instead so the client can prompt the user to
+    re-send.
+    """
+    client = _get_client()
+    model = get_model("chat")
+    anthropic_messages = _build_chat_messages_array(
+        message, conversation_id, task_context_id, task_context, history
+    )
+
+    accumulated = ""
+    last_emitted = ""
+    final_message = None
+    try:
+        with client.messages.stream(
+            model=model,
+            max_tokens=1024,
+            system=_CHAT_SYSTEM_PROMPT,
+            messages=anthropic_messages,
+        ) as stream:
+            for text_delta in stream.text_stream:
+                if not text_delta:
+                    continue
+                accumulated += text_delta
+                current_msg = _extract_partial_message_field(accumulated)
+                if current_msg is None or current_msg == last_emitted:
+                    continue
+                new_chunk = current_msg[len(last_emitted):]
+                last_emitted = current_msg
+                yield {"type": "token", "text": new_chunk}
+            final_message = stream.get_final_message()
+    except Exception as exc:
+        logger.error(f"Chat stream upstream error: {type(exc).__name__}: {exc}")
+        yield {
+            "type": "error",
+            "message": "AI service temporarily unavailable",
+            "code": "upstream_error",
+        }
+        return
+
+    try:
+        usage = getattr(final_message, "usage", None) if final_message else None
+        payload = _finalize_chat_payload(accumulated, usage)
+    except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as exc:
+        logger.error(f"Chat stream parse error: {exc}")
+        yield {
+            "type": "error",
+            "message": "AI returned an invalid response",
+            "code": "parse_error",
+        }
+        return
+
+    yield {
+        "type": "done",
+        "message": payload["message"],
+        "actions": payload["actions"],
+        "tokens_used": payload["tokens_used"],
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -659,6 +659,127 @@ Before opening PR:
 
 ---
 
+---
+
+## Phase 3 — bundle summary (post-implementation, pre-merge)
+
+PR #1192 opened on branch `claude/chat-streaming-cancel-6DWQ4`,
+3 commits, 2,248 insertions / 127 deletions across 13 files.
+
+| Component | Files | LOC delta | Notes |
+|-----------|-------|-----------|-------|
+| Audit doc | `docs/audits/F7_F8_CHAT_STREAMING_BUNDLE_AUDIT.md` | +676 | This file. |
+| Backend route | `backend/app/routers/ai.py` | +102 | New `/chat/stream` SSE endpoint + `_format_sse_event` helper. |
+| Backend service | `backend/app/services/ai_productivity.py` | +225 / -42 | Extracted `_build_chat_messages_array` + `_finalize_chat_payload`; new `_extract_partial_message_field` scanner; new `generate_chat_response_stream`. |
+| Backend tests | `backend/tests/test_ai_chat_stream.py` | +471 | Scanner cases + service streaming + endpoint SSE grammar. |
+| Android SSE type | `data/remote/api/ChatStreamEvent.kt` | +30 | Sealed interface (Token / Done / Error). |
+| Android SSE client | `data/remote/sse/ChatStreamClient.kt` | +157 | OkHttp `EventSources` wrapped in `callbackFlow`. |
+| Android repo | `data/repository/ChatRepository.kt` | +60 / -25 | `streamMessage` + `commitAssistantTurn`; single-shot retained. |
+| Android VM | `ui/screens/chat/ChatViewModel.kt` | +120 / -50 | `ChatTurnState` state machine + `cancelInFlight`. |
+| Android UI | `ui/screens/chat/ChatScreen.kt` | +90 / -10 | Streaming partial bubble + Stop button. |
+| Build | `app/build.gradle.kts` | +2 | `okhttp-sse:4.12.0` dep. |
+| Android tests | `ChatViewModelStreamingTest.kt` (new) + 2 updated | +295 / -10 | Token/Done/Error/cancel coverage; existing tests adjusted for new ctor + state machine. |
+
+**LOC actuals vs estimate**: 2,248 actual vs 1,150 estimate = 1.95×
+drift, inside the memory #10 1.9-14× drift band. Overshoot is mostly
+in test files (~770 LOC of coverage, more thorough than estimated).
+Phase 2 net (excluding the 676-line audit doc) is 1,572 LOC, marginally
+over the 1,500 LOC ceiling but well under the STOP-MEGA 2,500 line.
+**STOP-LOC drift NOT triggered** — overshoot is in tests, not core
+implementation.
+
+**Verdicts that needed default-applying mid-implementation**: none.
+All Item 1-10 verdicts held. The output-shape reframe (§ 0.4) drove
+the partial-JSON scanner design which was already in the audit plan.
+
+**STOPs fired**: none. **Sibling fixes pulled in**: none (Item 8's
+Weekly Planner / Weekly Review SSE candidates remain F-series-only).
+
+**Manual S25 Ultra verification**: deferred to operator (Phase 3
+verification gate per the audit). The session has no device access.
+
+**Local verification limitations**: this session's container has no
+Android SDK, so `./gradlew compileDebugKotlin testDebugUnitTest` could
+not run locally. The partial-JSON scanner was sanity-checked
+standalone (16/16 case verification) but full backend pytest also
+deferred to CI. **CI is the gate**, per audit § Phase 3.
+
+## Phase 4 — Claude Chat handoff
+
+Paste-ready block for follow-on Claude Chat threads:
+
+```
+[F7 D.1 + F8 D.2 chat streaming + cancel bundle — handoff]
+
+PR: https://github.com/averycorp/prismTask/pull/1192
+Branch: claude/chat-streaming-cancel-6DWQ4
+Audit: docs/audits/F7_F8_CHAT_STREAMING_BUNDLE_AUDIT.md
+Status: opened ready-for-review, CI pending. Merge gated on CI green.
+
+What shipped:
+- Backend SSE endpoint POST /api/v1/ai/chat/stream returning
+  text/event-stream with token/done/error events. Single-shot
+  /chat endpoint preserved as fallback. Partial-JSON message-field
+  scanner extracts user-visible reply tokens from the structured
+  JSON envelope without leaking syntax to the client.
+- Android: ChatStreamEvent sealed interface, ChatStreamClient
+  (OkHttp okhttp-sse 4.12.0 callbackFlow), ChatRepository
+  streamMessage + commitAssistantTurn, ChatViewModel ChatTurnState
+  state machine + cancelInFlight, ChatScreen streaming bubble +
+  Stop button.
+- Cancel UX: commit-as-partial with "(cancelled)" suffix per
+  audit Item 4 verdict; partial render preserved + boundary
+  explicit.
+
+Reframe count: 1
+- Output-shape: chat backend emits structured JSON
+  ({"message": ..., "actions": [...]}), not free-form prose.
+  Streaming required server-side partial-JSON scanning. Documented
+  in audit § 0.4. Adds ~30 LOC scanner; not a STOP-A.
+
+Architectural staleness reframes caught: 0.
+
+LOC drift: 1.95× (2,248 actual / 1,150 estimate). Inside memory #10
+band. Overshoot in test files, not core code. STOP-LOC NOT triggered.
+
+STOPs fired: none. STOP-D borderline (Item 8 surfaced 2 sibling
+streaming candidates) resolved by filing as F-series follow-ons,
+neither bundled.
+
+Sibling F-series follow-ons filed (NOT bundled):
+1. Weekly Planner SSE — re-trigger ≥ 2 reports/wk of "Planner feels
+   frozen" by 2026-09-01.
+2. Weekly Review AI summary SSE — re-trigger same as above.
+
+Re-trigger criteria for THIS bundle (post-launch retro cues):
+- Cancelled-stream cost spike → consider per-user concurrent-stream
+  cap server-side. Re-trigger ≥ 3 reports/wk of cancel-spam burning
+  AI budget by 2026-08-15.
+- Streaming bubble recomposition perf bad on low-end → consider
+  derivedStateOf throttling. Defer until reports surface.
+- Anthropic SDK upgrade past 0.42.0 → re-verify messages.stream() shape.
+
+Pre-merge gates remaining:
+- CI Android (./gradlew compileDebugKotlin testDebugUnitTest) green.
+- CI backend (pytest backend/tests/) green.
+- ./gradlew compileDebugAndroidTestKotlin DAO-gap pre-merge guard.
+- Operator manual on S25 Ultra (long reply token render, Stop
+  mid-stream, action emission at end-of-stream parity with #1168
+  plumbing, 451 on AI-disabled).
+
+Privacy doc impact: NONE. V3 disclosure NOT triggered. No new fields
+egress. Same Anthropic messages call shape, transport-layer change
+only.
+
+Memory updates flagged for review:
+- "schema-introduces-output-shape-the-prompt-misses" — 1 data point
+  so far. Track to see if pattern recurs.
+- "router-level-AI-gate-auto-inherits-to-siblings" — defect family
+  #20 prevention; already known pattern, this PR is a confirming
+  data point.
+```
+
+---
 ## Appendix — operator-decided defaults applied
 
 Per prompt § "Operator pre-decisions (locked)": Path A (SSE) per § Item 1;

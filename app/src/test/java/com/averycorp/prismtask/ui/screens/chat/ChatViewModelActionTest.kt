@@ -372,14 +372,13 @@ class ChatViewModelActionTest {
 
     @Test
     fun rapid_double_send_only_dispatches_one_request() = runTest(dispatcher) {
-        // First sendMessage suspends until we release the gate, mirroring the
-        // ~16ms recompose window where Compose's `enabled = !isTyping` hasn't
-        // caught up yet and a second tap could land.
-        val gate = CompletableDeferred<Unit>()
-        coEvery { chatRepository.sendMessage(any(), any(), any()) } coAnswers {
-            gate.await()
-            mockk(relaxed = true)
-        }
+        // First sendMessage opens a streaming Flow that suspends forever
+        // (no Done/Error emitted), mirroring the ~16ms window where the
+        // user can double-tap before the in-flight state propagates to
+        // recomposition. Post F7 D.1 the dedup guard is keyed off
+        // turnState, not _isTyping, so we exercise the streaming path.
+        every { chatRepository.streamMessage(any(), any(), any()) } returns
+            kotlinx.coroutines.flow.flow { kotlinx.coroutines.awaitCancellation() }
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -389,10 +388,7 @@ class ChatViewModelActionTest {
         viewModel.sendMessage("hello")
         advanceUntilIdle()
 
-        gate.complete(Unit)
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { chatRepository.sendMessage(any(), any(), any()) }
+        io.mockk.verify(exactly = 1) { chatRepository.streamMessage(any(), any(), any()) }
     }
 
     @Test

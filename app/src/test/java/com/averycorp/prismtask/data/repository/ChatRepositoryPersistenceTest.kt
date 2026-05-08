@@ -6,6 +6,7 @@ import com.averycorp.prismtask.data.remote.api.ChatMessageRecord
 import com.averycorp.prismtask.data.remote.api.ChatResponse
 import com.averycorp.prismtask.data.remote.api.ChatTokensUsed
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import com.averycorp.prismtask.data.remote.sse.ChatStreamClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -36,7 +37,7 @@ class ChatRepositoryPersistenceTest {
             tokensUsed = ChatTokensUsed(input = 8, output = 3)
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao)
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
 
         repo.sendMessage(userMessage = "hello")
 
@@ -62,7 +63,7 @@ class ChatRepositoryPersistenceTest {
             message = "ack", actions = emptyList(), conversationId = "x"
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao)
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
 
         // Pre-seed a row in a different conversation; it must not surface.
         dao.upsert(
@@ -92,7 +93,7 @@ class ChatRepositoryPersistenceTest {
             message = "ack", actions = emptyList(), conversationId = "x"
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao)
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
 
         repo.sendMessage(userMessage = "first")
         val rowsBeforeClear = dao.rowsSnapshot.size
@@ -137,7 +138,7 @@ class ChatRepositoryPersistenceTest {
             nextBefore = null
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao)
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
 
         repo.pullHistory("chat_2026-05-08_pull")
 
@@ -164,7 +165,7 @@ class ChatRepositoryPersistenceTest {
             nextBefore = null
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao)
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
 
         repo.pullHistory("c")
         repo.pullHistory("c")
@@ -177,7 +178,7 @@ class ChatRepositoryPersistenceTest {
     fun `sendMessage forwards prior turns as chronological history`() = runTest {
         val api = mockk<PrismTaskApi>(relaxed = true)
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao)
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
         coEvery { api.aiChat(any()) } returnsMany listOf(
             ChatResponse(message = "first reply", actions = emptyList(), conversationId = "x"),
             ChatResponse(message = "second reply", actions = emptyList(), conversationId = "x")

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -85,6 +86,7 @@ fun ChatScreen(
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isTyping by viewModel.isTyping.collectAsStateWithLifecycle()
+    val turnState by viewModel.turnState.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val showUpgradePrompt by viewModel.showUpgradePrompt.collectAsStateWithLifecycle()
     val userTier by viewModel.userTier.collectAsStateWithLifecycle()
@@ -294,8 +296,25 @@ fun ChatScreen(
                     )
                 }
 
-                // Typing indicator
-                if (isTyping) {
+                // F7 D.1: streaming partial-bubble. Renders the
+                // assistant's reply token-by-token as deltas arrive
+                // from the SSE Flow. Falls back to the pre-stream
+                // typing-dot indicator when partialText is empty
+                // (the brief window between sendMessage and first
+                // Token event).
+                val streaming = turnState as? ChatViewModel.ChatTurnState.Streaming
+                if (streaming != null) {
+                    item(key = "streaming") {
+                        if (streaming.partialText.isEmpty()) {
+                            TypingIndicator()
+                        } else {
+                            StreamingBubble(text = streaming.partialText)
+                        }
+                    }
+                } else if (isTyping) {
+                    // Defensive: turnState is the source of truth, but
+                    // keep the legacy isTyping branch alive in case a
+                    // future caller flips _isTyping directly.
                     item(key = "typing") {
                         TypingIndicator()
                     }
@@ -312,6 +331,8 @@ fun ChatScreen(
                         inputText = ""
                     }
                 },
+                onCancel = { viewModel.cancelInFlight() },
+                isStreaming = turnState is ChatViewModel.ChatTurnState.Streaming,
                 enabled = !isTyping
             )
         }
@@ -535,6 +556,8 @@ private fun ChatInputBar(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
+    onCancel: () -> Unit,
+    isStreaming: Boolean,
     enabled: Boolean
 ) {
     Surface(
@@ -560,7 +583,7 @@ private fun ChatInputBar(
                 shape = RoundedCornerShape(24.dp),
                 singleLine = false,
                 maxLines = 4,
-                enabled = enabled,
+                enabled = enabled && !isStreaming,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend() }),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -571,20 +594,62 @@ private fun ChatInputBar(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = onSend,
-                enabled = enabled && value.isNotBlank()
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
-                    tint = if (enabled && value.isNotBlank()) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    }
-                )
+            // F8 D.2: while streaming, the Send button is replaced by a
+            // Stop button so the user can cancel the in-flight turn.
+            // Cancelled turns commit the partial text + "(cancelled)"
+            // suffix per the audit's Item 4 verdict.
+            if (isStreaming) {
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onSend,
+                    enabled = enabled && value.isNotBlank()
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (enabled && value.isNotBlank()) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        }
+                    )
+                }
             }
         }
+    }
+}
+
+/**
+ * F7 D.1: assistant bubble rendered while a turn is streaming. Same
+ * visual shape as a committed assistant ChatBubble but pulls its text
+ * from the in-flight turnState's partialText. No action chips — those
+ * emit only at end-of-stream once the full JSON validates.
+ */
+@Composable
+private fun StreamingBubble(text: String) {
+    val maxWidth = (LocalConfiguration.current.screenWidthDp * 0.8f).dp
+    Surface(
+        shape = RoundedCornerShape(
+            topStart = 16.dp,
+            topEnd = 16.dp,
+            bottomStart = 4.dp,
+            bottomEnd = 16.dp
+        ),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.widthIn(max = maxWidth)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }

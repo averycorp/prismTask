@@ -7,8 +7,10 @@ import com.averycorp.prismtask.data.remote.api.ChatHistoryEntry
 import com.averycorp.prismtask.data.remote.api.ChatMessageRecord
 import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
+import com.averycorp.prismtask.data.remote.api.ChatStreamEvent
 import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import com.averycorp.prismtask.data.remote.sse.ChatStreamClient
 import com.google.gson.Gson
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -50,7 +53,8 @@ class ChatRepository
 @Inject
 constructor(
     private val api: PrismTaskApi,
-    private val chatMessageDao: ChatMessageDao
+    private val chatMessageDao: ChatMessageDao,
+    private val streamClient: ChatStreamClient
 ) {
     /** Maximum conversation pairs forwarded to the backend (spec: 6). */
     private val maxHistoryPairs = 6
@@ -108,19 +112,14 @@ constructor(
         }
 
         val now = System.currentTimeMillis()
-        val userRowLocalId = UUID.randomUUID().toString()
         val userRow = ChatMessageEntity(
-            id = userRowLocalId,
+            id = UUID.randomUUID().toString(),
             conversationId = convId,
             role = "user",
             content = userMessage,
             taskContextJson = taskContext?.let { gson.toJson(it) },
             createdAt = now
         )
-        // Optimistic local insert so the UI shows the user turn before the
-        // server round-trip completes. Server will write its own row with
-        // a different id; we replace this optimistic row with the
-        // authoritative one on response by deleting it first.
         chatMessageDao.upsert(userRow)
 
         val response = api.aiChat(
@@ -147,6 +146,73 @@ constructor(
         chatMessageDao.upsert(assistantRow)
 
         return response
+    }
+
+    /**
+     * F7 D.1 streaming variant. Appends the user's turn locally so the
+     * bubble renders immediately, then returns a [Flow] of [ChatStreamEvent]s
+     * consumed by [com.averycorp.prismtask.ui.screens.chat.ChatViewModel].
+     */
+    fun streamMessage(
+        userMessage: String,
+        taskContextId: Long? = null,
+        taskContext: ChatTaskContext? = null
+    ): Flow<ChatStreamEvent> {
+        resetIfNewDay()
+        val convId = _conversationId.value
+
+        val historyPayload = runBlocking {
+            chatMessageDao.getForConversation(convId)
+                .takeLast(maxHistoryPairs * 2)
+                .map { ChatHistoryEntry(role = it.role, content = it.content) }
+        }
+
+        runBlocking {
+            chatMessageDao.upsert(
+                ChatMessageEntity(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = convId,
+                    role = "user",
+                    content = userMessage,
+                    taskContextJson = taskContext?.let { gson.toJson(it) },
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+        }
+
+        return streamClient.stream(
+            ChatRequest(
+                message = userMessage,
+                conversationId = convId,
+                taskContextId = taskContextId,
+                taskContext = taskContext,
+                history = historyPayload
+            )
+        )
+    }
+
+    /**
+     * Append the assistant's turn once a streaming turn resolves
+     * (Done or user-cancel commit-as-partial).
+     */
+    fun commitAssistantTurn(
+        text: String,
+        actions: List<ChatActionResponse>
+    ) {
+        val convId = _conversationId.value
+        runBlocking {
+            chatMessageDao.upsert(
+                ChatMessageEntity(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = convId,
+                    role = "assistant",
+                    content = text,
+                    actionsJson = actions.takeIf { it.isNotEmpty() }
+                        ?.let { gson.toJson(it) },
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+        }
     }
 
     /**
