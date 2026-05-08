@@ -207,6 +207,25 @@
             </intent-filter>
         </activity>
 
+        <!--
+            Override Google Play Billing's ProxyBillingActivity so the system
+            cannot restore it from Recents or after process death with a
+            stale Intent. The library's onCreate reads the PendingIntent
+            extra without null-checking; if Android recreates the activity
+            and the extra is missing, it NPEs on
+            PendingIntent.getIntentSender(). noHistory + excludeFromRecents
+            ensures the activity is finished as soon as it leaves the
+            foreground and is never re-entered with a missing extra. See
+            crash report tagged "ProxyBillingActivity NPE" for context.
+        -->
+        <activity
+            android:name="com.android.billingclient.api.ProxyBillingActivity"
+            android:exported="false"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            tools:node="merge"
+            tools:replace="android:noHistory,android:excludeFromRecents" />
+
         <receiver
             android:name=".widget.QuickAddWidgetReceiver"
             android:enabled="true"
