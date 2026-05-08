@@ -1,7 +1,9 @@
+import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -970,6 +972,106 @@ async def chat(
         actions=validated_actions,
         conversation_id=data.conversation_id,
         tokens_used=tokens_used,
+    )
+
+
+def _format_sse_event(event: dict) -> bytes:
+    """Format a service-layer event dict into an SSE frame.
+
+    Strips the ``type`` discriminator into the SSE ``event:`` line and
+    serializes the rest of the dict as JSON in the ``data:`` line.
+    """
+    event_type = event.get("type", "message")
+    payload = {k: v for k, v in event.items() if k != "type"}
+    return f"event: {event_type}\ndata: {json.dumps(payload, default=str)}\n\n".encode("utf-8")
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    data: ChatRequest,
+    request: Request,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Token-by-token streaming variant of ``/chat`` (F7 D.1).
+
+    Same request schema as the single-shot endpoint. Returns
+    ``text/event-stream`` with three event types:
+
+    - ``token``: ``{"text": "<delta>"}`` — incremental ``message`` field
+      content as the upstream Claude response accumulates. The route
+      filters out the surrounding JSON envelope so the client only sees
+      the user-visible reply text.
+    - ``done``: ``{"message": "<final>", "actions": [<validated>],
+      "tokens_used": {"input": int, "output": int}}`` — emitted once the
+      upstream stream completes and the JSON parses + actions validate.
+    - ``error``: ``{"message": "<...>", "code": "<short>"}`` — emitted
+      on any upstream or parse failure. Stream then closes.
+
+    Auth + AI gate + rate limiting fire BEFORE the SSE response opens,
+    so a user over budget gets HTTP 429 on the initial POST without
+    seeing a half-opened stream.
+    """
+    chat_rate_limiter.check(request)
+    tier = await resolve_effective_tier(current_user, db)
+    daily_ai_rate_limiter.check(current_user.id, tier)
+
+    def event_generator():
+        try:
+            from app.services.ai_productivity import generate_chat_response_stream
+
+            stream_iter = generate_chat_response_stream(
+                message=data.message,
+                conversation_id=data.conversation_id,
+                task_context_id=data.task_context_id,
+                task_context=(
+                    data.task_context.model_dump(exclude_none=True)
+                    if data.task_context is not None
+                    else None
+                ),
+                history=[h.model_dump() for h in data.history],
+            )
+            for event in stream_iter:
+                if event.get("type") == "done":
+                    # Validate each AI-proposed action against
+                    # ChatActionPayload and drop any that don't conform.
+                    # Keeps the streaming path's action grammar identical
+                    # to the single-shot endpoint at ai.py:944-960.
+                    validated: list[dict] = []
+                    for raw in event.get("actions", []) or []:
+                        if not isinstance(raw, dict):
+                            continue
+                        try:
+                            validated.append(
+                                ChatActionPayload(**raw).model_dump(exclude_none=True)
+                            )
+                        except ValidationError:
+                            logger.info(
+                                "Dropping malformed chat action: user_id=%s type=%s",
+                                current_user.id,
+                                raw.get("type"),
+                            )
+                    event["actions"] = validated
+                    event["conversation_id"] = data.conversation_id
+                yield _format_sse_event(event)
+        except RuntimeError:
+            yield _format_sse_event({
+                "type": "error",
+                "message": "AI service temporarily unavailable",
+                "code": "unavailable",
+            })
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            # Discourage proxy buffering so SSE chunks reach the client
+            # promptly. Railway's edge already passes text/event-stream
+            # without buffering, but X-Accel-Buffering: no is the
+            # canonical hint for nginx-flavored intermediaries.
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+        },
     )
 
 
