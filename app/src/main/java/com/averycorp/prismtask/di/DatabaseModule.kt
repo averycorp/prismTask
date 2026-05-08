@@ -9,6 +9,7 @@ import com.averycorp.prismtask.data.local.dao.AutomationRuleDao
 import com.averycorp.prismtask.data.local.dao.BatchUndoLogDao
 import com.averycorp.prismtask.data.local.dao.BoundaryRuleDao
 import com.averycorp.prismtask.data.local.dao.CalendarSyncDao
+import com.averycorp.prismtask.data.local.dao.ChatMessageDao
 import com.averycorp.prismtask.data.local.dao.CheckInLogDao
 import com.averycorp.prismtask.data.local.dao.CustomSoundDao
 import com.averycorp.prismtask.data.local.dao.DailyEssentialSlotCompletionDao
@@ -213,6 +214,9 @@ object DatabaseModule {
 
     @Provides
     fun provideExternalAnchorDao(database: PrismTaskDatabase): ExternalAnchorDao = database.externalAnchorDao()
+
+    @Provides
+    fun provideChatMessageDao(database: PrismTaskDatabase): ChatMessageDao = database.chatMessageDao()
 }
 
 /**
