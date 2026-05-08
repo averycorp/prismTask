@@ -32,7 +32,8 @@ data class ChatMessageEntity(
     val id: String,
     @ColumnInfo(name = "conversation_id")
     val conversationId: String,
-    val role: String, // "user" | "assistant"
+    // "user" | "assistant"
+    val role: String,
     val content: String,
     @ColumnInfo(name = "actions_json")
     val actionsJson: String? = null,
