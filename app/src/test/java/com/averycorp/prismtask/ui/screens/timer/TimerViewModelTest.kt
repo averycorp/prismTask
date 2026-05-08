@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -121,12 +120,16 @@ class TimerViewModelTest {
         vm.seedMode(TimerMode.WORK)
 
         vm.onTimerCompleted()
-        // runCurrent (not advanceUntilIdle) — start() launches a tick
-        // loop with `while(true) { delay(1000) ... }`, and
-        // advanceUntilIdle would burn through the full duration in
-        // virtual time, ending with isRunning=false. We only need to
-        // observe that start() flipped the flag synchronously.
-        runCurrent()
+        // Skip both runCurrent and advanceUntilIdle — onTimerCompleted +
+        // start() flip _uiState synchronously. Running the tickJob's
+        // body (which calls a suspending mocked widgetUpdateManager
+        // followed by `delay(1000)`) captures a real continuation
+        // bound to the test dispatcher; that continuation outlives
+        // tickJob.cancel() in @After and bleeds into the next test as
+        // a Dispatchers.Main / DataStore-actor NPE attributed to
+        // whichever test JUnit happens to be running. Reading
+        // _uiState.value immediately verifies the synchronous flip
+        // without launching the body.
 
         val state = vm.uiState.value
         assertEquals(TimerMode.BREAK, state.mode)
@@ -156,9 +159,10 @@ class TimerViewModelTest {
         vm.seedMode(TimerMode.BREAK)
 
         vm.onTimerCompleted()
-        // See sibling test — runCurrent avoids running the tick loop to
-        // completion, which would flip isRunning back to false.
-        runCurrent()
+        // See sibling test — skip runCurrent so the tickJob body never
+        // executes. Reading _uiState.value verifies the synchronous
+        // start() flip without capturing a real continuation that
+        // would outlive @After.
 
         val state = vm.uiState.value
         assertEquals(TimerMode.WORK, state.mode)
