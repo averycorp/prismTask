@@ -208,18 +208,25 @@ private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
  * per-instance config is purged from DataStore when the user removes the
  * widget from the home screen. Uses [BroadcastReceiver.goAsync] so the
  * receiver stays alive while the DataStore writes complete.
+ *
+ * `goAsync()` returns null when the receiver isn't currently dispatching a
+ * broadcast — e.g. when `super.onDeleted()` (which `GlanceAppWidgetReceiver`
+ * itself wraps in `goAsync`/`finish`) has already finished the result before
+ * we get here. In that case the broadcast lifecycle is already over, so we
+ * just run the cleanup on the background scope without keeping anything
+ * alive.
  */
 fun clearWidgetConfigOnDelete(
     receiver: BroadcastReceiver,
     context: Context,
     appWidgetIds: IntArray
 ) {
-    val pending = receiver.goAsync()
+    val pending: BroadcastReceiver.PendingResult? = receiver.goAsync()
     cleanupScope.launch {
         try {
             appWidgetIds.forEach { WidgetConfigDataStore.clearForWidget(context, it) }
         } finally {
-            pending.finish()
+            pending?.finish()
         }
     }
 }
