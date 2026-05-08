@@ -403,24 +403,34 @@ constructor(
     private fun syncWidgetState() {
         val s = _uiState.value
         viewModelScope.launch {
-            TimerStateDataStore.write(
-                appContext,
-                TimerWidgetState(
-                    isRunning = s.isRunning,
-                    isPaused = !s.isRunning && s.remainingSeconds < s.totalSeconds && s.remainingSeconds > 0,
-                    remainingSeconds = s.remainingSeconds,
-                    totalSeconds = s.totalSeconds,
-                    sessionType = when (s.mode) {
-                        TimerMode.WORK -> "work"
-                        TimerMode.BREAK -> "break"
-                        TimerMode.CUSTOM -> "custom"
-                    },
-                    currentSession = s.completedSessions + if (s.mode == TimerMode.WORK) 1 else 0,
-                    totalSessions = s.sessionsUntilLongBreak,
-                    isLongBreak = s.isLongBreak,
-                    pomodoroEnabled = s.pomodoroEnabled
+            // DataStore writes can fail (disk pressure, file-system errors,
+            // and most loudly: tests running with a mocked Context that has
+            // no real applicationContext.filesDir to back the underlying
+            // file). Widget state is best-effort UX — a write failure
+            // leaves the widget showing the last successful snapshot but
+            // must NEVER take the timer ViewModel down.
+            try {
+                TimerStateDataStore.write(
+                    appContext,
+                    TimerWidgetState(
+                        isRunning = s.isRunning,
+                        isPaused = !s.isRunning && s.remainingSeconds < s.totalSeconds && s.remainingSeconds > 0,
+                        remainingSeconds = s.remainingSeconds,
+                        totalSeconds = s.totalSeconds,
+                        sessionType = when (s.mode) {
+                            TimerMode.WORK -> "work"
+                            TimerMode.BREAK -> "break"
+                            TimerMode.CUSTOM -> "custom"
+                        },
+                        currentSession = s.completedSessions + if (s.mode == TimerMode.WORK) 1 else 0,
+                        totalSessions = s.sessionsUntilLongBreak,
+                        isLongBreak = s.isLongBreak,
+                        pomodoroEnabled = s.pomodoroEnabled
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                android.util.Log.w("TimerViewModel", "Widget DataStore write failed", e)
+            }
         }
     }
 
