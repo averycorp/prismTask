@@ -88,6 +88,7 @@ constructor(
                 }
                 PomodoroTimerService.ACTION_PAUSED -> onServicePaused()
                 PomodoroTimerService.ACTION_RESUMED -> onServiceResumed()
+                PomodoroTimerService.ACTION_STOPPED -> onServiceStopped()
                 PomodoroTimerService.ACTION_COMPLETE -> onServiceComplete()
             }
         }
@@ -188,6 +189,7 @@ constructor(
                 addAction(PomodoroTimerService.ACTION_TICK)
                 addAction(PomodoroTimerService.ACTION_PAUSED)
                 addAction(PomodoroTimerService.ACTION_RESUMED)
+                addAction(PomodoroTimerService.ACTION_STOPPED)
                 addAction(PomodoroTimerService.ACTION_COMPLETE)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -286,6 +288,26 @@ constructor(
 
     private fun onServiceResumed() {
         _uiState.value = _uiState.value.copy(isRunning = true)
+        syncWidgetState()
+        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
+    }
+
+    // The user tapped "Stop" on the ongoing notification (or another caller
+    // dispatched ACTION_STOP). Reset the in-app state to mirror reset() so
+    // the UI doesn't keep claiming the timer is still running.
+    private fun onServiceStopped() {
+        val state = _uiState.value
+        val total = when {
+            state.mode == TimerMode.WORK -> workDurationSeconds.value
+            state.mode == TimerMode.CUSTOM -> customDurationSeconds.value
+            state.isLongBreak -> longBreakDurationSeconds.value
+            else -> breakDurationSeconds.value
+        }
+        _uiState.value = state.copy(
+            remainingSeconds = total,
+            totalSeconds = total,
+            isRunning = false
+        )
         syncWidgetState()
         viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }

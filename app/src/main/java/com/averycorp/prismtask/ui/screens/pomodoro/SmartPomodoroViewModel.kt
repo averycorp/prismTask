@@ -272,6 +272,7 @@ constructor(
                         _timerSecondsRemaining.value = seconds
                     }
                 }
+                PomodoroTimerService.ACTION_STOPPED -> _isTimerRunning.value = false
                 PomodoroTimerService.ACTION_COMPLETE -> onTimerComplete()
             }
         }
@@ -311,6 +312,7 @@ constructor(
         try {
             val filter = IntentFilter().apply {
                 addAction(PomodoroTimerService.ACTION_TICK)
+                addAction(PomodoroTimerService.ACTION_STOPPED)
                 addAction(PomodoroTimerService.ACTION_COMPLETE)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

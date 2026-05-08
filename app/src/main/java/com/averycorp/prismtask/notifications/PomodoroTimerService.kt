@@ -63,6 +63,16 @@ class PomodoroTimerService : Service() {
             ACTION_RESUME -> resumeCountdown()
             ACTION_STOP -> {
                 stopCountdown()
+                sendBroadcast(
+                    Intent(ACTION_STOPPED).apply {
+                        setPackage(packageName)
+                        putExtra(EXTRA_SECONDS_REMAINING, secondsRemaining)
+                        putExtra(EXTRA_SESSION_INDEX, sessionIndex)
+                        putExtra(EXTRA_SESSION_TYPE, sessionType)
+                        putExtra(EXTRA_OWNER, owner)
+                    }
+                )
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
             else -> {
@@ -341,6 +351,7 @@ class PomodoroTimerService : Service() {
         const val ACTION_TICK = "com.averycorp.prismtask.pomodoro.TICK"
         const val ACTION_PAUSED = "com.averycorp.prismtask.pomodoro.PAUSED"
         const val ACTION_RESUMED = "com.averycorp.prismtask.pomodoro.RESUMED"
+        const val ACTION_STOPPED = "com.averycorp.prismtask.pomodoro.STOPPED"
         const val ACTION_COMPLETE = "com.averycorp.prismtask.pomodoro.COMPLETE"
 
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
