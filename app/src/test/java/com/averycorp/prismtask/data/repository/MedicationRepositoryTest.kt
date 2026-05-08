@@ -58,6 +58,23 @@ class MedicationRepositoryTest {
     }
 
     @Test
+    fun insert_recoversFromUniqueNameCollisionByAdoptingExistingRow() = runBlocking {
+        // A pre-existing row with the same name simulates a concurrent
+        // insert (or sync pull) that won the race against this caller's
+        // pre-flight `getByNameOnce` check. The DAO insert throws
+        // SQLiteConstraintException; the repo must catch it and return
+        // the existing row's id rather than crashing.
+        medicationDao.rows += MedicationEntity(id = 42, name = "Lipitor")
+        medicationDao.failNextInsertOnNameCollision = true
+
+        val id = repo.insert(MedicationEntity(name = "Lipitor"))
+
+        assertEquals(42L, id)
+        // Adopt path must NOT track a create — no row was actually inserted.
+        coVerify(exactly = 0) { syncTracker.trackCreate(any(), "medication") }
+    }
+
+    @Test
     fun insert_stampsCreatedAndUpdatedAtAtInsertTime() = runBlocking {
         // Pass a medication with zero timestamps; the repo should stamp
         // them — sync needs updatedAt to resolve last-write-wins.
@@ -322,7 +339,21 @@ private class FakeMedicationDaoForRepo : MedicationDao {
     val rows = mutableListOf<MedicationEntity>()
     private var nextId = 1L
 
+    /**
+     * When true, the next `insert` call whose `name` already exists in
+     * [rows] throws `SQLiteConstraintException` (matching the real Room
+     * DAO behavior under `OnConflictStrategy.ABORT`). One-shot — flag
+     * resets after the throw so subsequent inserts behave normally.
+     */
+    var failNextInsertOnNameCollision: Boolean = false
+
     override suspend fun insert(medication: MedicationEntity): Long {
+        if (failNextInsertOnNameCollision && rows.any { it.name == medication.name }) {
+            failNextInsertOnNameCollision = false
+            throw android.database.sqlite.SQLiteConstraintException(
+                "UNIQUE constraint failed: medications.name"
+            )
+        }
         val id = if (medication.id == 0L) nextId++ else medication.id
         rows += medication.copy(id = id)
         return id
