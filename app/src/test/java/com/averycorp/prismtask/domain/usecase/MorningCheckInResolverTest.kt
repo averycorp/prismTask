@@ -38,67 +38,16 @@ class MorningCheckInResolverTest {
     )
 
     @Test
-    fun `shouldPrompt true before threshold with no prior completion`() {
-        val todayStart = millis(2026, 4, 11, 0)
-        val now = millis(2026, 4, 11, 9) // 9am, before 11am threshold
+    fun `disabled config returns empty plan`() {
         val plan = resolver.plan(
             tasks = emptyList(),
-            habits = emptyList(),
-            config = MorningCheckInConfig(),
-            lastCompletedDate = null,
-            todayStart = todayStart,
-            now = now,
-            zone = zone
-        )
-        assertTrue(plan.shouldPrompt)
-    }
-
-    @Test
-    fun `shouldPrompt false after threshold`() {
-        val todayStart = millis(2026, 4, 11, 0)
-        val now = millis(2026, 4, 11, 13) // 1pm, after 11am threshold
-        val plan = resolver.plan(
-            tasks = emptyList(),
-            habits = emptyList(),
-            config = MorningCheckInConfig(),
-            lastCompletedDate = null,
-            todayStart = todayStart,
-            now = now,
-            zone = zone
-        )
-        assertFalse(plan.shouldPrompt)
-    }
-
-    @Test
-    fun `shouldPrompt false when already completed today`() {
-        val todayStart = millis(2026, 4, 11, 0)
-        val now = millis(2026, 4, 11, 9)
-        val plan = resolver.plan(
-            tasks = emptyList(),
-            habits = emptyList(),
-            config = MorningCheckInConfig(),
-            // already done this morning
-            lastCompletedDate = todayStart + 1000,
-            todayStart = todayStart,
-            now = now,
-            zone = zone
-        )
-        assertFalse(plan.shouldPrompt)
-    }
-
-    @Test
-    fun `shouldPrompt false when disabled`() {
-        val plan = resolver.plan(
-            tasks = emptyList(),
-            habits = emptyList(),
+            habits = listOf(habit(1)),
             config = MorningCheckInConfig(enabled = false),
-            lastCompletedDate = null,
-            todayStart = millis(2026, 4, 11, 0),
-            now = millis(2026, 4, 11, 9),
-            zone = zone
+            todayStart = millis(2026, 4, 11, 0)
         )
-        assertFalse(plan.shouldPrompt)
         assertTrue(plan.steps.isEmpty())
+        assertTrue(plan.topTasks.isEmpty())
+        assertTrue(plan.todayHabits.isEmpty())
     }
 
     @Test
@@ -115,10 +64,7 @@ class MorningCheckInResolverTest {
             tasks = tasks,
             habits = emptyList(),
             config = MorningCheckInConfig(),
-            lastCompletedDate = null,
-            todayStart = todayStart,
-            now = millis(2026, 4, 11, 9),
-            zone = zone
+            todayStart = todayStart
         )
         assertEquals(3, plan.topTasks.size)
         // Priority 4 first, then 3, then 2.
@@ -138,10 +84,7 @@ class MorningCheckInResolverTest {
             tasks = tasks,
             habits = emptyList(),
             config = MorningCheckInConfig(),
-            lastCompletedDate = null,
-            todayStart = todayStart,
-            now = millis(2026, 4, 11, 9),
-            zone = zone
+            todayStart = todayStart
         )
         assertEquals(1, plan.topTasks.size)
         assertEquals(2L, plan.topTasks[0].id)
@@ -153,10 +96,7 @@ class MorningCheckInResolverTest {
             tasks = emptyList(),
             habits = emptyList(),
             config = MorningCheckInConfig(),
-            lastCompletedDate = null,
-            todayStart = millis(2026, 4, 11, 0),
-            now = millis(2026, 4, 11, 9),
-            zone = zone
+            todayStart = millis(2026, 4, 11, 0)
         )
         assertFalse(plan.steps.contains(CheckInStep.HABITS))
     }
@@ -167,10 +107,7 @@ class MorningCheckInResolverTest {
             tasks = emptyList(),
             habits = listOf(habit(1)),
             config = MorningCheckInConfig(includeMedications = false),
-            lastCompletedDate = null,
-            todayStart = millis(2026, 4, 11, 0),
-            now = millis(2026, 4, 11, 9),
-            zone = zone
+            todayStart = millis(2026, 4, 11, 0)
         )
         assertFalse(plan.steps.contains(CheckInStep.MEDICATIONS))
     }
@@ -181,10 +118,7 @@ class MorningCheckInResolverTest {
             tasks = emptyList(),
             habits = listOf(habit(1)),
             config = MorningCheckInConfig(),
-            lastCompletedDate = null,
-            todayStart = millis(2026, 4, 11, 0),
-            now = millis(2026, 4, 11, 9),
-            zone = zone
+            todayStart = millis(2026, 4, 11, 0)
         )
         assertEquals(
             listOf(

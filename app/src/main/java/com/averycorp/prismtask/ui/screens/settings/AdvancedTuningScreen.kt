@@ -610,12 +610,21 @@ private fun GoodEnoughTimerGroup(vm: AdvancedTuningViewModel) {
 @Composable
 private fun MorningCheckInGroup(vm: AdvancedTuningViewModel) {
     val state by vm.morningCheckIn.collectAsStateWithLifecycle()
+    val validation by vm.morningCheckInValidation.collectAsStateWithLifecycle()
     ExpandableGroup(
         title = "Morning Check-In Prompt",
         subtitle = "Latest hour the morning prompt will trigger"
     ) {
         IntSliderRow("Latest hour", state.latestHour, 0..23, valueFormatter = { "$it:00" }) {
             vm.setMorningCheckIn(state.copy(latestHour = it))
+        }
+        (validation as? MorningCheckInCutoffValidation.Invalid)?.let { invalid ->
+            Text(
+                text = invalid.reason,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

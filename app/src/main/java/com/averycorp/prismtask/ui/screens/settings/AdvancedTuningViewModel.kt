@@ -24,6 +24,7 @@ import com.averycorp.prismtask.data.preferences.SearchPreview
 import com.averycorp.prismtask.data.preferences.SelfCareTierDefaults
 import com.averycorp.prismtask.data.preferences.SmartDefaultsConfig
 import com.averycorp.prismtask.data.preferences.SuggestionConfig
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UrgencyBands
 import com.averycorp.prismtask.data.preferences.UrgencyWindows
 import com.averycorp.prismtask.data.preferences.WeeklySummarySchedule
@@ -31,6 +32,8 @@ import com.averycorp.prismtask.data.preferences.WidgetRefreshConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -45,7 +48,8 @@ import javax.inject.Inject
 class AdvancedTuningViewModel
 @Inject
 constructor(
-    private val prefs: AdvancedTuningPreferences
+    private val prefs: AdvancedTuningPreferences,
+    private val taskBehaviorPreferences: TaskBehaviorPreferences
 ) : ViewModel() {
     val urgencyBands: StateFlow<UrgencyBands> =
         prefs.getUrgencyBands().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UrgencyBands())
@@ -91,6 +95,22 @@ constructor(
     val morningCheckIn: StateFlow<MorningCheckInPromptCutoff> =
         prefs.getMorningCheckInPromptCutoff()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MorningCheckInPromptCutoff())
+
+    private val startOfDayHour: StateFlow<Int> =
+        taskBehaviorPreferences.getStartOfDay()
+            .map { it.hour }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 4)
+
+    /**
+     * Live validation for the persisted morning check-in cutoff against the
+     * user's Start-of-Day. Drives the inline error caption in the Advanced
+     * Tuning settings screen so users learn why an attempted slider value
+     * didn't stick.
+     */
+    val morningCheckInValidation: StateFlow<MorningCheckInCutoffValidation> =
+        combine(morningCheckIn, startOfDayHour) { cutoff, sod ->
+            validateMorningCheckInCutoff(sodHour = sod, cutoffHour = cutoff.latestHour)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MorningCheckInCutoffValidation.Valid)
 
     val lifeCategoryKeywords: StateFlow<LifeCategoryCustomKeywords> =
         prefs.getLifeCategoryCustomKeywords()
@@ -155,7 +175,13 @@ constructor(
     fun setSuggestion(value: SuggestionConfig) = launchSet { prefs.setSuggestionConfig(value) }
     fun setExtractor(value: ExtractorConfig) = launchSet { prefs.setExtractorConfig(value) }
     fun setSmartDefaults(value: SmartDefaultsConfig) = launchSet { prefs.setSmartDefaultsConfig(value) }
-    fun setMorningCheckIn(value: MorningCheckInPromptCutoff) = launchSet { prefs.setMorningCheckInPromptCutoff(value) }
+    fun setMorningCheckIn(value: MorningCheckInPromptCutoff) {
+        val sod = startOfDayHour.value
+        if (validateMorningCheckInCutoff(sodHour = sod, cutoffHour = value.latestHour) !is MorningCheckInCutoffValidation.Valid) {
+            return
+        }
+        launchSet { prefs.setMorningCheckInPromptCutoff(value) }
+    }
     fun setLifeCategoryKeywords(value: LifeCategoryCustomKeywords) = launchSet {
         prefs.setLifeCategoryCustomKeywords(value)
     }
@@ -178,3 +204,36 @@ constructor(
         viewModelScope.launch { block() }
     }
 }
+
+/**
+ * Validation outcome for the morning check-in prompt cutoff against the
+ * user's Start-of-Day. The Settings UI renders the [Invalid.reason]
+ * inline so users see why a slider value didn't persist.
+ */
+sealed class MorningCheckInCutoffValidation {
+    data object Valid : MorningCheckInCutoffValidation()
+    data class Invalid(val reason: String) : MorningCheckInCutoffValidation()
+}
+
+/**
+ * Pure-function validator for the morning check-in cutoff against SoD.
+ *
+ * Wrap-around windows (late SoD, early cutoff — e.g. SoD=22, cutoff=2)
+ * are accepted because [MorningCheckInBannerDecider] handles them via
+ * modular arithmetic. Same-hour values and cutoffs that fall before an
+ * already-early SoD are rejected as user error: same-hour collapses
+ * the morning window to nothing semantically (or 24h via the decider's
+ * fallback, neither of which is a useful "morning" prompt), and an
+ * early-SoD-with-earlier-cutoff almost certainly means the user typed
+ * the wrong number rather than meaning a 23-hour wrap-around window.
+ */
+fun validateMorningCheckInCutoff(sodHour: Int, cutoffHour: Int): MorningCheckInCutoffValidation =
+    when {
+        cutoffHour == sodHour ->
+            MorningCheckInCutoffValidation.Invalid("Invalid Cutoff — Must Come After Start-of-Day.")
+        cutoffHour < sodHour && sodHour < EVENING_SOD_HOUR ->
+            MorningCheckInCutoffValidation.Invalid("Invalid Cutoff — Must Come After Start-of-Day.")
+        else -> MorningCheckInCutoffValidation.Valid
+    }
+
+private const val EVENING_SOD_HOUR = 12
