@@ -4,8 +4,11 @@ import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.remote.api.ChatHistoryEntry
 import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
+import com.averycorp.prismtask.data.remote.api.ChatStreamEvent
 import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import com.averycorp.prismtask.data.remote.sse.ChatStreamClient
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +32,8 @@ data class ChatMessage(
 class ChatRepository
 @Inject
 constructor(
-    private val api: PrismTaskApi
+    private val api: PrismTaskApi,
+    private val streamClient: ChatStreamClient
 ) {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -49,11 +53,9 @@ constructor(
     }
 
     /**
-     * Sends a message to the AI chat backend and returns the response.
-     *
-     * Forwards the rolling N=6 user/assistant pairs the repository is
-     * already holding so the model has actual multi-turn memory; trims
-     * locally afterwards.
+     * Sends a message to the AI chat backend (single-shot, non-streaming)
+     * and returns the response. Retained as a fallback path; the primary
+     * UI path is [streamMessage] (F7 D.1).
      */
     suspend fun sendMessage(
         userMessage: String,
@@ -62,16 +64,7 @@ constructor(
     ): ChatResponse {
         resetIfNewDay()
 
-        // Snapshot history BEFORE appending the new user turn — the latest
-        // user message becomes ChatRequest.message, not history.
-        val historyPayload = _messages.value
-            .takeLast(maxHistoryPairs * 2)
-            .map {
-                ChatHistoryEntry(
-                    role = if (it.role == ChatMessage.Role.USER) "user" else "assistant",
-                    content = it.text
-                )
-            }
+        val historyPayload = snapshotHistoryPayload()
 
         val userMsg = ChatMessage(
             role = ChatMessage.Role.USER,
@@ -101,6 +94,56 @@ constructor(
         return response
     }
 
+    /**
+     * F7 D.1 streaming variant. Appends the user's turn to [messages]
+     * synchronously so the user bubble renders immediately, then returns
+     * a [Flow] of [ChatStreamEvent]s the caller (ChatViewModel) consumes
+     * to render incremental tokens. The caller is responsible for
+     * calling [commitAssistantTurn] on a `Done` (or to commit a partial
+     * on user-cancel) so the message list stays single-source-of-truth.
+     */
+    fun streamMessage(
+        userMessage: String,
+        taskContextId: Long? = null,
+        taskContext: ChatTaskContext? = null
+    ): Flow<ChatStreamEvent> {
+        resetIfNewDay()
+
+        val historyPayload = snapshotHistoryPayload()
+
+        _messages.value = _messages.value + ChatMessage(
+            role = ChatMessage.Role.USER,
+            text = userMessage
+        )
+
+        return streamClient.stream(
+            ChatRequest(
+                message = userMessage,
+                conversationId = conversationId,
+                taskContextId = taskContextId,
+                taskContext = taskContext,
+                history = historyPayload
+            )
+        )
+    }
+
+    /**
+     * Append the assistant's turn to the message list once a streaming
+     * turn has resolved (either `Done` or user-cancel commit-as-partial).
+     * Trims rolling history per spec.
+     */
+    fun commitAssistantTurn(
+        text: String,
+        actions: List<ChatActionResponse>
+    ) {
+        _messages.value = _messages.value + ChatMessage(
+            role = ChatMessage.Role.ASSISTANT,
+            text = text,
+            actions = actions
+        )
+        trimHistory()
+    }
+
     fun clearConversation() {
         _messages.value = emptyList()
         conversationId = generateConversationId()
@@ -113,6 +156,16 @@ constructor(
             clearConversation()
         }
     }
+
+    private fun snapshotHistoryPayload(): List<ChatHistoryEntry> =
+        _messages.value
+            .takeLast(maxHistoryPairs * 2)
+            .map {
+                ChatHistoryEntry(
+                    role = if (it.role == ChatMessage.Role.USER) "user" else "assistant",
+                    content = it.text
+                )
+            }
 
     /**
      * Trims conversation history to keep at most [maxHistoryPairs] user+assistant pairs.

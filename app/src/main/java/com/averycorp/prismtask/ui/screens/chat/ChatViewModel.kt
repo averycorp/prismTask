@@ -11,6 +11,7 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
+import com.averycorp.prismtask.data.remote.api.ChatStreamEvent
 import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.data.repository.ChatRepository
@@ -20,6 +21,7 @@ import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.toCalendarDayOfWeek
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -52,8 +56,33 @@ constructor(
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
     val messages: StateFlow<List<ChatMessage>> = chatRepository.messages
 
+    /**
+     * F7 D.1 + F8 D.2: state machine for the in-flight chat turn.
+     * - [Idle]: no turn in progress; send button visible, input enabled.
+     * - [Streaming]: a turn is being received; the partial text is
+     *   rendered as the assistant's pending bubble; input shows a Stop
+     *   button (D.2 cancel affordance) instead of Send.
+     */
+    sealed interface ChatTurnState {
+        data object Idle : ChatTurnState
+        data class Streaming(
+            val partialText: String,
+            val startedAt: Long
+        ) : ChatTurnState
+    }
+
+    private val _turnState = MutableStateFlow<ChatTurnState>(ChatTurnState.Idle)
+    val turnState: StateFlow<ChatTurnState> = _turnState.asStateFlow()
+
+    /**
+     * Backward-compat shim: `isTyping` is true whenever a turn is
+     * streaming. Existing tests and screens read this flow; keeping it
+     * derived (rather than removed) avoids a regression risk.
+     */
     private val _isTyping = MutableStateFlow(false)
     val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
+
+    private var streamingJob: Job? = null
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -160,55 +189,117 @@ constructor(
         if (text.isBlank()) return
 
         // D.3 (F8 follow-on): leading idempotency guard. Compose's
-        // `enabled = !isTyping` on the send button blocks most double
-        // taps, but there is a ~16ms window between the user tap and
-        // the next recomposition where a second tap can land. Reading
-        // the StateFlow value here is synchronous and races with
-        // nothing — closes the gap cheaply.
-        if (_isTyping.value) return
+        // `enabled` on the send button blocks most double taps, but
+        // there is a ~16ms window between the user tap and the next
+        // recomposition where a second tap can land. Reading the
+        // StateFlow value here is synchronous and races with nothing.
+        // Keyed off turnState now (not just _isTyping) so the same
+        // guard covers streaming turns too.
+        if (_turnState.value !is ChatTurnState.Idle) return
 
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_CONVERSATIONAL)) {
             _showUpgradePrompt.value = true
             return
         }
 
-        // Flip _isTyping synchronously — BEFORE viewModelScope.launch — so
-        // a second sendMessage call landing in the same dispatch tick
-        // sees the flag set and bails at the guard above. Setting it
-        // inside the launch left the dedup window open for as long as
-        // the launch was queued; the test in
-        // ChatViewModelActionTest.rapid_double_send_only_dispatches_one_request
-        // exercises exactly that race.
+        // Flip turnState synchronously BEFORE launching so a second
+        // sendMessage call landing in the same dispatch tick sees the
+        // non-Idle state at the guard above. Mirrors the synchronous
+        // _isTyping flip from #1182.
+        _turnState.value = ChatTurnState.Streaming(
+            partialText = "",
+            startedAt = System.currentTimeMillis()
+        )
         _isTyping.value = true
         _error.value = null
-        viewModelScope.launch {
-            try {
-                chatRepository.sendMessage(
-                    userMessage = text,
-                    taskContextId = taskContextId,
-                    taskContext = buildTaskContextSnapshot(_contextTask.value)
-                )
-            } catch (e: java.net.UnknownHostException) {
-                _error.value = "I need an internet connection to chat. Your tasks are still available offline."
-            } catch (e: java.net.ConnectException) {
-                _error.value = "I need an internet connection to chat. Your tasks are still available offline."
-            } catch (e: retrofit2.HttpException) {
-                android.util.Log.e("ChatViewModel", "Chat HTTP ${e.code()} ${e.message()}", e)
-                _error.value = when (e.code()) {
-                    401 -> "Sign in to use chat — your session has expired."
-                    403 -> "Chat requires Pro. Upgrade in Settings to continue."
-                    429 -> "Daily chat limit reached. Try again later."
-                    451 -> "AI features are disabled. Re-enable them in Settings → AI Features."
-                    503 -> "Chat backend is unavailable. Try again in a moment."
-                    else -> "Chat is unavailable right now (HTTP ${e.code()})."
+
+        val contextSnapshotJob = viewModelScope.launch {
+            val snapshot = buildTaskContextSnapshot(_contextTask.value)
+            startStreamingTurn(text, snapshot)
+        }
+        // Track the snapshot-build job too so cancelInFlight works
+        // even if the user taps Stop before the task-context snapshot
+        // resolves.
+        streamingJob = contextSnapshotJob
+    }
+
+    private fun startStreamingTurn(text: String, snapshot: ChatTaskContext?) {
+        var sawDoneOrError = false
+        val flowJob = chatRepository
+            .streamMessage(
+                userMessage = text,
+                taskContextId = taskContextId,
+                taskContext = snapshot
+            )
+            .onEach { event ->
+                when (event) {
+                    is ChatStreamEvent.Token -> {
+                        val current = _turnState.value as? ChatTurnState.Streaming
+                            ?: return@onEach
+                        _turnState.value = current.copy(
+                            partialText = current.partialText + event.text
+                        )
+                    }
+                    is ChatStreamEvent.Done -> {
+                        sawDoneOrError = true
+                        chatRepository.commitAssistantTurn(
+                            text = event.message,
+                            actions = event.actions
+                        )
+                        finishTurn()
+                    }
+                    is ChatStreamEvent.Error -> {
+                        sawDoneOrError = true
+                        _error.value = event.message
+                        finishTurn()
+                    }
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("ChatViewModel", "Chat send failed", e)
-                _error.value = "Chat is unavailable right now: ${e.javaClass.simpleName} — ${e.message ?: "unknown error"}"
-            } finally {
-                _isTyping.value = false
+            }
+            .launchIn(viewModelScope)
+
+        streamingJob = flowJob
+        flowJob.invokeOnCompletion {
+            // If we never saw a `Done` or `Error`, this is a cooperative
+            // cancel (D.2 — user tapped Stop). cancelInFlight() owns the
+            // commit-as-partial path; here we just guarantee turnState
+            // returns to Idle so the UI re-enables.
+            if (!sawDoneOrError && _turnState.value !is ChatTurnState.Idle) {
+                finishTurn()
             }
         }
+    }
+
+    private fun finishTurn() {
+        _turnState.value = ChatTurnState.Idle
+        _isTyping.value = false
+        streamingJob = null
+    }
+
+    /**
+     * F8 D.2 — cancel the in-flight streaming turn. Commits whatever
+     * partial text was collected so far (with a "(cancelled)" suffix
+     * so the boundary is explicit) into the message list, then
+     * transitions back to Idle. No-op when no turn is streaming.
+     */
+    fun cancelInFlight() {
+        val current = _turnState.value as? ChatTurnState.Streaming ?: return
+        val job = streamingJob
+        // Take the snapshot BEFORE cancelling so we still have the
+        // partial text — _turnState is mutated on the same dispatcher
+        // but the job cancel propagates asynchronously.
+        val partial = current.partialText
+        job?.cancel()
+
+        val committed = if (partial.isBlank()) {
+            "(cancelled)"
+        } else {
+            "$partial (cancelled)"
+        }
+        chatRepository.commitAssistantTurn(
+            text = committed,
+            actions = emptyList()
+        )
+        finishTurn()
     }
 
     fun clearError() {

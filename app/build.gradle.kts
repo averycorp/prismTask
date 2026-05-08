@@ -302,6 +302,8 @@ dependencies {
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // F7 D.1: SSE companion artifact for the chat-streaming endpoint.
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
 
     // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

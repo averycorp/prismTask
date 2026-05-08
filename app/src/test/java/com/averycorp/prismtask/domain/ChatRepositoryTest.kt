@@ -242,7 +242,7 @@ class ChatRepositoryTest {
         coEvery { api.aiChat(capture(captured)) } returns ChatResponse(
             message = "hi", actions = emptyList(), conversationId = "x"
         )
-        val repo = ChatRepository(api)
+        val repo = ChatRepository(api, mockk(relaxed = true))
 
         repo.sendMessage(userMessage = "hello")
 
@@ -262,7 +262,7 @@ class ChatRepositoryTest {
             ChatResponse(message = "first reply", actions = emptyList(), conversationId = "x"),
             ChatResponse(message = "second reply", actions = emptyList(), conversationId = "x")
         )
-        val repo = ChatRepository(api)
+        val repo = ChatRepository(api, mockk(relaxed = true))
 
         repo.sendMessage(userMessage = "first user message")
         // After turn 1, repo holds [user, assistant]. The next sendMessage
@@ -286,7 +286,7 @@ class ChatRepositoryTest {
         coEvery { api.aiChat(capture(captured)) } answers {
             ChatResponse(message = "ok", actions = emptyList(), conversationId = "x")
         }
-        val repo = ChatRepository(api)
+        val repo = ChatRepository(api, mockk(relaxed = true))
 
         // 8 turns → after the 8th send, repo would hold 14 messages pre-trim;
         // the request must still cap forwarded history to 12.
