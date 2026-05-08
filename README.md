@@ -90,6 +90,10 @@ Auth is Firebase Auth (with the FastAPI verifying ID tokens). See
 
 ## Development
 
+### Getting Started
+
+To build and run this project locally, ensure you are using Gradle 9.3.1. The minimum Android SDK level required is 26.
+
 ### Firebase Emulator (local testing)
 
 Debug builds connect to a local Firebase Emulator Suite (Firestore + Auth) by default — not production Firestore. Start it with `firebase emulators:start --import=./firebase-emulator-data --export-on-exit=./firebase-emulator-data` before launching a debug APK, or you will see "no data syncing" because the app is talking to `10.0.2.2:8080`. See [`docs/FIREBASE_EMULATOR.md`](docs/FIREBASE_EMULATOR.md) for setup, two-device configs, and troubleshooting. To use production Firestore in a debug build, flip `USE_FIREBASE_EMULATOR` to `false` in `app/build.gradle.kts` before building.
