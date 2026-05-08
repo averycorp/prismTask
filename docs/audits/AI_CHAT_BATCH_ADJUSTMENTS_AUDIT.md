@@ -199,3 +199,57 @@ One PR (single coherent scope per the audit-first fan-out rule):
 - Touch: backend schema + system prompt + Android API model + ChatViewModel
   + ChatScreen + minimal tests on both sides.
 - CI green required.
+
+---
+
+## Phase 3 — Bundle summary
+
+**Shipped (1 PR, single coherent scope):**
+
+- **#1204 — `feat(chat): batch_command action routes Coach to BatchPreviewScreen`**
+  ([branch](https://github.com/averycorp/prismTask/tree/claude/batch-adjustments-ai-chat-Nkff0)).
+  - Backend: extended `_CHAT_ACTION_TYPE_PATTERN` and added
+    `command_text: Optional[str]` to `ChatActionPayload`
+    (`backend/app/schemas/ai.py:529-558`); taught
+    `_CHAT_SYSTEM_PROMPT` when to emit `batch_command` vs. the
+    existing single-entity / `reschedule_batch` shapes
+    (`backend/app/services/ai_productivity.py:1170-1175`).
+  - Android: added `commandText` to `ChatActionResponse`
+    (`ApiModels.kt:589`); new `ChatNavEvent.OpenBatchPreview`,
+    `handleBatchCommand`, dispatch + signature wiring
+    (`ChatViewModel.kt`); chip label "Preview Batch" + nav route to
+    `PrismTaskRoute.BatchPreview` (`ChatScreen.kt`).
+  - Tests: backend asserts `batch_command` survives validation and
+    `command_text` round-trips through `/chat`; Android asserts the
+    chip emits `OpenBatchPreview` with the command text intact, and
+    that blank `command_text` is silently dropped.
+  - CHANGELOG: Unreleased entry under "Added".
+
+**Wall-clock baseline.** ~1 single-PR session. Everything routed through
+the existing `/batch-parse` → `BatchPreviewScreen` →
+`BatchOperationsRepository` pipeline; no new mutation primitives,
+no new undo paths, no new Pro-gating. Estimate held — the pre-existing
+batch infra was the load-bearing call.
+
+**Deferred (per audit, not shipped):**
+
+- Item 3 (inline `complete_batch` / `archive_batch` in chat) — duplicates
+  the path Item 2 covers via BatchPreviewScreen. Re-evaluate after we
+  see whether users ask for inline-vs-preview on high-confidence verbs.
+- Item 4 (project context in chat prompt) — only matters if Item 3
+  expands to project-level inline actions. Item 2's bridge sidesteps it.
+
+**Memory entry candidates.** None — the change followed the existing
+"chat action grammar lives in three places, drifts independently"
+pattern flagged in the audit's anti-pattern list, but that pattern
+was already documented in prior chat audits (F8 follow-on,
+`AUTO_BUTTONS_CHAT_404_AUDIT.md`). Nothing surprising surfaced here.
+
+**Schedule for next audit.** Driven by user feedback — if users start
+hitting "I want to apply this batch in chat without the preview detour",
+revisit Item 3. If users start saying "I tried to archive a project
+from chat and the AI couldn't pick it", revisit Item 4. Otherwise
+the bridge is sufficient.
+
+---
+
