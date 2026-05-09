@@ -49,6 +49,7 @@ constructor(
         private val TOUR_CARD_ELIGIBLE = booleanPreferencesKey("tour_card_eligible")
         private val TOUR_CARD_DISMISSED = booleanPreferencesKey("tour_card_dismissed")
         private val TOUR_STEP_INDEX = intPreferencesKey("tour_step_index")
+
         // Coachmark tour (post-onboarding 13-surface walkthrough). Reuses
         // the same DataStore so account-wipe (PR #1180) and debug-reset
         // paths stay single-store. Eligibility shares the same gate as
