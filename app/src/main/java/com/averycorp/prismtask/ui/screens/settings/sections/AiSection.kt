@@ -33,7 +33,9 @@ fun AiSection(
     smartPomodoroFeatureEnabled: Boolean = true,
     onSmartPomodoroFeatureEnabledChanged: (Boolean) -> Unit = {},
     weeklyPlannerFeatureEnabled: Boolean = true,
-    onWeeklyPlannerFeatureEnabledChanged: (Boolean) -> Unit = {}
+    onWeeklyPlannerFeatureEnabledChanged: (Boolean) -> Unit = {},
+    morningCheckInFeatureEnabled: Boolean = true,
+    onMorningCheckInFeatureEnabledChanged: (Boolean) -> Unit = {}
 ) {
     SectionHeader("AI Features")
 
@@ -95,6 +97,12 @@ fun AiSection(
         subtitle = "AI-generated week plan distributing tasks across days.",
         checked = weeklyPlannerFeatureEnabled,
         onCheckedChange = onWeeklyPlannerFeatureEnabledChanged
+    )
+    SettingsToggleRow(
+        title = "Morning Check-In",
+        subtitle = "Morning guided flow with mood, medications, top tasks, habits, and balance steps.",
+        checked = morningCheckInFeatureEnabled,
+        onCheckedChange = onMorningCheckInFeatureEnabledChanged
     )
 
     SettingsRowWithSubtitle(

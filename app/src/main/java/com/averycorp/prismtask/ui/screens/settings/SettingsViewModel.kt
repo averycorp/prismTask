@@ -279,6 +279,10 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setAiWeeklyPlannerEnabled(enabled) }
     }
 
+    fun setMorningCheckInFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiMorningCheckInEnabled(enabled) }
+    }
+
     /** Boundary rules (v1.4.0 V3). */
     val boundaryRules: StateFlow<List<com.averycorp.prismtask.domain.model.BoundaryRule>> =
         boundaryRuleRepository

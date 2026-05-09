@@ -153,7 +153,8 @@ data class PerFeatureAiPrefs(
     val chatEnabled: Boolean = true,
     val dailyBriefingEnabled: Boolean = true,
     val smartPomodoroEnabled: Boolean = true,
-    val weeklyPlannerEnabled: Boolean = true
+    val weeklyPlannerEnabled: Boolean = true,
+    val morningCheckInEnabled: Boolean = true
 )
 
 /**
@@ -258,6 +259,15 @@ class UserPreferencesDataStore(
             booleanPreferencesKey("ai_smart_pomodoro_enabled")
         val KEY_AI_WEEKLY_PLANNER_ENABLED =
             booleanPreferencesKey("ai_weekly_planner_enabled")
+
+        // F3 Item 2 — forward-compat per-feature gate for Morning Check-In.
+        // Morning Check-In is purely deterministic today (no AI integration);
+        // this key is in place so any future AI augmentation path on the
+        // morning-check-in surface can consult the same per-feature shape
+        // PR #1214 established for the other 4 features without a follow-on
+        // prefs migration. Defaults to true to match the other 4.
+        val KEY_AI_MORNING_CHECKIN_ENABLED =
+            booleanPreferencesKey("ai_morning_checkin_enabled")
 
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1, Phase 2 #2).
         // Set to true the first time the user dismisses the disclosure
@@ -439,7 +449,8 @@ class UserPreferencesDataStore(
             chatEnabled = prefs[KEY_AI_CHAT_ENABLED] ?: true,
             dailyBriefingEnabled = prefs[KEY_AI_DAILY_BRIEFING_ENABLED] ?: true,
             smartPomodoroEnabled = prefs[KEY_AI_SMART_POMODORO_ENABLED] ?: true,
-            weeklyPlannerEnabled = prefs[KEY_AI_WEEKLY_PLANNER_ENABLED] ?: true
+            weeklyPlannerEnabled = prefs[KEY_AI_WEEKLY_PLANNER_ENABLED] ?: true,
+            morningCheckInEnabled = prefs[KEY_AI_MORNING_CHECKIN_ENABLED] ?: true
         )
     }
 
@@ -574,6 +585,10 @@ class UserPreferencesDataStore(
 
     suspend fun setAiWeeklyPlannerEnabled(enabled: Boolean) {
         dataStore.edit { it[KEY_AI_WEEKLY_PLANNER_ENABLED] = enabled }
+    }
+
+    suspend fun setAiMorningCheckInEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_MORNING_CHECKIN_ENABLED] = enabled }
     }
 
     /**

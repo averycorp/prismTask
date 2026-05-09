@@ -84,7 +84,9 @@ fun TodayAiHubSheet(
                 smartPomodoroFeatureEnabled = perFeatureAiPrefs.smartPomodoroEnabled,
                 onSmartPomodoroFeatureEnabledChanged = viewModel::setSmartPomodoroFeatureEnabled,
                 weeklyPlannerFeatureEnabled = perFeatureAiPrefs.weeklyPlannerEnabled,
-                onWeeklyPlannerFeatureEnabledChanged = viewModel::setWeeklyPlannerFeatureEnabled
+                onWeeklyPlannerFeatureEnabledChanged = viewModel::setWeeklyPlannerFeatureEnabled,
+                morningCheckInFeatureEnabled = perFeatureAiPrefs.morningCheckInEnabled,
+                onMorningCheckInFeatureEnabledChanged = viewModel::setMorningCheckInFeatureEnabled
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
