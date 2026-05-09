@@ -199,6 +199,20 @@ constructor(
         }
     }
 
+    /**
+     * Per-feature AI opt-ins (F3 low-risk bundle). Layered on top of the
+     * master AI privacy switch — the Today chip row consults these to
+     * hide individual AI surfaces while the master toggle remains the
+     * sole gate for backend egress.
+     */
+    val perFeatureAiPrefs: StateFlow<com.averycorp.prismtask.data.preferences.PerFeatureAiPrefs> =
+        userPreferencesDataStore.perFeatureAiPrefsFlow
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.PerFeatureAiPrefs()
+            )
+
     fun advanceTourCard(totalSteps: Int) {
         viewModelScope.launch {
             try {

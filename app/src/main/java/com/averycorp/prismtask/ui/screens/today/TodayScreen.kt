@@ -151,6 +151,7 @@ fun TodayScreen(
     val dailyEssentials by viewModel.dailyEssentials.collectAsStateWithLifecycle()
     val tourCardState by viewModel.tourCardState.collectAsStateWithLifecycle()
     val resumeTourVisible by viewModel.resumeTourVisible.collectAsStateWithLifecycle()
+    val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
     var overloadBannerDismissed by remember { mutableStateOf(false) }
 
     // A2 NLP batch ops — listens to BatchUndoEventBus so we can offer
@@ -267,7 +268,7 @@ fun TodayScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (viewModel.isPro) {
+                if (viewModel.isPro && perFeatureAiPrefs.chatEnabled) {
                     SmallFloatingActionButton(
                         onClick = {
                             navController.navigate(PrismTaskRoute.AiChat.createRoute())
@@ -493,33 +494,39 @@ fun TodayScreen(
                                     border = chipBorder
                                 )
                             }
-                            AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.DailyBriefing.route) },
-                                label = { Text("Briefing") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                },
-                                colors = chipColors,
-                                border = chipBorder
-                            )
-                            AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.SmartPomodoro.route) },
-                                label = { Text("Focus") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
-                                },
-                                colors = chipColors,
-                                border = chipBorder
-                            )
-                            AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.WeeklyPlanner.route) },
-                                label = { Text("Plan Week") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
-                                },
-                                colors = chipColors,
-                                border = chipBorder
-                            )
+                            if (perFeatureAiPrefs.dailyBriefingEnabled) {
+                                AssistChip(
+                                    onClick = { navController.navigate(PrismTaskRoute.DailyBriefing.route) },
+                                    label = { Text("Briefing") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
+                            if (perFeatureAiPrefs.smartPomodoroEnabled) {
+                                AssistChip(
+                                    onClick = { navController.navigate(PrismTaskRoute.SmartPomodoro.route) },
+                                    label = { Text("Focus") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
+                            if (perFeatureAiPrefs.weeklyPlannerEnabled) {
+                                AssistChip(
+                                    onClick = { navController.navigate(PrismTaskRoute.WeeklyPlanner.route) },
+                                    label = { Text("Plan Week") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
                             AssistChip(
                                 onClick = { navController.navigate(PrismTaskRoute.EisenhowerMatrix.route) },
                                 label = { Text("Matrix") },

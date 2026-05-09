@@ -254,6 +254,31 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setAiFeaturesEnabled(enabled) }
     }
 
+    /** Per-feature AI opt-ins (F3 low-risk bundle). */
+    val perFeatureAiPrefs: StateFlow<com.averycorp.prismtask.data.preferences.PerFeatureAiPrefs> =
+        userPreferencesDataStore.perFeatureAiPrefsFlow
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.PerFeatureAiPrefs()
+            )
+
+    fun setAiChatFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiChatEnabled(enabled) }
+    }
+
+    fun setDailyBriefingFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiDailyBriefingEnabled(enabled) }
+    }
+
+    fun setSmartPomodoroFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiSmartPomodoroEnabled(enabled) }
+    }
+
+    fun setWeeklyPlannerFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiWeeklyPlannerEnabled(enabled) }
+    }
+
     /** Boundary rules (v1.4.0 V3). */
     val boundaryRules: StateFlow<List<com.averycorp.prismtask.domain.model.BoundaryRule>> =
         boundaryRuleRepository

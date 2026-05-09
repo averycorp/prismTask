@@ -41,6 +41,7 @@ fun TodayAiHubSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val eisenhowerPrefs by viewModel.eisenhowerPrefs.collectAsStateWithLifecycle()
     val aiFeaturePrefs by viewModel.aiFeaturePrefs.collectAsStateWithLifecycle()
+    val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
 
     val navigateAndDismiss: (String) -> Unit = { route ->
         onDismiss()
@@ -75,7 +76,15 @@ fun TodayAiHubSheet(
                 eisenhowerAutoClassifyEnabled = eisenhowerPrefs.autoClassifyEnabled,
                 onEisenhowerAutoClassifyChanged = viewModel::setEisenhowerAutoClassifyEnabled,
                 aiFeaturesEnabled = aiFeaturePrefs.enabled,
-                onAiFeaturesEnabledChanged = viewModel::setAiFeaturesEnabled
+                onAiFeaturesEnabledChanged = viewModel::setAiFeaturesEnabled,
+                aiChatFeatureEnabled = perFeatureAiPrefs.chatEnabled,
+                onAiChatFeatureEnabledChanged = viewModel::setAiChatFeatureEnabled,
+                dailyBriefingFeatureEnabled = perFeatureAiPrefs.dailyBriefingEnabled,
+                onDailyBriefingFeatureEnabledChanged = viewModel::setDailyBriefingFeatureEnabled,
+                smartPomodoroFeatureEnabled = perFeatureAiPrefs.smartPomodoroEnabled,
+                onSmartPomodoroFeatureEnabledChanged = viewModel::setSmartPomodoroFeatureEnabled,
+                weeklyPlannerFeatureEnabled = perFeatureAiPrefs.weeklyPlannerEnabled,
+                onWeeklyPlannerFeatureEnabledChanged = viewModel::setWeeklyPlannerFeatureEnabled
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
