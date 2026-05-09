@@ -8,6 +8,8 @@ const {
   googleProviderMock,
   setFirebaseUidMock,
   authApiMock,
+  getAiFeaturesEnabledMock,
+  setAiFeaturesEnabledMock,
 } = vi.hoisted(() => ({
   signInWithPopupMock: vi.fn(),
   signOutMock: vi.fn(),
@@ -15,6 +17,8 @@ const {
   firebaseAuthMock: { authStateReady: vi.fn().mockResolvedValue(undefined) },
   googleProviderMock: {},
   setFirebaseUidMock: vi.fn(),
+  getAiFeaturesEnabledMock: vi.fn(),
+  setAiFeaturesEnabledMock: vi.fn(),
   authApiMock: {
     login: vi.fn(),
     register: vi.fn(),
@@ -47,6 +51,12 @@ vi.mock('@/api/auth', () => ({
   authApi: authApiMock,
 }));
 
+vi.mock('@/api/firestore/aiPreferences', () => ({
+  DEFAULT_AI_FEATURES_ENABLED: true,
+  getAiFeaturesEnabled: getAiFeaturesEnabledMock,
+  setAiFeaturesEnabled: setAiFeaturesEnabledMock,
+}));
+
 import { useAuthStore } from '@/stores/authStore';
 
 function resetStore() {
@@ -67,6 +77,10 @@ describe('authStore — deletion-status sign-in gating', () => {
   beforeEach(() => {
     resetStore();
     Object.values(authApiMock).forEach((fn) => fn.mockReset());
+    getAiFeaturesEnabledMock.mockReset();
+    getAiFeaturesEnabledMock.mockResolvedValue(true);
+    setAiFeaturesEnabledMock.mockReset();
+    setAiFeaturesEnabledMock.mockResolvedValue(undefined);
     signInWithPopupMock.mockReset();
     setFirebaseUidMock.mockReset();
     localStorage.clear();
