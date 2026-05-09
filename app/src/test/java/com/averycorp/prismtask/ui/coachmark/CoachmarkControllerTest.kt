@@ -6,6 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -271,11 +273,22 @@ class CoachmarkControllerTest {
     @Test
     fun stepIndex_persists_on_advance() = runTest(testDispatcher) {
         prefs.markEligible()
-        val c = controller()
+        val controllerScope = TestScope(testDispatcher)
+        val c = CoachmarkController(
+            tourCardPreferences = prefs,
+            tour = tour,
+            scope = controllerScope
+        )
         c.tryStart()
         advanceUntilIdle()
         c.next() // 0 → 1 (Next action persists)
         advanceUntilIdle()
+        // c.next() persists via scope.launch on the controller's scope;
+        // advanceUntilIdle drains the test scheduler but the launched
+        // coroutine ultimately suspends on DataStore's IO actor, which
+        // completes off-scheduler. Join the controller scope's in-flight
+        // children so the write is observed before we read it back.
+        controllerScope.coroutineContext.job.children.toList().joinAll()
         assertEquals(1, prefs.coachmarkStepIndex().first())
     }
 }
