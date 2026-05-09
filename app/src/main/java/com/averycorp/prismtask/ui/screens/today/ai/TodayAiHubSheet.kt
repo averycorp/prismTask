@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.averycorp.prismtask.data.billing.UserTier
+import com.averycorp.prismtask.ui.components.ProGatedFeature
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.settings.SettingsViewModel
 import com.averycorp.prismtask.ui.screens.settings.sections.AiSection
@@ -36,16 +38,28 @@ import com.averycorp.prismtask.ui.screens.settings.sections.AiSection
 fun TodayAiHubSheet(
     navController: NavController,
     onDismiss: () -> Unit,
+    onShowUpsell: (ProGatedFeature) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val eisenhowerPrefs by viewModel.eisenhowerPrefs.collectAsStateWithLifecycle()
     val aiFeaturePrefs by viewModel.aiFeaturePrefs.collectAsStateWithLifecycle()
     val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
+    val userTier by viewModel.userTier.collectAsStateWithLifecycle()
+    val isPro = userTier == UserTier.PRO
 
     val navigateAndDismiss: (String) -> Unit = { route ->
         onDismiss()
         navController.navigate(route)
+    }
+
+    val gatedNavigate: (ProGatedFeature, String) -> Unit = { feature, route ->
+        if (isPro) {
+            navigateAndDismiss(route)
+        } else {
+            onDismiss()
+            onShowUpsell(feature)
+        }
     }
 
     ModalBottomSheet(
@@ -64,15 +78,15 @@ fun TodayAiHubSheet(
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)
             )
             AiSection(
-                onNavigateToEisenhower = { navigateAndDismiss(PrismTaskRoute.EisenhowerMatrix.route) },
-                onNavigateToSmartPomodoro = { navigateAndDismiss(PrismTaskRoute.SmartPomodoro.route) },
-                onNavigateToDailyBriefing = { navigateAndDismiss(PrismTaskRoute.DailyBriefing.route) },
-                onNavigateToWeeklyPlanner = { navigateAndDismiss(PrismTaskRoute.WeeklyPlanner.route) },
-                onNavigateToTimeline = { navigateAndDismiss(PrismTaskRoute.Timeline.route) },
-                onNavigateToPasteExtract = { navigateAndDismiss(PrismTaskRoute.PasteConversation.route) },
-                onNavigateToWeeklyReview = { navigateAndDismiss(PrismTaskRoute.WeeklyReview.route) },
+                onNavigateToEisenhower = { gatedNavigate(ProGatedFeature.EISENHOWER, PrismTaskRoute.EisenhowerMatrix.route) },
+                onNavigateToSmartPomodoro = { gatedNavigate(ProGatedFeature.SMART_POMODORO, PrismTaskRoute.SmartPomodoro.route) },
+                onNavigateToDailyBriefing = { gatedNavigate(ProGatedFeature.AI_BRIEFING, PrismTaskRoute.DailyBriefing.route) },
+                onNavigateToWeeklyPlanner = { gatedNavigate(ProGatedFeature.WEEKLY_PLANNER, PrismTaskRoute.WeeklyPlanner.route) },
+                onNavigateToTimeline = { gatedNavigate(ProGatedFeature.TIME_BLOCKING, PrismTaskRoute.Timeline.route) },
+                onNavigateToPasteExtract = { gatedNavigate(ProGatedFeature.PASTE_EXTRACT, PrismTaskRoute.PasteConversation.route) },
+                onNavigateToWeeklyReview = { gatedNavigate(ProGatedFeature.WEEKLY_REVIEW, PrismTaskRoute.WeeklyReview.route) },
                 onNavigateToMoodAnalytics = { navigateAndDismiss(PrismTaskRoute.MoodAnalytics.route) },
-                onNavigateToAiChat = { navigateAndDismiss(PrismTaskRoute.AiChat.createRoute()) },
+                onNavigateToAiChat = { gatedNavigate(ProGatedFeature.AI_CHAT, PrismTaskRoute.AiChat.createRoute()) },
                 eisenhowerAutoClassifyEnabled = eisenhowerPrefs.autoClassifyEnabled,
                 onEisenhowerAutoClassifyChanged = viewModel::setEisenhowerAutoClassifyEnabled,
                 aiFeaturesEnabled = aiFeaturePrefs.enabled,
