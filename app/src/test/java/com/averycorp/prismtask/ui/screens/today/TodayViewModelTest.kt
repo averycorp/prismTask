@@ -1,5 +1,6 @@
 package com.averycorp.prismtask.ui.screens.today
 
+import app.cash.turbine.test
 import com.averycorp.prismtask.core.time.LocalDateFlow
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
@@ -197,6 +198,81 @@ class TodayViewModelTest {
     fun viewModel_constructsWithoutCrashing() = runTest(dispatcher) {
         newViewModel()
         advanceUntilIdle()
+    }
+
+    @Test
+    fun resumeTourVisible_isFalse_whenIneligible() = runTest(dispatcher) {
+        coEvery { tourCardPreferences.eligible() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkCompleted() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkDismissed() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(3)
+
+        val vm = newViewModel()
+        vm.resumeTourVisible.test {
+            // The seed value is false; with all upstream sources cold-emitting
+            // a single value, the only post-seed emission is the resolved
+            // combine — also false here. Skip the seed and assert the upstream.
+            advanceUntilIdle()
+            assert(!expectMostRecentItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun resumeTourVisible_isFalse_whenStepIndexZero() = runTest(dispatcher) {
+        coEvery { tourCardPreferences.eligible() } returns flowOf(true)
+        coEvery { tourCardPreferences.coachmarkCompleted() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkDismissed() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(0)
+
+        val vm = newViewModel()
+        vm.resumeTourVisible.test {
+            advanceUntilIdle()
+            assert(!expectMostRecentItem()) {
+                "resumeTourVisible should be false at stepIndex 0 (auto tryStart covers this)"
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun resumeTourVisible_isTrue_whenMidTour() = runTest(dispatcher) {
+        coEvery { tourCardPreferences.eligible() } returns flowOf(true)
+        coEvery { tourCardPreferences.coachmarkCompleted() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkDismissed() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(5)
+
+        val vm = newViewModel()
+        vm.resumeTourVisible.test {
+            advanceUntilIdle()
+            assert(expectMostRecentItem()) {
+                "resumeTourVisible should be true when eligible & mid-tour"
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun resumeTourVisible_isFalse_whenCompleted() = runTest(dispatcher) {
+        coEvery { tourCardPreferences.eligible() } returns flowOf(true)
+        coEvery { tourCardPreferences.coachmarkCompleted() } returns flowOf(true)
+        coEvery { tourCardPreferences.coachmarkDismissed() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(5)
+
+        val vm = newViewModel()
+        vm.resumeTourVisible.test {
+            advanceUntilIdle()
+            assert(!expectMostRecentItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun resumeTour_invokesController() = runTest(dispatcher) {
+        val vm = newViewModel()
+        vm.resumeTour()
+        advanceUntilIdle()
+        coVerify { coachmarkController.resume(any()) }
     }
 
     @Test
