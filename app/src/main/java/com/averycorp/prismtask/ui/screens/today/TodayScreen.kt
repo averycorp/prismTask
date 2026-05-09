@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -65,6 +66,7 @@ import com.averycorp.prismtask.ui.components.RichEmptyState
 import com.averycorp.prismtask.ui.components.TaskListSkeleton
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.components.WelcomeBackDialog
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.sync.SyncIndicatorHost
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.addedittask.AddEditTaskSheetHost
@@ -148,6 +150,8 @@ fun TodayScreen(
     val currentNudge by viewModel.currentNudge.collectAsStateWithLifecycle()
     val dailyEssentials by viewModel.dailyEssentials.collectAsStateWithLifecycle()
     val tourCardState by viewModel.tourCardState.collectAsStateWithLifecycle()
+    val resumeTourVisible by viewModel.resumeTourVisible.collectAsStateWithLifecycle()
+    val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
     var overloadBannerDismissed by remember { mutableStateOf(false) }
 
     // A2 NLP batch ops — listens to BatchUndoEventBus so we can offer
@@ -264,13 +268,16 @@ fun TodayScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (viewModel.isPro) {
+                if (viewModel.isPro && perFeatureAiPrefs.chatEnabled) {
                     SmallFloatingActionButton(
                         onClick = {
                             navController.navigate(PrismTaskRoute.AiChat.createRoute())
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.coachmarkAnchor(
+                            com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.AI_COACH_FAB
+                        )
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Chat,
@@ -472,33 +479,54 @@ fun TodayScreen(
                                 .padding(vertical = 2.dp)
                                 .horizontalScroll(rememberScrollState())
                         ) {
-                            AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.DailyBriefing.route) },
-                                label = { Text("Briefing") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                                },
-                                colors = chipColors,
-                                border = chipBorder
-                            )
-                            AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.SmartPomodoro.route) },
-                                label = { Text("Focus") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
-                                },
-                                colors = chipColors,
-                                border = chipBorder
-                            )
-                            AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.WeeklyPlanner.route) },
-                                label = { Text("Plan Week") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
-                                },
-                                colors = chipColors,
-                                border = chipBorder
-                            )
+                            if (resumeTourVisible) {
+                                AssistChip(
+                                    onClick = { viewModel.resumeTour() },
+                                    label = { Text("Resume Tour") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
+                            if (perFeatureAiPrefs.dailyBriefingEnabled) {
+                                AssistChip(
+                                    onClick = { navController.navigate(PrismTaskRoute.DailyBriefing.route) },
+                                    label = { Text("Briefing") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
+                            if (perFeatureAiPrefs.smartPomodoroEnabled) {
+                                AssistChip(
+                                    onClick = { navController.navigate(PrismTaskRoute.SmartPomodoro.route) },
+                                    label = { Text("Focus") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
+                            if (perFeatureAiPrefs.weeklyPlannerEnabled) {
+                                AssistChip(
+                                    onClick = { navController.navigate(PrismTaskRoute.WeeklyPlanner.route) },
+                                    label = { Text("Plan Week") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
                             AssistChip(
                                 onClick = { navController.navigate(PrismTaskRoute.EisenhowerMatrix.route) },
                                 label = { Text("Matrix") },
@@ -533,7 +561,10 @@ fun TodayScreen(
                                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
                                 colors = chipColors,
-                                border = chipBorder
+                                border = chipBorder,
+                                modifier = Modifier.coachmarkAnchor(
+                                    com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.TODAY_AI_TOOLS_CHIP
+                                )
                             )
                         }
                     }

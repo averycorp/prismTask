@@ -25,7 +25,15 @@ fun AiSection(
     eisenhowerAutoClassifyEnabled: Boolean = true,
     onEisenhowerAutoClassifyChanged: (Boolean) -> Unit = {},
     aiFeaturesEnabled: Boolean = true,
-    onAiFeaturesEnabledChanged: (Boolean) -> Unit = {}
+    onAiFeaturesEnabledChanged: (Boolean) -> Unit = {},
+    aiChatFeatureEnabled: Boolean = true,
+    onAiChatFeatureEnabledChanged: (Boolean) -> Unit = {},
+    dailyBriefingFeatureEnabled: Boolean = true,
+    onDailyBriefingFeatureEnabledChanged: (Boolean) -> Unit = {},
+    smartPomodoroFeatureEnabled: Boolean = true,
+    onSmartPomodoroFeatureEnabledChanged: (Boolean) -> Unit = {},
+    weeklyPlannerFeatureEnabled: Boolean = true,
+    onWeeklyPlannerFeatureEnabledChanged: (Boolean) -> Unit = {}
 ) {
     SectionHeader("AI Features")
 
@@ -59,6 +67,34 @@ fun AiSection(
         subtitle = "Automatically assign an Eisenhower quadrant when you create a task. Manual moves are always preserved.",
         checked = eisenhowerAutoClassifyEnabled,
         onCheckedChange = onEisenhowerAutoClassifyChanged
+    )
+
+    // Per-feature AI opt-ins (F3 low-risk bundle). These hide the
+    // associated UI surface when off; the master toggle above is still
+    // the only switch that affects backend egress (PII privacy gate).
+    SettingsToggleRow(
+        title = "AI Coach Chat",
+        subtitle = "Conversational coaching with starter prompts and action chips.",
+        checked = aiChatFeatureEnabled,
+        onCheckedChange = onAiChatFeatureEnabledChanged
+    )
+    SettingsToggleRow(
+        title = "Daily Briefing",
+        subtitle = "Morning summary with top priorities and a suggested task order.",
+        checked = dailyBriefingFeatureEnabled,
+        onCheckedChange = onDailyBriefingFeatureEnabledChanged
+    )
+    SettingsToggleRow(
+        title = "Smart Focus Sessions",
+        subtitle = "AI-planned Pomodoro sessions tailored to your task list.",
+        checked = smartPomodoroFeatureEnabled,
+        onCheckedChange = onSmartPomodoroFeatureEnabledChanged
+    )
+    SettingsToggleRow(
+        title = "Weekly Planner",
+        subtitle = "AI-generated week plan distributing tasks across days.",
+        checked = weeklyPlannerFeatureEnabled,
+        onCheckedChange = onWeeklyPlannerFeatureEnabledChanged
     )
 
     SettingsRowWithSubtitle(

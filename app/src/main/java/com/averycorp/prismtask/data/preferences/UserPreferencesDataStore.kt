@@ -137,6 +137,26 @@ data class AiFeaturePrefs(
 )
 
 /**
+ * Per-feature AI opt-ins (F3 low-risk bundle).
+ *
+ * These are UI / local-action gates that layer on top of the master
+ * [AiFeaturePrefs.enabled] privacy switch. When the master is OFF the
+ * per-feature flags are functionally inert (the OkHttp interceptor +
+ * backend `require_ai_features_enabled` dependency reject everything
+ * anyway). When the master is ON, the user can hide individual surfaces
+ * — e.g. turn off Daily Briefing while keeping Smart Pomodoro and AI
+ * Chat working.
+ *
+ * All defaults are true so post-upgrade behaviour matches pre-upgrade.
+ */
+data class PerFeatureAiPrefs(
+    val chatEnabled: Boolean = true,
+    val dailyBriefingEnabled: Boolean = true,
+    val smartPomodoroEnabled: Boolean = true,
+    val weeklyPlannerEnabled: Boolean = true
+)
+
+/**
  * Global default for medication reminder mode (v1.6.0). Per-slot and
  * per-medication overrides on `MedicationSlotEntity` / `MedicationEntity`
  * win over this default when set; resolution lives in
@@ -222,6 +242,22 @@ class UserPreferencesDataStore(
 
         // Master AI-feature opt-out (PII egress audit, 2026-04-26)
         val KEY_AI_FEATURES_ENABLED = booleanPreferencesKey("ai_features_enabled")
+
+        // Per-feature AI opt-ins (F3 low-risk bundle).
+        //
+        // These layer on top of the master KEY_AI_FEATURES_ENABLED switch:
+        // turning the master OFF still gates everything via
+        // AiFeatureGateInterceptor + the backend require_ai_features_enabled
+        // dependency. The per-feature prefs only let the user hide a
+        // specific AI surface while keeping the master ON. They default to
+        // true so existing users see no behaviour change post-upgrade.
+        val KEY_AI_CHAT_ENABLED = booleanPreferencesKey("ai_chat_enabled")
+        val KEY_AI_DAILY_BRIEFING_ENABLED =
+            booleanPreferencesKey("ai_daily_briefing_enabled")
+        val KEY_AI_SMART_POMODORO_ENABLED =
+            booleanPreferencesKey("ai_smart_pomodoro_enabled")
+        val KEY_AI_WEEKLY_PLANNER_ENABLED =
+            booleanPreferencesKey("ai_weekly_planner_enabled")
 
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1, Phase 2 #2).
         // Set to true the first time the user dismisses the disclosure
@@ -398,6 +434,15 @@ class UserPreferencesDataStore(
         )
     }
 
+    val perFeatureAiPrefsFlow: Flow<PerFeatureAiPrefs> = dataStore.data.map { prefs ->
+        PerFeatureAiPrefs(
+            chatEnabled = prefs[KEY_AI_CHAT_ENABLED] ?: true,
+            dailyBriefingEnabled = prefs[KEY_AI_DAILY_BRIEFING_ENABLED] ?: true,
+            smartPomodoroEnabled = prefs[KEY_AI_SMART_POMODORO_ENABLED] ?: true,
+            weeklyPlannerEnabled = prefs[KEY_AI_WEEKLY_PLANNER_ENABLED] ?: true
+        )
+    }
+
     val medicationReminderModeFlow: Flow<MedicationReminderModePrefs> = dataStore.data.map { prefs ->
         MedicationReminderModePrefs(
             mode = MedicationReminderMode.fromName(prefs[KEY_MED_REMINDER_MODE_DEFAULT]),
@@ -513,6 +558,22 @@ class UserPreferencesDataStore(
 
     suspend fun setAiFeaturesEnabled(enabled: Boolean) {
         dataStore.edit { it[KEY_AI_FEATURES_ENABLED] = enabled }
+    }
+
+    suspend fun setAiChatEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_CHAT_ENABLED] = enabled }
+    }
+
+    suspend fun setAiDailyBriefingEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_DAILY_BRIEFING_ENABLED] = enabled }
+    }
+
+    suspend fun setAiSmartPomodoroEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_SMART_POMODORO_ENABLED] = enabled }
+    }
+
+    suspend fun setAiWeeklyPlannerEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_WEEKLY_PLANNER_ENABLED] = enabled }
     }
 
     /**

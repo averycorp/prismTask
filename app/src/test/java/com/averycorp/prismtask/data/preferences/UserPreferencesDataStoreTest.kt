@@ -262,4 +262,58 @@ class UserPreferencesDataStoreTest {
     }
 
     // endregion ----------------------------------------------------------
+
+    // region Per-feature AI opt-ins (F3 low-risk bundle) ----------------
+
+    @Test
+    fun `per-feature ai prefs all default to true`() = runTest {
+        val p = prefs.perFeatureAiPrefsFlow.first()
+        assertTrue(p.chatEnabled)
+        assertTrue(p.dailyBriefingEnabled)
+        assertTrue(p.smartPomodoroEnabled)
+        assertTrue(p.weeklyPlannerEnabled)
+    }
+
+    @Test
+    fun `set ai chat enabled false persists round trip`() = runTest {
+        prefs.setAiChatEnabled(false)
+        val p = prefs.perFeatureAiPrefsFlow.first()
+        assertFalse(p.chatEnabled)
+        // Other per-feature prefs unaffected.
+        assertTrue(p.dailyBriefingEnabled)
+        assertTrue(p.smartPomodoroEnabled)
+        assertTrue(p.weeklyPlannerEnabled)
+    }
+
+    @Test
+    fun `set daily briefing enabled false persists round trip`() = runTest {
+        prefs.setAiDailyBriefingEnabled(false)
+        assertFalse(prefs.perFeatureAiPrefsFlow.first().dailyBriefingEnabled)
+    }
+
+    @Test
+    fun `set smart pomodoro enabled false persists round trip`() = runTest {
+        prefs.setAiSmartPomodoroEnabled(false)
+        assertFalse(prefs.perFeatureAiPrefsFlow.first().smartPomodoroEnabled)
+    }
+
+    @Test
+    fun `set weekly planner enabled false persists round trip`() = runTest {
+        prefs.setAiWeeklyPlannerEnabled(false)
+        assertFalse(prefs.perFeatureAiPrefsFlow.first().weeklyPlannerEnabled)
+    }
+
+    @Test
+    fun `per-feature ai prefs are independent of master toggle`() = runTest {
+        // Master OFF, per-feature ON: master is the privacy gate, but the
+        // per-feature pref keeps its own state for the UI layer.
+        prefs.setAiFeaturesEnabled(false)
+        val p = prefs.perFeatureAiPrefsFlow.first()
+        assertTrue(p.chatEnabled)
+        assertTrue(p.dailyBriefingEnabled)
+        // Master toggle independent.
+        assertFalse(prefs.aiFeaturePrefsFlow.first().enabled)
+    }
+
+    // endregion ----------------------------------------------------------
 }

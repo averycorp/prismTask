@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.settings.SettingsGroup
 import com.averycorp.prismtask.ui.components.settings.SettingsNavRow
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
@@ -198,6 +199,9 @@ fun SettingsScreen(
                         subtitle = "Accent color, overrides, font size",
                         iconEmoji = "\uD83C\uDFA8",
                         iconBgColor = ColAppearance,
+                        modifier = Modifier.coachmarkAnchor(
+                            com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.SETTINGS_APPEARANCE_ENTRY
+                        ),
                         onClick = { navController.navigate("settings/appearance") }
                     )
                     SettingsNavRow(
