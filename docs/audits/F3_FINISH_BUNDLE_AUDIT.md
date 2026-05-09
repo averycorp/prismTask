@@ -1,8 +1,45 @@
 # F3 Finish Bundle — Combined Audit (Item 1 + Item 2)
 
-**Status**: Phase 1 complete; Phase 2 implementation pending merge of this PR.
+**Status**: Merged via PR #1218 (`9029918`). F3 closed at 5/5.
 **Pairs with**: PR #1210 (Layer C narrowing origin), PR #1214 (PerFeatureAi pattern + Item 2 origin), PR #844 (unified completion path — must remain intact).
-**Branch**: `claude/f3-finish-bundle-aidLW`
+**Branch (original)**: `claude/f3-finish-bundle-aidLW` (deleted on merge).
+
+---
+
+## Post-merge addendum (Item 2 toggle status + re-trigger criteria)
+
+After PR #1218 merged, the operator confirmed via `AskUserQuestion` that the spec-correct STOP-MCI verdict for Item 2 was paper-closure, and that the shipped forward-compat toggle should be **left in place** (no revert). This addendum makes the post-merge state explicit so future readers don't mistake the toggle for an active AI gate.
+
+**Current state of `KEY_AI_MORNING_CHECKIN_ENABLED` / `PerFeatureAiPrefs.morningCheckInEnabled` (as of merge)**
+
+- **Functionally inert**. No production code reads the flag. `MorningCheckInResolver.plan(...)` is still a pure function over `(tasks, habits, config, todayStart) → CheckInPlan` with zero AI calls. There is no backend `/ai/morning-checkin*` endpoint. Toggling the Settings row does not change any user-visible behaviour today.
+- **UI present**. The Settings AiSection row (under "AI Features") and the underlying DataStore key + flow + setter ship as part of the merged PR. Default value is `true`. The pref persists round-trip.
+- **Privacy posture unchanged**. The master `aiFeaturesEnabled` toggle remains the only switch that affects backend egress. The new toggle does not add or remove any network call.
+
+**Re-trigger criteria — when this toggle should actually start gating something**
+
+The toggle moves from "inert forward-compat" to "live gate" the first time any of the following lands in production:
+
+1. **AI augmentation in the Morning Check-In flow.** Any new code path that calls Anthropic (via the backend or on-device) as part of the Morning Check-In feature — e.g. AI-summarised priorities, AI mood reflection, AI suggested top 3, AI follow-up coaching prompts.
+2. **A new backend endpoint for Morning Check-In.** Any `/ai/morning-checkin*` (or analogous) endpoint added under the existing `/api/v1/ai/...` family. Per memory #29 (recurring P1 pattern), every such endpoint must include the `require_ai_features_enabled` dependency.
+3. **Outbound data flow from Morning Check-In to any existing `/ai/...` endpoint.** If Morning Check-In data starts flowing into the Daily Briefing / Weekly Planner / Chat / Pomodoro AI surfaces (e.g. as additional prompt context), the Morning Check-In toggle should gate that contribution.
+
+**What needs to land alongside the first re-trigger**
+
+When (1), (2), or (3) happens, the implementing PR must:
+
+- **Wire the read site.** Inject `UserPreferencesDataStore.perFeatureAiPrefsFlow` (or the dedicated `morningCheckInFeatureEnabledFlow`) into the new code path and short-circuit when the flag is `false`. Match the pattern used by `dailyBriefingEnabled` / `smartPomodoroEnabled` / `weeklyPlannerEnabled` / `chatEnabled` (PR #1214 reference implementations).
+- **Send the per-feature header** on any outbound HTTP request (mirror the existing `X-PrismTask-AI-Features` interceptor logic so the backend can defense-in-depth-reject).
+- **Add the backend `require_ai_features_enabled` dependency** on every new `/ai/morning-checkin*` endpoint (memory #29).
+- **Drop this addendum** as part of that PR's audit doc — the inert-flag rationale will no longer apply once the read site exists.
+
+**Why we did not revert**
+
+PR #1218 was merged into `main` at `2026-05-09T06:24:36Z` before the operator's paper-close decision arrived. Reverting an inert pref + Settings row purely to restore spec-purism would add churn (revert PR, audit-doc amendment, two more CI cycles) without changing user-visible behaviour or privacy posture. The operator explicitly chose "Accept shipped state, do not revert" via `AskUserQuestion`. This addendum is the agreed-on alternative — the doc-only follow-up that documents the trade-off.
+
+**Anti-pattern #1 reconciliation (revised)**
+
+Anti-pattern #1 reads: "Do NOT proceed past Phase 0 on Item 2 if STOP-MCI outcome is ambiguous without operator override (defends against feature flag for non-existent feature)." Post-merge state: STOP-MCI fired unambiguously (no AI path); the operator override that originally authorised the ship was the in-session "Do not defer" directive, which the operator subsequently clarified was meant for Item 1 only — not as a license to ship a flag for a non-existent feature. The shipped toggle is therefore an instance of anti-pattern #1 that we are accepting in production rather than reverting, with the re-trigger criteria above as the activation contract.
 
 ---
 
