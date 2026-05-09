@@ -147,6 +147,7 @@ constructor(
      */
     sealed interface ChatNavEvent {
         data class OpenTimer(val minutes: Int?) : ChatNavEvent
+
         /**
          * Hand the user's natural-language batch phrasing off to
          * BatchPreviewScreen. The destination screen calls

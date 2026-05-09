@@ -1,6 +1,7 @@
 package com.averycorp.prismtask.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -61,7 +62,7 @@ class ProductivityWidget : GlanceAppWidget() {
         provideContent {
             val size = LocalSize.current
             if (data != null) {
-                ProductivityContent(data, size, palette, thresholds)
+                ProductivityContent(context, data, size, palette, thresholds)
             } else {
                 WidgetLoadingState(palette)
             }
@@ -71,6 +72,7 @@ class ProductivityWidget : GlanceAppWidget() {
 
 @Composable
 private fun ProductivityContent(
+    context: Context,
     data: ProductivityWidgetData,
     size: DpSize,
     palette: WidgetThemePalette,
@@ -98,6 +100,9 @@ private fun ProductivityContent(
         else -> "– no change"
     }
     val yesterdayScore = (data.score - data.trendPoints).coerceIn(0, 100)
+    val openApp = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    }
 
     Column(
         modifier = GlanceModifier
@@ -105,7 +110,7 @@ private fun ProductivityContent(
             .cornerRadius(palette.widgetCornerRadius)
             .background(palette.surfaceBackground)
             .padding(12.dp)
-            .clickable(actionStartActivity<MainActivity>()),
+            .clickable(actionStartActivity(openApp)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
