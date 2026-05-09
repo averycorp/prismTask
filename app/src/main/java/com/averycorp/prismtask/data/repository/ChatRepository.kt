@@ -90,9 +90,13 @@ constructor(
 
     /**
      * Sends a message to the AI chat backend. The backend persists both
-     * turns inside the handler; on success we mirror into Room so the UI
-     * Flow updates immediately. Failures during local mirroring are
-     * non-fatal — the next `pullHistory()` call reconciles.
+     * turns inside the handler and returns the server-assigned PKs on the
+     * response; we mirror into Room using THOSE PKs so a subsequent
+     * `pullHistory()`'s REPLACE-on-PK upsert is idempotent (D12 Gate (b)).
+     *
+     * Older backends / persistence-failure responses may omit the IDs,
+     * in which case we fall back to fresh client-side UUIDs — the row
+     * still renders correctly, it just won't dedup on the next pull.
      */
     suspend fun sendMessage(
         userMessage: String,
@@ -111,17 +115,6 @@ constructor(
             ChatHistoryEntry(role = it.role, content = it.content)
         }
 
-        val now = System.currentTimeMillis()
-        val userRow = ChatMessageEntity(
-            id = UUID.randomUUID().toString(),
-            conversationId = convId,
-            role = "user",
-            content = userMessage,
-            taskContextJson = taskContext?.let { gson.toJson(it) },
-            createdAt = now
-        )
-        chatMessageDao.upsert(userRow)
-
         val response = api.aiChat(
             ChatRequest(
                 message = userMessage,
@@ -132,8 +125,19 @@ constructor(
             )
         )
 
+        // D12 Gate (b): use server-assigned PKs when present so REPLACE-on-PK
+        // collapses cleanly when pullHistory later re-fetches the same rows.
+        val now = System.currentTimeMillis()
+        val userRow = ChatMessageEntity(
+            id = response.userMessageId ?: UUID.randomUUID().toString(),
+            conversationId = convId,
+            role = "user",
+            content = userMessage,
+            taskContextJson = taskContext?.let { gson.toJson(it) },
+            createdAt = now
+        )
         val assistantRow = ChatMessageEntity(
-            id = UUID.randomUUID().toString(),
+            id = response.assistantMessageId ?: UUID.randomUUID().toString(),
             conversationId = convId,
             role = "assistant",
             content = response.message,
@@ -141,17 +145,22 @@ constructor(
                 ?.let { gson.toJson(it) },
             tokensInput = response.tokensUsed?.input,
             tokensOutput = response.tokensUsed?.output,
-            createdAt = System.currentTimeMillis()
+            // +1ms so chronological retrieval orders user-then-assistant
+            // even if wall-clock collapses.
+            createdAt = now + 1
         )
-        chatMessageDao.upsert(assistantRow)
+        chatMessageDao.upsertAll(listOf(userRow, assistantRow))
 
         return response
     }
 
     /**
-     * F7 D.1 streaming variant. Appends the user's turn locally so the
-     * bubble renders immediately, then returns a [Flow] of [ChatStreamEvent]s
-     * consumed by [com.averycorp.prismtask.ui.screens.chat.ChatViewModel].
+     * F7 D.1 streaming variant. The user-visible bubble renders from
+     * `ChatViewModel`'s `_turnState.partialText` while the stream is
+     * in flight; we therefore do NOT optimistically write the user row
+     * to Room here (D12 Gate (b)) — the row is committed alongside the
+     * assistant row at [commitAssistantTurn] using server-assigned IDs
+     * from the SSE done event.
      */
     fun streamMessage(
         userMessage: String,
@@ -167,19 +176,6 @@ constructor(
                 .map { ChatHistoryEntry(role = it.role, content = it.content) }
         }
 
-        runBlocking {
-            chatMessageDao.upsert(
-                ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
-                    conversationId = convId,
-                    role = "user",
-                    content = userMessage,
-                    taskContextJson = taskContext?.let { gson.toJson(it) },
-                    createdAt = System.currentTimeMillis()
-                )
-            )
-        }
-
         return streamClient.stream(
             ChatRequest(
                 message = userMessage,
@@ -192,26 +188,43 @@ constructor(
     }
 
     /**
-     * Append the assistant's turn once a streaming turn resolves
-     * (Done or user-cancel commit-as-partial).
+     * Append BOTH turns (user + assistant) once a streaming turn resolves
+     * (Done or user-cancel commit-as-partial). [userText] is the original
+     * message the user sent, captured by ChatViewModel before the stream
+     * started. When the SSE done event carried server-assigned PKs they
+     * are used as Room PKs so pullHistory()'s REPLACE-on-PK collapses
+     * cleanly; on cancel (or older backend) we fall back to fresh UUIDs.
      */
     fun commitAssistantTurn(
+        userText: String,
         text: String,
-        actions: List<ChatActionResponse>
+        actions: List<ChatActionResponse>,
+        userMessageId: String? = null,
+        assistantMessageId: String? = null,
+        userTaskContext: ChatTaskContext? = null
     ) {
         val convId = _conversationId.value
+        val now = System.currentTimeMillis()
+        val userRow = ChatMessageEntity(
+            id = userMessageId ?: UUID.randomUUID().toString(),
+            conversationId = convId,
+            role = "user",
+            content = userText,
+            taskContextJson = userTaskContext?.let { gson.toJson(it) },
+            createdAt = now
+        )
+        val assistantRow = ChatMessageEntity(
+            id = assistantMessageId ?: UUID.randomUUID().toString(),
+            conversationId = convId,
+            role = "assistant",
+            content = text,
+            actionsJson = actions.takeIf { it.isNotEmpty() }
+                ?.let { gson.toJson(it) },
+            // +1ms so chronological retrieval orders user-then-assistant.
+            createdAt = now + 1
+        )
         runBlocking {
-            chatMessageDao.upsert(
-                ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
-                    conversationId = convId,
-                    role = "assistant",
-                    content = text,
-                    actionsJson = actions.takeIf { it.isNotEmpty() }
-                        ?.let { gson.toJson(it) },
-                    createdAt = System.currentTimeMillis()
-                )
-            )
+            chatMessageDao.upsertAll(listOf(userRow, assistantRow))
         }
     }
 

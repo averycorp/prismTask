@@ -975,10 +975,17 @@ async def chat(
     # land here so cross-device GET /chat/history returns a consistent view.
     # Failures are logged but never bubble up to the user — the AI response
     # already returned successfully and the next history pull will reconcile.
+    # D12 Gate (b): pre-allocate IDs so the response can carry them back to
+    # the Android client, which uses them as local Room PKs. Defaulted to
+    # None so a persistence failure surfaces a usable response without IDs.
+    user_msg_id: str | None = None
+    assistant_msg_id: str | None = None
     try:
         now = datetime.now(timezone.utc)
+        user_msg_id = uuid.uuid4().hex
+        assistant_msg_id = uuid.uuid4().hex
         user_row = ChatMessageModel(
-            id=uuid.uuid4().hex,
+            id=user_msg_id,
             user_id=current_user.id,
             conversation_id=data.conversation_id,
             role="user",
@@ -991,7 +998,7 @@ async def chat(
             created_at=now,
         )
         assistant_row = ChatMessageModel(
-            id=uuid.uuid4().hex,
+            id=assistant_msg_id,
             user_id=current_user.id,
             conversation_id=data.conversation_id,
             role="assistant",
@@ -1013,12 +1020,16 @@ async def chat(
             data.conversation_id,
         )
         await db.rollback()
+        user_msg_id = None
+        assistant_msg_id = None
 
     return ChatResponse(
         message=result["message"],
         actions=validated_actions,
         conversation_id=data.conversation_id,
         tokens_used=tokens_used,
+        user_message_id=user_msg_id,
+        assistant_message_id=assistant_msg_id,
     )
 
 
@@ -1063,7 +1074,17 @@ async def chat_stream(
     tier = await resolve_effective_tier(current_user, db)
     daily_ai_rate_limiter.check(current_user.id, tier)
 
-    def event_generator():
+    # D12 Gate (a): pre-allocate the IDs we'll use for the persisted rows
+    # so we can surface them in the SSE done payload without a second
+    # round-trip. Mirrors the single-shot /chat handler's persistence
+    # shape at ai.py:974-1015 — both endpoints now write user+assistant
+    # rows to chat_messages so cross-device GET /chat/history is
+    # consistent regardless of which endpoint produced the turn.
+    user_msg_id = uuid.uuid4().hex
+    assistant_msg_id = uuid.uuid4().hex
+
+    async def event_generator():
+        persisted = False
         try:
             from app.services.ai_productivity import generate_chat_response_stream
 
@@ -1100,6 +1121,61 @@ async def chat_stream(
                             )
                     event["actions"] = validated
                     event["conversation_id"] = data.conversation_id
+
+                    # D12 Gate (a): persist BOTH turns to chat_messages on
+                    # done — mirror the single-shot handler. Failures are
+                    # logged but do not bubble up to the user; the next
+                    # GET /chat/history reconciles. `persisted` guards
+                    # against a theoretical duplicate done event from the
+                    # service layer.
+                    if not persisted:
+                        try:
+                            now = datetime.now(timezone.utc)
+                            tokens = event.get("tokens_used") or {}
+                            db.add(ChatMessageModel(
+                                id=user_msg_id,
+                                user_id=current_user.id,
+                                conversation_id=data.conversation_id,
+                                role="user",
+                                content=data.message,
+                                task_context_snapshot=(
+                                    data.task_context.model_dump(exclude_none=True)
+                                    if data.task_context is not None
+                                    else None
+                                ),
+                                created_at=now,
+                            ))
+                            db.add(ChatMessageModel(
+                                id=assistant_msg_id,
+                                user_id=current_user.id,
+                                conversation_id=data.conversation_id,
+                                role="assistant",
+                                content=event.get("message", ""),
+                                actions=validated or None,
+                                tokens_input=int(tokens.get("input", 0) or 0),
+                                tokens_output=int(tokens.get("output", 0) or 0),
+                                # +1µs so chronological retrieval orders
+                                # user-then-assistant even when wall-clock
+                                # collapses to identical timestamps.
+                                created_at=now + timedelta(microseconds=1),
+                            ))
+                            await db.commit()
+                            persisted = True
+                        except Exception:
+                            logger.exception(
+                                "Failed to persist streaming chat turn for"
+                                " user_id=%s conversation_id=%s",
+                                current_user.id,
+                                data.conversation_id,
+                            )
+                            await db.rollback()
+
+                    # D12 Gate (b): surface the persisted IDs in the done
+                    # payload so the Android client can use them for the
+                    # local Room write — keeping client and server PKs in
+                    # lockstep so pullHistory() upserts are idempotent.
+                    event["user_message_id"] = user_msg_id
+                    event["assistant_message_id"] = assistant_msg_id
                 yield _format_sse_event(event)
         except RuntimeError:
             yield _format_sse_event({

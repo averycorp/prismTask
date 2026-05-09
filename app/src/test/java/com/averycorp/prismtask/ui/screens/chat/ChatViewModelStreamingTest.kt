@@ -161,8 +161,12 @@ class ChatViewModelStreamingTest {
         val actionsSlot = slot<List<ChatActionResponse>>()
         verify {
             chatRepository.commitAssistantTurn(
+                userText = any(),
                 text = capture(textSlot),
-                actions = capture(actionsSlot)
+                actions = capture(actionsSlot),
+                userMessageId = any(),
+                assistantMessageId = any(),
+                userTaskContext = any()
             )
         }
         assertEquals("All done", textSlot.captured)
@@ -195,7 +199,14 @@ class ChatViewModelStreamingTest {
         )
         assertEquals(ChatViewModel.ChatTurnState.Idle, viewModel.turnState.value)
         verify(exactly = 0) {
-            chatRepository.commitAssistantTurn(any(), any())
+            chatRepository.commitAssistantTurn(
+                userText = any(),
+                text = any(),
+                actions = any(),
+                userMessageId = any(),
+                assistantMessageId = any(),
+                userTaskContext = any()
+            )
         }
     }
 
@@ -224,8 +235,12 @@ class ChatViewModelStreamingTest {
         val actionsSlot = slot<List<ChatActionResponse>>()
         verify {
             chatRepository.commitAssistantTurn(
+                userText = any(),
                 text = capture(textSlot),
-                actions = capture(actionsSlot)
+                actions = capture(actionsSlot),
+                userMessageId = any(),
+                assistantMessageId = any(),
+                userTaskContext = any()
             )
         }
         assertEquals("Here is your plan (cancelled)", textSlot.captured)
@@ -242,7 +257,14 @@ class ChatViewModelStreamingTest {
 
         assertEquals(ChatViewModel.ChatTurnState.Idle, viewModel.turnState.value)
         verify(exactly = 0) {
-            chatRepository.commitAssistantTurn(any(), any())
+            chatRepository.commitAssistantTurn(
+                userText = any(),
+                text = any(),
+                actions = any(),
+                userMessageId = any(),
+                assistantMessageId = any(),
+                userTaskContext = any()
+            )
         }
     }
 
@@ -265,8 +287,12 @@ class ChatViewModelStreamingTest {
         val textSlot = slot<String>()
         verify {
             chatRepository.commitAssistantTurn(
+                userText = any(),
                 text = capture(textSlot),
-                actions = any()
+                actions = any(),
+                userMessageId = any(),
+                assistantMessageId = any(),
+                userTaskContext = any()
             )
         }
         assertEquals("(cancelled)", textSlot.captured)
