@@ -35,16 +35,44 @@ def mock_anthropic_module():
     importlib.reload(app.services.ai_productivity)
 
 
-def _fake_stream_context(deltas: list[str], input_tokens: int = 30, output_tokens: int = 12):
+def _fake_stream_context(
+    deltas: list[str],
+    actions: list[dict] | None = None,
+    final_text_override: str | None = None,
+    final_content_override: object | None = None,
+    input_tokens: int = 30,
+    output_tokens: int = 12,
+):
     """Build a fake ``client.messages.stream(...)`` context manager.
 
-    Mirrors the Anthropic SDK 0.42 surface area the streaming chat
-    handler uses: ``with client.messages.stream(...) as stream`` exposes
-    a ``text_stream`` iterator over text deltas plus a
-    ``get_final_message()`` method returning a Message-like object with
-    a ``usage`` field.
+    D12 Item A (B.1): ``stream.text_stream`` yields user-visible reply
+    text directly (no JSON envelope), and ``stream.get_final_message()``
+    returns a Message with structured ``content`` blocks (text +
+    tool_use). Tests pass the raw text deltas they want emitted plus an
+    optional list of action dicts that become tool_use blocks on the
+    final Message.
     """
     final_message = MagicMock()
+    if final_content_override is not None:
+        final_message.content = final_content_override
+    else:
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = (
+            final_text_override
+            if final_text_override is not None
+            else "".join(deltas)
+        )
+        blocks: list[MagicMock] = [text_block]
+        for action in (actions or []):
+            tool_block = MagicMock()
+            tool_block.type = "tool_use"
+            tool_block.name = action["type"]
+            tool_block.input = {
+                k: v for k, v in action.items() if k != "type"
+            }
+            blocks.append(tool_block)
+        final_message.content = blocks
     final_message.usage = MagicMock()
     final_message.usage.input_tokens = input_tokens
     final_message.usage.output_tokens = output_tokens
@@ -60,107 +88,17 @@ def _fake_stream_context(deltas: list[str], input_tokens: int = 30, output_token
 
 
 # ---------------------------------------------------------------------------
-# _extract_partial_message_field — partial JSON scanner
-# ---------------------------------------------------------------------------
-
-class TestExtractPartialMessageField:
-    def test_returns_none_when_message_key_not_yet_seen(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert _extract_partial_message_field("") is None
-        assert _extract_partial_message_field("{") is None
-        assert _extract_partial_message_field('{"actions": []}') is None
-        assert _extract_partial_message_field('{"message"') is None
-        assert _extract_partial_message_field('{"message":') is None
-
-    def test_extracts_partial_value_before_closing_quote(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert _extract_partial_message_field('{"message": "Hello world') == "Hello world"
-        assert _extract_partial_message_field('{"message": "') == ""
-
-    def test_extracts_value_at_closing_quote(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert _extract_partial_message_field('{"message": "Hello"') == "Hello"
-        assert (
-            _extract_partial_message_field('{"message": "Hello", "actions": []}')
-            == "Hello"
-        )
-
-    def test_handles_escaped_quote_inside_value(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert (
-            _extract_partial_message_field('{"message": "with \\"quote\\" inside')
-            == 'with "quote" inside'
-        )
-
-    def test_handles_other_basic_escapes(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert (
-            _extract_partial_message_field('{"message": "line1\\nline2')
-            == "line1\nline2"
-        )
-        assert (
-            _extract_partial_message_field('{"message": "tab\\there')
-            == "tab\there"
-        )
-        assert (
-            _extract_partial_message_field('{"message": "back\\\\slash')
-            == "back\\slash"
-        )
-
-    def test_drops_trailing_partial_backslash(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        # Stream cuts mid-escape — drop the trailing backslash so we
-        # don't emit it raw; it'll resolve next delta.
-        assert _extract_partial_message_field('{"message": "trail\\') == "trail"
-
-    def test_decodes_complete_unicode_escape(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert (
-            _extract_partial_message_field('{"message": "smile\\u263a"')
-            == "smile☺"
-        )
-
-    def test_drops_partial_unicode_escape(self):
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        # Three hex digits collected so far — drop the partial \u sequence.
-        assert _extract_partial_message_field('{"message": "smile\\u26') == "smile"
-
-    def test_value_with_embedded_brace(self):
-        """Chat replies sometimes mention JSON-shaped text. The scanner
-        must ignore unquoted ``}`` inside the value — only the closing
-        quote terminates the scan."""
-        from app.services.ai_productivity import _extract_partial_message_field
-
-        assert (
-            _extract_partial_message_field('{"message": "use {key: value}"')
-            == "use {key: value}"
-        )
-
-
-# ---------------------------------------------------------------------------
 # generate_chat_response_stream — service-layer streaming
 # ---------------------------------------------------------------------------
 
 class TestChatStreamService:
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
     def test_emits_token_events_in_order(self):
+        """D12 Item A: text_stream yields user-visible reply directly,
+        so every non-empty delta becomes a token event verbatim."""
         from app.services.ai_productivity import generate_chat_response_stream
 
-        # Split a complete JSON envelope across three deltas. The scanner
-        # should reconstruct the message field token-by-token.
-        deltas = [
-            '{"message": "Hello',
-            ' there',
-            '", "actions": []}',
-        ]
+        deltas = ["Hello", " there"]
         with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
             mock_client = MagicMock()
             mock_anthropic.Anthropic.return_value = mock_client
@@ -174,7 +112,6 @@ class TestChatStreamService:
             )
 
         token_events = [e for e in events if e["type"] == "token"]
-        # Each delta that grew the message field emits a token.
         assert len(token_events) == 2
         assert token_events[0]["text"] == "Hello"
         assert token_events[1]["text"] == " there"
@@ -183,15 +120,15 @@ class TestChatStreamService:
     def test_emits_done_with_validated_actions(self):
         from app.services.ai_productivity import generate_chat_response_stream
 
-        deltas = [
-            '{"message": "ok"',
-            ', "actions": [{"type": "start_timer", "minutes": 25}]}',
-        ]
+        deltas = ["ok"]
         with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
             mock_client = MagicMock()
             mock_anthropic.Anthropic.return_value = mock_client
             mock_client.messages.stream = _fake_stream_context(
-                deltas, input_tokens=11, output_tokens=7
+                deltas,
+                actions=[{"type": "start_timer", "minutes": 25}],
+                input_tokens=11,
+                output_tokens=7,
             )
 
             events = list(
@@ -237,15 +174,20 @@ class TestChatStreamService:
         assert events[0]["message"] == "AI service temporarily unavailable"
 
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
-    def test_emits_error_on_malformed_final_json(self):
+    def test_emits_error_on_structurally_broken_final_message(self):
+        """D12 Item A: with tool_use the JSON-envelope failure mode is
+        gone, but a structurally broken Anthropic response (content not
+        a list at all) still fails extraction and surfaces a parse_error
+        event so the client can prompt re-send."""
         from app.services.ai_productivity import generate_chat_response_stream
 
-        # Stream completes with no parseable JSON at all.
-        deltas = ["this is not JSON at all"]
         with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
             mock_client = MagicMock()
             mock_anthropic.Anthropic.return_value = mock_client
-            mock_client.messages.stream = _fake_stream_context(deltas)
+            mock_client.messages.stream = _fake_stream_context(
+                deltas=["partial"],
+                final_content_override="not a list",
+            )
 
             events = list(
                 generate_chat_response_stream(
@@ -254,10 +196,11 @@ class TestChatStreamService:
                 )
             )
 
-        # No tokens (no "message": opener), then a parse error.
         token_events = [e for e in events if e["type"] == "token"]
         error_events = [e for e in events if e["type"] == "error"]
-        assert len(token_events) == 0
+        # A token may or may not have been emitted before the broken
+        # final shape was observed — the contract is about the error.
+        assert len(token_events) == 1
         assert len(error_events) == 1
         assert error_events[0]["code"] == "parse_error"
 
@@ -268,7 +211,7 @@ class TestChatStreamService:
         # Some Anthropic stream events fire empty text deltas (e.g.
         # content_block_start). The handler must skip these without
         # generating spurious empty token events.
-        deltas = ["", '{"message": "ok", "actions": []}', ""]
+        deltas = ["", "ok", ""]
         with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
             mock_client = MagicMock()
             mock_anthropic.Anthropic.return_value = mock_client

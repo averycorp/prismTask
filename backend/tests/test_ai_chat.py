@@ -14,10 +14,31 @@ from httpx import AsyncClient
 
 
 def _make_mock_response(data, input_tokens: int = 42, output_tokens: int = 17) -> MagicMock:
-    content_block = MagicMock()
-    content_block.text = json.dumps(data)
+    """Build a structured Anthropic Message with text + tool_use blocks.
+
+    D12 Item A (B.1): the chat protocol now uses native tool_use blocks
+    instead of a JSON-in-text envelope, so existing test data (shaped as
+    ``{"message": "...", "actions": [...]}``) is converted to the new
+    block shape here. Test bodies stay untouched.
+    """
+    blocks: list[MagicMock] = []
+    if isinstance(data, dict):
+        reply_text = data.get("message")
+        if isinstance(reply_text, str):
+            text_block = MagicMock()
+            text_block.type = "text"
+            text_block.text = reply_text
+            blocks.append(text_block)
+        for action in (data.get("actions") or []):
+            if not isinstance(action, dict) or "type" not in action:
+                continue
+            tool_block = MagicMock()
+            tool_block.type = "tool_use"
+            tool_block.name = action["type"]
+            tool_block.input = {k: v for k, v in action.items() if k != "type"}
+            blocks.append(tool_block)
     message = MagicMock()
-    message.content = [content_block]
+    message.content = blocks
     usage = MagicMock()
     usage.input_tokens = input_tokens
     usage.output_tokens = output_tokens
@@ -87,7 +108,11 @@ class TestChatService:
             assert result["actions"] == []
 
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
-    def test_retries_then_succeeds_on_malformed_first_response(self):
+    def test_retries_then_succeeds_on_malformed_response(self):
+        """D12 Item A: the legacy 'malformed JSON in text block' failure
+        mode is gone (no JSON envelope to parse), but a structurally
+        broken Anthropic response (no content list at all) still
+        triggers the one-shot retry."""
         from app.services.ai_productivity import generate_chat_response
 
         with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
@@ -95,9 +120,7 @@ class TestChatService:
             mock_anthropic.Anthropic.return_value = mock_client
 
             bad_response = MagicMock()
-            bad_content = MagicMock()
-            bad_content.text = "not valid json"
-            bad_response.content = [bad_content]
+            bad_response.content = "not a list"  # forces ValueError
             bad_response.usage = MagicMock(input_tokens=0, output_tokens=0)
 
             good_response = _make_mock_response(
@@ -113,21 +136,49 @@ class TestChatService:
             assert mock_client.messages.create.call_count == 2
 
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
-    def test_raises_value_error_on_missing_message_field(self):
+    def test_synthesizes_done_when_only_tool_use_blocks_returned(self):
+        """D12 Item A: tool_use-only responses (no accompanying text
+        block) get a synthesized minimal reply so the chat bubble isn't
+        empty. Replaces the old missing-message-field failure mode."""
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            # No "message" key — only an action.
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"actions": [{"type": "start_timer", "minutes": 25}]}
+            )
+
+            result = generate_chat_response(
+                message="start a timer",
+                conversation_id="chat_x",
+            )
+            assert result["message"] == "Done."
+            assert result["actions"] == [{"type": "start_timer", "minutes": 25}]
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_passes_tools_parameter_with_all_action_types(self):
+        """D12 Item A: every supported action type is wired as an
+        Anthropic tool definition. The migration's correctness depends
+        on this list being complete and aligned with
+        ``_CHAT_ACTION_TYPE_PATTERN`` in schemas/ai.py."""
         from app.services.ai_productivity import generate_chat_response
 
         with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
             mock_client = MagicMock()
             mock_anthropic.Anthropic.return_value = mock_client
             mock_client.messages.create.return_value = _make_mock_response(
-                {"actions": []}  # missing "message"
+                {"message": "ok", "actions": []}
             )
 
-            with pytest.raises(ValueError):
-                generate_chat_response(
-                    message="anything",
-                    conversation_id="chat_x",
-                )
+            generate_chat_response(message="hi", conversation_id="chat_x")
+            tools = mock_client.messages.create.call_args.kwargs["tools"]
+            tool_names = {t["name"] for t in tools}
+            assert tool_names == {
+                "complete", "reschedule", "reschedule_batch", "breakdown",
+                "archive", "start_timer", "create_task", "batch_command",
+            }
 
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
     def test_passes_task_context_id_to_prompt(self):

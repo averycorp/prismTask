@@ -20,7 +20,15 @@ sealed interface ChatStreamEvent {
     data class Done(
         val message: String,
         val actions: List<ChatActionResponse>,
-        val tokensUsed: ChatTokensUsed?
+        val tokensUsed: ChatTokensUsed?,
+        // D12 Gate (b): server-assigned PKs of the rows just persisted by
+        // `/chat/stream`'s done-event handler (D12 Gate (a)). The
+        // repository uses these as the local Room PKs so pullHistory()'s
+        // REPLACE-on-PK upsert collapses cleanly. Nullable for resilience
+        // against older backends or persistence-failure paths; the
+        // repository falls back to fresh client-side UUIDs in that case.
+        val userMessageId: String? = null,
+        val assistantMessageId: String? = null
     ) : ChatStreamEvent
 
     data class Error(

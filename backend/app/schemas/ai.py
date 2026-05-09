@@ -622,6 +622,14 @@ class ChatResponse(BaseModel):
     actions: list[ChatActionPayload] = Field(default_factory=list)
     conversation_id: str
     tokens_used: Optional[ChatTokensUsed] = None
+    # D12 Gate (b): server-assigned IDs of the rows just persisted to
+    # chat_messages. Optional because legacy mocks in unit tests don't
+    # round-trip them; the Android client falls back to fresh UUIDs in
+    # that case (see ChatRepository.kt). When present, the client uses
+    # these as the local Room PKs so a subsequent pullHistory()'s
+    # REPLACE-on-PK upsert collapses cleanly to one row per turn.
+    user_message_id: Optional[str] = None
+    assistant_message_id: Optional[str] = None
 
 
 class ChatMessageRecord(BaseModel):

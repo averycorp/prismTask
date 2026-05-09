@@ -74,7 +74,12 @@ constructor(
         data object Idle : ChatTurnState
         data class Streaming(
             val partialText: String,
-            val startedAt: Long
+            val startedAt: Long,
+            // D12 Gate (b): captured so [cancelInFlight] can persist the
+            // user turn alongside the partial assistant turn even when
+            // the SSE done event never fires (cooperative cancel path).
+            val userText: String = "",
+            val userTaskContext: ChatTaskContext? = null
         ) : ChatTurnState
     }
 
@@ -235,13 +240,20 @@ constructor(
         // _isTyping flip from #1182.
         _turnState.value = ChatTurnState.Streaming(
             partialText = "",
-            startedAt = System.currentTimeMillis()
+            startedAt = System.currentTimeMillis(),
+            userText = text
         )
         _isTyping.value = true
         _error.value = null
 
         val contextSnapshotJob = viewModelScope.launch {
             val snapshot = buildTaskContextSnapshot(_contextTask.value)
+            // D12 Gate (b): record the snapshot on turnState so
+            // cancelInFlight can persist the user row with the same
+            // task-context the backend received.
+            (_turnState.value as? ChatTurnState.Streaming)?.let {
+                _turnState.value = it.copy(userTaskContext = snapshot)
+            }
             startStreamingTurn(text, snapshot)
         }
         // Track the snapshot-build job too so cancelInFlight works
@@ -270,8 +282,12 @@ constructor(
                     is ChatStreamEvent.Done -> {
                         sawDoneOrError = true
                         chatRepository.commitAssistantTurn(
+                            userText = text,
                             text = event.message,
-                            actions = event.actions
+                            actions = event.actions,
+                            userMessageId = event.userMessageId,
+                            assistantMessageId = event.assistantMessageId,
+                            userTaskContext = snapshot
                         )
                         finishTurn()
                     }
@@ -315,6 +331,8 @@ constructor(
         // partial text — _turnState is mutated on the same dispatcher
         // but the job cancel propagates asynchronously.
         val partial = current.partialText
+        val userText = current.userText
+        val userTaskContext = current.userTaskContext
         job?.cancel()
 
         val committed = if (partial.isBlank()) {
@@ -322,9 +340,15 @@ constructor(
         } else {
             "$partial (cancelled)"
         }
+        // D12 Gate (b): no server IDs available on cancel (done never
+        // fired), so commitAssistantTurn falls back to fresh client UUIDs.
+        // The cancelled turn is not server-persisted; pullHistory won't
+        // double-render it because no server row exists for it.
         chatRepository.commitAssistantTurn(
+            userText = userText,
             text = committed,
-            actions = emptyList()
+            actions = emptyList(),
+            userTaskContext = userTaskContext
         )
         finishTurn()
     }

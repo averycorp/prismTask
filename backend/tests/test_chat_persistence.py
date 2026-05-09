@@ -309,3 +309,171 @@ class TestChatHistoryEndpoint:
             headers=pro_auth_headers,
         )
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# D12 Gate (a) — streaming endpoint server-side persistence
+# D12 Gate (b) — server-assigned IDs surfaced to the client
+# ---------------------------------------------------------------------------
+
+
+class TestChatStreamPersistence:
+    """D12 Gate (a): the streaming endpoint must persist BOTH turns to
+    chat_messages on the done event, mirroring the single-shot endpoint.
+    Pre-fix, /chat/stream wrote nothing server-side; cross-device sync
+    via GET /chat/history returned an empty conversation despite a
+    populated local Room. Gate (b) additionally pins that the SSE done
+    payload carries the persisted IDs so the client can use them as
+    local Room PKs (idempotent REPLACE-on-PK on subsequent pulls)."""
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_persists_both_turns_on_done(
+        self, client: AsyncClient, pro_auth_headers: dict, _clear_rate_limiter
+    ):
+        def _fake_stream(**_kwargs):
+            yield {"type": "token", "text": "Got it"}
+            yield {
+                "type": "done",
+                "message": "Got it",
+                "actions": [{"type": "start_timer", "minutes": 25}],
+                "tokens_used": {"input": 9, "output": 4},
+            }
+
+        with patch(
+            "app.services.ai_productivity.generate_chat_response_stream",
+            side_effect=_fake_stream,
+        ):
+            resp = await client.post(
+                "/api/v1/ai/chat/stream",
+                json={
+                    "message": "start a timer",
+                    "conversation_id": "chat_2026-05-09_stream_a",
+                },
+                headers=pro_auth_headers,
+            )
+        assert resp.status_code == 200, resp.text
+
+        rows = await _list_chat_rows("chat_2026-05-09_stream_a")
+        assert len(rows) == 2
+        user_row, assistant_row = rows
+        assert user_row.role == "user"
+        assert user_row.content == "start a timer"
+        assert assistant_row.role == "assistant"
+        assert assistant_row.content == "Got it"
+        assert assistant_row.tokens_input == 9
+        assert assistant_row.tokens_output == 4
+        assert assistant_row.actions and len(assistant_row.actions) == 1
+        assert assistant_row.actions[0]["type"] == "start_timer"
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_done_event_carries_persisted_ids(
+        self, client: AsyncClient, pro_auth_headers: dict, _clear_rate_limiter
+    ):
+        """D12 Gate (b): the IDs returned in the SSE done event must
+        match the PKs of the rows actually written to chat_messages so
+        the Android client can use them as Room PKs."""
+        import json as _json
+
+        def _fake_stream(**_kwargs):
+            yield {
+                "type": "done",
+                "message": "ok",
+                "actions": [],
+                "tokens_used": {"input": 1, "output": 1},
+            }
+
+        with patch(
+            "app.services.ai_productivity.generate_chat_response_stream",
+            side_effect=_fake_stream,
+        ):
+            resp = await client.post(
+                "/api/v1/ai/chat/stream",
+                json={
+                    "message": "ping",
+                    "conversation_id": "chat_2026-05-09_stream_b",
+                },
+                headers=pro_auth_headers,
+            )
+        assert resp.status_code == 200, resp.text
+
+        # Find the done event in the SSE body and extract the IDs.
+        done_payload: dict | None = None
+        for chunk in resp.text.split("\n\n"):
+            if "event: done" in chunk:
+                for line in chunk.split("\n"):
+                    if line.startswith("data: "):
+                        done_payload = _json.loads(line[len("data: "):])
+                        break
+                break
+        assert done_payload is not None
+        user_msg_id = done_payload.get("user_message_id")
+        assistant_msg_id = done_payload.get("assistant_message_id")
+        assert isinstance(user_msg_id, str) and len(user_msg_id) >= 8
+        assert isinstance(assistant_msg_id, str) and len(assistant_msg_id) >= 8
+
+        rows = await _list_chat_rows("chat_2026-05-09_stream_b")
+        row_ids = {r.id for r in rows}
+        assert user_msg_id in row_ids
+        assert assistant_msg_id in row_ids
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_no_persist_on_error(
+        self, client: AsyncClient, pro_auth_headers: dict, _clear_rate_limiter
+    ):
+        """An upstream failure (no done event) must NOT write rows —
+        Gate (a)'s persistence is gated on done firing."""
+        def _failing_stream(**_kwargs):
+            yield {
+                "type": "error",
+                "message": "AI service temporarily unavailable",
+                "code": "upstream_error",
+            }
+
+        with patch(
+            "app.services.ai_productivity.generate_chat_response_stream",
+            side_effect=_failing_stream,
+        ):
+            await client.post(
+                "/api/v1/ai/chat/stream",
+                json={
+                    "message": "should not persist",
+                    "conversation_id": "chat_2026-05-09_stream_err",
+                },
+                headers=pro_auth_headers,
+            )
+
+        rows = await _list_chat_rows("chat_2026-05-09_stream_err")
+        assert rows == []
+
+
+class TestChatPostPersistedIds:
+    """D12 Gate (b) for the single-shot path: ChatResponse must echo
+    the persisted PKs so the Android client can use them as local Room
+    keys, keeping pullHistory()'s REPLACE-on-PK upserts idempotent."""
+
+    @pytest.mark.asyncio
+    async def test_chat_post_response_carries_persisted_ids(
+        self, client: AsyncClient, pro_auth_headers: dict, _clear_rate_limiter
+    ):
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            mock_gen.return_value = {
+                "message": "ok",
+                "actions": [],
+                "tokens_used": {"input": 5, "output": 2},
+            }
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={"message": "ping", "conversation_id": "chat_2026-05-09_post_ids"},
+                headers=pro_auth_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        user_msg_id = body.get("user_message_id")
+        assistant_msg_id = body.get("assistant_message_id")
+        assert isinstance(user_msg_id, str) and len(user_msg_id) >= 8
+        assert isinstance(assistant_msg_id, str) and len(assistant_msg_id) >= 8
+
+        rows = await _list_chat_rows("chat_2026-05-09_post_ids")
+        row_ids = {r.id for r in rows}
+        assert user_msg_id in row_ids
+        assert assistant_msg_id in row_ids

@@ -617,7 +617,14 @@ data class ChatResponse(
     val message: String,
     val actions: List<ChatActionResponse> = emptyList(),
     @SerializedName("conversation_id") val conversationId: String,
-    @SerializedName("tokens_used") val tokensUsed: ChatTokensUsed? = null
+    @SerializedName("tokens_used") val tokensUsed: ChatTokensUsed? = null,
+    // D12 Gate (b): server-assigned PKs of the rows just persisted to
+    // `chat_messages`. The repository uses these as the local Room PKs so
+    // a subsequent pullHistory()'s REPLACE-on-PK upsert is idempotent.
+    // Nullable to tolerate older mocks / persistence-failure responses;
+    // the repository falls back to a fresh client-side UUID in that case.
+    @SerializedName("user_message_id") val userMessageId: String? = null,
+    @SerializedName("assistant_message_id") val assistantMessageId: String? = null
 )
 
 /**

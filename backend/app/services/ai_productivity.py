@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 from datetime import date, timedelta
 from typing import Any, Iterator
 
@@ -1160,34 +1159,224 @@ def parse_batch_command(
 
 _CHAT_SYSTEM_PROMPT = """You are PrismTask's conversational productivity coach. The user is in a one-on-one chat with you inside an Android task-management app. Be warm, concise, and concrete — never preachy. Default to 1-3 short sentences; only go longer when the user explicitly asks.
 
-You can suggest inline action buttons that the app will render under your reply. Only emit actions that map to a real user need expressed in the most recent message. NEVER invent task IDs or fabricate references the user did not give you.
+You have access to a set of tools that render as inline action buttons under your reply. Use them when the user has expressed a clear, actionable intent in their most recent message. Prefer no tool call over a weak suggestion. NEVER invent task IDs or fabricate references the user did not give you.
 
-When the user opens chat from a specific task, the latest user turn carries a `task_context` block with the actual title, description, due date, and priority. Ground your reply in those concrete fields — refer to the task by its title, not the opaque id. The `task_context_id` integer is the handle the action buttons must echo back; only the user-facing reply text should mention the task by title.
-
-Allowed action shapes (use exactly these `type` values; omit any unused fields):
-- {"type": "create_task", "title": "...", "due": "today|tomorrow|next_week|YYYY-MM-DD", "priority": "low|medium|high|urgent", "description": "...", "tags": ["tag1", "tag2"], "project": "Project Name"}
-  - `description`, `tags`, and `project` are OPTIONAL. Only include them when the user actually named or strongly implied that detail. Never invent a project name the user hasn't mentioned. Tags are short single-word labels (no `#` prefix). Maximum 10 tags.
-- {"type": "start_timer", "minutes": 25}
-- {"type": "batch_command", "command_text": "<the user's natural-language batch phrasing, verbatim>"}
-  - Use ONLY when the user clearly wants to mutate MULTIPLE tasks/projects/habits/medications in one breath, beyond what the single-entity actions above can express. Examples that warrant `batch_command`: "complete all tasks tagged #errands", "move every overdue work task to next Monday", "archive my Q1 projects", "skip my vitamins this week", "set everything in #blocked to high priority".
-  - DO NOT use `batch_command` for a single task — emit `complete` / `reschedule` / `archive` instead. DO NOT use it for the existing batch action `reschedule_batch` (when you already know the specific task IDs from context).
-  - Echo the user's own phrasing as `command_text`. Do not paraphrase, do not invent task IDs, and do not pre-resolve project or tag names — the Android client routes the phrase to a preview screen that resolves it safely.
-- When the user is talking about a specific task and you have been given a `task_context_id`, you MAY suggest:
-  - {"type": "complete", "task_id": "<task_context_id>"}
-  - {"type": "reschedule", "task_id": "<task_context_id>", "to": "today|tomorrow|next_week|YYYY-MM-DD"}
-  - {"type": "breakdown", "task_id": "<task_context_id>", "subtasks": ["...", "..."]}
-  - {"type": "archive", "task_id": "<task_context_id>"}
+When the user opens chat from a specific task, the latest user turn carries a `task_context` block with the actual title, description, due date, and priority. Ground your reply in those concrete fields — refer to the task by its title, not the opaque id. The `task_context_id` integer is the handle action tools must echo back; only the user-facing reply text should mention the task by title.
 
 Hard rules:
-1. Output STRICT JSON only. No markdown fences, no prose outside JSON.
-2. Top-level shape: {"message": "<your reply>", "actions": [<0..N action objects>]}.
-3. `actions` may be an empty list — prefer that over emitting weak suggestions.
-4. Only reference a task_id when the user has either (a) explicitly given you one in their message or (b) you have a `task_context_id` in the prompt.
-5. For `breakdown`, propose 2-5 concrete subtasks expressed as imperative phrases (e.g. "Draft outline", "Review with team").
-6. Never invent due dates beyond today/tomorrow/next_week unless the user named one.
-7. Stay supportive and practical. Avoid moralizing about productivity.
+1. Only invoke a tool when the user expressed actionable intent in the most recent message. Otherwise just reply in prose.
+2. Only reference a task_id when the user has either (a) explicitly given you one in their message or (b) you have a `task_context_id` in the prompt.
+3. For `breakdown`, propose 2-5 concrete subtasks expressed as imperative phrases (e.g. "Draft outline", "Review with team").
+4. Never invent due dates beyond today/tomorrow/next_week unless the user named one.
+5. Stay supportive and practical. Avoid moralizing about productivity.
+6. If the user message is small talk or unclear, just reply in prose with no tool calls."""
 
-If the user message is small talk or unclear, just reply with `{"message": "<friendly short reply>", "actions": []}`."""
+
+# D12 Item A (B.1) — native Anthropic tool_use migration. Each tool's
+# `name` matches the action `type` value the Android client's
+# ``ChatViewModel.executeAction`` already dispatches on, so the wire
+# contract on the response side (ChatResponse.actions[]) is unchanged —
+# only how the backend GETS the action data from Claude is migrated
+# from JSON-in-text to native tool_use blocks.
+_CHAT_TOOL_DEFINITIONS: list[dict] = [
+    {
+        "name": "complete",
+        "description": (
+            "Mark a task as completed when the user has finished it. "
+            "Use ONLY when the user has a task_context (i.e. they're "
+            "talking about a specific task) and clearly indicates "
+            "they're done with it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "string",
+                    "description": (
+                        "The task_context_id from the conversation, "
+                        "echoed back as a string."
+                    ),
+                },
+            },
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "reschedule",
+        "description": (
+            "Move a single task's due date. Use when the user wants "
+            "to delay or shift a specific task they're discussing. "
+            "Requires a task_context_id."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"},
+                "to": {
+                    "type": "string",
+                    "description": (
+                        "today | tomorrow | next_week | YYYY-MM-DD"
+                    ),
+                },
+            },
+            "required": ["task_id", "to"],
+        },
+    },
+    {
+        "name": "reschedule_batch",
+        "description": (
+            "Move multiple tasks' due dates at once when you already "
+            "know the specific task_ids from prior conversation turns. "
+            "Do NOT use for a single task — use 'reschedule' instead. "
+            "Do NOT use for natural-language batch phrasing where you "
+            "don't know the exact ids — use 'batch_command' for that."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "to": {
+                    "type": "string",
+                    "description": (
+                        "today | tomorrow | next_week | YYYY-MM-DD"
+                    ),
+                },
+            },
+            "required": ["task_ids", "to"],
+        },
+    },
+    {
+        "name": "breakdown",
+        "description": (
+            "Suggest 2-5 concrete subtasks to break down a parent "
+            "task. Use when the user is overwhelmed by a single task "
+            "and would benefit from decomposing it. Requires a "
+            "task_context_id."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"},
+                "subtasks": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 2,
+                    "maxItems": 5,
+                    "description": (
+                        "Imperative phrases (e.g. 'Draft outline', "
+                        "'Review with team')."
+                    ),
+                },
+            },
+            "required": ["task_id", "subtasks"],
+        },
+    },
+    {
+        "name": "archive",
+        "description": (
+            "Move a task out of active view without completing it. "
+            "Use when the user has decided not to do a task but "
+            "doesn't want to mark it complete. Requires a "
+            "task_context_id."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"task_id": {"type": "string"}},
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "start_timer",
+        "description": (
+            "Open a focus timer for the user. Suggest only when the "
+            "user explicitly asks for a timer or pomodoro session."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 480,
+                },
+            },
+            "required": ["minutes"],
+        },
+    },
+    {
+        "name": "create_task",
+        "description": (
+            "Create a new task on the user's behalf. Use when the "
+            "user has expressed a clear intent to add something to "
+            "their list. Only include description / tags / project "
+            "when the user named or strongly implied them — never "
+            "invent project names."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "maxLength": 500},
+                "due": {
+                    "type": "string",
+                    "description": (
+                        "today | tomorrow | next_week | YYYY-MM-DD"
+                    ),
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "urgent"],
+                },
+                "description": {"type": "string", "maxLength": 4000},
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 10,
+                    "description": (
+                        "Short single-word labels (no '#' prefix)."
+                    ),
+                },
+                "project": {
+                    "type": "string",
+                    "description": (
+                        "An EXISTING project name the user has "
+                        "already mentioned. Never invent."
+                    ),
+                },
+            },
+            "required": ["title"],
+        },
+    },
+    {
+        "name": "batch_command",
+        "description": (
+            "Hand the user's natural-language batch phrasing to a "
+            "preview screen for safe resolution. Use ONLY when the "
+            "user wants to mutate MULTIPLE tasks/projects/habits/"
+            "medications in one breath, beyond what single-entity "
+            "tools can express. Examples: 'complete all tasks tagged "
+            "#errands', 'archive my Q1 projects', 'skip my vitamins "
+            "this week'. Echo the user's phrasing verbatim — do not "
+            "paraphrase or pre-resolve names."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command_text": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": (
+                        "The user's natural-language batch phrasing, "
+                        "verbatim."
+                    ),
+                },
+            },
+            "required": ["command_text"],
+        },
+    },
+]
 
 
 def _build_chat_messages_array(
@@ -1225,106 +1414,54 @@ def _build_chat_messages_array(
     return anthropic_messages
 
 
-def _finalize_chat_payload(
-    raw_text: str,
-    usage: Any,
-) -> dict:
-    """Parse + validate the chat AI's JSON output, returning the canonical dict.
+def _extract_chat_payload_from_blocks(ai_message: Any) -> dict:
+    """Extract reply text + tool_use action dicts from a structured response.
 
-    Shared by the single-shot and streaming chat handlers so both surface
-    the same shape and raise the same errors on malformed responses.
+    D12 Item A (B.1): replaces the old JSON-in-text envelope. ``content``
+    is a list of typed blocks: ``text`` blocks concatenate into the
+    user-visible reply; ``tool_use`` blocks (one per AI-proposed action)
+    map 1:1 to the action dict shape the Android client already
+    expects (``{"type": <tool_name>, **<tool_input>}``).
+
+    A response that returns only tool_use blocks (no reply text) gets a
+    minimal "Done." synthesized so the chat bubble isn't empty —
+    preserves the prior contract where the client always rendered an
+    assistant bubble.
     """
-    result = _parse_ai_json(raw_text)
-    if not isinstance(result, dict):
-        raise ValueError("Expected a JSON object at top level")
-    reply = result.get("message")
-    if not isinstance(reply, str) or not reply.strip():
-        raise ValueError("Response missing required string 'message'")
-    actions_raw = result.get("actions") or []
-    if not isinstance(actions_raw, list):
-        raise ValueError("'actions' must be a list when present")
-    tokens_used = {
-        "input": int(getattr(usage, "input_tokens", 0) or 0),
-        "output": int(getattr(usage, "output_tokens", 0) or 0),
-    }
+    if ai_message is None:
+        raise ValueError("Anthropic response is None")
+    content = getattr(ai_message, "content", None)
+    if not isinstance(content, list):
+        raise ValueError("Anthropic response missing content blocks")
+
+    text_parts: list[str] = []
+    actions: list[dict] = []
+    for block in content:
+        block_type = getattr(block, "type", None)
+        if block_type == "text":
+            block_text = getattr(block, "text", "")
+            if isinstance(block_text, str) and block_text:
+                text_parts.append(block_text)
+        elif block_type == "tool_use":
+            name = getattr(block, "name", None)
+            tool_input = getattr(block, "input", None) or {}
+            if not isinstance(name, str) or not isinstance(tool_input, dict):
+                continue
+            actions.append({"type": name, **tool_input})
+
+    reply = "".join(text_parts).strip()
+    if not reply:
+        reply = "Done."
+
+    usage = getattr(ai_message, "usage", None)
     return {
-        "message": reply.strip(),
-        "actions": actions_raw,
-        "tokens_used": tokens_used,
+        "message": reply,
+        "actions": actions,
+        "tokens_used": {
+            "input": int(getattr(usage, "input_tokens", 0) or 0),
+            "output": int(getattr(usage, "output_tokens", 0) or 0),
+        },
     }
-
-
-_PARTIAL_MESSAGE_KEY_RE = re.compile(r'"message"\s*:\s*"')
-
-
-def _extract_partial_message_field(s: str) -> str | None:
-    """Extract the (possibly partial) value of the top-level ``"message"`` key.
-
-    Used by the streaming chat handler to forward only the user-visible
-    reply text to the SSE consumer as it accumulates, without leaking the
-    surrounding JSON envelope (``{"message": ...``, ``"actions": ...``)
-    into the chat bubble.
-
-    Returns the value collected so far, or ``None`` if the ``"message":"``
-    opener has not yet appeared in the stream. Honors basic JSON string
-    escapes (``\\"`` ``\\\\`` ``\\n`` ``\\t`` ``\\r`` ``\\b`` ``\\f`` ``\\/``) and
-    decodes ``\\uXXXX`` when the four hex digits have arrived. A trailing
-    partial escape (e.g. raw text ending in ``\\``) is dropped from the
-    returned value and re-emitted on the next delta.
-    """
-    match = _PARTIAL_MESSAGE_KEY_RE.search(s)
-    if not match:
-        return None
-    i = match.end()
-    out: list[str] = []
-    n = len(s)
-    while i < n:
-        c = s[i]
-        if c == '\\':
-            if i + 1 >= n:
-                break  # partial escape — drop trailing backslash
-            nxt = s[i + 1]
-            if nxt == '"':
-                out.append('"')
-                i += 2
-            elif nxt == '\\':
-                out.append('\\')
-                i += 2
-            elif nxt == '/':
-                out.append('/')
-                i += 2
-            elif nxt == 'n':
-                out.append('\n')
-                i += 2
-            elif nxt == 't':
-                out.append('\t')
-                i += 2
-            elif nxt == 'r':
-                out.append('\r')
-                i += 2
-            elif nxt == 'b':
-                out.append('\b')
-                i += 2
-            elif nxt == 'f':
-                out.append('\f')
-                i += 2
-            elif nxt == 'u':
-                if i + 6 > n:
-                    break  # partial \uXXXX — drop and resume next delta
-                try:
-                    out.append(chr(int(s[i + 2:i + 6], 16)))
-                except ValueError:
-                    out.append(s[i + 1:i + 6])
-                i += 6
-            else:
-                out.append(nxt)
-                i += 2
-        elif c == '"':
-            break  # closing quote — end of value
-        else:
-            out.append(c)
-            i += 1
-    return ''.join(out)
 
 
 def generate_chat_response(
@@ -1354,9 +1491,14 @@ def generate_chat_response(
           "tokens_used": {"input": int, "output": int},
         }
 
+    D12 Item A (B.1): uses native Anthropic ``tool_use`` blocks instead of
+    the legacy JSON-in-text protocol. The wire contract on the response
+    side (``ChatResponse.actions[]``) is unchanged — only the
+    backend-internal extraction is migrated.
+
     Raises:
         RuntimeError: Anthropic client unavailable / API key missing.
-        ValueError:   AI returned a malformed response after retry.
+        ValueError:   AI returned a malformed (non-content-blocks) response after retry.
     """
     client = _get_client()
     model = get_model("chat")
@@ -1371,24 +1513,24 @@ def generate_chat_response(
                 model=model,
                 max_tokens=1024,
                 system=_CHAT_SYSTEM_PROMPT,
+                tools=_CHAT_TOOL_DEFINITIONS,
                 messages=anthropic_messages,
             )
-            content = ai_message.content[0].text
-            return _finalize_chat_payload(content, getattr(ai_message, "usage", None))
-        except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
+            return _extract_chat_payload_from_blocks(ai_message)
+        except (KeyError, TypeError, IndexError, ValueError) as e:
             last_error = e
             logger.error(
-                f"Failed to parse chat response (attempt {attempt + 1}): {e}"
+                f"Failed to extract chat response (attempt {attempt + 1}): {e}"
             )
             if attempt == 0:
                 continue
             raise ValueError(
-                f"Failed to parse chat response after retry: {e}"
+                f"Failed to extract chat response after retry: {e}"
             ) from e
         except Exception as e:
             logger.error(f"Chat AI error: {type(e).__name__}: {e}")
             raise
-    raise ValueError(f"Failed to parse chat response: {last_error}")
+    raise ValueError(f"Failed to extract chat response: {last_error}")
 
 
 def generate_chat_response_stream(
@@ -1404,15 +1546,21 @@ def generate_chat_response_stream(
     formats into SSE frames:
 
     - ``{"type": "token", "text": "<delta>"}`` — each new chunk of the
-      ``message`` field as the JSON envelope accumulates upstream.
+      assistant's reply text as the upstream stream accumulates.
     - ``{"type": "done", "message": "<final>", "actions": [...],
       "tokens_used": {"input": int, "output": int}}`` — once the upstream
-      stream completes and the JSON parses + actions validate.
+      stream completes and any tool_use blocks are extracted.
     - ``{"type": "error", "message": "<...>", "code": "<short>"}`` — on
-      Anthropic upstream failure or parse failure. Stream then closes.
+      Anthropic upstream failure or extraction failure. Stream then closes.
+
+    D12 Item A (B.1): uses native Anthropic ``tool_use`` blocks. The
+    SDK's ``stream.text_stream`` yields ONLY text-block deltas (tool_use
+    input deltas arrive on a separate channel and are accumulated by the
+    SDK), so each delta is the user-visible reply text and gets forwarded
+    directly to the client — no regex envelope-stripping needed.
 
     Unlike :func:`generate_chat_response` this function does NOT retry on
-    parse failure: a streamed response that fails to parse is rare and
+    parse failure: a streamed response that fails to extract is rare and
     re-running the whole stream would double Anthropic billing. Surfaces
     the ``error`` event instead so the client can prompt the user to
     re-send.
@@ -1423,26 +1571,19 @@ def generate_chat_response_stream(
         message, conversation_id, task_context_id, task_context, history
     )
 
-    accumulated = ""
-    last_emitted = ""
     final_message = None
     try:
         with client.messages.stream(
             model=model,
             max_tokens=1024,
             system=_CHAT_SYSTEM_PROMPT,
+            tools=_CHAT_TOOL_DEFINITIONS,
             messages=anthropic_messages,
         ) as stream:
             for text_delta in stream.text_stream:
                 if not text_delta:
                     continue
-                accumulated += text_delta
-                current_msg = _extract_partial_message_field(accumulated)
-                if current_msg is None or current_msg == last_emitted:
-                    continue
-                new_chunk = current_msg[len(last_emitted):]
-                last_emitted = current_msg
-                yield {"type": "token", "text": new_chunk}
+                yield {"type": "token", "text": text_delta}
             final_message = stream.get_final_message()
     except Exception as exc:
         logger.error(f"Chat stream upstream error: {type(exc).__name__}: {exc}")
@@ -1454,10 +1595,9 @@ def generate_chat_response_stream(
         return
 
     try:
-        usage = getattr(final_message, "usage", None) if final_message else None
-        payload = _finalize_chat_payload(accumulated, usage)
-    except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as exc:
-        logger.error(f"Chat stream parse error: {exc}")
+        payload = _extract_chat_payload_from_blocks(final_message)
+    except (KeyError, TypeError, IndexError, ValueError) as exc:
+        logger.error(f"Chat stream extraction error: {exc}")
         yield {
             "type": "error",
             "message": "AI returned an invalid response",

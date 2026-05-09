@@ -104,10 +104,17 @@ constructor(
                     val tokensUsed = json.get("tokens_used")?.takeIf { !it.isJsonNull }?.let {
                         gson.fromJson(it, ChatTokensUsed::class.java)
                     }
+                    // D12 Gate (b): forwarded server PKs.
+                    val userMessageId =
+                        json.get("user_message_id")?.takeIf { !it.isJsonNull }?.asString
+                    val assistantMessageId =
+                        json.get("assistant_message_id")?.takeIf { !it.isJsonNull }?.asString
                     ChatStreamEvent.Done(
                         message = message,
                         actions = actions,
-                        tokensUsed = tokensUsed
+                        tokensUsed = tokensUsed,
+                        userMessageId = userMessageId,
+                        assistantMessageId = assistantMessageId
                     )
                 }
                 "error" -> ChatStreamEvent.Error(

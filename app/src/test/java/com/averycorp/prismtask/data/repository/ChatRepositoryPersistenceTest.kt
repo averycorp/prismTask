@@ -197,4 +197,91 @@ class ChatRepositoryPersistenceTest {
         coVerify(exactly = 2) { api.aiChat(any()) }
         assertTrue(dao.rowsSnapshot.size >= 4)
     }
+
+    @Test
+    fun `sendMessage uses server-assigned ids when present`() = runTest {
+        val api = mockk<PrismTaskApi>()
+        coEvery { api.aiChat(any()) } returns ChatResponse(
+            message = "ack",
+            actions = emptyList(),
+            conversationId = "x",
+            tokensUsed = ChatTokensUsed(input = 1, output = 1),
+            userMessageId = "srv-user-id",
+            assistantMessageId = "srv-asst-id"
+        )
+        val dao = FakeChatMessageDao()
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+
+        repo.sendMessage(userMessage = "hello")
+
+        // D12 Gate (b): the local Room PKs must match the server-assigned
+        // ids so a subsequent pullHistory's REPLACE-on-PK collapses to
+        // exactly the same rows (no duplicates).
+        val ids = dao.rowsSnapshot.map { it.id }.toSet()
+        assertTrue("user row uses server id", "srv-user-id" in ids)
+        assertTrue("assistant row uses server id", "srv-asst-id" in ids)
+    }
+
+    @Test
+    fun `pullHistory after sendMessage does not duplicate when ids match`() = runTest {
+        val api = mockk<PrismTaskApi>()
+        coEvery { api.aiChat(any()) } returns ChatResponse(
+            message = "ack",
+            actions = emptyList(),
+            conversationId = "chat_2026-05-09_dedup",
+            tokensUsed = null,
+            userMessageId = "srv-user-id",
+            assistantMessageId = "srv-asst-id"
+        )
+        coEvery {
+            api.aiChatHistory(any(), any(), any())
+        } returns ChatHistoryResponse(
+            messages = listOf(
+                ChatMessageRecord(
+                    id = "srv-user-id",
+                    conversationId = "chat_2026-05-09_dedup",
+                    role = "user",
+                    content = "hello",
+                    createdAt = "2026-05-09T10:00:00+00:00"
+                ),
+                ChatMessageRecord(
+                    id = "srv-asst-id",
+                    conversationId = "chat_2026-05-09_dedup",
+                    role = "assistant",
+                    content = "ack",
+                    createdAt = "2026-05-09T10:00:01+00:00"
+                )
+            ),
+            nextBefore = null
+        )
+        val dao = FakeChatMessageDao()
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+
+        repo.sendMessage(userMessage = "hello")
+        // Simulate the cross-device pull: identical PKs collapse via
+        // REPLACE-on-PK rather than adding duplicate rows.
+        repo.pullHistory()
+
+        assertEquals(2, dao.rowsSnapshot.size)
+    }
+
+    @Test
+    fun `sendMessage falls back to client uuid when server omits ids`() = runTest {
+        val api = mockk<PrismTaskApi>()
+        coEvery { api.aiChat(any()) } returns ChatResponse(
+            message = "ack",
+            actions = emptyList(),
+            conversationId = "x",
+            tokensUsed = null
+            // userMessageId / assistantMessageId omitted → null defaults
+        )
+        val dao = FakeChatMessageDao()
+        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+
+        repo.sendMessage(userMessage = "hello")
+
+        // Two rows still land — just with client-side UUIDs. Behavior is
+        // resilient to older backends or persistence-failure responses.
+        assertEquals(2, dao.rowsSnapshot.size)
+    }
 }
