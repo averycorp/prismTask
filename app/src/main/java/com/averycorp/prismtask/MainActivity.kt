@@ -124,6 +124,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var localDateFlow: LocalDateFlow
 
+    @Inject
+    lateinit var coachmarkController: com.averycorp.prismtask.ui.coachmark.CoachmarkController
+
     companion object {
         /** Intent extra key set by widgets to route deep-links. Wire-id values
          * live on [WidgetLaunchAction] subclasses. */
@@ -578,15 +581,36 @@ class MainActivity : ComponentActivity() {
                                 .themeOverlay(currentPrismTheme)
                         ) {
                             val launchAction by launchActionState
-                            PrismTaskNavGraph(
-                                modifier = Modifier.fillMaxSize(),
-                                navController = navController,
-                                tabOrder = tabOrder,
-                                hiddenTabs = hiddenTabs,
-                                initialLaunchAction = launchAction,
-                                initialSharedText = initialSharedText,
-                                hasCompletedOnboarding = hasCompletedOnboarding!!
-                            )
+                            // Mount the coachmark host above the nav graph so
+                            // the overlay sits on top of every screen and the
+                            // anchor registry is available to all participating
+                            // surfaces. The host is a no-op until the
+                            // controller's state machine moves to ShowingStep.
+                            com.averycorp.prismtask.ui.coachmark.CoachmarkHost(
+                                controller = coachmarkController,
+                                onNavigateRoute = { routeKey ->
+                                    handleCoachmarkRoute(routeKey, navController)
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                PrismTaskNavGraph(
+                                    modifier = Modifier.fillMaxSize(),
+                                    navController = navController,
+                                    tabOrder = tabOrder,
+                                    hiddenTabs = hiddenTabs,
+                                    initialLaunchAction = launchAction,
+                                    initialSharedText = initialSharedText,
+                                    hasCompletedOnboarding = hasCompletedOnboarding!!
+                                )
+                            }
+                            // Auto-launch the coachmark tour on first entry
+                            // post-onboarding. `tryStart` is a no-op when
+                            // ineligible, completed, or dismissed.
+                            LaunchedEffect(hasCompletedOnboarding) {
+                                if (hasCompletedOnboarding == true) {
+                                    coachmarkController.tryStart(isProActive = true)
+                                }
+                            }
 
                             // Notification permission denial snackbar
                             androidx.compose.material3.SnackbarHost(
@@ -627,6 +651,38 @@ class MainActivity : ComponentActivity() {
             wireId = intent.getStringExtra(EXTRA_LAUNCH_ACTION),
             taskId = taskId
         )
+    }
+
+    /**
+     * Translate a coachmark navigation route key into an actual NavController
+     * call. The CoachmarkHost emits a route key when a tour step's action is
+     * [com.averycorp.prismtask.ui.coachmark.CoachmarkAction.Navigate]; this
+     * function maps each known route to a navigation call and is a no-op for
+     * unknown keys (so adding a new route in tour content doesn't crash).
+     */
+    private fun handleCoachmarkRoute(
+        routeKey: String,
+        navController: androidx.navigation.NavController
+    ) {
+        when (routeKey) {
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.TASKS,
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.HABITS,
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.MEDICATIONS,
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.SETTINGS -> {
+                // Top-level bottom-nav targets — host pager is the navigator,
+                // not the NavController. Tour steps that target tabs leave
+                // the user on Today; the spotlight on the tab itself is the
+                // teaching surface, not a navigation.
+                Unit
+            }
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.EISENHOWER ->
+                navController.navigate(PrismTaskRoute.EisenhowerMatrix.route)
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.TIMER ->
+                navController.navigate(PrismTaskRoute.Timer.route)
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.SETTINGS_APPEARANCE ->
+                navController.navigate(PrismTaskRoute.Settings.route)
+            else -> Unit
+        }
     }
 
     private fun setCrashlyticsUserId() {

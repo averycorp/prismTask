@@ -52,6 +52,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.screens.habits.HabitListScreen
 import com.averycorp.prismtask.ui.screens.onboarding.OnboardingScreen
 import com.averycorp.prismtask.ui.screens.onboarding.OnboardingViewModel
@@ -426,6 +428,11 @@ fun PrismTaskNavGraph(
                 bottomNavItems
                     .indexOfFirst { it.route == PrismTaskRoute.Timer.route }
                     .let { idx -> if (idx >= 0) pagerState.scrollToPage(idx) }
+            // Coachmark tour resume entry — currently no external trigger
+            // wires this; retained for future notification / widget hooks.
+            // The in-app resume chip talks to the controller directly and
+            // doesn't reach this branch.
+            is WidgetLaunchAction.OpenTourStep -> Unit
         }
     }
 
@@ -502,7 +509,11 @@ fun PrismTaskNavGraph(
         containerColor = prismColors.background,
         bottomBar = {
             if (showBottomBar) {
-                Column {
+                Column(
+                    modifier = androidx.compose.ui.Modifier.coachmarkAnchor(
+                        CoachmarkAnchors.BOTTOM_NAV_ROW
+                    )
+                ) {
                     PrismHudDivider()
                     NavigationBar(
                         containerColor = prismColors.background,

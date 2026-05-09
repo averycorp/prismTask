@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.QuickAddBar
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
@@ -50,6 +51,7 @@ internal fun FloatingQuickAddBar(
         bottomEnd = 0.dp
     )
 
+    Box(modifier = Modifier.coachmarkAnchor(com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.TODAY_QUICK_ADD)) {
     when {
         // Cyberpunk — dashed neon border, transparent fill
         attrs.brackets -> {
@@ -144,6 +146,8 @@ internal fun FloatingQuickAddBar(
                 }
             }
         }
+    }
+
     }
 
     LaunchedEffect(autoStartVoice) {

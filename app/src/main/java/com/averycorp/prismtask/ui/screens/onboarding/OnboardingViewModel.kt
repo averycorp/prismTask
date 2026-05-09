@@ -104,6 +104,22 @@ constructor(
     val voiceInputEnabled: StateFlow<Boolean> = voicePreferences
         .getVoiceInputEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    // BrainModePage state flows. Replace per-page `var ... by remember`
+    // local state with reactive prefs (F8 idiom drift fix). Also lets the
+    // page reflect the persisted state if the user backs up to it.
+    val adhdMode: StateFlow<Boolean> = ndPreferencesDataStore
+        .ndPreferencesFlow
+        .map { it.adhdModeEnabled }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val calmMode: StateFlow<Boolean> = ndPreferencesDataStore
+        .ndPreferencesFlow
+        .map { it.calmModeEnabled }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val focusReleaseMode: StateFlow<Boolean> = ndPreferencesDataStore
+        .ndPreferencesFlow
+        .map { it.focusReleaseModeEnabled }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val aiFeaturesEnabled: StateFlow<Boolean> = userPreferencesDataStore
         .aiFeaturePrefsFlow
         .map { it.enabled }
@@ -137,6 +153,28 @@ constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val reengagementEnabled: StateFlow<Boolean> = notificationPreferences
         .reengagementEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    // Per-type notification toggles surfaced on the onboarding
+    // NotificationsPage. Storage already lives in NotificationPreferences;
+    // onboarding writes through the existing setters.
+    val taskRemindersEnabled: StateFlow<Boolean> = notificationPreferences
+        .taskRemindersEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val timerAlertsEnabled: StateFlow<Boolean> = notificationPreferences
+        .timerAlertsEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val medicationRemindersEnabled: StateFlow<Boolean> = notificationPreferences
+        .medicationRemindersEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    // Widget theme override surfaced on the onboarding ThemePickerPage.
+    // Empty / default value = follow the app theme; a non-default override
+    // is set elsewhere (Settings → Appearance). Onboarding only exposes the
+    // "follow app theme" toggle.
+    val widgetThemeFollowsApp: StateFlow<Boolean> = themePreferences
+        .getWidgetThemeOverride()
+        .map { it.isBlank() || it == "default" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val startOfDayHour: StateFlow<Int> = taskBehaviorPreferences
@@ -370,6 +408,29 @@ constructor(
 
     fun setReengagementEnabled(enabled: Boolean) {
         viewModelScope.launch { notificationPreferences.setReengagementEnabled(enabled) }
+    }
+
+    fun setTaskRemindersEnabled(enabled: Boolean) {
+        viewModelScope.launch { notificationPreferences.setTaskRemindersEnabled(enabled) }
+    }
+
+    fun setTimerAlertsEnabled(enabled: Boolean) {
+        viewModelScope.launch { notificationPreferences.setTimerAlertsEnabled(enabled) }
+    }
+
+    fun setMedicationRemindersEnabled(enabled: Boolean) {
+        viewModelScope.launch { notificationPreferences.setMedicationRemindersEnabled(enabled) }
+    }
+
+    /**
+     * "Use app theme for widgets" — when true, widgets render with the active
+     * PrismTheme palette. When false, the user can pick a separate widget
+     * theme in Settings → Appearance. Onboarding only exposes the toggle.
+     */
+    fun setWidgetThemeFollowsApp(follow: Boolean) {
+        viewModelScope.launch {
+            themePreferences.setWidgetThemeOverride(if (follow) null else "custom")
+        }
     }
 
     /**

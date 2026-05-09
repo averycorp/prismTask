@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.screens.today.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +59,9 @@ internal fun HabitChipRow(
     onSeeAll: () -> Unit
 ) {
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .coachmarkAnchor(com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.TODAY_HABIT_CHIPS),
         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
