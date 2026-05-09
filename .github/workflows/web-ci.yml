@@ -23,18 +23,10 @@ permissions:
   actions: read          # capture-failure-log fetches job logs via API
 
 jobs:
-  # Renamed from `lint-and-test` to `web-lint-and-test` so the status-check
-  # context does not collide with Android CI's `lint-and-test` job; branch
-  # protection dedups shared names into a single requirement, which let a
-  # failing Android lint-and-test slip through if Web's passed (or vice versa).
-  #
-  # Required status check — must post on every PR, so real work is gated
-  # on `steps.relevance.outputs.web` rather than a workflow-level path filter.
-  web-lint-and-test:
+  web-relevance:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
+    outputs:
+      web: ${{ steps.relevance.outputs.web }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
@@ -45,17 +37,86 @@ jobs:
               - 'web/**'
               - '.github/workflows/web-ci.yml'
               - '.github/actions/setup-node-web/**'
+
+  web-lint:
+    needs: web-relevance
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
       - name: Short-circuit (no web changes)
-        if: steps.relevance.outputs.web != 'true'
-        run: echo "✓ No web paths changed; web-lint-and-test is a no-op."
+        if: needs.web-relevance.outputs.web != 'true'
+        run: echo "✓ No web paths changed; web-lint is a no-op."
       - uses: ./.github/actions/setup-node-web
-        if: steps.relevance.outputs.web == 'true'
-      - run: npm run lint
-        if: steps.relevance.outputs.web == 'true'
-      - run: npm run test:run
-        if: steps.relevance.outputs.web == 'true'
-      - run: npm run build
-        if: steps.relevance.outputs.web == 'true'
+        if: needs.web-relevance.outputs.web == 'true'
+      - name: Run ESLint
+        if: needs.web-relevance.outputs.web == 'true'
+        run: npm run lint
+
+  web-unit-tests:
+    needs: web-relevance
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+        total: [3]
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - name: Short-circuit (no web changes)
+        if: needs.web-relevance.outputs.web != 'true'
+        run: echo "✓ No web paths changed; web-unit-tests shard ${{ matrix.shard }}/${{ matrix.total }} is a no-op."
+      - uses: ./.github/actions/setup-node-web
+        if: needs.web-relevance.outputs.web == 'true'
+      - name: Run Vitest shard ${{ matrix.shard }}/${{ matrix.total }}
+        if: needs.web-relevance.outputs.web == 'true'
+        run: npm run test:run -- --shard=${{ matrix.shard }}/${{ matrix.total }}
+
+  web-build:
+    needs: web-relevance
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - name: Short-circuit (no web changes)
+        if: needs.web-relevance.outputs.web != 'true'
+        run: echo "✓ No web paths changed; web-build is a no-op."
+      - uses: ./.github/actions/setup-node-web
+        if: needs.web-relevance.outputs.web == 'true'
+      - name: Build web app
+        if: needs.web-relevance.outputs.web == 'true'
+        run: npm run build
+
+  # Aggregate required status. The actual work is split above so lint,
+  # unit-test shards, and build post separate CI parts instead of one long
+  # all-in-one job. Keep this context stable for existing branch protection.
+  web-lint-and-test:
+    needs: [web-lint, web-unit-tests, web-build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify split web checks
+        run: |
+          if [ '${{ needs.web-lint.result }}' != 'success' ]; then
+            echo "web-lint finished with ${{ needs.web-lint.result }}" >&2
+            exit 1
+          fi
+          if [ '${{ needs.web-unit-tests.result }}' != 'success' ]; then
+            echo "web-unit-tests finished with ${{ needs.web-unit-tests.result }}" >&2
+            exit 1
+          fi
+          if [ '${{ needs.web-build.result }}' != 'success' ]; then
+            echo "web-build finished with ${{ needs.web-build.result }}" >&2
+            exit 1
+          fi
+          echo "✓ Split web lint, unit-test shards, and build passed."
 
   e2e:
     needs: web-lint-and-test

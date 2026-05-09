@@ -306,21 +306,62 @@ jobs:
               -o "$DEP_DIR/$file" "$BASE_URL/$file"
             echo "fetched: $file ($(stat -c%s "$DEP_DIR/$file") bytes)"
           done
-      - name: Unit tests
-        # `set -o pipefail` is on by default in GitHub's bash shell, but we
-        # make it explicit so a regression in the shell config can't hide a
-        # non-zero Gradle exit behind `tee`. `--continue` lets Gradle finish
-        # every test task so the XML reports we inspect below are complete.
-        # `-i` (info) makes Gradle print each test class as it starts, so a
-        # hung test shows which class it was on. 20-minute step timeout
-        # turns an indefinite hang into a reported failure (the codebase's
-        # historical test runtime is ~5 min).
+      - name: Prepare unit-test outputs
         if: steps.relevance.outputs.android == 'true'
-        timeout-minutes: 20
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew testDebugUnitTest --continue -i 2>&1 | tee unit-test-output.log
+          rm -f unit-test-output.log
+          rm -rf app/build/test-results/testDebugUnitTest
+      - name: Unit tests — data layer
+        # Split the JVM unit suite into smaller CI parts. A single
+        # all-classes Gradle invocation previously had a 20-minute timeout,
+        # which made failures slow to surface and hard to localize. Each
+        # shard appends to unit-test-output.log so the failure-comment step
+        # below still has one combined log to summarize.
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.data.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — domain layer
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.domain.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — UI layer
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.ui.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — platform and workers
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.TaskCompletionAnalyticsTest' \
+            --tests 'com.averycorp.prismtask.core.*' \
+            --tests 'com.averycorp.prismtask.diagnostics.*' \
+            --tests 'com.averycorp.prismtask.feedback.*' \
+            --tests 'com.averycorp.prismtask.notifications.*' \
+            --tests 'com.averycorp.prismtask.startup.*' \
+            --tests 'com.averycorp.prismtask.sync.*' \
+            --tests 'com.averycorp.prismtask.widget.*' \
+            --tests 'com.averycorp.prismtask.workers.*' \
+            2>&1 | tee -a unit-test-output.log
       - name: Verify unit-test results (XML)
         # Belt-and-suspenders: even if Gradle's exit code somehow ends up zero,
         # a single <testsuite> reporting non-zero `failures` or `errors` fails
