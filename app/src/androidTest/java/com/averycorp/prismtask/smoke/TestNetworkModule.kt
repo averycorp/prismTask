@@ -13,6 +13,7 @@ import dagger.Provides
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import javax.inject.Singleton
@@ -46,6 +47,15 @@ object TestNetworkModule {
     @Singleton
     fun provideCalendarBackendApi(): com.averycorp.prismtask.data.remote.api.CalendarBackendApi =
         io.mockk.mockk(relaxed = true)
+
+    // ChatStreamClient (F3 D11/F7) constructor-injects OkHttpClient. The
+    // production NetworkModule provides it; replacing that module here
+    // strips the binding. SSE chat is never exercised in the instrumentation
+    // suite, so a default builder client is fine — it just needs to satisfy
+    // the Hilt graph at app construction.
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder().build()
 }
 
 /**
