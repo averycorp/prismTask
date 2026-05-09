@@ -49,6 +49,7 @@ import com.averycorp.prismtask.ui.screens.settings.sections.PrismThemeSection
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
+import com.averycorp.prismtask.ui.theme.expandedWidthCap
 import com.averycorp.prismtask.ui.theme.gridFloor
 
 private val ColAccount = Color(0xFFE6F1FB)
@@ -162,6 +163,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
+                    .expandedWidthCap()
             ) {
                 item {
                     SettingsGroup(label = "Account") {
