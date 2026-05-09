@@ -61,6 +61,8 @@ import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.EnergyCheckInCard
 import com.averycorp.prismtask.ui.components.HabitChipRowSkeleton
 import com.averycorp.prismtask.ui.components.MoveToProjectSheet
+import com.averycorp.prismtask.ui.components.ProGatedFeature
+import com.averycorp.prismtask.ui.components.ProUpsellSheet
 import com.averycorp.prismtask.ui.components.ProgressHeaderSkeleton
 import com.averycorp.prismtask.ui.components.QuickReschedulePopup
 import com.averycorp.prismtask.ui.components.RichEmptyState
@@ -95,6 +97,7 @@ import com.averycorp.prismtask.ui.screens.today.dailyessentials.DailyEssentialsA
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.DailyEssentialsSection
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
+import com.averycorp.prismtask.ui.theme.expandedWidthCap
 import com.averycorp.prismtask.ui.theme.gridFloor
 import com.averycorp.prismtask.ui.theme.prismGlow
 
@@ -209,6 +212,7 @@ fun TodayScreen(
     var editorSheetTaskId by remember { mutableStateOf<Long?>(null) }
     var showEditorSheet by remember { mutableStateOf(false) }
     var showAiHub by remember { mutableStateOf(false) }
+    var upsellFeature by remember { mutableStateOf<ProGatedFeature?>(null) }
     var reschedulePopupTask by remember { mutableStateOf<TaskEntity?>(null) }
     var moveToProjectSheetTask by remember { mutableStateOf<TaskEntity?>(null) }
     var cascadeConfirmState by remember { mutableStateOf<Pair<TaskEntity, Long?>?>(null) }
@@ -268,10 +272,14 @@ fun TodayScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (viewModel.isPro && perFeatureAiPrefs.chatEnabled) {
+                if (perFeatureAiPrefs.chatEnabled) {
                     SmallFloatingActionButton(
                         onClick = {
-                            navController.navigate(PrismTaskRoute.AiChat.createRoute())
+                            if (viewModel.isPro) {
+                                navController.navigate(PrismTaskRoute.AiChat.createRoute())
+                            } else {
+                                upsellFeature = ProGatedFeature.AI_CHAT
+                            }
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -316,7 +324,8 @@ fun TodayScreen(
                         .fillMaxSize()
                         .gridFloor()
                         .padding(padding)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
+                        .expandedWidthCap(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (nothingToday && !allTodayDone) {
@@ -496,7 +505,13 @@ fun TodayScreen(
                             }
                             if (perFeatureAiPrefs.dailyBriefingEnabled) {
                                 AssistChip(
-                                    onClick = { navController.navigate(PrismTaskRoute.DailyBriefing.route) },
+                                    onClick = {
+                                        if (viewModel.isPro) {
+                                            navController.navigate(PrismTaskRoute.DailyBriefing.route)
+                                        } else {
+                                            upsellFeature = ProGatedFeature.AI_BRIEFING
+                                        }
+                                    },
                                     label = { Text("Briefing") },
                                     leadingIcon = {
                                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -507,7 +522,13 @@ fun TodayScreen(
                             }
                             if (perFeatureAiPrefs.smartPomodoroEnabled) {
                                 AssistChip(
-                                    onClick = { navController.navigate(PrismTaskRoute.SmartPomodoro.route) },
+                                    onClick = {
+                                        if (viewModel.isPro) {
+                                            navController.navigate(PrismTaskRoute.SmartPomodoro.route)
+                                        } else {
+                                            upsellFeature = ProGatedFeature.SMART_POMODORO
+                                        }
+                                    },
                                     label = { Text("Focus") },
                                     leadingIcon = {
                                         Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -518,7 +539,13 @@ fun TodayScreen(
                             }
                             if (perFeatureAiPrefs.weeklyPlannerEnabled) {
                                 AssistChip(
-                                    onClick = { navController.navigate(PrismTaskRoute.WeeklyPlanner.route) },
+                                    onClick = {
+                                        if (viewModel.isPro) {
+                                            navController.navigate(PrismTaskRoute.WeeklyPlanner.route)
+                                        } else {
+                                            upsellFeature = ProGatedFeature.WEEKLY_PLANNER
+                                        }
+                                    },
                                     label = { Text("Plan Week") },
                                     leadingIcon = {
                                         Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -528,7 +555,13 @@ fun TodayScreen(
                                 )
                             }
                             AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.EisenhowerMatrix.route) },
+                                onClick = {
+                                    if (viewModel.isPro) {
+                                        navController.navigate(PrismTaskRoute.EisenhowerMatrix.route)
+                                    } else {
+                                        upsellFeature = ProGatedFeature.EISENHOWER
+                                    }
+                                },
                                 label = { Text("Matrix") },
                                 leadingIcon = {
                                     Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -537,7 +570,13 @@ fun TodayScreen(
                                 border = chipBorder
                             )
                             AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.PasteConversation.route) },
+                                onClick = {
+                                    if (viewModel.isPro) {
+                                        navController.navigate(PrismTaskRoute.PasteConversation.route)
+                                    } else {
+                                        upsellFeature = ProGatedFeature.PASTE_EXTRACT
+                                    }
+                                },
                                 label = { Text("Extract") },
                                 leadingIcon = {
                                     Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -546,7 +585,13 @@ fun TodayScreen(
                                 border = chipBorder
                             )
                             AssistChip(
-                                onClick = { navController.navigate(PrismTaskRoute.WeeklyReview.route) },
+                                onClick = {
+                                    if (viewModel.isPro) {
+                                        navController.navigate(PrismTaskRoute.WeeklyReview.route)
+                                    } else {
+                                        upsellFeature = ProGatedFeature.WEEKLY_REVIEW
+                                    }
+                                },
                                 label = { Text("Review") },
                                 leadingIcon = {
                                     Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -925,7 +970,24 @@ fun TodayScreen(
     if (showAiHub) {
         TodayAiHubSheet(
             navController = navController,
-            onDismiss = { showAiHub = false }
+            onDismiss = { showAiHub = false },
+            onShowUpsell = { feature -> upsellFeature = feature }
+        )
+    }
+
+    upsellFeature?.let { feature ->
+        ProUpsellSheet(
+            feature = feature,
+            currentTier = if (viewModel.isPro) {
+                com.averycorp.prismtask.data.billing.UserTier.PRO
+            } else {
+                com.averycorp.prismtask.data.billing.UserTier.FREE
+            },
+            onUpgrade = {
+                upsellFeature = null
+                navController.navigate("settings/subscription")
+            },
+            onDismiss = { upsellFeature = null }
         )
     }
 
