@@ -27,6 +27,7 @@ import com.averycorp.prismtask.data.repository.TaskTemplateRepository
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUiState
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUseCase
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
+import com.averycorp.prismtask.ui.coachmark.CoachmarkController
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -79,6 +80,7 @@ class TodayViewModelTest {
     private lateinit var leisureRepository: LeisureRepository
     private lateinit var localDateFlow: LocalDateFlow
     private lateinit var tourCardPreferences: TourCardPreferences
+    private lateinit var coachmarkController: CoachmarkController
 
     @Before
     fun setUp() {
@@ -109,6 +111,10 @@ class TodayViewModelTest {
         coEvery { tourCardPreferences.eligible() } returns flowOf(false)
         coEvery { tourCardPreferences.dismissed() } returns flowOf(false)
         coEvery { tourCardPreferences.stepIndex() } returns flowOf(0)
+        coEvery { tourCardPreferences.coachmarkCompleted() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkDismissed() } returns flowOf(false)
+        coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(0)
+        coachmarkController = mockk(relaxed = true)
         // Mock LocalDateFlow so `observe()` returns a single-emission flow that
         // completes. The real production flow re-emits forever via an internal
         // `delay(timeUntilNextBoundary)` loop — which would keep `runTest`'s
@@ -183,7 +189,8 @@ class TodayViewModelTest {
         schoolworkRepository,
         leisureRepository,
         localDateFlow,
-        tourCardPreferences
+        tourCardPreferences,
+        coachmarkController
     )
 
     @Test

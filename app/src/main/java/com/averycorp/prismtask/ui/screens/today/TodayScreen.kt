@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -148,6 +149,7 @@ fun TodayScreen(
     val currentNudge by viewModel.currentNudge.collectAsStateWithLifecycle()
     val dailyEssentials by viewModel.dailyEssentials.collectAsStateWithLifecycle()
     val tourCardState by viewModel.tourCardState.collectAsStateWithLifecycle()
+    val resumeTourVisible by viewModel.resumeTourVisible.collectAsStateWithLifecycle()
     var overloadBannerDismissed by remember { mutableStateOf(false) }
 
     // A2 NLP batch ops — listens to BatchUndoEventBus so we can offer
@@ -472,6 +474,21 @@ fun TodayScreen(
                                 .padding(vertical = 2.dp)
                                 .horizontalScroll(rememberScrollState())
                         ) {
+                            if (resumeTourVisible) {
+                                AssistChip(
+                                    onClick = { viewModel.resumeTour() },
+                                    label = { Text("Resume Tour") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    colors = chipColors,
+                                    border = chipBorder
+                                )
+                            }
                             AssistChip(
                                 onClick = { navController.navigate(PrismTaskRoute.DailyBriefing.route) },
                                 label = { Text("Briefing") },

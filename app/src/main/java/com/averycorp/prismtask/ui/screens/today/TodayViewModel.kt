@@ -47,6 +47,7 @@ import com.averycorp.prismtask.domain.usecase.HabitTodayVisibilityResolver
 import com.averycorp.prismtask.domain.usecase.MorningCheckInBannerDecider
 import com.averycorp.prismtask.domain.usecase.SelfCareNudge
 import com.averycorp.prismtask.domain.usecase.SelfCareNudgeEngine
+import com.averycorp.prismtask.ui.coachmark.CoachmarkController
 import com.averycorp.prismtask.ui.components.QuickRescheduleFormatter
 import com.averycorp.prismtask.util.DayBoundary
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -95,7 +96,8 @@ constructor(
     private val schoolworkRepository: SchoolworkRepository,
     private val leisureRepository: LeisureRepository,
     private val localDateFlow: LocalDateFlow,
-    private val tourCardPreferences: TourCardPreferences
+    private val tourCardPreferences: TourCardPreferences,
+    private val coachmarkController: CoachmarkController
 ) : ViewModel() {
     /**
      * True when the morning check-in banner should render on the Today
@@ -169,6 +171,33 @@ constructor(
             TourCardUiState(stepIndex = step.coerceAtLeast(0))
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /**
+     * True when the post-onboarding coachmark tour is paused mid-flight
+     * and a "Resume Tour" chip should appear in the Today quick-actions row.
+     *
+     * Visible iff the user is eligible for the tour, hasn't completed or
+     * dismissed it, AND has advanced past the first step (so the auto
+     * `tryStart` on Today entry isn't already covering them).
+     */
+    val resumeTourVisible: StateFlow<Boolean> = combine(
+        tourCardPreferences.eligible(),
+        tourCardPreferences.coachmarkCompleted(),
+        tourCardPreferences.coachmarkDismissed(),
+        tourCardPreferences.coachmarkStepIndex()
+    ) { eligible, completed, dismissed, stepIndex ->
+        eligible && !completed && !dismissed && stepIndex > 0
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun resumeTour() {
+        viewModelScope.launch {
+            try {
+                coachmarkController.resume()
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to resume coachmark tour", e)
+            }
+        }
+    }
 
     fun advanceTourCard(totalSteps: Int) {
         viewModelScope.launch {
