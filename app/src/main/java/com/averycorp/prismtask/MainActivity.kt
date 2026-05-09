@@ -58,6 +58,7 @@ import com.averycorp.prismtask.ui.navigation.PrismTaskNavGraph
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.tasklist.components.DayBounds
 import com.averycorp.prismtask.ui.screens.tasklist.components.LocalDayBounds
+import com.averycorp.prismtask.ui.theme.LocalWindowSizeClass
 import com.averycorp.prismtask.ui.theme.PriorityColors
 import com.averycorp.prismtask.ui.theme.PrismTaskTheme
 import com.averycorp.prismtask.ui.theme.ThemeViewModel
@@ -136,6 +137,7 @@ class MainActivity : ComponentActivity() {
 
     private val launchActionState = mutableStateOf<WidgetLaunchAction?>(null)
 
+    @OptIn(androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -574,7 +576,12 @@ class MainActivity : ComponentActivity() {
                         .collectAsStateWithLifecycle(initialValue = java.time.LocalDate.now())
                     val dayBounds = remember(logicalDate) { DayBounds.logical(logicalDate) }
 
-                    CompositionLocalProvider(LocalDayBounds provides dayBounds) {
+                    val windowSizeClass = androidx.compose.material3.windowsizeclass
+                        .calculateWindowSizeClass(this@MainActivity)
+                    CompositionLocalProvider(
+                        LocalDayBounds provides dayBounds,
+                        LocalWindowSizeClass provides windowSizeClass
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
