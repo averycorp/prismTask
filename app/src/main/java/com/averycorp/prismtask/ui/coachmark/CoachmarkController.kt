@@ -98,7 +98,7 @@ class CoachmarkController(
      */
     fun next(isProActive: Boolean = true) {
         val current = _state.value as? CoachmarkState.ShowingStep ?: return
-        when (current.step.action) {
+        when (val action = current.step.action) {
             is CoachmarkAction.Finish -> finishCompleted()
             is CoachmarkAction.Navigate -> {
                 val next = nextEligibleIndex(current.stepIndex, isProActive)
@@ -108,10 +108,10 @@ class CoachmarkController(
                     scope.launch { tourCardPreferences.setCoachmarkStepIndex(next) }
                     _state.value = CoachmarkState.Navigating(
                         pendingStepIndex = next,
-                        routeKey = (current.step.action as CoachmarkAction.Navigate).routeKey
+                        routeKey = action.routeKey
                     )
                     _hostEvent.value = CoachmarkHostEvent.Navigate(
-                        routeKey = (current.step.action as CoachmarkAction.Navigate).routeKey,
+                        routeKey = action.routeKey,
                         stepIndex = next
                     )
                 }
@@ -198,14 +198,14 @@ class CoachmarkController(
         return nextEligibleIndex(from, isProActive)
     }
 
-    private fun isStepEligible(step: CoachmarkStep, isProActive: Boolean): Boolean {
-        // Pro-gated steps: the audit calls for "show with upsell copy" rather
-        // than skip, so eligibility ignores `requiresPro`. Hosts can render
-        // upsell variants. This method is kept for future selective skipping.
-        @Suppress("UNUSED_PARAMETER") val unused = isProActive
-        @Suppress("UNUSED_PARAMETER") val unused2 = step
-        return true
-    }
+    /**
+     * Pro-gated steps: the audit calls for "show with upsell copy" rather
+     * than skip, so eligibility currently always returns true. Hosts can
+     * render upsell variants based on [CoachmarkStep.requiresPro]. Kept as
+     * a hook for future selective skipping driven by [step] / [isProActive].
+     */
+    @Suppress("UNUSED_PARAMETER")
+    private fun isStepEligible(step: CoachmarkStep, isProActive: Boolean): Boolean = true
 
     private suspend fun eligibleForStart(): Boolean {
         val eligible = tourCardPreferences.eligible().first()

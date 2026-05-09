@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors
 import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.QuickAddBar
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
@@ -51,12 +52,12 @@ internal fun FloatingQuickAddBar(
         bottomEnd = 0.dp
     )
 
-    Box(modifier = Modifier.coachmarkAnchor(com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.TODAY_QUICK_ADD)) {
+    val anchor = Modifier.coachmarkAnchor(CoachmarkAnchors.TODAY_QUICK_ADD)
     when {
         // Cyberpunk — dashed neon border, transparent fill
         attrs.brackets -> {
             Box(
-                modifier = Modifier
+                modifier = anchor
                     .fillMaxWidth()
                     .background(colors.background)
                     .border(
@@ -80,7 +81,7 @@ internal fun FloatingQuickAddBar(
         // Synthwave — subtle gradient tint behind the bar (alpha=24/255≈0.094)
         attrs.sunset -> {
             Box(
-                modifier = Modifier
+                modifier = anchor
                     .fillMaxWidth()
                     .background(
                         brush = Brush.horizontalGradient(
@@ -104,7 +105,7 @@ internal fun FloatingQuickAddBar(
         // Matrix — solid thin primary border + "$  _" prompt prefix
         attrs.terminal -> {
             Row(
-                modifier = Modifier
+                modifier = anchor
                     .fillMaxWidth()
                     .background(colors.background)
                     .border(1.dp, colors.primary.copy(alpha = 0.5f), barShape)
@@ -128,6 +129,7 @@ internal fun FloatingQuickAddBar(
         // Void / default — frosted translucent surface
         else -> {
             Surface(
+                modifier = anchor,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 tonalElevation = 4.dp,
                 shadowElevation = 6.dp
@@ -146,8 +148,6 @@ internal fun FloatingQuickAddBar(
                 }
             }
         }
-    }
-
     }
 
     LaunchedEffect(autoStartVoice) {

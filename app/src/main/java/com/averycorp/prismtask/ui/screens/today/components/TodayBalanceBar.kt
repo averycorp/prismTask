@@ -2,7 +2,6 @@ package com.averycorp.prismtask.ui.screens.today.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +33,7 @@ import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.usecase.BalanceState
 import com.averycorp.prismtask.domain.usecase.BurnoutResult
 import com.averycorp.prismtask.domain.usecase.CognitiveLoadBalanceState
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.theme.CognitiveLoadColor
 import com.averycorp.prismtask.ui.theme.LifeCategoryColor
 
