@@ -164,12 +164,23 @@ class CoachmarkControllerTest {
     @Test
     fun dismiss_marks_dismissed_and_persists() = runTest(testDispatcher) {
         prefs.markEligible()
-        val c = controller()
+        val controllerScope = TestScope(testDispatcher)
+        val c = CoachmarkController(
+            tourCardPreferences = prefs,
+            tour = tour,
+            scope = controllerScope
+        )
         c.tryStart()
         advanceUntilIdle()
         c.dismiss()
         advanceUntilIdle()
         assertEquals(CoachmarkState.Dismissed, c.state.value)
+        // dismiss() persists via scope.launch on the controller's scope;
+        // advanceUntilIdle drains the test scheduler but the launched
+        // coroutine ultimately suspends on DataStore's IO actor, which
+        // completes off-scheduler. Join the controller scope's in-flight
+        // children so the write is observed before we read it back.
+        controllerScope.coroutineContext.job.children.toList().joinAll()
         assertTrue(prefs.coachmarkDismissed().first())
     }
 
