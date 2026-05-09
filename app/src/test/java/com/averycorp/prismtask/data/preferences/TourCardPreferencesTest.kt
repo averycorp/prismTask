@@ -92,4 +92,71 @@ class TourCardPreferencesTest {
         assertEquals(2, prefs.stepIndex().first())
         assertTrue(prefs.dismissed().first())
     }
+
+    // ─── Coachmark tour keys (post-onboarding 13-surface walkthrough) ──────
+
+    @Test
+    fun coachmark_completed_defaults_to_false() = runTest {
+        assertFalse(prefs.coachmarkCompleted().first())
+    }
+
+    @Test
+    fun coachmark_dismissed_defaults_to_false() = runTest {
+        assertFalse(prefs.coachmarkDismissed().first())
+    }
+
+    @Test
+    fun coachmark_step_index_defaults_to_zero() = runTest {
+        assertEquals(0, prefs.coachmarkStepIndex().first())
+    }
+
+    @Test
+    fun mark_coachmark_completed_flips_flag() = runTest {
+        prefs.markCoachmarkCompleted()
+        assertTrue(prefs.coachmarkCompleted().first())
+    }
+
+    @Test
+    fun mark_coachmark_dismissed_flips_flag() = runTest {
+        prefs.markCoachmarkDismissed()
+        assertTrue(prefs.coachmarkDismissed().first())
+    }
+
+    @Test
+    fun set_coachmark_step_index_round_trips() = runTest {
+        prefs.setCoachmarkStepIndex(7)
+        assertEquals(7, prefs.coachmarkStepIndex().first())
+    }
+
+    @Test
+    fun set_coachmark_step_index_clamps_negative_to_zero() = runTest {
+        prefs.setCoachmarkStepIndex(-3)
+        assertEquals(0, prefs.coachmarkStepIndex().first())
+    }
+
+    @Test
+    fun reset_clears_coachmark_keys_too() = runTest {
+        prefs.markCoachmarkCompleted()
+        prefs.markCoachmarkDismissed()
+        prefs.setCoachmarkStepIndex(5)
+        prefs.resetTourCard()
+        assertFalse(prefs.coachmarkCompleted().first())
+        assertFalse(prefs.coachmarkDismissed().first())
+        assertEquals(0, prefs.coachmarkStepIndex().first())
+    }
+
+    @Test
+    fun reset_clears_both_tour_card_and_coachmark_state() = runTest {
+        prefs.markEligible()
+        prefs.setStepIndex(3)
+        prefs.markCoachmarkCompleted()
+        prefs.setCoachmarkStepIndex(8)
+        prefs.resetTourCard()
+        // Existing 5-step Today card keys
+        assertFalse(prefs.eligible().first())
+        assertEquals(0, prefs.stepIndex().first())
+        // New coachmark keys
+        assertFalse(prefs.coachmarkCompleted().first())
+        assertEquals(0, prefs.coachmarkStepIndex().first())
+    }
 }

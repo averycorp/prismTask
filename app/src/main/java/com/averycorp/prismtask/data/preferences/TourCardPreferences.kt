@@ -49,6 +49,13 @@ constructor(
         private val TOUR_CARD_ELIGIBLE = booleanPreferencesKey("tour_card_eligible")
         private val TOUR_CARD_DISMISSED = booleanPreferencesKey("tour_card_dismissed")
         private val TOUR_STEP_INDEX = intPreferencesKey("tour_step_index")
+        // Coachmark tour (post-onboarding 13-surface walkthrough). Reuses
+        // the same DataStore so account-wipe (PR #1180) and debug-reset
+        // paths stay single-store. Eligibility shares the same gate as
+        // the 5-step Today card: only `markEligible()` flips it.
+        private val COACHMARK_TOUR_COMPLETED = booleanPreferencesKey("coachmark_tour_completed")
+        private val COACHMARK_TOUR_DISMISSED = booleanPreferencesKey("coachmark_tour_dismissed")
+        private val COACHMARK_STEP_INDEX = intPreferencesKey("coachmark_step_index")
     }
 
     /** True iff the user finished onboarding via SetupPage and the tour
@@ -84,6 +91,36 @@ constructor(
         }
     }
 
+    fun coachmarkCompleted(): Flow<Boolean> = context.tourCardDataStore.data.map { prefs ->
+        prefs[COACHMARK_TOUR_COMPLETED] ?: false
+    }
+
+    fun coachmarkDismissed(): Flow<Boolean> = context.tourCardDataStore.data.map { prefs ->
+        prefs[COACHMARK_TOUR_DISMISSED] ?: false
+    }
+
+    fun coachmarkStepIndex(): Flow<Int> = context.tourCardDataStore.data.map { prefs ->
+        prefs[COACHMARK_STEP_INDEX] ?: 0
+    }
+
+    suspend fun setCoachmarkStepIndex(index: Int) {
+        context.tourCardDataStore.edit { prefs ->
+            prefs[COACHMARK_STEP_INDEX] = index.coerceAtLeast(0)
+        }
+    }
+
+    suspend fun markCoachmarkCompleted() {
+        context.tourCardDataStore.edit { prefs ->
+            prefs[COACHMARK_TOUR_COMPLETED] = true
+        }
+    }
+
+    suspend fun markCoachmarkDismissed() {
+        context.tourCardDataStore.edit { prefs ->
+            prefs[COACHMARK_TOUR_DISMISSED] = true
+        }
+    }
+
     /** Debug-only: clear all tour flags so the card re-appears alongside
      *  a re-run of onboarding. Wired into `SettingsViewModel.resetOnboarding`. */
     suspend fun resetTourCard() {
@@ -91,6 +128,9 @@ constructor(
             prefs.remove(TOUR_CARD_ELIGIBLE)
             prefs.remove(TOUR_CARD_DISMISSED)
             prefs.remove(TOUR_STEP_INDEX)
+            prefs.remove(COACHMARK_TOUR_COMPLETED)
+            prefs.remove(COACHMARK_TOUR_DISMISSED)
+            prefs.remove(COACHMARK_STEP_INDEX)
         }
     }
 }

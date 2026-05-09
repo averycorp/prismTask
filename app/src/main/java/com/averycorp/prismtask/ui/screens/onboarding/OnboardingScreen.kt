@@ -128,7 +128,7 @@ fun OnboardingScreen(
         ) { page ->
             when (page) {
                 0 -> WelcomePage(viewModel = viewModel)
-                1 -> ThemePickerPage()
+                1 -> ThemePickerPage(viewModel = viewModel)
                 2 -> SmartTasksPage()
                 3 -> ProjectsPage()
                 4 -> NaturalLanguagePage()
@@ -831,9 +831,13 @@ private fun ViewsPage() {
 
 @Composable
 private fun BrainModePage(viewModel: OnboardingViewModel) {
-    var adhdSelected by remember { mutableStateOf(false) }
-    var calmSelected by remember { mutableStateOf(false) }
-    var focusReleaseSelected by remember { mutableStateOf(false) }
+    // F8 idiom drift fix: read persisted state via the standard
+    // collectAsLocalState helper instead of `var ... by remember`. The
+    // setters now write through the ViewModel; backing up to this page
+    // shows the persisted selection.
+    val adhdSelected by collectAsLocalState(viewModel.adhdMode, initial = false)
+    val calmSelected by collectAsLocalState(viewModel.calmMode, initial = false)
+    val focusReleaseSelected by collectAsLocalState(viewModel.focusReleaseMode, initial = false)
     var expandedCard by remember { mutableIntStateOf(-1) }
 
     var visible by remember { mutableStateOf(false) }
@@ -885,8 +889,7 @@ private fun BrainModePage(viewModel: OnboardingViewModel) {
             isSelected = adhdSelected,
             isExpanded = expandedCard == 0,
             onToggle = {
-                adhdSelected = !adhdSelected
-                viewModel.setAdhdMode(!adhdSelected.not()) // toggle already flipped
+                viewModel.setAdhdMode(!adhdSelected)
                 if (expandedCard != 0) expandedCard = 0 else expandedCard = -1
             },
             onExpandToggle = { expandedCard = if (expandedCard == 0) -1 else 0 },
@@ -905,8 +908,7 @@ private fun BrainModePage(viewModel: OnboardingViewModel) {
             isSelected = calmSelected,
             isExpanded = expandedCard == 1,
             onToggle = {
-                calmSelected = !calmSelected
-                viewModel.setCalmMode(!calmSelected.not())
+                viewModel.setCalmMode(!calmSelected)
                 if (expandedCard != 1) expandedCard = 1 else expandedCard = -1
             },
             onExpandToggle = { expandedCard = if (expandedCard == 1) -1 else 1 },
@@ -926,8 +928,7 @@ private fun BrainModePage(viewModel: OnboardingViewModel) {
             isSelected = focusReleaseSelected,
             isExpanded = expandedCard == 2,
             onToggle = {
-                focusReleaseSelected = !focusReleaseSelected
-                viewModel.setFocusReleaseMode(!focusReleaseSelected.not())
+                viewModel.setFocusReleaseMode(!focusReleaseSelected)
                 if (expandedCard != 2) expandedCard = 2 else expandedCard = -1
             },
             onExpandToggle = { expandedCard = if (expandedCard == 2) -1 else 2 },
@@ -1659,6 +1660,9 @@ private fun NotificationsPage(viewModel: OnboardingViewModel) {
     val overload by collectAsLocalState(viewModel.overloadAlertsEnabled, initial = true)
     val streaks by collectAsLocalState(viewModel.streakAlertsEnabled, initial = true)
     val reengagement by collectAsLocalState(viewModel.reengagementEnabled, initial = true)
+    val taskReminders by collectAsLocalState(viewModel.taskRemindersEnabled, initial = true)
+    val timerAlerts by collectAsLocalState(viewModel.timerAlertsEnabled, initial = true)
+    val medicationReminders by collectAsLocalState(viewModel.medicationRemindersEnabled, initial = true)
 
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -1753,6 +1757,39 @@ private fun NotificationsPage(viewModel: OnboardingViewModel) {
             subtitle = "Occasional nudge if you've been away.",
             checked = reengagement,
             onCheckedChange = viewModel::setReengagementEnabled
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = "Per-Channel Reminders",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        LifeModeRow(
+            emoji = "✅",
+            title = "Task Reminders",
+            subtitle = "Per-task notifications you set yourself.",
+            checked = taskReminders,
+            onCheckedChange = viewModel::setTaskRemindersEnabled
+        )
+        LifeModeRow(
+            emoji = "⏱️",
+            title = "Timer Alerts",
+            subtitle = "Pomodoro start, break, finish chimes.",
+            checked = timerAlerts,
+            onCheckedChange = viewModel::setTimerAlertsEnabled
+        )
+        LifeModeRow(
+            emoji = "💊",
+            title = "Medication Reminders",
+            subtitle = "Per-slot dose alerts. Snoozable, not naggy.",
+            checked = medicationReminders,
+            onCheckedChange = viewModel::setMedicationRemindersEnabled
         )
     }
 }
@@ -1929,9 +1966,10 @@ private val OnboardingThemeEntries = listOf(
 )
 
 @Composable
-private fun ThemePickerPage() {
-    val viewModel: ThemeViewModel = hiltViewModel()
-    var selectedTheme by remember { mutableStateOf(viewModel.currentTheme.value) }
+private fun ThemePickerPage(viewModel: OnboardingViewModel) {
+    val themeViewModel: ThemeViewModel = hiltViewModel()
+    var selectedTheme by remember { mutableStateOf(themeViewModel.currentTheme.value) }
+    val widgetFollowsApp by collectAsLocalState(viewModel.widgetThemeFollowsApp, initial = true)
 
     Box(
         modifier = Modifier
@@ -1971,10 +2009,43 @@ private fun ThemePickerPage() {
                     isSelected = selectedTheme == entry.theme,
                     onSelect = {
                         selectedTheme = entry.theme
-                        viewModel.setTheme(entry.theme)
+                        themeViewModel.setTheme(entry.theme)
                     }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = ThemePickerCardBg),
+                border = BorderStroke(1.dp, ThemePickerBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Match Widgets to App Theme",
+                            color = ThemePickerText,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Off lets you set a separate widget theme in Settings.",
+                            color = ThemePickerSubtext,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(
+                        checked = widgetFollowsApp,
+                        onCheckedChange = viewModel::setWidgetThemeFollowsApp
+                    )
+                }
             }
         }
     }

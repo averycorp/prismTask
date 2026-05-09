@@ -62,6 +62,26 @@ sealed class WidgetLaunchAction {
         }
     }
 
+    /**
+     * Resume the post-onboarding coachmark tour at [stepIndex]. Used by a
+     * future tour resume notification / widget; the in-app resume chip
+     * doesn't need this since it talks to the controller directly.
+     */
+    data class OpenTourStep(val stepIndex: Int) : WidgetLaunchAction() {
+        override val wireId: String = "$WIRE_ID_PREFIX:$stepIndex"
+
+        companion object {
+            const val WIRE_ID_PREFIX: String = "open_tour_step"
+
+            fun parseWireId(wireId: String): OpenTourStep? {
+                if (!wireId.startsWith("$WIRE_ID_PREFIX:")) return null
+                val idx = wireId.removePrefix("$WIRE_ID_PREFIX:").toIntOrNull() ?: return null
+                if (idx < 0) return null
+                return OpenTourStep(idx)
+            }
+        }
+    }
+
     companion object {
         /**
          * Rehydrate a wire-format action. `wireId` is the string the widget
@@ -85,7 +105,7 @@ sealed class WidgetLaunchAction {
                 OpenMedication.wireId -> OpenMedication
                 OpenInsights.wireId -> OpenInsights
                 OpenTask.WIRE_ID -> taskId?.let(::OpenTask)
-                else -> null
+                else -> OpenTourStep.parseWireId(wireId)
             }
         }
     }
