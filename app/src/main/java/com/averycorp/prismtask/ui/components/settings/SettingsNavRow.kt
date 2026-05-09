@@ -99,6 +99,7 @@ fun SettingsNavRow(
     iconEmoji: String,
     iconBgColor: Color,
     isPro: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val prismColors = LocalPrismColors.current
@@ -106,7 +107,7 @@ fun SettingsNavRow(
     val badgeRadius = (attrs.cardRadius / 2).coerceAtLeast(4).dp
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp),

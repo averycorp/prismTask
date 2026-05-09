@@ -345,6 +345,20 @@ val ALL_BOTTOM_NAV_ITEMS = listOf(
 
 private const val NAV_ANIM_DURATION = 300
 
+/**
+ * Map a bottom-nav route to its coachmark anchor id, or null if the route
+ * is not a tour target. Used by the [PrismTaskNavGraph] bottom-bar loop to
+ * register per-tab anchors on the [NavigationBarItem] that owns each route.
+ */
+private fun bottomNavCoachmarkAnchor(route: String): String? = when (route) {
+    PrismTaskRoute.TaskList.route -> CoachmarkAnchors.NAV_TASKS_TAB
+    PrismTaskRoute.HabitList.route -> CoachmarkAnchors.NAV_HABITS_TAB
+    PrismTaskRoute.Medication.route -> CoachmarkAnchors.NAV_MEDS_TAB
+    PrismTaskRoute.Timer.route -> CoachmarkAnchors.OPEN_TIMER_ENTRY
+    PrismTaskRoute.Settings.route -> CoachmarkAnchors.NAV_SETTINGS_TAB
+    else -> null
+}
+
 @Composable
 fun PrismTaskNavGraph(
     modifier: Modifier = Modifier,
@@ -522,9 +536,15 @@ fun PrismTaskNavGraph(
                     ) {
                         bottomNavItems.forEachIndexed { index, item ->
                             val selected = pagerState.currentPage == index
+                            val tabAnchorId = bottomNavCoachmarkAnchor(item.route)
 
                             NavigationBarItem(
                                 selected = selected,
+                                modifier = if (tabAnchorId != null) {
+                                    Modifier.coachmarkAnchor(tabAnchorId)
+                                } else {
+                                    Modifier
+                                },
                                 onClick = {
                                     coroutineScope.launch {
                                         pagerState.animateScrollToPage(index)

@@ -66,6 +66,7 @@ import com.averycorp.prismtask.ui.components.RichEmptyState
 import com.averycorp.prismtask.ui.components.TaskListSkeleton
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.components.WelcomeBackDialog
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.sync.SyncIndicatorHost
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.addedittask.AddEditTaskSheetHost
@@ -272,7 +273,10 @@ fun TodayScreen(
                             navController.navigate(PrismTaskRoute.AiChat.createRoute())
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.coachmarkAnchor(
+                            com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.AI_COACH_FAB
+                        )
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Chat,
@@ -550,7 +554,10 @@ fun TodayScreen(
                                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
                                 colors = chipColors,
-                                border = chipBorder
+                                border = chipBorder,
+                                modifier = Modifier.coachmarkAnchor(
+                                    com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.TODAY_AI_TOOLS_CHIP
+                                )
                             )
                         }
                     }

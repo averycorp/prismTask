@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.TaskEntity
+import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.theme.LocalPriorityColors
@@ -186,6 +187,9 @@ fun EisenhowerScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .coachmarkAnchor(
+                        com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.EISENHOWER_QUADRANT_GRID
+                    )
             ) {
                 // Screen-level banner for Empty and Error states. Renders
                 // above the grid so the user sees it even when the grid
