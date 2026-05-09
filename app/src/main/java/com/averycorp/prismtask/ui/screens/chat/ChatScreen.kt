@@ -76,6 +76,7 @@ import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.ui.components.ProFeature
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
+import com.averycorp.prismtask.ui.theme.expandedWidthCap
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -277,7 +278,8 @@ fun ChatScreen(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .expandedWidthCap(maxWidth = 600.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
