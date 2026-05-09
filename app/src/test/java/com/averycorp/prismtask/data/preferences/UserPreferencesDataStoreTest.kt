@@ -272,6 +272,7 @@ class UserPreferencesDataStoreTest {
         assertTrue(p.dailyBriefingEnabled)
         assertTrue(p.smartPomodoroEnabled)
         assertTrue(p.weeklyPlannerEnabled)
+        assertTrue(p.morningCheckInEnabled)
     }
 
     @Test
@@ -301,6 +302,18 @@ class UserPreferencesDataStoreTest {
     fun `set weekly planner enabled false persists round trip`() = runTest {
         prefs.setAiWeeklyPlannerEnabled(false)
         assertFalse(prefs.perFeatureAiPrefsFlow.first().weeklyPlannerEnabled)
+    }
+
+    @Test
+    fun `set morning checkin enabled false persists round trip`() = runTest {
+        prefs.setAiMorningCheckInEnabled(false)
+        val p = prefs.perFeatureAiPrefsFlow.first()
+        assertFalse(p.morningCheckInEnabled)
+        // Other per-feature prefs unaffected.
+        assertTrue(p.chatEnabled)
+        assertTrue(p.dailyBriefingEnabled)
+        assertTrue(p.smartPomodoroEnabled)
+        assertTrue(p.weeklyPlannerEnabled)
     }
 
     @Test
