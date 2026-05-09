@@ -664,24 +664,17 @@ class MainActivity : ComponentActivity() {
         routeKey: String,
         navController: androidx.navigation.NavController
     ) {
+        // Top-level bottom-nav targets (TASKS/HABITS/MEDICATIONS/SETTINGS)
+        // are no-ops here — the host pager is the navigator, not the
+        // NavController, and the spotlight on the tab itself is the
+        // teaching surface (no navigation needed).
         when (routeKey) {
-            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.TASKS,
-            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.HABITS,
-            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.MEDICATIONS,
-            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.SETTINGS -> {
-                // Top-level bottom-nav targets — host pager is the navigator,
-                // not the NavController. Tour steps that target tabs leave
-                // the user on Today; the spotlight on the tab itself is the
-                // teaching surface, not a navigation.
-                Unit
-            }
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.EISENHOWER ->
                 navController.navigate(PrismTaskRoute.EisenhowerMatrix.route)
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.TIMER ->
                 navController.navigate(PrismTaskRoute.Timer.route)
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.SETTINGS_APPEARANCE ->
                 navController.navigate(PrismTaskRoute.Settings.route)
-            else -> Unit
         }
     }
 
