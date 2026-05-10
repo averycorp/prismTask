@@ -1741,7 +1741,11 @@ private fun OnboardingPageLayout(
             val horizontalPadding = if (
                 fold?.state == FoldingFeature.State.HALF_OPENED &&
                 fold.orientation == FoldingFeature.Orientation.VERTICAL
-            ) 56.dp else 32.dp
+            ) {
+                56.dp
+            } else {
+                32.dp
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(horizontal = horizontalPadding)
