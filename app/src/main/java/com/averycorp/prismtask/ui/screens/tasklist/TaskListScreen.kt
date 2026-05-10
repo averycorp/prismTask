@@ -99,7 +99,9 @@ import com.averycorp.prismtask.ui.screens.tasklist.components.reorderableTaskIte
 import com.averycorp.prismtask.ui.screens.tasklist.components.taskItemWithSubtasks
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
+import com.averycorp.prismtask.ui.theme.expandedWidthCap
 import com.averycorp.prismtask.ui.theme.gridFloor
+import com.averycorp.prismtask.ui.theme.hingeAwareHorizontalPadding
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
@@ -813,11 +815,18 @@ fun TaskListScreen(
                         draftOrder = mutable
                     }
                 }
+                // F-FOLDABLE-001 — hinge-aware horizontal padding +
+                // expandedWidthCap for tablet width. Helper returns
+                // horizontal = 16.dp on phones (no regression on the
+                // dominant device segment); widens on HALF_OPENED + VERTICAL
+                // folds. expandedWidthCap is a no-op below Expanded width.
+                val hingePadding = hingeAwareHorizontalPadding()
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp),
+                        .padding(hingePadding)
+                        .expandedWidthCap(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
