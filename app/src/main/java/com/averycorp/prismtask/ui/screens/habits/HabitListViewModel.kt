@@ -293,19 +293,28 @@ constructor(
         val showStreak = habit?.habit?.showStreak == true
 
         if (routineType == "medication") {
-            // Mirror MedicationScreen's counter: count how many time-of-day
-            // groups that actually have scheduled meds have been "clicked"
-            // (any tier picked, including "skipped").
+            // D8 Item 8 reader migration. The medication card has been a
+            // top-level destination (`MedicationScreen`) since v1.6;
+            // `MedicationViewModel` reads `medication_tier_states`
+            // directly and is the live consumer of tier-block state.
+            //
+            // This HabitList branch is no longer wired into any caller
+            // (see the `combine` block above — `medLog`/`medSteps` are
+            // combined but never passed to `computeCardData`). The
+            // legacy `tiers_by_time` JSON read that lived here was the
+            // only remaining UI consumer of the column; eliminating it
+            // closes Item 8's reader-migration step. If the medication
+            // tile is ever re-enabled on this screen, plumb a per-block
+            // flow from `MedicationTierStateDao.getDistinctTimeOfDayForDateOnce`
+            // rather than re-introducing the JSON parse.
             val scheduledTods = SelfCareRoutines.timesOfDay
                 .filter { tod -> steps.any { step -> tod.id in SelfCareRoutines.parseTimeOfDay(step.timeOfDay) } }
                 .map { it.id }
-            val tiersByTime = selfCareRepository.parseTiersByTime(log?.tiersByTime ?: "{}")
-            val clickedCount = scheduledTods.count { it in tiersByTime.keys }
             return SelfCareCardData(
-                completedCount = clickedCount,
+                completedCount = 0,
                 totalCount = scheduledTods.size,
                 tierLabel = tierLabel,
-                isComplete = scheduledTods.isNotEmpty() && clickedCount == scheduledTods.size,
+                isComplete = false,
                 currentStreak = currentStreak,
                 showStreak = showStreak
             )

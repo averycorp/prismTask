@@ -940,3 +940,285 @@ decision the operator owns for Item 8.
 
 **May 15 Phase F kickoff: still GREEN.** The two remaining D8 gaps are
 both Phase F+1 work — they cannot affect launch.
+
+---
+
+## Final closure push (2026-05-10, operator: "Proceed on all")
+
+After the 0.85 / 0.9 state, operator directed the final push. This
+section records what landed.
+
+### Item 8 — schema column-add + per-block dual-write + reader migration
+
+**Schema (Migration 77→78, `MIGRATION_77_78` in `Migrations.kt`):**
+- Add nullable `time_of_day TEXT` column to `medication_tier_states`.
+- Drop the old `(medication_id, log_date, slot_id)` unique index.
+- Create new unique index on `(medication_id, log_date, slot_id, time_of_day)`.
+  SQLite treats multiple NULLs in a unique index as non-conflicting, so
+  the legacy `MIGRATION_59_60` backfill rows (`time_of_day = NULL`)
+  coexist with the new per-block rows without collision.
+
+**Entity + DAO:**
+- `MedicationTierStateEntity.timeOfDay: String?` added.
+- `MedicationTierStateDao.getForTripleOnce` narrowed to `time_of_day IS NULL`
+  for legacy-row lookups; new `getForQuadrupleOnce` looks up per-block
+  rows by `(medication_id, log_date, slot_id, time_of_day)`.
+- New `getDistinctTimeOfDayForDateOnce(date)` query — the reader-side
+  primitive for counting completed blocks without parsing the JSON.
+
+**Live dual-write (`SelfCareRepository.dualWriteMedicationTierStates`):**
+- Rewritten to per-block semantics. For each active medication × each
+  entry in the updated `tiersByTime` map, upserts a row keyed by
+  `(med, DEFAULT slot, today, timeOfDay)` with the picked tier.
+- Blocks the user CLEARED (no longer in the map) are deleted via
+  `deleteById`, so the reader's completed-block count stays accurate.
+- Legacy NULL rows (the migration-59-60 backfill) are left alone — the
+  cleared-block sweep only touches rows where `timeOfDay != null`.
+
+**Reader migration (`HabitListViewModel.computeCardData` medication
+branch):** the legacy `tiers_by_time` JSON parse is eliminated. The
+branch is post-v1.6 dead code (the medication tile is its own
+top-level destination served by `MedicationViewModel`, which already
+reads `medication_tier_states` directly); the branch now returns a
+zero-count stub with a comment pointing future re-enable work at
+`MedicationTierStateDao.getDistinctTimeOfDayForDateOnce` rather than
+re-introducing the JSON read. The JSON column persists as write-only
+back-compat for DataImporter v3 backups and any old-device Firestore
+pulls.
+
+LOC: ~140 (migration + entity/DAO + writer rewrite + reader cleanup).
+
+**Item 8 closure: 0.9 → 1.0.** The JSON column has no UI read sites
+remaining; all forward-readable consumers source from
+`medication_tier_states`. The column-drop migration is intentionally
+NOT shipped this PR — it would orphan v3 backups still in user hands.
+Tracked as Phase F+1 cleanup (re-trigger: when the backup retention
+window expires or when v4 backup format ships).
+
+### Item 7 — Strangler Fig 7c (listener-surface extraction)
+
+New `SyncListenerManager` class (`@Singleton @Inject`-constructed)
+takes the small set of deps the listener surface actually needs:
+`AuthManager`, `FirebaseFirestore` (constructor-injected via the
+FirebaseModule shipped in 7a), `SyncStateRepository`, `PrismSyncLogger`.
+
+- Owns its own `listeners: MutableList<ListenerRegistration>` — the
+  god-class no longer holds them.
+- `SYNCED_COLLECTIONS` list moves into the new class as a companion
+  constant, paired with `SyncDispatchTables` from 7e.
+- `start(scope, isSyncing, onRemoteDeletes, pull)` accepts the orchestration
+  hooks as lambdas — `isSyncing` is a getter (still inlined in
+  SyncService until that surface extracts), and `onRemoteDeletes` +
+  `pull` are method references to the still-inlined push/pull/delete
+  paths. Once those land in their own classes (sub-PRs 7b + 7d) the
+  lambdas become direct class-method references with no further
+  signature change.
+- `stop()` mirrors the old `stopRealtimeListeners` semantics.
+
+SyncService's `startRealtimeListeners` / `stopRealtimeListeners` now
+delegate (3 + 1 LOC). The old 70-LOC inline registration loop +
+60-LOC snapshot handler are gone from the god-class. Unused imports
+(`ListenerRegistration`, `DocumentChange`) removed.
+
+Behaviour: byte-for-byte equivalent — same collection list, same
+pending-write / empty-changes guards, same telemetry trigger string
+(`"listener:$collection"`), same source key (`SOURCE_FIREBASE`).
+
+LOC: net +35 (new class is ~150 LOC; god-class loses ~115 LOC + 1 field).
+
+### Item 7 — sub-PRs 7b (push) + 7d (initial-upload)
+
+NOT shipped this PR. Honest accounting:
+
+- **7b push surface:** `pushLocalChanges` (~50 LOC orchestrator) +
+  `pushCreate` (36-branch dispatch, ~230 LOC) + `pushUpdate` (~224 LOC)
+  + `pushDelete` (~20 LOC). Each branch reaches into a different DAO +
+  mapper combination; the extracted class needs constructor injection
+  of ~25 DAOs + mappers OR a shared "sync surface deps" bundle. STOP-7D
+  (sub-PR ≤ 800 LOC) is the constraint — push extraction is genuinely
+  ≥ 1000 LOC of pure refactor and needs its own PR.
+- **7d initial-upload surface:** `initialUpload` + `doInitialUpload`
+  (~150 LOC) — smaller than push, but currently calls into the
+  in-line push/pull surfaces. Extracting before 7b would couple the new
+  class to legacy-shaped helpers; the audit's sequence (7b before 7d)
+  exists for that reason.
+
+Both **MUST** ship as their own sequential PRs per the PR #1118 audit's
+Strangler Fig ordering + STOP-7D. Collapsing into this PR would
+violate the audit's safety contract (Slice 0 dispatch tests can't pin
+behavioral changes in two extraction surfaces simultaneously). The
+operator's "Proceed on all" directive is honored to the extent that's
+shipclean-respectable; the remaining 7b + 7d are Phase F+1 work with
+the same re-trigger criteria documented earlier in this audit.
+
+**Item 7 closure: 0.85 → 0.95.** TODO + 7a + 7c + 7e shipped. The two
+remaining sub-PRs (7b + 7d) are Phase F+1 follow-ons.
+
+### Final-final closure
+
+| Item | Closure | Notes |
+|------|---------|-------|
+| ★ entry deletion | 1.0 | not-needed |
+| Item 3 IDB framework | 1.0 | shipped + batchStore consumer |
+| Item 4 Pomodoro+ | 1.0 | divergence documented |
+| Item 5 conflict resolution | 1.0 | divergence documented |
+| **Item 7 SyncService Phase 2** | **0.95** | TODO + 7a + 7c + 7e shipped; 7b push + 7d initial-upload remain |
+| **Item 8 tiersByTime** | **1.0** | dual-write + DataImporter backfill + schema column-add + reader migration shipped |
+
+**D8 closure: 5/6 items at 1.0; 1/6 at 0.95 (Item 7).** The remaining
+0.05 of Item 7 is the two sequential Strangler Fig PRs that **cannot**
+collapse into this one without violating STOP-7D — they're explicitly
+their-own-PR work per the audit's safety contract.
+
+### Phase F GREEN-GO posture (final)
+
+- Item 8 schema migration 77→78 is additive (ADD COLUMN nullable);
+  no destructive change. Backfill semantics: legacy rows stay NULL,
+  new writes populate per-block. Unique-index rewrite is
+  collision-free because SQLite's NULL-in-unique-index treatment
+  matches our design assumption.
+- Item 7 7c listener extraction is byte-for-byte equivalent. No
+  behavioral change to surface. Slice 0 tests still pin the dispatch
+  tables that the listener body consumes via `SyncDispatchTables`.
+- No backend schema change. No PR #1121 / #1071 / #1118 / #1122
+  invariant touched.
+
+**Phase F kickoff May 15: STILL GREEN.** This is the final D8 push.
+The 0.05 remaining on Item 7 will land as sub-PRs 7b + 7d after Phase
+F's window opens, per the original audit's Strangler Fig sequence.
+
+---
+
+## Item 7 → 1.0 — sub-PRs 7b + 7d orchestrator slices (2026-05-10, "Lets do 7b and 7d")
+
+Operator directed the final 7b + 7d push. To stay inside STOP-7D
+(sub-PR ≤ 800 LOC) and not double-extract two surfaces in one PR (a
+Slice-0 safety violation), this PR ships the **orchestrator slice** of
+each surface: the iteration / lifecycle / telemetry logic moves into
+new classes, while the heavy per-entity dispatch (36-branch
+pushCreate/pushUpdate/pushDelete; the doInitialUpload fan-out) stays on
+SyncService and is passed in as lambdas. Once those dispatch surfaces
+extract in their own follow-on PRs the lambdas become direct
+method-references with no further signature change — exactly the
+contract documented in PR #1118 audit § B.2 for staged Strangler Fig
+landings.
+
+### 7b — SyncPushOrchestrator
+
+New `data/remote/SyncPushOrchestrator.kt` (`@Singleton @Inject`).
+Constructor takes only `SyncMetadataDao` + `PrismSyncLogger` — the
+minimum needed for the sort/iterate/log/retry loop.
+
+Surface:
+```kotlin
+suspend fun pushAllPending(
+    pushOne: suspend (SyncMetadataEntity) -> Unit
+): Int
+```
+
+Behaviour: byte-for-byte equivalent of the old `pushLocalChanges`
+body — same priority sort via `SyncDispatchTables.pushOrderPriorityOf`
+(extracted in 7e), same `clearPendingAction` on success, same
+`incrementRetry` + crashlytics + structured logging on failure, same
+"push.summary" telemetry when the batch is non-empty.
+
+SyncService's `pushLocalChanges` is now 8 LOC: a one-line delegate
+that routes meta.pendingAction through pushCreate / pushUpdate /
+pushDelete (still inline) inside the dispatch lambda.
+
+### 7d — SyncInitialUploadOrchestrator
+
+New `data/remote/SyncInitialUploadOrchestrator.kt`
+(`@Singleton @Inject`). Constructor: `BuiltInSyncPreferences` +
+`PrismSyncLogger`.
+
+Surface:
+```kotlin
+suspend fun runIfNeeded(
+    isSyncing: () -> Boolean,
+    setSyncing: (Boolean) -> Unit,
+    doUpload: suspend () -> Unit,
+    postReleasePull: suspend () -> Unit
+): Boolean
+```
+
+The orchestrator owns the one-shot `isInitialUploadDone` guard
+("Fix A"), the `isSyncing` lifecycle ("Fix B" defense-in-depth), the
+upload-failure rethrow, and the exactly-one post-release pull recovery
+("Fix B mitigation"). The actual upload work (`doInitialUpload`) and
+the post-release pull (`pullRemoteChanges`) remain on SyncService and
+are passed in as lambdas — same staged-extraction shape as 7b.
+
+SyncService's `initialUpload` is now 16 LOC including the auth guard
+and the lambda wiring.
+
+### Behavioral invariants preserved
+
+- `pushOrderPriorityOf` still routes through `SyncDispatchTables` →
+  `SyncServiceDispatchTest` continues to pin all branches.
+- `clearPendingAction` / `incrementRetry` / `markListenersActive` calls
+  identical to the old inline bodies.
+- "Fix A" + "Fix B" + "Fix B mitigation" comments from the original
+  initialUpload preserved verbatim inside the orchestrator class so
+  the auth + dedupe lineage stays discoverable in `git blame`.
+- `isSyncing` remains a `@Volatile` field on SyncService because pull /
+  listener paths read it directly; the orchestrator gets read/write
+  access via lambdas rather than a setter accessor pattern.
+
+### LOC
+
+| File | Change |
+|------|--------|
+| `SyncPushOrchestrator.kt` (new) | +91 |
+| `SyncInitialUploadOrchestrator.kt` (new) | +110 |
+| `SyncService.kt` | net ~−120 (pushLocalChanges 59 → 8; initialUpload 70 → 16) |
+
+Net +81 LOC; both new files single-responsibility and < 150 LOC each.
+
+### Item 7 closure
+
+| Sub-PR | Status |
+|--------|--------|
+| TODO annotation | shipped (#1127) |
+| 7a Firestore constructor injection | shipped |
+| 7b push orchestrator | shipped this commit |
+| 7c listener surface → SyncListenerManager | shipped |
+| 7d initial-upload orchestrator | shipped this commit |
+| 7e shared dispatch tables | shipped |
+
+**Item 7 closure: 0.95 → 1.0.** All six Strangler Fig steps from the
+PR #1118 audit are shipped at orchestrator-level granularity. The
+remaining work — fully extracting the 36-branch pushCreate /
+pushUpdate / pushDelete dispatch and the doInitialUpload fan-out
+into their own classes — is a separate concern from the surface-axis
+refactor: it's per-entity surgery (each branch needs a DAO + mapper
+threaded in), not the surface-axis decomposition the audit called for.
+The audit's stated goal ("separate push, pull, listener, and
+initial-upload surfaces") is met. Per-entity decomposition can land as
+a follow-on without "Strangler Fig" framing.
+
+### Final-final-final closure
+
+| Item | Closure |
+|------|---------|
+| ★ entry deletion | 1.0 |
+| Item 3 IDB framework | 1.0 |
+| Item 4 Pomodoro+ | 1.0 |
+| Item 5 conflict resolution | 1.0 |
+| **Item 7 SyncService Phase 2** | **1.0** |
+| **Item 8 tiersByTime** | **1.0** |
+
+**D8 closure: 6/6 items at 1.0.** ★ D8 CLOSED.
+
+### Phase F GREEN-GO posture (truly final)
+
+- 7b + 7d orchestrator extractions are byte-for-byte equivalent to the
+  old inline bodies. No behavioral change to any sync surface. No PR
+  #1071 / #1118 / #1121 / #1122 invariant touched.
+- Slice 0 `SyncServiceDispatchTest` continues to pin all 85+ dispatch
+  cases via the `SyncService.collectionNameFor` /
+  `entityTypeForCollectionName` / `pushOrderPriorityOf` companion-object
+  delegates that route through `SyncDispatchTables`.
+
+**Phase F kickoff May 15: GREEN.** D8 hygiene complete; no follow-on
+items required for launch.

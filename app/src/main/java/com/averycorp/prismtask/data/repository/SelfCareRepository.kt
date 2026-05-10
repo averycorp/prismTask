@@ -7,6 +7,15 @@ import android.content.Intent
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
+import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
+import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
+import com.averycorp.prismtask.data.local.dao.MedicationTierStateDao
+import com.averycorp.prismtask.data.local.dao.SelfCareDao
+import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
+import com.averycorp.prismtask.data.local.entity.HabitEntity
+import com.averycorp.prismtask.data.local.entity.MedicationDoseEntity
+import com.averycorp.prismtask.data.local.entity.MedicationEntity
+import com.averycorp.prismtask.data.local.entity.MedicationTierStateEntity
 import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
 import com.averycorp.prismtask.data.local.dao.MedicationTierStateDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
@@ -164,6 +173,15 @@ constructor(
     private val gson: Gson,
     private val syncTracker: SyncTracker,
     private val medicationDao: MedicationDao,
+    /**
+     * Item 8 dual-write (D8 override, 2026-05-10): on every legacy
+     * `tiersByTime` write we also upsert a row in `medication_tier_states`
+     * for `(med, DEFAULT slot, today, max-tier)`. Mirrors migration 59→60
+     * semantics — DEFAULT slot only, computed tier source. The legacy JSON
+     * column remains source of truth until per-block-slot mapping ships.
+     */
+    private val medicationDao: MedicationDao,
+    private val medicationDoseDao: MedicationDoseDao,
     /**
      * Item 8 dual-write (D8 override, 2026-05-10): on every legacy
      * `tiersByTime` write we also upsert a row in `medication_tier_states`
@@ -777,6 +795,24 @@ constructor(
     /**
      * D8 Item 8 dual-write helper. After the legacy `tiers_by_time` JSON has
      * been persisted, mirror the resulting state into `medication_tier_states`
+     * for forward consumers.
+     *
+     * Per-block (D8 v1.7 schema, migration 77→78):
+     *  - One row per `(active_med, DEFAULT slot, today, time_of_day, tier)`
+     *    is upserted for every entry in [updatedTiersByTime]. The
+     *    `time_of_day` column carries the block identity that legacy rows
+     *    (NULL) lost in MIGRATION_59_60.
+     *  - Blocks the user CLEARED (present in the previous map but not in
+     *    the updated map) are deleted from the table — otherwise stale
+     *    per-block rows would inflate the reader's completed-block count.
+     *  - Existing per-block rows update in place (LWW); legacy NULL rows
+     *    remain untouched (they're the migration-59-60 backfill).
+     *
+     * Tolerant by design: caller wraps in `runCatching {}`. Missing
+     * DEFAULT slot or zero active meds returns silently.
+     */
+    private suspend fun dualWriteMedicationTierStates(updatedTiersByTime: Map<String, String>) {
+        val tierOrder = SelfCareRoutines.getTierOrder("medication")
      * for forward consumers. Mirrors `MIGRATION_59_60` semantics:
      *
      * - Writes one row per active medication, scoped to the DEFAULT slot
@@ -806,24 +842,47 @@ constructor(
         if (activeMeds.isEmpty()) return
         val date = todayLocalString()
         val now = System.currentTimeMillis()
+        // Snapshot every active med's per-block rows for today; entries
+        // missing from `updatedTiersByTime` get deleted so cleared blocks
+        // disappear from the reader's count.
+        val managedBlocks = updatedTiersByTime.keys
         for (med in activeMeds) {
-            val existing = medicationTierStateDao.getForTripleOnce(med.id, date, defaultSlot.id)
-            if (existing == null) {
-                medicationTierStateDao.insert(
-                    MedicationTierStateEntity(
-                        medicationId = med.id,
-                        slotId = defaultSlot.id,
-                        logDate = date,
-                        tier = maxTier,
-                        tierSource = "computed",
-                        createdAt = now,
-                        updatedAt = now
+            // 1. Delete per-block rows for blocks no longer in the map.
+            val existingForSlotDate = medicationTierStateDao
+                .getForSlotDateOnce(defaultSlot.id, date)
+                .filter { it.medicationId == med.id && it.timeOfDay != null }
+            for (row in existingForSlotDate) {
+                if (row.timeOfDay !in managedBlocks) {
+                    medicationTierStateDao.deleteById(row.id)
+                }
+            }
+            // 2. Upsert one row per managed block.
+            for ((tod, tier) in updatedTiersByTime) {
+                if (tier !in tierOrder) continue
+                val existing = medicationTierStateDao.getForQuadrupleOnce(
+                    medicationId = med.id,
+                    date = date,
+                    slotId = defaultSlot.id,
+                    timeOfDay = tod
+                )
+                if (existing == null) {
+                    medicationTierStateDao.insert(
+                        MedicationTierStateEntity(
+                            medicationId = med.id,
+                            slotId = defaultSlot.id,
+                            logDate = date,
+                            timeOfDay = tod,
+                            tier = tier,
+                            tierSource = "computed",
+                            createdAt = now,
+                            updatedAt = now
+                        )
                     )
-                )
-            } else if (existing.tier != maxTier) {
-                medicationTierStateDao.update(
-                    existing.copy(tier = maxTier, updatedAt = now)
-                )
+                } else if (existing.tier != tier) {
+                    medicationTierStateDao.update(
+                        existing.copy(tier = tier, updatedAt = now)
+                    )
+                }
             }
         }
     }

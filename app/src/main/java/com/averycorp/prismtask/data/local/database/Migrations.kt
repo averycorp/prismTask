@@ -2395,7 +2395,42 @@ val MIGRATION_76_77 = object : Migration(76, 77) {
     }
 }
 
-const val CURRENT_DB_VERSION = 77
+/**
+ * v1.7 D8 Item 8 closure — adds `time_of_day` to `medication_tier_states`
+ * so live writes can carry per-block identity that the legacy
+ * `tiers_by_time` JSON column had but `MIGRATION_59_60` dropped (the
+ * backfill used the DEFAULT slot for every legacy row, losing
+ * `timeOfDay` granularity).
+ *
+ * Schema change:
+ *  - Add nullable `time_of_day TEXT` column. NULL preserves the
+ *    legacy `MIGRATION_59_60`-backfilled rows (no `timeOfDay` was
+ *    knowable then); live writes from `SelfCareRepository.setTierForTime`
+ *    will populate per-block rows going forward.
+ *  - Replace the `(medication_id, log_date, slot_id)` unique index with
+ *    `(medication_id, log_date, slot_id, time_of_day)` so multiple
+ *    per-block rows can coexist for the same `(med, day, slot)` triple.
+ *    SQLite treats multiple NULL values in a unique index as
+ *    non-conflicting, so the legacy NULL row coexists with the new
+ *    per-block rows without collision.
+ */
+val MIGRATION_77_78 = object : Migration(77, 78) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE medication_tier_states ADD COLUMN time_of_day TEXT"
+        )
+        db.execSQL(
+            "DROP INDEX IF EXISTS `index_medication_tier_states_medication_id_log_date_slot_id`"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                "`index_medication_tier_states_medication_id_log_date_slot_id_time_of_day` " +
+                "ON `medication_tier_states` (`medication_id`, `log_date`, `slot_id`, `time_of_day`)"
+        )
+    }
+}
+
+const val CURRENT_DB_VERSION = 78
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2473,5 +2508,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_73_74,
     MIGRATION_74_75,
     MIGRATION_75_76,
-    MIGRATION_76_77
+    MIGRATION_76_77,
+    MIGRATION_77_78
 )
