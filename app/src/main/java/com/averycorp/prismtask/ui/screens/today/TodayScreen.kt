@@ -56,7 +56,6 @@ import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.repository.LeisureRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
-import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.EnergyCheckInCard
 import com.averycorp.prismtask.ui.components.HabitChipRowSkeleton
@@ -697,23 +696,7 @@ fun TodayScreen(
                                 HabitChipRow(
                                     habits = todayHabits,
                                     onToggle = { hws ->
-                                        // Mode-task habits (Morning / Bedtime Self-Care,
-                                        // Housework, School, Leisure) each own a dedicated
-                                        // detail screen — open that instead of toggling,
-                                        // since tapping the chip can't express the
-                                        // per-section state those flows require.
-                                        // Everything else still toggles directly from
-                                        // the chip — including the Medication chip,
-                                        // whose Today-screen route navigation was
-                                        // removed alongside the Daily Essentials
-                                        // medication card.
                                         val route = when (hws.habit.name) {
-                                            SelfCareRepository.MORNING_HABIT_NAME ->
-                                                PrismTaskRoute.SelfCare.createRoute("morning")
-                                            SelfCareRepository.BEDTIME_HABIT_NAME ->
-                                                PrismTaskRoute.SelfCare.createRoute("bedtime")
-                                            SelfCareRepository.HOUSEWORK_HABIT_NAME ->
-                                                PrismTaskRoute.SelfCare.createRoute("housework")
                                             SchoolworkRepository.SCHOOL_HABIT_NAME ->
                                                 PrismTaskRoute.Schoolwork.route
                                             LeisureRepository.LEISURE_HABIT_NAME ->

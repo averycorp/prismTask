@@ -737,9 +737,15 @@ constructor(
             .sortedBy { it.habit.sortOrder }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Daily habit chips — exclude bookable habits (they have their own sections)
+    private val modeHabitNames = setOf(
+        SelfCareRepository.MORNING_HABIT_NAME,
+        SelfCareRepository.BEDTIME_HABIT_NAME,
+        SelfCareRepository.MEDICATION_HABIT_NAME,
+        SelfCareRepository.HOUSEWORK_HABIT_NAME,
+    )
+
     val todayHabits: StateFlow<List<HabitWithStatus>> = allTodayHabits
-        .map { list -> list.filter { !it.habit.isBookable } }
+        .map { list -> list.filter { !it.habit.isBookable && it.habit.name !in modeHabitNames } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /**
