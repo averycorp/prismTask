@@ -2,21 +2,15 @@ name: Android CI
 
 on:
   workflow_dispatch:
-  # Merge-only: CI runs on push to main (post-merge) and manual dispatch.
-  # No pull_request / merge_group triggers — if branch protection requires
-  # the `lint-and-test` status, drop it from required checks or PRs will
-  # block forever waiting for a status that never posts.
-  push:
+  # PR-time CI: lint-and-test is the required status check that gates
+  # auto-merge. The job posts on every PR (using an internal paths-filter
+  # to short-circuit to a no-op when no Android paths changed) so branch
+  # protection's required check always resolves. No `push: main` trigger:
+  # post-merge bumping + tagging is owned by version-bump-and-tag.yml
+  # (workflow_run on auto-merge.yml), and the actual signed build runs
+  # in release.yml on the resulting `vX.Y.Z` tag push.
+  pull_request:
     branches: [main]
-    paths:
-      - 'app/**'
-      - 'gradlew'
-      - 'gradlew.bat'
-      - 'gradle/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - '.github/workflows/android-ci.yml'
-      - '.github/actions/setup-android/**'
 
 concurrency:
   group: android-ci-${{ github.ref }}
@@ -182,11 +176,12 @@ jobs:
     # needs: [autofix]. detekt and Android lint don't care about ktlint
     # formatting, and unit tests don't care about either. ktlintCheck
     # remains the authoritative formatting verdict in the autofix job
-    # for PR events; for push events the fallback step below runs it.
+    # for PR events; for workflow_dispatch events the fallback step
+    # below runs it.
     #
     # Checkout pins to `pull_request.head.sha` (NOT the head_ref branch)
-    # so autofix's parallel push can't race-update what we read. On push
-    # events the branch ref is used since there's no PR context.
+    # so autofix's parallel push can't race-update what we read. On
+    # workflow_dispatch the branch ref is used since there's no PR context.
     #
     # This job is a required status check in branch protection, so it
     # must always post a result — even on PRs that don't touch Android.
@@ -490,192 +485,8 @@ jobs:
           path: app/build/test-results/
           retention-days: 7
 
-  # Direct-to-main tag + release. Auto-merged PRs use
-  # version-bump-and-tag.yml's workflow_run chain instead — `gh pr merge`
-  # under GITHUB_TOKEN suppresses the push:main event entirely (GitHub's
-  # anti-recursion rule), so this job never fires for auto-merged PRs.
-  # It covers the gap where hand-pushed commits to main (docs, version
-  # bumps, trivial fixes per CLAUDE.md "Repo conventions") used to land
-  # without producing a vX.Y.Z tag or a GitHub Release.
-  #
-  # Skips its own bump commit via the [skip ci] guard on HEAD — that
-  # commit naturally suppresses the next workflow run, but the explicit
-  # check defends against workflow_dispatch re-runs and concurrent main
-  # pushes that could land a [skip ci] commit at HEAD between trigger
-  # and checkout.
-  tag-and-release:
-    name: Tag & Release
-    needs: [lint-and-test]
-    # Cross-workflow lock so the tag-push critical section is owned by
-    # exactly one path at a time — version-bump-and-tag.yml shares this
-    # group. The per-job `git ls-remote --tags` idempotency guards still
-    # close the loop on any race that slips through, but this group
-    # makes the common case observably serialized. See
-    # CI_AUDIT_2026-04-30 F7.
-    concurrency:
-      group: tag-push-main
-      cancel-in-progress: false
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      needs.lint-and-test.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write   # workflow_dispatch on release.yml
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          # AUTOFIX_PAT (admin) bypasses branch protection for the bump
-          # push to main, same rationale as version-bump-and-tag.yml.
-          # Falls back to GITHUB_TOKEN if unset — push will then fail
-          # loud at "Commit version bump" rather than silently dropping.
-          token: ${{ secrets.AUTOFIX_PAT || secrets.GITHUB_TOKEN }}
-          ref: main
-          fetch-depth: 0
-      - name: Skip if HEAD is a version bump
-        id: skip_check
-        run: |
-          set -euo pipefail
-          MSG=$(git log -1 --pretty=%B)
-          if echo "$MSG" | grep -qF '[skip ci]'; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ HEAD carries [skip ci]; skipping tag/release."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Bump versionCode and versionName
-        if: steps.skip_check.outputs.skip != 'true'
-        id: version
-        run: |
-          set -euo pipefail
-          CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)
-          if [ -z "${CURRENT_CODE:-}" ]; then
-            echo "::error::Could not parse current versionCode from app/build.gradle.kts"
-            exit 1
-          fi
-          NEW_CODE=$(( CURRENT_CODE + 1 ))
-          sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" app/build.gradle.kts
-
-          CURRENT_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
-          if [ -z "${CURRENT_NAME:-}" ]; then
-            echo "::error::Could not parse current versionName from app/build.gradle.kts"
-            exit 1
-          fi
-          MAJOR=$(echo "$CURRENT_NAME" | cut -d. -f1)
-          MINOR=$(echo "$CURRENT_NAME" | cut -d. -f2)
-          PATCH=$(echo "$CURRENT_NAME" | cut -d. -f3)
-          NEW_PATCH=$(( PATCH + 1 ))
-          NEW_NAME="${MAJOR}.${MINOR}.${NEW_PATCH}"
-          sed -i "s/versionName = \"${CURRENT_NAME}\"/versionName = \"${NEW_NAME}\"/" app/build.gradle.kts
-
-          # Hard verify the bump landed on disk before we let any
-          # downstream step (commit, tag, release dispatch) proceed.
-          # Belt-and-suspenders against a sed substitution that silently
-          # didn't match — the goal is "no release without a bump", and
-          # an unverified sed plus the no-diff fast-path in the next step
-          # could otherwise cut a release pointed at an unbumped commit.
-          ACTUAL_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)
-          ACTUAL_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
-          if [ "$ACTUAL_CODE" != "$NEW_CODE" ] || [ "$ACTUAL_NAME" != "$NEW_NAME" ]; then
-            echo "::error::Version bump did not land on disk (expected versionCode=$NEW_CODE versionName=$NEW_NAME, got versionCode=$ACTUAL_CODE versionName=$ACTUAL_NAME)"
-            exit 1
-          fi
-
-          echo "version_name=$NEW_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$NEW_CODE" >> "$GITHUB_OUTPUT"
-          echo "Bumping to v$NEW_NAME (build $NEW_CODE)"
-      - name: Commit version bump
-        if: steps.skip_check.outputs.skip != 'true'
-        run: |
-          set -euo pipefail
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add app/build.gradle.kts
-          # Strict: a release MUST be preceded by a real bump diff. The
-          # bump step above already verified the file changed on disk, so
-          # a missing staged diff here means the working tree was reset
-          # or the file was reverted between steps — fail loud rather
-          # than silently producing a release pointed at an unbumped
-          # main tip.
-          if git diff --cached --quiet; then
-            echo "::error::No staged version-bump diff after bump step. Refusing to tag/release without a real bump."
-            exit 1
-          fi
-          git commit -m "chore: bump to v${{ steps.version.outputs.version_name }} (build ${{ steps.version.outputs.version_code }}) [skip ci]"
-          # Concurrent pushes to main can race the bump commit; rebase
-          # onto the current tip and retry on rejection. Same shape as
-          # version-bump-and-tag.yml so the recovery story is identical.
-          for attempt in 1 2 3 4 5; do
-            if git push origin HEAD:main; then
-              echo "Pushed version bump on attempt $attempt"
-              exit 0
-            fi
-            echo "Push rejected on attempt $attempt; rebasing onto origin/main and retrying"
-            git fetch origin main
-            if ! git rebase origin/main; then
-              git rebase --abort || true
-              echo "::error::Rebase conflict while replaying version bump; aborting."
-              exit 1
-            fi
-            sleep $((attempt * 2))
-          done
-          echo "::error::Failed to push version bump after 5 attempts."
-          exit 1
-      - name: Push patch tag
-        if: steps.skip_check.outputs.skip != 'true'
-        env:
-          NEW_NAME: ${{ steps.version.outputs.version_name }}
-          NEW_CODE: ${{ steps.version.outputs.version_code }}
-        run: |
-          set -euo pipefail
-          TAG="v${NEW_NAME}"
-          # Idempotency guard against version-bump-and-tag.yml or another
-          # concurrent android-ci run racing us to push the same tag.
-          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
-            echo "Tag ${TAG} already exists on origin; another run pushed first. Skipping."
-            exit 0
-          fi
-          git fetch origin main
-          git checkout main
-          git reset --hard origin/main
-          git tag -a "${TAG}" -m "PrismTask v${NEW_NAME} (build ${NEW_CODE})"
-          for attempt in 1 2 3; do
-            if git push origin "${TAG}"; then
-              echo "Pushed ${TAG} on attempt ${attempt}"
-              exit 0
-            fi
-            echo "Tag push rejected on attempt ${attempt}; retrying"
-            sleep $((attempt * 2))
-          done
-          echo "::error::Failed to push tag ${TAG} after 3 attempts."
-          exit 1
-      - name: Dispatch release.yml on the new tag
-        # The bump commit's [skip ci] suppresses the tag-push trigger on
-        # release.yml, so we dispatch explicitly. workflow_dispatch is one
-        # of the documented exceptions to GitHub's GITHUB_TOKEN anti-
-        # recursion rule (alongside repository_dispatch), so the dispatch
-        # fires even though we're inside a GITHUB_TOKEN-driven run.
-        if: steps.skip_check.outputs.skip != 'true' && steps.version.outputs.version_name != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          NEW_NAME: ${{ steps.version.outputs.version_name }}
-        run: |
-          set -euo pipefail
-          TAG="v${NEW_NAME}"
-          EXISTING=$(gh run list --repo "$REPO" --workflow=release.yml \
-            --limit 20 --json headBranch,databaseId \
-            -q ".[] | select(.headBranch == \"${TAG}\") | .databaseId" | head -1 || true)
-          if [ -n "$EXISTING" ]; then
-            echo "release.yml run ${EXISTING} already exists for ${TAG}; skipping dispatch."
-            exit 0
-          fi
-          gh workflow run release.yml --repo "$REPO" --ref "${TAG}"
-          echo "Dispatched release.yml on ${TAG}"
-
   capture-failure-log:
-    needs: [autofix, lint-and-test, tag-and-release]
+    needs: [autofix, lint-and-test]
     if: ${{ failure() }}
     uses: ./.github/workflows/capture-failure.yml
     with:
