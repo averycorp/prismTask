@@ -43,6 +43,7 @@ import com.averycorp.prismtask.domain.usecase.CognitiveLoadBalanceState
 import com.averycorp.prismtask.domain.usecase.CognitiveLoadBalanceTracker
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUiState
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUseCase
+import com.averycorp.prismtask.domain.usecase.HabitDailyTaskGenerator
 import com.averycorp.prismtask.domain.usecase.HabitTodayVisibilityResolver
 import com.averycorp.prismtask.domain.usecase.MorningCheckInBannerDecider
 import com.averycorp.prismtask.domain.usecase.SelfCareNudge
@@ -97,7 +98,8 @@ constructor(
     private val leisureRepository: LeisureRepository,
     private val localDateFlow: LocalDateFlow,
     private val tourCardPreferences: TourCardPreferences,
-    private val coachmarkController: CoachmarkController
+    private val coachmarkController: CoachmarkController,
+    private val habitDailyTaskGenerator: HabitDailyTaskGenerator
 ) : ViewModel() {
     /**
      * True when the morning check-in banner should render on the Today
@@ -248,6 +250,17 @@ constructor(
         }
 
         _checkInGreeting.value = computeGreeting()
+
+        // Spawn habit-linked tasks for today on first open after a day
+        // boundary, in case the DailyResetWorker hasn't fired yet (e.g. fresh
+        // install, OS-killed worker). Idempotent — re-runs are no-ops.
+        viewModelScope.launch {
+            try {
+                habitDailyTaskGenerator.ensureTasksForToday()
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Habit daily task generation failed", e)
+            }
+        }
 
         // Reactive banner-visibility pipeline. Recomputes whenever the user
         // dismisses, the feature toggle flips, or a check-in log arrives

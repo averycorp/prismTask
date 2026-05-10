@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 @Singleton
@@ -46,7 +47,8 @@ constructor(
     private val eisenhowerClassifier: EisenhowerClassifier,
     private val userPreferences: UserPreferencesDataStore,
     private val automationEventBus: AutomationEventBus,
-    private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+    private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences,
+    private val habitRepositoryProvider: Provider<HabitRepository>
 ) {
     /**
      * Latest snapshot of the user's custom life-category keywords, refreshed
@@ -437,6 +439,18 @@ constructor(
         automationEventBus.emit(AutomationEvent.TaskCompleted(id))
         calendarPushDispatcher.enqueueDeleteTaskEvent(id)
         widgetUpdateManager.updateTaskWidgets()
+
+        // Two-way sync: an auto-generated habit task carries `sourceHabitId`.
+        // Mirror the completion onto the linked habit. HabitRepository's
+        // completion path is idempotent, so the reverse-sync there finding
+        // this task already complete is a safe no-op.
+        task.sourceHabitId?.let { habitId ->
+            try {
+                habitRepositoryProvider.get().completeHabit(habitId, now)
+            } catch (e: Exception) {
+                android.util.Log.e("TaskRepository", "Habit sync on complete failed", e)
+            }
+        }
         return nextRecurrenceId
     }
 
@@ -501,6 +515,16 @@ constructor(
             )
         }
         widgetUpdateManager.updateTaskWidgets()
+
+        // Two-way sync: a manual undo on the linked task should also
+        // un-log the habit completion that the forward path inserted.
+        current.sourceHabitId?.let { habitId ->
+            try {
+                habitRepositoryProvider.get().uncompleteHabit(habitId, System.currentTimeMillis())
+            } catch (e: Exception) {
+                android.util.Log.e("TaskRepository", "Habit sync on uncomplete failed", e)
+            }
+        }
     }
 
     suspend fun deleteTask(id: Long) {

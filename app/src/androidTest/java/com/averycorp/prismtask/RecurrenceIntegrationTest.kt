@@ -78,7 +78,8 @@ class RecurrenceIntegrationTest {
                 every { getLifeCategoryCustomKeywords() } returns flowOf(
                     com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords()
                 )
-            }
+            },
+            habitRepositoryProvider = javax.inject.Provider { mockk(relaxed = true) }
         )
     }
 
