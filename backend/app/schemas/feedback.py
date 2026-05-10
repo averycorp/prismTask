@@ -102,3 +102,23 @@ class BugReportResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class InAppFeedbackCreate(BaseModel):
+    """Body for ``POST /api/v1/feedback/in-app``.
+
+    ``sentiment`` is the discriminator (``thumb_up`` / ``thumb_down`` /
+    ``rating``). ``rating`` is set only when sentiment == ``rating``.
+    ``free_text`` is capped at 4000 chars at the API boundary; the
+    Postgres column itself is unbounded ``Text``.
+    """
+
+    sentiment: str = Field(..., pattern=r"^(thumb_up|thumb_down|rating)$")
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
+    free_text: Optional[str] = Field(default=None, max_length=4000)
+    client_timestamp: Optional[int] = Field(default=None, ge=0)
+
+
+class InAppFeedbackResponse(BaseModel):
+    success: bool
+    feedback_id: int

@@ -8,12 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.admin import require_admin
 from app.middleware.auth import get_current_user, get_optional_user
-from app.models import BugReportModel, User
+from app.models import BugReportModel, InAppFeedback, User
 from app.schemas.feedback import (
     BugReportCreate,
     BugReportMirror,
     BugReportResponse,
     BugReportStatusUpdate,
+    InAppFeedbackCreate,
+    InAppFeedbackResponse,
 )
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
@@ -173,3 +175,38 @@ async def update_bug_report_status(
     await db.refresh(report)
 
     return report
+
+
+@router.post(
+    "/in-app",
+    status_code=status.HTTP_201_CREATED,
+    response_model=InAppFeedbackResponse,
+)
+async def submit_in_app_feedback(
+    body: InAppFeedbackCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> InAppFeedbackResponse:
+    """Custom in-app rating prompt write path (E2 in-app ratings).
+
+    User-scoped; auth required. Free-text is stored Postgres-only and
+    never logged to standard log channels (treated as PII per
+    ``docs/audits/E2_IN_APP_RATINGS_AUDIT.md`` § Item 5 STOP-5A).
+    """
+    if body.sentiment == "rating" and body.rating is None:
+        raise HTTPException(
+            status_code=422,
+            detail="rating field required when sentiment == 'rating'",
+        )
+
+    feedback = InAppFeedback(
+        user_id=current_user.id,
+        sentiment=body.sentiment,
+        rating=body.rating,
+        free_text=body.free_text,
+        client_timestamp=body.client_timestamp,
+    )
+    db.add(feedback)
+    await db.flush()
+    await db.refresh(feedback)
+    return InAppFeedbackResponse(success=True, feedback_id=feedback.id)
