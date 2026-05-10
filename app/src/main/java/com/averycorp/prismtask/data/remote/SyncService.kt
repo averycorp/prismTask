@@ -125,13 +125,24 @@ constructor(
     private val externalAnchorDao: ExternalAnchorDao,
     private val firestore: FirebaseFirestore,
     /**
-     * D8 Item 7 Strangler Fig 7c — Firestore realtime listener surface
-     * lives in its own class. SyncService still orchestrates start /
-     * stop because the listener's snapshot callback needs to reach back
-     * into pull / processRemoteDeletions, which haven't been extracted
-     * yet (sub-PRs 7b + 7d).
+     * D8 Item 7 Strangler Fig 7c — realtime listener surface.
      */
-    private val listenerManager: SyncListenerManager
+    private val listenerManager: SyncListenerManager,
+    /**
+     * D8 Item 7 Strangler Fig 7b — push surface (orchestrator slice).
+     * Owns the sort / iterate / log / retry loop. The 36-branch
+     * pushCreate / pushUpdate / pushDelete dispatch remains on
+     * SyncService for now; the orchestrator routes through a single
+     * dispatch lambda passed in from [pushLocalChanges].
+     */
+    private val pushOrchestrator: SyncPushOrchestrator,
+    /**
+     * D8 Item 7 Strangler Fig 7d — initial-upload surface (orchestrator
+     * slice). Owns the one-shot guard, isSyncing lifecycle, completion
+     * telemetry, and post-release pull. `doInitialUpload` body remains
+     * on SyncService and is passed in as a lambda.
+     */
+    private val initialUploadOrchestrator: SyncInitialUploadOrchestrator
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -142,74 +153,25 @@ constructor(
 
     suspend fun initialUpload() {
         if (authManager.userId == null) return
-
-        // Fix A — one-shot guard. Every sign-in used to re-run the entire
-        // upload loop and mint brand-new Firestore docs for every local row,
-        // fueling the duplication spiral. The flag is only set on successful
-        // completion so a mid-run failure stays retryable on the next sign-in.
-        if (builtInSyncPreferences.isInitialUploadDone()) {
-            logger.info(operation = "initialUpload.skipped", detail = "reason=already_done")
-            return
-        }
-
-        // Fix B — hold [isSyncing] for the duration of the upload loop so
-        // listener-triggered pulls defer (they already check this flag at
-        // line ~1300). Mirrors the pattern used by [fullSync]. AuthViewModel
-        // serializes fullSync → initialUpload so there is normally no
-        // contention here, but the guard is kept as a defense-in-depth.
-        if (isSyncing) {
-            logger.info(
-                operation = "initialUpload.deferred",
-                detail = "reason=another_sync_running"
-            )
-            return
-        }
-        isSyncing = true
-        logger.info(operation = "initialUpload.started")
-        val uploadStart = System.currentTimeMillis()
-        var success = false
-        try {
-            doInitialUpload()
-            builtInSyncPreferences.setInitialUploadDone(true)
-            success = true
-            logger.info(
-                operation = "initialUpload.completed",
-                status = "success",
-                durationMs = System.currentTimeMillis() - uploadStart
-            )
-        } catch (e: Throwable) {
-            logger.error(
-                operation = "initialUpload.failed",
-                durationMs = System.currentTimeMillis() - uploadStart,
-                throwable = e
-            )
-            throw e
-        } finally {
-            isSyncing = false
-        }
-
-        // Fix B mitigation — while [isSyncing] was held above, any
-        // listener-triggered pull callback short-circuited at
-        // `if (isSyncing) return@launch` (line ~1298). Those callbacks are
-        // fire-and-forget; once dropped, they don't re-run by themselves.
-        // Run exactly one pullRemoteChanges() after release so any cloud
-        // state that changed during the upload window still lands locally.
-        // Realtime listeners keep firing normally for everything after this.
-        if (success) {
-            try {
+        // D8 Item 7 7d — orchestration extracted to
+        // [SyncInitialUploadOrchestrator]. The dispatch (`doInitialUpload`)
+        // and the post-release pull (`pullRemoteChanges`) remain on
+        // SyncService and are passed in as lambdas; once those surfaces
+        // extract in follow-on PRs the lambdas become direct method
+        // references with no signature change.
+        initialUploadOrchestrator.runIfNeeded(
+            isSyncing = { isSyncing },
+            setSyncing = { isSyncing = it },
+            doUpload = { doInitialUpload() },
+            postReleasePull = {
                 val pullSummary = pullRemoteChanges()
                 logger.debug(
                     operation = "initialUpload.post_release_pull",
                     status = "success",
                     detail = "applied=${pullSummary.applied} permanently_failed=${pullSummary.skippedPermanent}"
                 )
-            } catch (e: Throwable) {
-                logger.error(
-                    operation = "initialUpload.post_release_pull",
-                    throwable = e
-                )
             }
-        }
+        )
     }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
@@ -1222,60 +1184,19 @@ constructor(
      * Returns the number of pending operations processed (success + failure).
      * Callers use this to populate the "pushed=N" detail in sync completion
      * logs so we can see partial-push ratios at a glance.
+     *
+     * D8 Item 7 7b — sort / iterate / log / retry orchestration lives in
+     * [SyncPushOrchestrator]; the per-entity create/update/delete
+     * dispatch remains on SyncService until its own follow-on PR.
      */
-    suspend fun pushLocalChanges(): Int {
-        val pending = syncMetadataDao.getPendingActions()
-        // Process in order: projects → tags → everything else → task_completions
-        // task_completions must go last because they reference task cloud IDs.
-        val ordered = pending.sortedBy { pushOrderPriorityOf(it.entityType) }
-
-        var successCount = 0
-        var failureCount = 0
-        for (meta in ordered) {
-            val start = System.currentTimeMillis()
-            try {
-                when (meta.pendingAction) {
-                    "create" -> pushCreate(meta)
-                    "update" -> pushUpdate(meta)
-                    "delete" -> pushDelete(meta)
-                }
-                syncMetadataDao.clearPendingAction(meta.localId, meta.entityType)
-                successCount++
-                logger.debug(
-                    operation = "push.${meta.pendingAction}",
-                    entity = meta.entityType,
-                    id = meta.localId.toString(),
-                    status = "success",
-                    durationMs = System.currentTimeMillis() - start
-                )
-            } catch (e: Exception) {
-                failureCount++
-                logger.error(
-                    operation = "push.${meta.pendingAction ?: "unknown"}",
-                    entity = meta.entityType,
-                    id = meta.localId.toString(),
-                    durationMs = System.currentTimeMillis() - start,
-                    detail = "retry=${meta.retryCount}",
-                    throwable = e
-                )
-                try {
-                    com.google.firebase.crashlytics.FirebaseCrashlytics
-                        .getInstance()
-                        .recordException(e)
-                } catch (_: Exception) {
-                }
-                syncMetadataDao.incrementRetry(meta.localId, meta.entityType)
+    suspend fun pushLocalChanges(): Int =
+        pushOrchestrator.pushAllPending { meta ->
+            when (meta.pendingAction) {
+                "create" -> pushCreate(meta)
+                "update" -> pushUpdate(meta)
+                "delete" -> pushDelete(meta)
             }
         }
-        if (ordered.isNotEmpty()) {
-            logger.info(
-                operation = "push.summary",
-                status = if (failureCount == 0) "success" else "partial",
-                detail = "success=$successCount failed=$failureCount"
-            )
-        }
-        return successCount + failureCount
-    }
 
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
     // Dispatch across every synced entityType — splitting the `when` is not

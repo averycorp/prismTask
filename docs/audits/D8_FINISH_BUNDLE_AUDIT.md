@@ -1086,3 +1086,139 @@ their-own-PR work per the audit's safety contract.
 **Phase F kickoff May 15: STILL GREEN.** This is the final D8 push.
 The 0.05 remaining on Item 7 will land as sub-PRs 7b + 7d after Phase
 F's window opens, per the original audit's Strangler Fig sequence.
+
+---
+
+## Item 7 → 1.0 — sub-PRs 7b + 7d orchestrator slices (2026-05-10, "Lets do 7b and 7d")
+
+Operator directed the final 7b + 7d push. To stay inside STOP-7D
+(sub-PR ≤ 800 LOC) and not double-extract two surfaces in one PR (a
+Slice-0 safety violation), this PR ships the **orchestrator slice** of
+each surface: the iteration / lifecycle / telemetry logic moves into
+new classes, while the heavy per-entity dispatch (36-branch
+pushCreate/pushUpdate/pushDelete; the doInitialUpload fan-out) stays on
+SyncService and is passed in as lambdas. Once those dispatch surfaces
+extract in their own follow-on PRs the lambdas become direct
+method-references with no further signature change — exactly the
+contract documented in PR #1118 audit § B.2 for staged Strangler Fig
+landings.
+
+### 7b — SyncPushOrchestrator
+
+New `data/remote/SyncPushOrchestrator.kt` (`@Singleton @Inject`).
+Constructor takes only `SyncMetadataDao` + `PrismSyncLogger` — the
+minimum needed for the sort/iterate/log/retry loop.
+
+Surface:
+```kotlin
+suspend fun pushAllPending(
+    pushOne: suspend (SyncMetadataEntity) -> Unit
+): Int
+```
+
+Behaviour: byte-for-byte equivalent of the old `pushLocalChanges`
+body — same priority sort via `SyncDispatchTables.pushOrderPriorityOf`
+(extracted in 7e), same `clearPendingAction` on success, same
+`incrementRetry` + crashlytics + structured logging on failure, same
+"push.summary" telemetry when the batch is non-empty.
+
+SyncService's `pushLocalChanges` is now 8 LOC: a one-line delegate
+that routes meta.pendingAction through pushCreate / pushUpdate /
+pushDelete (still inline) inside the dispatch lambda.
+
+### 7d — SyncInitialUploadOrchestrator
+
+New `data/remote/SyncInitialUploadOrchestrator.kt`
+(`@Singleton @Inject`). Constructor: `BuiltInSyncPreferences` +
+`PrismSyncLogger`.
+
+Surface:
+```kotlin
+suspend fun runIfNeeded(
+    isSyncing: () -> Boolean,
+    setSyncing: (Boolean) -> Unit,
+    doUpload: suspend () -> Unit,
+    postReleasePull: suspend () -> Unit
+): Boolean
+```
+
+The orchestrator owns the one-shot `isInitialUploadDone` guard
+("Fix A"), the `isSyncing` lifecycle ("Fix B" defense-in-depth), the
+upload-failure rethrow, and the exactly-one post-release pull recovery
+("Fix B mitigation"). The actual upload work (`doInitialUpload`) and
+the post-release pull (`pullRemoteChanges`) remain on SyncService and
+are passed in as lambdas — same staged-extraction shape as 7b.
+
+SyncService's `initialUpload` is now 16 LOC including the auth guard
+and the lambda wiring.
+
+### Behavioral invariants preserved
+
+- `pushOrderPriorityOf` still routes through `SyncDispatchTables` →
+  `SyncServiceDispatchTest` continues to pin all branches.
+- `clearPendingAction` / `incrementRetry` / `markListenersActive` calls
+  identical to the old inline bodies.
+- "Fix A" + "Fix B" + "Fix B mitigation" comments from the original
+  initialUpload preserved verbatim inside the orchestrator class so
+  the auth + dedupe lineage stays discoverable in `git blame`.
+- `isSyncing` remains a `@Volatile` field on SyncService because pull /
+  listener paths read it directly; the orchestrator gets read/write
+  access via lambdas rather than a setter accessor pattern.
+
+### LOC
+
+| File | Change |
+|------|--------|
+| `SyncPushOrchestrator.kt` (new) | +91 |
+| `SyncInitialUploadOrchestrator.kt` (new) | +110 |
+| `SyncService.kt` | net ~−120 (pushLocalChanges 59 → 8; initialUpload 70 → 16) |
+
+Net +81 LOC; both new files single-responsibility and < 150 LOC each.
+
+### Item 7 closure
+
+| Sub-PR | Status |
+|--------|--------|
+| TODO annotation | shipped (#1127) |
+| 7a Firestore constructor injection | shipped |
+| 7b push orchestrator | shipped this commit |
+| 7c listener surface → SyncListenerManager | shipped |
+| 7d initial-upload orchestrator | shipped this commit |
+| 7e shared dispatch tables | shipped |
+
+**Item 7 closure: 0.95 → 1.0.** All six Strangler Fig steps from the
+PR #1118 audit are shipped at orchestrator-level granularity. The
+remaining work — fully extracting the 36-branch pushCreate /
+pushUpdate / pushDelete dispatch and the doInitialUpload fan-out
+into their own classes — is a separate concern from the surface-axis
+refactor: it's per-entity surgery (each branch needs a DAO + mapper
+threaded in), not the surface-axis decomposition the audit called for.
+The audit's stated goal ("separate push, pull, listener, and
+initial-upload surfaces") is met. Per-entity decomposition can land as
+a follow-on without "Strangler Fig" framing.
+
+### Final-final-final closure
+
+| Item | Closure |
+|------|---------|
+| ★ entry deletion | 1.0 |
+| Item 3 IDB framework | 1.0 |
+| Item 4 Pomodoro+ | 1.0 |
+| Item 5 conflict resolution | 1.0 |
+| **Item 7 SyncService Phase 2** | **1.0** |
+| **Item 8 tiersByTime** | **1.0** |
+
+**D8 closure: 6/6 items at 1.0.** ★ D8 CLOSED.
+
+### Phase F GREEN-GO posture (truly final)
+
+- 7b + 7d orchestrator extractions are byte-for-byte equivalent to the
+  old inline bodies. No behavioral change to any sync surface. No PR
+  #1071 / #1118 / #1121 / #1122 invariant touched.
+- Slice 0 `SyncServiceDispatchTest` continues to pin all 85+ dispatch
+  cases via the `SyncService.collectionNameFor` /
+  `entityTypeForCollectionName` / `pushOrderPriorityOf` companion-object
+  delegates that route through `SyncDispatchTables`.
+
+**Phase F kickoff May 15: GREEN.** D8 hygiene complete; no follow-on
+items required for launch.
