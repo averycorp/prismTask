@@ -75,12 +75,14 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.window.layout.FoldingFeature
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.ui.a11y.asHeading
 import com.averycorp.prismtask.ui.a11y.politeLiveRegion
 import com.averycorp.prismtask.ui.screens.auth.EmailAuthSection
 import com.averycorp.prismtask.ui.screens.templates.TemplatePickerContent
 import com.averycorp.prismtask.ui.screens.templates.TemplateSelections
+import com.averycorp.prismtask.ui.theme.LocalFoldingFeature
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
@@ -1729,9 +1731,20 @@ private fun OnboardingPageLayout(
             visible = visible,
             enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { 30 }
         ) {
+            // F-FOLDABLE-001 — onboarding page already centers its column at
+            // 32dp horizontal padding. On HALF_OPENED + VERTICAL folds widen
+            // the horizontal padding so the headline / body text never lands
+            // across the crease. Read directly here (not via
+            // hingeAwareHorizontalPadding) because the baseline horizontal
+            // padding is 32dp, not 16dp.
+            val fold = LocalFoldingFeature.current
+            val horizontalPadding = if (
+                fold?.state == FoldingFeature.State.HALF_OPENED &&
+                fold.orientation == FoldingFeature.Orientation.VERTICAL
+            ) 56.dp else 32.dp
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = 32.dp)
+                modifier = Modifier.padding(horizontal = horizontalPadding)
             ) {
                 Box(
                     modifier = Modifier
