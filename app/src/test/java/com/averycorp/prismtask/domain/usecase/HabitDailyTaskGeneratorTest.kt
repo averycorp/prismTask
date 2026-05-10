@@ -13,9 +13,9 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import org.junit.Assert.assertEquals
 
 class HabitDailyTaskGeneratorTest {
     private lateinit var habitDao: HabitDao

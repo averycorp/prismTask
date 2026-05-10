@@ -8,12 +8,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.core.time.LocalDateFlow
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
+import com.averycorp.prismtask.data.local.entity.SavedFilterEntity
 import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UrgencyWeights
-import com.averycorp.prismtask.data.local.entity.SavedFilterEntity
 import com.averycorp.prismtask.data.repository.AttachmentRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.SavedFilterRepository
