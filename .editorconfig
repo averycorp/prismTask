@@ -28,6 +28,7 @@ max_line_length = 140
 # cannot resolve in this codebase, so we stick with the IntelliJ style
 # that matches what the IDE formats to.
 ktlint_code_style = intellij_idea
+ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
 
 # Jetpack Compose uses PascalCase for @Composable functions, which clashes
 # with the function-naming rule. Disable globally — this is a Compose-first

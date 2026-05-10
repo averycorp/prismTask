@@ -260,9 +260,10 @@ formatting:
     autoCorrect: true
     insertFinalNewLine: true
   ImportOrdering:
-    active: true
-    autoCorrect: true
-    layout: '*,java.**,javax.**,kotlin.**,^'
+    # ktlint is the source of truth for import ordering. Keeping the detekt
+    # wrapper disabled avoids version/layout drift between detekt-formatting
+    # and the standalone ktlint Gradle task.
+    active: false
   PackageName:
     active: true
     autoCorrect: true
