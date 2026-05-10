@@ -122,12 +122,6 @@ constructor(
             _createdCount.value = selected.size
         }
     }
-
-    fun reset() {
-        _input.value = ""
-        _candidates.value = emptyList()
-        _createdCount.value = null
-    }
 }
 
 data class EditableCandidate(
