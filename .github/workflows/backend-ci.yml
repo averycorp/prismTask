@@ -1,15 +1,12 @@
 name: Backend CI
 
 on:
-  # Merge-only: CI runs on push to main (post-merge) and manual dispatch.
-  # No pull_request / merge_group triggers — if branch protection requires
-  # the `test` status, drop it from required checks or PRs will block
-  # forever waiting for a status that never posts.
-  push:
+  # PR-time CI: the `test` job is the required status check on the
+  # backend lane. It posts on every PR (using an internal paths-filter
+  # to short-circuit to a no-op when no backend paths changed) so
+  # branch protection's required check always resolves.
+  pull_request:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-ci.yml'
   workflow_dispatch:
 
 concurrency:
