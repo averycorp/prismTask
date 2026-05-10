@@ -39,6 +39,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -140,15 +141,16 @@ fun ChatScreen(
         }
     }
 
-    // B.4 (F8 follow-on): handle nav requests emitted by chat actions.
-    // start_timer asks the screen to open the Timer screen at the user's
-    // configured default duration; the AI-suggested duration is already
-    // surfaced in the snackbar text by the ViewModel.
+    // B.4 (D13): handle nav requests emitted by chat actions. start_timer
+    // forwards the AI-suggested minutes through the Timer route; the timer
+    // screen uses it as a one-shot session override and never persists it.
     LaunchedEffect(Unit) {
         viewModel.navigationEvents.collect { event ->
             when (event) {
                 is ChatViewModel.ChatNavEvent.OpenTimer ->
-                    navController.navigate(PrismTaskRoute.Timer.route)
+                    navController.navigate(
+                        PrismTaskRoute.Timer.createRoute(event.minutes)
+                    )
                 is ChatViewModel.ChatNavEvent.OpenBatchPreview ->
                     navController.navigate(
                         PrismTaskRoute.BatchPreview.createRoute(event.commandText)
@@ -203,16 +205,31 @@ fun ChatScreen(
 
     // C.3 (F8 follow-on): confirm before dropping the conversation. The
     // DeleteSweep button used to single-tap-clear with no undo path, so
-    // a misplaced thumb wiped active discussions.
+    // a misplaced thumb wiped active discussions. D13 adds a "Don't ask
+    // again" checkbox; ticking it persists a pref so future clears skip
+    // the dialog entirely.
     if (showClearConfirm) {
+        var dontAskAgain by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { viewModel.dismissClearConfirm() },
             title = { Text("Clear Chat?") },
             text = {
-                Text("This will delete all messages in the current conversation. This can't be undone.")
+                Column {
+                    Text("This will delete all messages in the current conversation. This can't be undone.")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = dontAskAgain,
+                            onCheckedChange = { dontAskAgain = it }
+                        )
+                        Text("Don't Ask Again")
+                    }
+                }
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.clearConversation() }) {
+                TextButton(onClick = {
+                    viewModel.confirmClearAndPersistSkip(dontAskAgain)
+                }) {
                     Text("Clear")
                 }
             },

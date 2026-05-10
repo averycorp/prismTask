@@ -14,7 +14,11 @@ import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTask
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
+import com.averycorp.prismtask.domain.usecase.ResolvedTask
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -57,6 +61,8 @@ class ChatViewModelStreamingTest {
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
+    private lateinit var naturalLanguageParser: NaturalLanguageParser
+    private lateinit var parsedTaskResolver: ParsedTaskResolver
 
     @Before
     fun setUp() {
@@ -81,6 +87,26 @@ class ChatViewModelStreamingTest {
             coEvery { aiChatDisclosureShownFlow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV2Flow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV3Flow } returns flowOf(true)
+            coEvery { chatClearSkipConfirmationFlow } returns flowOf(false)
+        }
+        naturalLanguageParser = mockk(relaxed = true) {
+            every { parse(any()) } answers { ParsedTask(title = firstArg()) }
+        }
+        parsedTaskResolver = mockk(relaxed = true) {
+            coEvery { resolve(any()) } answers {
+                val parsed = firstArg<ParsedTask>()
+                ResolvedTask(
+                    title = parsed.title,
+                    dueDate = null,
+                    dueTime = null,
+                    tagIds = emptyList(),
+                    projectId = null,
+                    priority = 0,
+                    recurrenceRule = null,
+                    unmatchedTags = emptyList(),
+                    unmatchedProject = null
+                )
+            }
         }
     }
 
@@ -100,7 +126,9 @@ class ChatViewModelStreamingTest {
         habitCompletionDao = habitCompletionDao,
         proFeatureGate = proFeatureGate,
         taskBehaviorPreferences = taskBehaviorPreferences,
-        userPreferencesDataStore = userPreferencesDataStore
+        userPreferencesDataStore = userPreferencesDataStore,
+        naturalLanguageParser = naturalLanguageParser,
+        parsedTaskResolver = parsedTaskResolver
     )
 
     @Test
