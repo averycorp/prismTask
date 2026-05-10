@@ -1,16 +1,12 @@
 name: Web CI
 
 on:
-  # Merge-only: CI runs on push to main (post-merge) and manual dispatch.
-  # No pull_request / merge_group triggers — if branch protection requires
-  # the `web-lint-and-test` status, drop it from required checks or PRs
-  # will block forever waiting for a status that never posts.
-  push:
+  # PR-time CI: the aggregate `web-lint-and-test` job is the required
+  # status check on the web lane. It posts on every PR (using an internal
+  # paths-filter to short-circuit each split job to a no-op when no web
+  # paths changed) so branch protection's required check always resolves.
+  pull_request:
     branches: [main]
-    paths:
-      - 'web/**'
-      - '.github/workflows/web-ci.yml'
-      - '.github/actions/setup-node-web/**'
   workflow_dispatch:
 
 concurrency:

@@ -94,7 +94,8 @@ class TaskRepositoryTest {
                 eisenhowerClassifier,
                 userPreferences,
                 automationEventBus,
-                advancedTuningPreferences
+                advancedTuningPreferences,
+                javax.inject.Provider { mockk(relaxed = true) }
             )
     }
 
@@ -922,6 +923,8 @@ class TaskRepositoryTest {
         }
 
         override suspend fun getTasksForHabitInRangeOnce(habitId: Long, startDate: Long, endDate: Long): List<TaskEntity> = emptyList()
+
+        override suspend fun getLatestHabitTaskForDayOnce(habitId: Long, startDate: Long, endDate: Long): TaskEntity? = null
 
         override suspend fun updateEisenhowerQuadrant(id: Long, quadrant: String?, reason: String?, updatedAt: Long) {
             val idx = tasks.indexOfFirst { it.id == id }
