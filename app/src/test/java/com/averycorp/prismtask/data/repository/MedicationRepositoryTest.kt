@@ -75,6 +75,31 @@ class MedicationRepositoryTest {
     }
 
     @Test
+    fun insert_recoversFromUniqueCloudIdCollisionByAdoptingExistingRow() = runBlocking {
+        // Cross-device convergence edge case: two devices wound up with
+        // the same cloud_id mapped to different local rows (e.g. a
+        // sync_metadata desync) and one device tries to insert a row
+        // whose cloud_id collides with a local row of a *different*
+        // name. The `medications.cloud_id` UNIQUE index fires with the
+        // same `MedicationDao_Impl.insert$lambda$0` stack signature as
+        // the `medications.name` collision — without the cloud_id
+        // fallback, the catch handler rethrew and crashed the app.
+        medicationDao.rows += MedicationEntity(
+            id = 99,
+            name = "Existing Name",
+            cloudId = "cloud-abc"
+        )
+        medicationDao.failNextInsertOnCloudIdCollision = true
+
+        val id = repo.insert(
+            MedicationEntity(name = "Incoming Name", cloudId = "cloud-abc")
+        )
+
+        assertEquals(99L, id)
+        coVerify(exactly = 0) { syncTracker.trackCreate(any(), "medication") }
+    }
+
+    @Test
     fun insert_stampsCreatedAndUpdatedAtAtInsertTime() = runBlocking {
         // Pass a medication with zero timestamps; the repo should stamp
         // them — sync needs updatedAt to resolve last-write-wins.
@@ -347,11 +372,28 @@ private class FakeMedicationDaoForRepo : MedicationDao {
      */
     var failNextInsertOnNameCollision: Boolean = false
 
+    /**
+     * Companion to [failNextInsertOnNameCollision] for the other unique
+     * index on the entity (`medications.cloud_id`). Lets a test
+     * simulate the rarer sync-convergence case where the cloud_id index
+     * fires even though the name is unique.
+     */
+    var failNextInsertOnCloudIdCollision: Boolean = false
+
     override suspend fun insert(medication: MedicationEntity): Long {
         if (failNextInsertOnNameCollision && rows.any { it.name == medication.name }) {
             failNextInsertOnNameCollision = false
             throw android.database.sqlite.SQLiteConstraintException(
                 "UNIQUE constraint failed: medications.name"
+            )
+        }
+        if (failNextInsertOnCloudIdCollision &&
+            medication.cloudId != null &&
+            rows.any { it.cloudId == medication.cloudId }
+        ) {
+            failNextInsertOnCloudIdCollision = false
+            throw android.database.sqlite.SQLiteConstraintException(
+                "UNIQUE constraint failed: medications.cloud_id"
             )
         }
         val id = if (medication.id == 0L) nextId++ else medication.id
