@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    SmallInteger,
     String,
     Text,
     Time,
@@ -822,6 +824,35 @@ class ChatMessage(Base):
     task_context_snapshot = Column(JSON, nullable=True)
     tokens_input = Column(Integer, nullable=True)
     tokens_output = Column(Integer, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user = relationship("User")
+
+
+class InAppFeedback(Base):
+    """In-app rating / sentiment feedback (E2 in-app ratings).
+
+    Per ``docs/audits/E2_IN_APP_RATINGS_AUDIT.md`` § Item 5. Greenfield
+    table; written by ``POST /api/v1/feedback/in-app`` after the user
+    submits the custom "how's it going?" prompt. ``sentiment`` is the
+    discriminator (``thumb_up`` / ``thumb_down`` / ``rating``); ``rating``
+    is set only when sentiment == ``rating`` (currently UI submits
+    thumbs only, but the column accommodates a future 1-5 surface
+    without a migration).
+    """
+
+    __tablename__ = "in_app_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    sentiment = Column(String(32), nullable=False)
+    rating = Column(SmallInteger, nullable=True)
+    free_text = Column(Text, nullable=True)
+    client_timestamp = Column(BigInteger, nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

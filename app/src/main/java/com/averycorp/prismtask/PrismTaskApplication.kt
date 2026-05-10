@@ -19,6 +19,7 @@ import com.averycorp.prismtask.data.repository.SchoolworkRepository
 import com.averycorp.prismtask.data.seed.AutomationSampleRulesSeeder
 import com.averycorp.prismtask.data.seed.TemplateSeeder
 import com.averycorp.prismtask.domain.automation.AutomationEngine
+import com.averycorp.prismtask.domain.rating.RecentCrashSignal
 import com.averycorp.prismtask.notifications.MedicationClockRescheduler
 import com.averycorp.prismtask.notifications.MedicationIntervalRescheduler
 import com.averycorp.prismtask.notifications.MedicationReminderScheduler
@@ -102,6 +103,9 @@ class PrismTaskApplication :
     @Inject
     lateinit var automationDuplicateBackfiller: AutomationDuplicateBackfiller
 
+    @Inject
+    lateinit var recentCrashSignal: RecentCrashSignal
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private companion object {
@@ -119,6 +123,7 @@ class PrismTaskApplication :
         super.onCreate()
         configureFirebaseEmulator()
         configureCrashlytics()
+        installRatingPromptCrashHook()
         // Belt-and-braces flush for migration events that fired
         // before Firebase was ready on cold-boot (BootReceiver) paths.
         // The RoomDatabase.Callback.onOpen hook is the primary flush
@@ -161,6 +166,24 @@ class PrismTaskApplication :
             } catch (_: Exception) {
                 // Firebase not available
             }
+        }
+    }
+
+    /**
+     * Stamps `last_crash_at` on process-fatal crashes so the in-app rating
+     * trigger heuristic suppresses prompts for 24h after a crash. Chains to
+     * the previously installed handler (Crashlytics's) so existing behavior
+     * is preserved. See `docs/audits/E2_IN_APP_RATINGS_AUDIT.md` § Item 3.
+     */
+    private fun installRatingPromptCrashHook() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                appScope.launch { recentCrashSignal.recordCrash() }
+            } catch (_: Throwable) {
+                // Don't let bookkeeping failure suppress the real crash.
+            }
+            previous?.uncaughtException(thread, throwable)
         }
     }
 

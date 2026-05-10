@@ -991,4 +991,18 @@ data class AutomationSummarizeResponse(
     val summary: String
 )
 
+// region In-App Feedback (E2 in-app ratings)
+data class InAppFeedbackRequest(
+    val sentiment: String,
+    val rating: Int? = null,
+    @SerializedName("free_text") val freeText: String? = null,
+    @SerializedName("client_timestamp") val clientTimestamp: Long? = null
+)
+
+data class InAppFeedbackResponse(
+    val success: Boolean,
+    @SerializedName("feedback_id") val feedbackId: Long
+)
+// endregion
+
 // endregion

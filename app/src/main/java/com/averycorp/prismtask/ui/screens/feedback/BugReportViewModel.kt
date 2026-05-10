@@ -25,6 +25,7 @@ import com.averycorp.prismtask.domain.model.BugCategory
 import com.averycorp.prismtask.domain.model.BugReport
 import com.averycorp.prismtask.domain.model.BugSeverity
 import com.averycorp.prismtask.domain.model.ReportStatus
+import com.averycorp.prismtask.domain.rating.RecentCrashSignal
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -53,6 +54,7 @@ constructor(
     private val diagnosticLogger: DiagnosticLogger,
     private val authManager: AuthManager,
     private val api: PrismTaskApi,
+    private val recentCrashSignal: RecentCrashSignal,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val fromScreen: String = savedStateHandle.get<String>("fromScreen") ?: "Unknown"
@@ -280,6 +282,10 @@ constructor(
             } catch (e: Exception) {
                 Log.e("BugReport", "Submit failed", e)
                 FirebaseCrashlytics.getInstance().recordException(e)
+                // Mirror the crash timestamp into RatingPromptPreferences so
+                // the in-app rating trigger heuristic suppresses prompts for
+                // 24h after a non-fatal report (see E2 audit § Item 3).
+                recentCrashSignal.recordCrash()
                 _messages.emit("Failed to submit report. Please try again.")
             } finally {
                 _isSubmitting.value = false

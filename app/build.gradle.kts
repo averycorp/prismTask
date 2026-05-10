@@ -358,6 +358,10 @@ dependencies {
     // Google Play Billing
     implementation("com.android.billingclient:billing-ktx:7.1.1")
 
+    // Google Play In-App Review (E2 in-app ratings)
+    implementation("com.google.android.play:review:2.0.2")
+    implementation("com.google.android.play:review-ktx:2.0.2")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.room:room-testing:2.8.4")
