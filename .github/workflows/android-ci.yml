@@ -336,7 +336,7 @@ jobs:
           ./gradlew testDebugUnitTest --continue -i \
             --tests 'com.averycorp.prismtask.domain.*' \
             2>&1 | tee -a unit-test-output.log
-      - name: Unit tests — UI support
+      - name: Unit tests — UI layer
         if: always() && steps.relevance.outputs.android == 'true'
         timeout-minutes: 8
         shell: bash
