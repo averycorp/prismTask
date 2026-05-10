@@ -41,6 +41,7 @@ import org.robolectric.annotation.Config
 class CoachmarkControllerTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var prefs: TourCardPreferences
+    private val controllerScopes = mutableListOf<TestScope>()
 
     private val tour = listOf(
         CoachmarkStep(
@@ -78,15 +79,25 @@ class CoachmarkControllerTest {
 
     @After
     fun tearDown() {
+        // Cancel every controller scope handed out by `controller()` /
+        // explicit `TestScope(testDispatcher)` constructions so leaked
+        // launches (e.g. DataStore writes still suspended on real IO)
+        // can't outlive the test and hang the next one's
+        // `advanceUntilIdle`.
+        controllerScopes.forEach { it.cancel() }
+        controllerScopes.clear()
         Dispatchers.resetMain()
     }
 
-    private fun controller(): CoachmarkController =
-        CoachmarkController(
+    private fun controller(): CoachmarkController {
+        val scope = TestScope(testDispatcher)
+        controllerScopes += scope
+        return CoachmarkController(
             tourCardPreferences = prefs,
             tour = tour,
-            scope = TestScope(testDispatcher)
+            scope = scope
         )
+    }
 
     @Test
     fun tryStart_no_op_when_ineligible() = runTest(testDispatcher) {
@@ -164,7 +175,7 @@ class CoachmarkControllerTest {
     @Test
     fun dismiss_marks_dismissed_and_persists() = runTest(testDispatcher) {
         prefs.markEligible()
-        val controllerScope = TestScope(testDispatcher)
+        val controllerScope = TestScope(testDispatcher).also { controllerScopes += it }
         val c = CoachmarkController(
             tourCardPreferences = prefs,
             tour = tour,
@@ -188,7 +199,7 @@ class CoachmarkControllerTest {
     fun finish_action_marks_completed() = runTest(testDispatcher) {
         prefs.markEligible()
         prefs.setCoachmarkStepIndex(3) // start on Finish step
-        val controllerScope = TestScope(testDispatcher)
+        val controllerScope = TestScope(testDispatcher).also { controllerScopes += it }
         val c = CoachmarkController(
             tourCardPreferences = prefs,
             tour = tour,
@@ -292,7 +303,7 @@ class CoachmarkControllerTest {
     @Test
     fun stepIndex_persists_on_advance() = runTest(testDispatcher) {
         prefs.markEligible()
-        val controllerScope = TestScope(testDispatcher)
+        val controllerScope = TestScope(testDispatcher).also { controllerScopes += it }
         val c = CoachmarkController(
             tourCardPreferences = prefs,
             tour = tour,

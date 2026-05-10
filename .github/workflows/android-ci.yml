@@ -331,7 +331,7 @@ jobs:
           ./gradlew testDebugUnitTest --continue -i \
             --tests 'com.averycorp.prismtask.domain.*' \
             2>&1 | tee -a unit-test-output.log
-      - name: Unit tests — UI layer
+      - name: Unit tests — UI layer (a11y / components / theme)
         if: always() && steps.relevance.outputs.android == 'true'
         timeout-minutes: 8
         shell: bash
@@ -339,9 +339,17 @@ jobs:
           set -euo pipefail
           ./gradlew testDebugUnitTest --continue -i \
             --tests 'com.averycorp.prismtask.ui.a11y.*' \
-            --tests 'com.averycorp.prismtask.ui.coachmark.*' \
             --tests 'com.averycorp.prismtask.ui.components.*' \
             --tests 'com.averycorp.prismtask.ui.theme.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — UI layer (coachmark, Robolectric)
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.ui.coachmark.*' \
             2>&1 | tee -a unit-test-output.log
       - name: Unit tests — UI medication screens
         if: always() && steps.relevance.outputs.android == 'true'
