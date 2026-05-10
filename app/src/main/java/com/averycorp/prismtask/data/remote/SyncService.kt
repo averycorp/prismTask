@@ -63,7 +63,8 @@ import javax.inject.Singleton
 
 // See docs/audits/SYNCSERVICE_GOD_CLASS_REFACTOR_AUDIT.md for the surface-axis
 // refactor plan (operator-confirmed May 4, 2026; Phase 1 + Slice 0 shipped via
-// PRs #1118 + #1122; Phase 2 implementation pending).
+// PRs #1118 + #1122; Phase 2 sub-PR 7a — Firestore constructor injection —
+// shipped via this PR).
 // TODO(sync-refactor): split SyncService — separate push, pull, listener,
 // and initial-upload surfaces. Each PR that touches this file widens the
 // file further; the next refactor should land before the next feature.
@@ -123,9 +124,9 @@ constructor(
     private val projectPhaseDao: ProjectPhaseDao,
     private val projectRiskDao: ProjectRiskDao,
     private val taskDependencyDao: TaskDependencyDao,
-    private val externalAnchorDao: ExternalAnchorDao
+    private val externalAnchorDao: ExternalAnchorDao,
+    private val firestore: FirebaseFirestore
 ) {
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val listeners = mutableListOf<ListenerRegistration>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

@@ -517,3 +517,133 @@ Each sub-PR ≤ 800 LOC, sequential, branch-off-prior-merged-sub-PR pattern.
 Slice 0 dispatch test suite (PR #1122) remains the safety net.
 
 No work in this bundle.
+
+---
+
+## Post-paper-close override (2026-05-10, branch `claude/d8-web-sync-hardening-wuL1v`)
+
+After the paper-close shipped (PR #1234), operator re-ran the maximalist
+mega-prompt with directive **"do not defer."** This section records the
+override outcome.
+
+### What shipped
+
+**Sub-PR 7a — Firestore constructor injection in SyncService.** The PR
+#1118 audit § B.2 prerequisite for the surface-axis Strangler Fig. New
+`FirebaseModule` provides `FirebaseFirestore` as a Hilt singleton; SyncService
+takes it as a constructor parameter instead of pulling
+`FirebaseFirestore.getInstance()` from a `by lazy` field. ~25 LOC across
+two files (`di/FirebaseModule.kt` new, `data/remote/SyncService.kt` edit).
+Other sync services (`GenericPreferenceSyncService`,
+`ThemePreferencesSyncService`, `SortPreferencesSyncService`,
+`CloudIdOrphanHealer`, `AccountDeletionService`) keep their lazy pattern;
+they migrate incrementally as Strangler Fig sub-PRs reach them.
+
+This is the smallest meaningful Phase 2 step and unblocks the next
+extraction (sub-PR 7b — pull-surface — which needs Firestore explicit on
+the extracted class).
+
+### What did not ship (and why)
+
+**Item 8 tiersByTime retirement** — additional inventory done this session
+refines the deferral. Migration 59→60 (`Migrations.kt:1604-1695`) backfilled
+the legacy `self_care_logs.tiers_by_time` JSON into
+`medication_tier_states` but cheated by writing every row to the **DEFAULT
+slot** only — per-medication time-of-day granularity from the legacy data
+was lost. A live dual-write in `SelfCareRepository.setTierForTime()` should
+NOT perpetuate the cheat: live writes need to map `timeOfDay → slot_id`
+correctly (the slot whose `time_of_day` matches the touched block).
+
+That mapping requires reading `medication_slots` for the active medications
+on the date, filtering by `time_of_day`, and resolving ambiguity when
+multiple slots match (or none match — fall back to DEFAULT for back-compat
+with the migration's semantics?). This is a real design decision, not
+mechanical work.
+
+**Refined re-trigger:** re-open Item 8 with a Phase 1 design pass that
+answers:
+
+1. When `timeOfDay` has multiple matching slots, which slot wins (newest?
+   user-pinned?  fan-out to all?)?
+2. When `timeOfDay` has zero matching slots, write to DEFAULT slot
+   (back-compat) or skip the row (strict)?
+3. Reader migration (`HabitListViewModel.kt:302`) — does the count of
+   "completed time-of-day blocks" still derive from `tiersByTime` strings
+   for back-compat, or pivot to a `medication_tier_states` aggregate that
+   groups by slot's `time_of_day`? The latter is cleaner but changes the
+   read shape.
+4. DataImporter v3 path — does importing a v3 backup also populate
+   `medication_tier_states` (forward-fix), or remain JSON-only and rely
+   on the next post-restore use-of-app to dual-write (lazy-fix)?
+
+STOP-8A remains valid — backup-restore round-trip can't regress. The
+refined re-trigger is a **deeper design pass before code**, not "we
+discover this later."
+
+**Item 3 IDB schema migration framework + first consumer (web)** —
+session-deep inventory confirms `web/` has zero IndexedDB usage today; the
+plausible first consumer is migrating `batchStore.ts` (~25-entry
+localStorage undo history, `prismtask_batch_history_{uid}`) onto IDB. That
+is real work (~250-300 LOC framework + 100-120 LOC consumer migration +
+150-200 LOC tests including `fake-indexeddb` setup) and adds an `idb` npm
+dependency.
+
+**Refined re-trigger:** re-open Item 3 when *any one* of:
+
+1. Operator decides batch-history-on-IDB is worth the npm dep + test infra
+   for its own sake (consumer-driven; framework follows). Scope estimate
+   above is the budget.
+2. Web introduces an offline-first feature (compose without network, push
+   later) — that becomes a much-stronger first consumer than batch history.
+3. PWA / offline-manifest work begins; web becomes a first-class offline
+   app. Largest justifying scope.
+
+Anti-pattern #16 ("don't extend Item 3 framework beyond what consumers
+actually need") still applies — minimal version-bump-on-open + per-version
+function lookup is enough; cross-tab leader-election (Web Locks API) and
+rollback semantics defer to consumer #2 or #3.
+
+### Closure verdicts post-override
+
+| Item | Pre-paper-close | Post-PR-#1234 | Post-override (this PR) | Status |
+|------|-----------------|---------------|-------------------------|--------|
+| ★ entry deletion | 0 | 1.0 | 1.0 | not-needed |
+| Item 3 IDB framework | 0 | 0 | 0 | YELLOW-DEFER (refined re-trigger) |
+| Item 4 Pomodoro+ | 0 | 1.0 | 1.0 | divergence documented |
+| Item 5 conflict resolution | 0 | 1.0 | 1.0 | divergence documented |
+| Item 7 SyncService Phase 2 | 0.30 | 0.5 | 0.6 | TODO + sub-PR 7a shipped; 7b-e deferred |
+| Item 8 tiersByTime | 0 | 0 | 0 | YELLOW-DEFER (refined re-trigger) |
+
+**D8 closure: 4/6 items at 1.0+, 1/6 partial (Item 7 0.6), 2/6 YELLOW-DEFER
+with refined re-trigger criteria.**
+
+### Phase F GREEN-GO posture
+
+Sub-PR 7a is **constructor injection only** — it does not change runtime
+behavior. `FirebaseFirestore.getInstance()` returns the same singleton
+that the lazy field returned; Hilt's `@Provides` just relocates the call
+site. No change to push/pull/listener semantics, no change to PR #1121
+canonical-row dedup invariants, no change to PR #1122 dispatch tables, no
+change to PR #1071 automation backend, no backend schema change.
+
+Slice 0 dispatch tests (`SyncServiceDispatchTest`) are pure-unit on
+companion-object tables — unchanged by this PR.
+
+**Phase F GREEN-GO impact: NEUTRAL.** May 15 kickoff unaffected.
+
+### STOP gate audit
+
+- STOP-7A (LOC > 4500): not fired (3859 LOC; +1 line for the constructor parameter).
+- STOP-7C (DI changes beyond SyncService): **fired and accepted** — this
+  PR adds `di/FirebaseModule.kt` (new file). Operator override of "do not
+  defer" supersedes the STOP. Other sync services keep `getInstance()`
+  pattern; they migrate as later sub-PRs reach them.
+- STOP-FIG-A (sub-PR CI red): pending CI verification post-push.
+- STOP-PHASE-F-RISK: not fired — constructor injection is behaviorally
+  inert.
+
+### Sub-PR 7b unblocked
+
+Next sequential sub-PR (7b — push surface extraction, OR 7-pull as 7a's
+partner) can now receive Firestore as constructor param on the extracted
+class. The `firestore` field is no longer god-class-private.
