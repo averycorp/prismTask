@@ -29,7 +29,6 @@ constructor(
 
         val DEFAULT_ORDER = listOf(
             "progress",
-            "habits",
             "daily_essentials",
             "overdue",
             "today_tasks",
@@ -40,10 +39,7 @@ constructor(
         // Sections collapsed by default. Anything not in this set is expanded.
         val DEFAULT_COLLAPSED = setOf("planned", "completed")
 
-        // Sections hidden by default. The habit bar is opt-in; users who want
-        // habit reminders surfaced as Today-screen tasks enable per-habit
-        // "Create daily to-do" instead.
-        val DEFAULT_HIDDEN = setOf("habits")
+        val DEFAULT_HIDDEN = emptySet<String>()
     }
 
     fun getSectionOrder(): Flow<List<String>> = context.dashboardDataStore.data.map { prefs ->

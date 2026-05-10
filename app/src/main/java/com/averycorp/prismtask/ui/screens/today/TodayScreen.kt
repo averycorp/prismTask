@@ -54,11 +54,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.TaskEntity
-import com.averycorp.prismtask.data.repository.LeisureRepository
-import com.averycorp.prismtask.data.repository.SchoolworkRepository
 import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.components.EnergyCheckInCard
-import com.averycorp.prismtask.ui.components.HabitChipRowSkeleton
 import com.averycorp.prismtask.ui.components.MoveToProjectSheet
 import com.averycorp.prismtask.ui.components.ProGatedFeature
 import com.averycorp.prismtask.ui.components.ProUpsellSheet
@@ -82,7 +79,6 @@ import com.averycorp.prismtask.ui.screens.today.components.CompletedTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.FloatingQuickAddBar
 import com.averycorp.prismtask.ui.screens.today.components.GUIDED_TOUR_STEPS
 import com.averycorp.prismtask.ui.screens.today.components.GuidedTourCard
-import com.averycorp.prismtask.ui.screens.today.components.HabitChipRow
 import com.averycorp.prismtask.ui.screens.today.components.MorningCheckInBanner
 import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
 import com.averycorp.prismtask.ui.screens.today.components.PlanForTodaySheet
@@ -103,7 +99,6 @@ import com.averycorp.prismtask.ui.theme.prismGlow
 
 private const val SECTION_OVERDUE = "overdue"
 private const val SECTION_TODAY_TASKS = "today_tasks"
-private const val SECTION_HABITS = "habits"
 private const val SECTION_DAILY_ESSENTIALS = "daily_essentials"
 private const val SECTION_SCHEDULED = "scheduled_today"
 private const val SECTION_PLANNED = "planned"
@@ -117,8 +112,7 @@ fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     coachingViewModel: CoachingViewModel = hiltViewModel(),
     autoStartVoice: Boolean = false,
-    onVoiceAutoStartConsumed: () -> Unit = {},
-    onNavigateToHabits: () -> Unit = {}
+    onVoiceAutoStartConsumed: () -> Unit = {}
 ) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val overdueTasks by viewModel.overdueTasks.collectAsStateWithLifecycle()
@@ -131,7 +125,6 @@ fun TodayScreen(
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val startOfToday by viewModel.startOfToday.collectAsStateWithLifecycle()
     val startOfTomorrow by viewModel.startOfTomorrow.collectAsStateWithLifecycle()
-    val todayHabits by viewModel.todayHabits.collectAsStateWithLifecycle()
     val scheduledTodayHabits by viewModel.scheduledTodayHabits.collectAsStateWithLifecycle()
     val overdueBookableHabits by viewModel.overdueBookableHabits.collectAsStateWithLifecycle()
     val combinedTotal by viewModel.combinedTotal.collectAsStateWithLifecycle()
@@ -315,8 +308,6 @@ fun TodayScreen(
                     ProgressHeaderSkeleton()
                     Spacer(modifier = Modifier.height(16.dp))
                     TaskListSkeleton(count = 3)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HabitChipRowSkeleton(count = 4)
                 }
             } else {
                 // F-FOLDABLE-001 — hinge-aware horizontal padding. Reads
@@ -683,44 +674,6 @@ fun TodayScreen(
                                         )
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    if (SECTION_HABITS !in hiddenSections && todayHabits.isNotEmpty()) {
-                        val expanded = SECTION_HABITS !in collapsedSections
-                        val habitDoneCount = todayHabits.count { it.isCompletedToday }
-                        item(key = "section_habits") {
-                            CollapsibleSection(
-                                emoji = "\uD83D\uDCAA",
-                                title = "Habits",
-                                count = todayHabits.size,
-                                countLabel = "$habitDoneCount done",
-                                accentColor = prismColors.secondary,
-                                expanded = expanded,
-                                onToggle = { viewModel.onToggleSectionCollapsed(SECTION_HABITS) }
-                            ) {
-                                HabitChipRow(
-                                    habits = todayHabits,
-                                    onToggle = { hws ->
-                                        val route = when (hws.habit.name) {
-                                            SchoolworkRepository.SCHOOL_HABIT_NAME ->
-                                                PrismTaskRoute.Schoolwork.route
-                                            LeisureRepository.LEISURE_HABIT_NAME ->
-                                                PrismTaskRoute.Leisure.route
-                                            else -> null
-                                        }
-                                        if (route != null) {
-                                            navController.navigate(route)
-                                        } else {
-                                            viewModel.onToggleHabitCompletion(
-                                                hws.habit.id,
-                                                hws.isCompletedToday
-                                            )
-                                        }
-                                    },
-                                    onSeeAll = onNavigateToHabits
-                                )
                             }
                         }
                     }

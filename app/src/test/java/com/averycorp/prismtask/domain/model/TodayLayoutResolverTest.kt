@@ -55,7 +55,7 @@ class TodayLayoutResolverTest {
 
     @Test
     fun `custom user order is preserved`() {
-        val custom = listOf("completed", "overdue", "today_tasks", "habits")
+        val custom = listOf("completed", "overdue", "today_tasks", "planned")
         val result = TodayLayoutResolver.resolve(
             userOrder = custom,
             hiddenKeys = emptySet(),
