@@ -21,7 +21,7 @@ class RatingPromptTriggerHelperTest {
             prefs = prefs,
             crashSignal = crash,
             onboardingPreferences = onboarding,
-            clock = { now },
+            clock = { now }
         )
 
     private fun stubBaseline(
@@ -31,7 +31,7 @@ class RatingPromptTriggerHelperTest {
         lastPlay: Long = 0L,
         lastCustom: Long = 0L,
         onboardingDone: Boolean = true,
-        recentCrash: Boolean = false,
+        recentCrash: Boolean = false
     ) {
         coEvery { onboarding.hasCompletedOnboarding() } returns flowOf(onboardingDone)
         coEvery { prefs.sessionCount() } returns flowOf(sessions)
@@ -94,7 +94,7 @@ class RatingPromptTriggerHelperTest {
         stubBaseline(
             tasksCompletedAfterIncrement = 5,
             firstLaunchAt = NOW - TimeUnit.DAYS.toMillis(3),
-            lastCustom = NOW - TimeUnit.DAYS.toMillis(15),
+            lastCustom = NOW - TimeUnit.DAYS.toMillis(15)
         )
         assertEquals(RatingPromptDecision.None, helper().onTaskCompleted())
     }

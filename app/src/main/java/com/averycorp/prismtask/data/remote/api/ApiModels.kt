@@ -996,12 +996,12 @@ data class InAppFeedbackRequest(
     val sentiment: String,
     val rating: Int? = null,
     @SerializedName("free_text") val freeText: String? = null,
-    @SerializedName("client_timestamp") val clientTimestamp: Long? = null,
+    @SerializedName("client_timestamp") val clientTimestamp: Long? = null
 )
 
 data class InAppFeedbackResponse(
     val success: Boolean,
-    @SerializedName("feedback_id") val feedbackId: Long,
+    @SerializedName("feedback_id") val feedbackId: Long
 )
 // endregion
 

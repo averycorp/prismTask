@@ -21,9 +21,10 @@ class RatingPromptTriggerHelper @Inject constructor(
     private val prefs: RatingPromptPreferences,
     private val crashSignal: RecentCrashSignal,
     private val onboardingPreferences: OnboardingPreferences,
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val clock: () -> Long = { System.currentTimeMillis() }
 ) {
     @Volatile private var customPromptShownThisSession: Boolean = false
+
     @Volatile private var playReviewShownThisSession: Boolean = false
 
     /**

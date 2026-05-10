@@ -24,7 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class RecentCrashSignal @Inject constructor(
     private val prefs: RatingPromptPreferences,
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val clock: () -> Long = { System.currentTimeMillis() }
 ) {
     suspend fun recordCrash() {
         prefs.setLastCrashAt(clock())

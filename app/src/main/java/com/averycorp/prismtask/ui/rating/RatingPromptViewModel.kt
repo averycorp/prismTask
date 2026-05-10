@@ -19,12 +19,12 @@ sealed class RatingPromptUiState {
 
 enum class RatingSentiment(val wireValue: String) {
     THUMB_UP("thumb_up"),
-    THUMB_DOWN("thumb_down"),
+    THUMB_DOWN("thumb_down")
 }
 
 @HiltViewModel
 class RatingPromptViewModel @Inject constructor(
-    private val repository: RatingFeedbackRepository,
+    private val repository: RatingFeedbackRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow<RatingPromptUiState>(RatingPromptUiState.Idle)
     val state: StateFlow<RatingPromptUiState> = _state.asStateFlow()
@@ -36,11 +36,11 @@ class RatingPromptViewModel @Inject constructor(
             val result = repository.submit(
                 sentiment = sentiment.wireValue,
                 freeText = freeText.trim().ifBlank { null },
-                clientTimestampMs = System.currentTimeMillis(),
+                clientTimestampMs = System.currentTimeMillis()
             )
             _state.value = result.fold(
                 onSuccess = { RatingPromptUiState.Submitted },
-                onFailure = { RatingPromptUiState.Error("Couldn't send — try again?") },
+                onFailure = { RatingPromptUiState.Error("Couldn't send — try again?") }
             )
         }
     }

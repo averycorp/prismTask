@@ -12,19 +12,19 @@ import javax.inject.Singleton
  */
 @Singleton
 class RatingFeedbackRepository @Inject constructor(
-    private val api: PrismTaskApi,
+    private val api: PrismTaskApi
 ) {
     suspend fun submit(
         sentiment: String,
         freeText: String?,
-        clientTimestampMs: Long,
+        clientTimestampMs: Long
     ): Result<Long> = runCatching {
         val response = api.submitInAppFeedback(
             InAppFeedbackRequest(
                 sentiment = sentiment,
                 rating = null,
                 freeText = freeText?.takeIf { it.isNotBlank() },
-                clientTimestamp = clientTimestampMs,
+                clientTimestamp = clientTimestampMs
             )
         )
         response.feedbackId
