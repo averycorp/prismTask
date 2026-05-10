@@ -16,15 +16,6 @@ import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.MedicationDoseEntity
 import com.averycorp.prismtask.data.local.entity.MedicationEntity
 import com.averycorp.prismtask.data.local.entity.MedicationTierStateEntity
-import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
-import com.averycorp.prismtask.data.local.dao.MedicationTierStateDao
-import com.averycorp.prismtask.data.local.dao.SelfCareDao
-import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
-import com.averycorp.prismtask.data.local.entity.HabitEntity
-import com.averycorp.prismtask.data.local.entity.MedicationTierStateEntity
-import com.averycorp.prismtask.data.local.dao.SelfCareDao
-import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
-import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareStepEntity
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
@@ -172,14 +163,6 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val gson: Gson,
     private val syncTracker: SyncTracker,
-    private val medicationDao: MedicationDao,
-    /**
-     * Item 8 dual-write (D8 override, 2026-05-10): on every legacy
-     * `tiersByTime` write we also upsert a row in `medication_tier_states`
-     * for `(med, DEFAULT slot, today, max-tier)`. Mirrors migration 59→60
-     * semantics — DEFAULT slot only, computed tier source. The legacy JSON
-     * column remains source of truth until per-block-slot mapping ships.
-     */
     private val medicationDao: MedicationDao,
     private val medicationDoseDao: MedicationDoseDao,
     /**
@@ -810,26 +793,6 @@ constructor(
      *
      * Tolerant by design: caller wraps in `runCatching {}`. Missing
      * DEFAULT slot or zero active meds returns silently.
-     */
-    private suspend fun dualWriteMedicationTierStates(updatedTiersByTime: Map<String, String>) {
-        val tierOrder = SelfCareRoutines.getTierOrder("medication")
-     * for forward consumers. Mirrors `MIGRATION_59_60` semantics:
-     *
-     * - Writes one row per active medication, scoped to the DEFAULT slot
-     *   (`name = "Default"`). Per-block-slot mapping is intentionally NOT
-     *   attempted — the migration cheated for the same reason (legacy data
-     *   never carried slot identity), and live writes preserve that
-     *   convention until a follow-on item ships per-block resolution.
-     * - Tier value: highest entry in [updatedTiersByTime] per the
-     *   `medication` routine's tier ladder (essential < prescription <
-     *   complete). Empty map → `"skipped"`.
-     * - Existing rows are updated in place (LWW by `updated_at`); missing
-     *   rows are inserted with `tier_source = "computed"`.
-     *
-     * Tolerant by design: the caller wraps in `runCatching {}` because
-     * silent fallthrough is the documented contract. Any FK violation,
-     * missing DEFAULT slot, or zero active meds returns silently and the
-     * legacy JSON column remains source of truth.
      */
     private suspend fun dualWriteMedicationTierStates(updatedTiersByTime: Map<String, String>) {
         val tierOrder = SelfCareRoutines.getTierOrder("medication")
