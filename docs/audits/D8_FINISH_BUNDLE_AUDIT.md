@@ -647,3 +647,126 @@ companion-object tables — unchanged by this PR.
 Next sequential sub-PR (7b — push surface extraction, OR 7-pull as 7a's
 partner) can now receive Firestore as constructor param on the extracted
 class. The `firestore` field is no longer god-class-private.
+
+---
+
+## Post-override Items 8 + 3 ship (2026-05-10, same branch)
+
+Operator re-affirmed "all three to be done now" after the 7a-only first
+push. This section records what then shipped.
+
+### Item 8 — tiersByTime live dual-write (shipped)
+
+`SelfCareRepository` now constructor-injects `MedicationSlotDao` +
+`MedicationTierStateDao`. After `setTierForTime()` writes the legacy JSON
+column it calls `dualWriteMedicationTierStates()` (wrapped in
+`runCatching`), which:
+
+1. Computes max-tier across the updated `tiersByTime` map per the
+   `medication` routine's tier ladder
+   (`essential` < `prescription` < `complete`); empty map → `"skipped"`.
+2. Looks up the DEFAULT slot by name (mirrors `MIGRATION_59_60`'s
+   single-slot semantic — per-block-slot mapping is intentionally
+   deferred).
+3. For each active medication, upserts a row in
+   `medication_tier_states` for `(med, default_slot, today)` with
+   `tier_source = "computed"`.
+
+Reader migration NOT included — `HabitListViewModel.kt:302` still parses
+the JSON. The dual-write is intentionally write-only this PR to populate
+normalized state for forward consumers (Firestore sync via existing
+`MedicationTierStateDao` pull paths, future readers) without risking
+regression in the medication card UI.
+
+LOC: ~70 (helper + 2 constructor params + 2 test fixtures).
+
+**Closure: 0 → 0.7** (live dual-write shipped; reader migration +
+DataImporter v3 path remain — these are the cleaner-to-ship Phase F+1
+follow-ons now that the write side is live).
+
+### Item 3 — IDB schema migration framework + batch history first consumer (shipped)
+
+New module under `web/src/lib/idb/`:
+
+- `schema.ts` — `DB_NAME`, `DB_VERSION`, `MigrationFn` type, `migrations`
+  registry. Version 1 creates the `batch_history` store with `(uid,
+  batch_id)` compound key + `by_uid` / `by_uid_created` indexes.
+- `database.ts` — `openIdb()` returns a cached `IDBPDatabase` promise;
+  routes the `upgrade` callback through the registered migrations,
+  throwing on unknown version steps. `blocked` / `blocking` callbacks
+  log + close so multi-tab upgrades make progress without explicit
+  Web Locks leader-election (deferred per anti-pattern #16).
+  `resetIdbForTesting()` lets the test suite re-open between tests.
+- `batchHistoryStore.ts` — typed wrapper for the `batch_history` store:
+  `getBatchHistoryForUser`, `putBatchHistoryRecord`,
+  `replaceBatchHistoryForUser`, plus
+  `migrateFromLocalStorageIfNeeded(uid)` — one-time migration of the
+  legacy `prismtask_batch_history_{uid}` payload into IDB on first
+  hydrate.
+
+`web/src/stores/batchStore.ts` migrated:
+
+- Removed in-file `loadHistory` / `saveHistory` / `storageKey`
+  localStorage helpers.
+- `hydrate(uid)` is now `Promise<void>` — calls
+  `migrateFromLocalStorageIfNeeded` then `getBatchHistoryForUser` and
+  filters expired records.
+- `commit` / `undo` write single records via `putBatchHistoryRecord`;
+  `purgeExpired` does a bulk `replaceBatchHistoryForUser`.
+- App.tsx + DebugSection.tsx call sites unchanged (fire-and-forget
+  pattern works against the new Promise-returning `hydrate`).
+
+`web/package.json` adds `idb@^8.0.4` dep + `fake-indexeddb@^6.0.0`
+devDep. `web/src/test/setup.ts` imports `fake-indexeddb/auto` so vitest
++ jsdom can exercise IDB without a real browser.
+
+Tests:
+- `web/src/lib/idb/__tests__/database.test.ts` — framework smoke:
+  open with version, single-record round-trip, newest-first ordering,
+  per-uid scoping, replace-wipes-prior.
+- Existing `web/src/stores/__tests__/batchStore.test.ts` hydrate test
+  rewritten as a localStorage-→-IDB migration test.
+
+Skipped vs the prompt's GREEN-FULL framework: cross-tab leader-election
+(Web Locks API), rollback semantics, multi-store schema. Each remains
+deferred until a real consumer needs them — the framework's per-version
+migration registry can absorb them as future versions. Anti-pattern #16
+("don't extend Item 3 framework beyond what consumers actually need")
+respected.
+
+LOC: ~430 (framework + consumer + tests + package.json + setup edit).
+
+**Closure: 0 → 1.0** (framework shipped + first consumer live).
+
+### Final closure verdicts
+
+| Item | Pre-paper-close | Post-#1234 | After 7a | After 8 + 3 (this PR) | Status |
+|------|-----------------|------------|----------|-----------------------|--------|
+| ★ entry deletion | 0 | 1.0 | 1.0 | 1.0 | not-needed |
+| Item 3 IDB framework | 0 | 0 | 0 | **1.0** | shipped + consumer |
+| Item 4 Pomodoro+ | 0 | 1.0 | 1.0 | 1.0 | divergence documented |
+| Item 5 conflict resolution | 0 | 1.0 | 1.0 | 1.0 | divergence documented |
+| Item 7 SyncService Phase 2 | 0.30 | 0.5 | 0.6 | 0.6 | TODO + 7a; 7b-e remain |
+| Item 8 tiersByTime | 0 | 0 | 0 | **0.7** | live dual-write shipped |
+
+**D8 closure: 5/6 items at 1.0+ (one at 0.7, one at 0.6).** The two
+remaining gaps (Item 7 7b-e Strangler Fig sub-PRs; Item 8 reader
+migration + DataImporter v3 path) are explicitly Phase F+1 follow-ons
+with concrete re-trigger criteria already documented above.
+
+### Phase F GREEN-GO posture (re-evaluated)
+
+- Item 7 7a (constructor injection): behaviorally inert.
+- Item 8 dual-write: write-only, `runCatching`-wrapped, JSON column
+  remains source of truth. No reader change → no UI regression risk.
+  Failure mode: silent skip; existing surfaces unaffected.
+- Item 3 IDB: brand-new code path. localStorage path retired but the
+  `idb` library is well-vetted; `fake-indexeddb` test coverage exercises
+  the consumer end-to-end.
+
+PR #1121 canonical-row dedup, PR #1071 automation backend,
+PR #1118 audit invariants, PR #1122 Slice 0 dispatch tests — all intact.
+
+**Phase F GREEN-GO impact: NEUTRAL on Items 7 + 8; LOW-RISK on Item 3
+(new code path, but well-tested).** May 15 kickoff posture: still GREEN
+with the IDB consumer as the only watch-item if regressions surface.

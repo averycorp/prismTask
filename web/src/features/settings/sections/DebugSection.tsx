@@ -8,6 +8,7 @@ import { firestore } from '@/lib/firebase';
 import { useAuthStore } from '@/stores/authStore';
 import { useBatchStore } from '@/stores/batchStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { replaceBatchHistoryForUser } from '@/lib/idb/batchHistoryStore';
 
 /**
  * Debug section — local-state maintenance tools that used to live on
@@ -45,11 +46,19 @@ export function DebugSection() {
     }
   };
 
-  const clearBatchHistory = () => {
+  const clearBatchHistory = async () => {
     if (!uid) return;
     try {
-      localStorage.removeItem(`prismtask_batch_history_${uid}`);
-      hydrateBatch(uid);
+      // Clear both the IDB store (current persistence) and any leftover
+      // localStorage payload from the pre-IDB build, in case the user
+      // hasn't gone through a hydrate cycle since the migration.
+      try {
+        localStorage.removeItem(`prismtask_batch_history_${uid}`);
+      } catch {
+        // ignore
+      }
+      await replaceBatchHistoryForUser(uid, []);
+      await hydrateBatch(uid);
       toast.success('Batch history cleared on this device.');
     } catch (e) {
       toast.error((e as Error).message || 'Failed to clear history');

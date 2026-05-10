@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom/vitest';
+// jsdom doesn't ship IndexedDB. fake-indexeddb provides an in-memory
+// implementation so tests can exercise the IDB framework + consumers
+// (`web/src/lib/idb/`) without spinning up a real browser.
+import 'fake-indexeddb/auto';
 
 // jsdom doesn't implement window.matchMedia. Stub a no-match version so
 // hooks like useMediaQuery (and any component that goes through Modal /
