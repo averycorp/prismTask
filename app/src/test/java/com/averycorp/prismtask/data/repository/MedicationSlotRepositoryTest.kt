@@ -488,6 +488,24 @@ private class FakeMedicationTierStateDao : MedicationTierStateDao {
             it.medicationId == medicationId && it.logDate == date && it.slotId == slotId
         }
 
+    override suspend fun getForQuadrupleOnce(
+        medicationId: Long,
+        date: String,
+        slotId: Long,
+        timeOfDay: String
+    ): MedicationTierStateEntity? =
+        rows.firstOrNull {
+            it.medicationId == medicationId &&
+                it.logDate == date &&
+                it.slotId == slotId &&
+                it.timeOfDay == timeOfDay
+        }
+
+    override suspend fun getDistinctTimeOfDayForDateOnce(date: String): List<String> =
+        rows.filter { it.logDate == date && it.timeOfDay != null }
+            .mapNotNull { it.timeOfDay }
+            .distinct()
+
     override suspend fun getForSlotDateOnce(slotId: Long, date: String): List<MedicationTierStateEntity> =
         rows.filter { it.slotId == slotId && it.logDate == date }
 
