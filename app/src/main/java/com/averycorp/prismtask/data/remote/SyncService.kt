@@ -144,6 +144,9 @@ constructor(
      */
     private val initialUploadOrchestrator: SyncInitialUploadOrchestrator
 ) {
+    private val firestore: FirebaseFirestore
+) {
+    private val listeners = mutableListOf<ListenerRegistration>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile private var isSyncing = false

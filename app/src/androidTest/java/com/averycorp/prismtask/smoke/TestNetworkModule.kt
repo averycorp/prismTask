@@ -311,4 +311,9 @@ class FakePrismTaskApi : PrismTaskApi {
         request: com.averycorp.prismtask.data.remote.api.AutomationSummarizeRequest
     ): com.averycorp.prismtask.data.remote.api.AutomationSummarizeResponse =
         error("Not used in offline tests")
+
+    override suspend fun submitInAppFeedback(
+        body: com.averycorp.prismtask.data.remote.api.InAppFeedbackRequest
+    ): com.averycorp.prismtask.data.remote.api.InAppFeedbackResponse =
+        error("Not used in offline tests")
 }
