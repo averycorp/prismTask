@@ -14,13 +14,13 @@ import com.google.gson.Gson
 import com.google.gson.JsonParseException
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
 
 data class CustomLeisureActivity(
     val id: String,
@@ -348,7 +348,7 @@ constructor(
         (
             gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
                 as List<CustomLeisureSection?>?
-        ).orEmpty()
+            ).orEmpty()
     } catch (exception: JsonParseException) {
         reportMitigation(
             mitigationId = "M1_gson_parse_fail",
