@@ -280,6 +280,16 @@ interface TaskDao {
     )
     suspend fun getTasksForHabitInRangeOnce(habitId: Long, startDate: Long, endDate: Long): List<TaskEntity>
 
+    // Latest auto-generated habit task whose due_date falls in the given range.
+    // Used by the daily-todo generator to dedupe and by the habit/task two-way
+    // completion sync to find the row to flip.
+    @Query(
+        "SELECT * FROM tasks WHERE source_habit_id = :habitId AND archived_at IS NULL " +
+            "AND due_date IS NOT NULL AND due_date >= :startDate AND due_date < :endDate " +
+            "ORDER BY id DESC LIMIT 1"
+    )
+    suspend fun getLatestHabitTaskForDayOnce(habitId: Long, startDate: Long, endDate: Long): TaskEntity?
+
     // --- Eisenhower quadrant ---
 
     @Query(

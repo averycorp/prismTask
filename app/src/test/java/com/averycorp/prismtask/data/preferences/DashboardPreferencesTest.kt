@@ -38,8 +38,9 @@ class DashboardPreferencesTest {
     }
 
     @Test
-    fun getHiddenSections_defaultsToEmpty() = runTest {
-        assertEquals(emptySet<String>(), prefs.getHiddenSections().first())
+    fun getHiddenSections_defaultsToHabits() = runTest {
+        assertEquals(DashboardPreferences.DEFAULT_HIDDEN, prefs.getHiddenSections().first())
+        assertTrue("habits" in prefs.getHiddenSections().first())
     }
 
     @Test
@@ -78,7 +79,7 @@ class DashboardPreferencesTest {
         prefs.resetToDefaults()
 
         assertEquals(DashboardPreferences.DEFAULT_ORDER, prefs.getSectionOrder().first())
-        assertEquals(emptySet<String>(), prefs.getHiddenSections().first())
+        assertEquals(DashboardPreferences.DEFAULT_HIDDEN, prefs.getHiddenSections().first())
         assertEquals("ring", prefs.getProgressStyle().first())
     }
 }

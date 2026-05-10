@@ -189,6 +189,21 @@ constructor(
         )
         widgetUpdateManager.updateHabitWidgets()
 
+        // Two-way sync: when a habit linked to a "Create daily to-do" task is
+        // marked complete, mirror onto the auto-generated task for today.
+        // Writes through TaskDao directly so TaskRepository.completeTask's
+        // habit-side sync (which would re-enter this method) is skipped.
+        result.habit?.takeIf { it.createDailyTask }?.let { h ->
+            val dayWindowStart = DayBoundary.normalizeToDayStart(now, currentDayStartHour())
+            val dayWindowEnd = dayWindowStart + DayBoundary.DAY_MILLIS
+            val linkedTask = taskDao.getLatestHabitTaskForDayOnce(h.id, dayWindowStart, dayWindowEnd)
+            if (linkedTask != null && !linkedTask.isCompleted) {
+                taskDao.markCompleted(linkedTask.id, now)
+                syncTracker.trackUpdate(linkedTask.id, "task")
+                widgetUpdateManager.updateTaskWidgets()
+            }
+        }
+
         val habit = result.habit
         if (habit?.reminderIntervalMillis != null && result.newCount < habit.reminderTimesPerDay) {
             medicationReminderScheduler.scheduleNext(
@@ -212,6 +227,19 @@ constructor(
         }
         completionDao.deleteLatestByHabitAndDateLocal(habitId, normalizedLocalDate)
         widgetUpdateManager.updateHabitWidgets()
+
+        // Two-way sync: roll back the auto-generated daily task's completion.
+        habitDao.getHabitByIdOnce(habitId)?.takeIf { it.createDailyTask }?.let { h ->
+            val now = System.currentTimeMillis()
+            val dayWindowStart = DayBoundary.normalizeToDayStart(now, currentDayStartHour())
+            val dayWindowEnd = dayWindowStart + DayBoundary.DAY_MILLIS
+            val linkedTask = taskDao.getLatestHabitTaskForDayOnce(h.id, dayWindowStart, dayWindowEnd)
+            if (linkedTask != null && linkedTask.isCompleted) {
+                taskDao.markIncomplete(linkedTask.id, now)
+                syncTracker.trackUpdate(linkedTask.id, "task")
+                widgetUpdateManager.updateTaskWidgets()
+            }
+        }
 
         // Reschedule from previous completion or cancel if none remain
         val habit = habitDao.getHabitByIdOnce(habitId)

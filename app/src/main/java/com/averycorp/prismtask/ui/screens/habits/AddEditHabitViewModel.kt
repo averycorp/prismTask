@@ -77,6 +77,8 @@ constructor(
         private set
     var showStreak by mutableStateOf(false)
         private set
+    var createDailyTask by mutableStateOf(false)
+        private set
     var nagSuppressionOverrideEnabled by mutableStateOf(false)
         private set
     var nagSuppressionDaysOverride by mutableIntStateOf(-1)
@@ -126,6 +128,7 @@ constructor(
                     trackPreviousPeriod = habit.trackPreviousPeriod
                     isBookable = habit.isBookable
                     showStreak = habit.showStreak
+                    createDailyTask = habit.createDailyTask
                     nagSuppressionOverrideEnabled = habit.nagSuppressionOverrideEnabled
                     nagSuppressionDaysOverride = habit.nagSuppressionDaysOverride
                     nagSuppressionDisableForHabit = habit.nagSuppressionDaysOverride == 0
@@ -251,6 +254,10 @@ constructor(
         showStreak = value
     }
 
+    fun onCreateDailyTaskChange(value: Boolean) {
+        createDailyTask = value
+    }
+
     fun onNagSuppressionOverrideEnabledChange(value: Boolean) {
         nagSuppressionOverrideEnabled = value
         if (!value) {
@@ -362,6 +369,7 @@ constructor(
                         trackPreviousPeriod = effectiveTrackPreviousPeriod,
                         isBookable = effectiveIsBookable,
                         showStreak = showStreak,
+                        createDailyTask = createDailyTask,
                         nagSuppressionOverrideEnabled = nagSuppressionOverrideEnabled,
                         nagSuppressionDaysOverride = effectiveNagOverride,
                         todaySkipAfterCompleteDays = effectiveSkipAfterComplete,
@@ -395,6 +403,7 @@ constructor(
                         trackPreviousPeriod = effectiveTrackPreviousPeriod,
                         isBookable = effectiveIsBookable,
                         showStreak = showStreak,
+                        createDailyTask = createDailyTask,
                         nagSuppressionOverrideEnabled = nagSuppressionOverrideEnabled,
                         nagSuppressionDaysOverride = effectiveNagOverride,
                         todaySkipAfterCompleteDays = effectiveSkipAfterComplete,
