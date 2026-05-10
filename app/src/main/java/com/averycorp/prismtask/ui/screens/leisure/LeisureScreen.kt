@@ -1,5 +1,6 @@
 package com.averycorp.prismtask.ui.screens.leisure
 
+import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.data.preferences.LeisureSlotId
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.leisure.components.ActivitySection
@@ -47,7 +49,16 @@ import com.averycorp.prismtask.ui.screens.leisure.components.LeisureOption
 import com.averycorp.prismtask.ui.screens.leisure.components.ProgressCard
 import com.averycorp.prismtask.ui.screens.leisure.components.SectionHeader
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.delay
+
+private fun LeisureSlotState.leisureDebugLabel(): String {
+    val id = when (val key = key) {
+        is LeisureSectionKey.BuiltIn -> key.slot.name
+        is LeisureSectionKey.Custom -> key.id
+    }
+    return "$id/${config.label}"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +72,35 @@ fun LeisureScreen(
     val customStates by viewModel.customSlots.collectAsStateWithLifecycle()
 
     // Active slots in display order. Disabled slots are hidden entirely.
-    val slots = (listOf(musicState, flexState, languageState) + customStates).filter { it.config.enabled }
+    val allSlots = listOf(musicState, flexState, languageState) + customStates
+    val slots = allSlots.filter { state ->
+        val include = state.config.enabled
+        if (!include && BuildConfig.DEBUG) {
+            Log.d(
+                "LeisurePrefs",
+                "M4_UI_FILTERED: ${state.leisureDebugLabel()} hidden by enabled=false"
+            )
+        }
+        include
+    }
+    val hiddenCustomSlotCount = customStates.count { !it.config.enabled }
+    LaunchedEffect(hiddenCustomSlotCount, customStates.size) {
+        if (hiddenCustomSlotCount > 0) {
+            val exception = IllegalStateException("M4_UI_HIDING_SECTIONS")
+            Log.e(
+                "LeisurePrefs",
+                "M4_UI_HIDING_SECTIONS: " +
+                    "$hiddenCustomSlotCount custom sections in data but not displayed",
+                exception
+            )
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("mitigation_id", "M4_ui_hiding_sections")
+                setCustomKey("hidden_count", hiddenCustomSlotCount.toString())
+                setCustomKey("total_count", customStates.size.toString())
+                recordException(exception)
+            }
+        }
+    }
     val doneCount = slots.count { it.done }
     val targetCount = slots.size
     val allDone = targetCount > 0 && doneCount == targetCount

@@ -1,15 +1,23 @@
 package com.averycorp.prismtask.data.preferences
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.averycorp.prismtask.BuildConfig
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
+import com.google.gson.JsonParseException
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -141,6 +149,7 @@ constructor(
         const val MAX_DURATION_MINUTES = 240
         const val MIN_GRID_COLUMNS = 1
         const val MAX_GRID_COLUMNS = 4
+        private const val LOG_TAG = "LeisurePrefs"
     }
 
     fun getSlotConfig(slot: LeisureSlotId): Flow<LeisureSlotConfig> =
@@ -284,13 +293,26 @@ constructor(
     suspend fun removeFlexActivity(id: String) = removeActivity(LeisureSlotId.FLEX, id)
 
     fun getCustomSections(): Flow<List<CustomLeisureSection>> =
-        context.leisureDataStore.data.map { prefs -> readCustomSections(prefs) }
+        context.leisureDataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    reportMitigation(
+                        mitigationId = "M3_datastore_read_fail",
+                        message = "M3_DATASTORE_READ_FAIL",
+                        exception = exception,
+                        customKeys = mapOf("exception_type" to exception.javaClass.simpleName)
+                    )
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
+            }
+            .map { prefs -> readCustomSections(prefs) }
 
     private fun readCustomSections(prefs: Preferences): List<CustomLeisureSection> {
         val raw = prefs[CUSTOM_SECTIONS_KEY] ?: return emptyList()
-        val parsed = runCatching { gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType) }
-            .getOrNull()
-            ?: return emptyList()
+        val parsed = parseCustomSections(raw)
+        val validSections = parsed.mapNotNull { section -> validateCustomSection(section) }
         // gson DOES NOT honour Kotlin non-null annotations — JSON `null`
         // (or a missing field) deserializes to a real Java `null` even
         // when the data class declares the property non-nullable. The
@@ -298,12 +320,90 @@ constructor(
         // LeisureSlotConfig.<init> via LeisureViewModel.toSlotState
         // because a synced CustomLeisureSection had at least one null
         // String field (label/emoji/id) or a null List<CustomLeisureActivity>.
-        // Filter out items that can't be made whole, and replace null
-        // fields on survivors with safe defaults so the downstream
+        // Filter out items that can't be made whole so the downstream
         // LeisureSlotConfig constructor never sees null.
-        return parsed
-            .filterNotNull()
+        val sanitizedSections = validSections
             .mapNotNull { runCatching { it.sanitized() }.getOrNull() }
+        logDebug(
+            "readCustomSections POST-SANITIZE: input=${parsed.size} " +
+                "output=${sanitizedSections.size} dropped=${parsed.size - sanitizedSections.size}"
+        )
+        if (parsed.size != sanitizedSections.size) {
+            val droppedCount = parsed.size - sanitizedSections.size
+            reportMitigation(
+                mitigationId = "M2_sanitize_dropped",
+                message = "M2_SANITIZE_DROPPED: $droppedCount sections; " +
+                    "raw=${parsed.size} sanitized=${sanitizedSections.size}",
+                exception = IllegalStateException("M2_SANITIZE_DROPPED"),
+                customKeys = mapOf(
+                    "dropped_count" to droppedCount.toString(),
+                    "raw_count" to parsed.size.toString()
+                )
+            )
+        }
+        return sanitizedSections
+    }
+
+    private fun parseCustomSections(raw: String): List<CustomLeisureSection?> = try {
+        (gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
+            as List<CustomLeisureSection?>?)
+            .orEmpty()
+    } catch (exception: JsonParseException) {
+        reportMitigation(
+            mitigationId = "M1_gson_parse_fail",
+            message = "M1_GSON_PARSE_FAIL",
+            exception = exception,
+            customKeys = mapOf("raw_length" to raw.length.toString())
+        )
+        emptyList()
+    }
+
+    private fun validateCustomSection(
+        section: CustomLeisureSection?
+    ): CustomLeisureSection? {
+        if (section == null) {
+            reportInvalidCustomSection("section", "null")
+            return null
+        }
+        if ((section.id as String?).isNullOrBlank()) {
+            reportInvalidCustomSection("id", "null_or_blank")
+            return null
+        }
+        if ((section.label as String?) == null) {
+            reportInvalidCustomSection("label", sectionSummary(section))
+            return null
+        }
+        val activities = section.customActivities as List<CustomLeisureActivity?>?
+        if (activities == null) {
+            reportInvalidCustomSection("activities", sectionSummary(section))
+            return null
+        }
+        val invalidActivityIndex = activities.indexOfFirst { activity ->
+            activity == null ||
+                (activity.id as String?).isNullOrBlank() ||
+                (activity.label as String?).isNullOrBlank()
+        }
+        if (invalidActivityIndex != -1) {
+            val invalidActivity = activities[invalidActivityIndex]
+            val invalidField = when {
+                invalidActivity == null -> "activity"
+                invalidActivity.idOrNull().isNullOrBlank() -> "activity_id"
+                invalidActivity.labelOrNull().isNullOrBlank() -> "activity_label"
+                else -> "activity"
+            }
+            reportInvalidCustomSection(invalidField, sectionSummary(section))
+            return null
+        }
+        return section
+    }
+
+    private fun reportInvalidCustomSection(invalidField: String, details: String) {
+        reportMitigation(
+            mitigationId = "M1_section_invalid_field",
+            message = "M1_SECTION_INVALID: field=$invalidField details=$details",
+            exception = IllegalStateException("M1_SECTION_INVALID"),
+            customKeys = mapOf("invalid_field" to invalidField)
+        )
     }
 
     /**
@@ -353,8 +453,10 @@ constructor(
         val trimmedLabel = label.trim().ifEmpty { "New Section" }
         val trimmedEmoji = emoji.trim().ifEmpty { "\u2728" }
         val id = "custom_section_${System.currentTimeMillis()}"
+        logDebug("addCustomSection ENTER: label=$trimmedLabel emoji=$trimmedEmoji id=$id")
         context.leisureDataStore.edit { prefs ->
             val current = readCustomSections(prefs)
+            logDebug("addCustomSection PRE-WRITE: ${customSectionSummary(current)}")
             val section = CustomLeisureSection(
                 id = id,
                 label = trimmedLabel,
@@ -367,14 +469,18 @@ constructor(
             )
             prefs[CUSTOM_SECTIONS_KEY] = gson.toJson(current + section)
         }
+        logCustomSectionsPostWrite("addCustomSection")
         return id
     }
 
     suspend fun removeCustomSection(id: String) {
+        logDebug("removeCustomSection ENTER: id=$id")
         context.leisureDataStore.edit { prefs ->
             val current = readCustomSections(prefs)
+            logDebug("removeCustomSection PRE-WRITE: ${customSectionSummary(current)}")
             prefs[CUSTOM_SECTIONS_KEY] = gson.toJson(current.filter { it.id != id })
         }
+        logCustomSectionsPostWrite("removeCustomSection")
     }
 
     suspend fun updateCustomSection(
@@ -386,8 +492,13 @@ constructor(
         gridColumns: Int? = null,
         autoComplete: Boolean? = null
     ) {
+        logDebug(
+            "updateCustomSection ENTER: id=$id enabled=$enabled label=$label emoji=$emoji " +
+                "durationMinutes=$durationMinutes gridColumns=$gridColumns autoComplete=$autoComplete"
+        )
         context.leisureDataStore.edit { prefs ->
             val current = readCustomSections(prefs)
+            logDebug("updateCustomSection PRE-WRITE: ${customSectionSummary(current)}")
             // If the target section is no longer present (e.g. wiped by a
             // sync pull between dialog-open and dialog-submit), don't write
             // back the unchanged list — the assignment would still trigger
@@ -398,6 +509,7 @@ constructor(
             if (current.none { it.id == id }) return@edit
             val updated = current.map { section ->
                 if (section.id != id) return@map section
+                logDebug("updateCustomSection MATCH: ${sectionSummary(section)}")
                 section.copy(
                     enabled = enabled ?: section.enabled,
                     label = label?.trim()?.takeIf { it.isNotEmpty() } ?: section.label,
@@ -413,17 +525,24 @@ constructor(
             }
             prefs[CUSTOM_SECTIONS_KEY] = gson.toJson(updated)
         }
+        logCustomSectionsPostWrite("updateCustomSection")
     }
 
     suspend fun addCustomSectionActivity(sectionId: String, label: String, icon: String) {
         val trimmedLabel = label.trim()
         val trimmedIcon = icon.trim()
+        logDebug(
+            "addCustomSectionActivity ENTER: sectionId=$sectionId " +
+                "label=$trimmedLabel icon=$trimmedIcon"
+        )
         if (trimmedLabel.isEmpty() || trimmedIcon.isEmpty()) return
         context.leisureDataStore.edit { prefs ->
             val current = readCustomSections(prefs)
+            logDebug("addCustomSectionActivity PRE-WRITE: ${customSectionSummary(current)}")
             if (current.none { it.id == sectionId }) return@edit
             val updated = current.map { section ->
                 if (section.id != sectionId) return@map section
+                logDebug("addCustomSectionActivity MATCH: ${sectionSummary(section)}")
                 val activity = CustomLeisureActivity(
                     id = "custom_${sectionId}_${System.currentTimeMillis()}",
                     label = trimmedLabel,
@@ -433,19 +552,65 @@ constructor(
             }
             prefs[CUSTOM_SECTIONS_KEY] = gson.toJson(updated)
         }
+        logCustomSectionsPostWrite("addCustomSectionActivity")
     }
 
     suspend fun removeCustomSectionActivity(sectionId: String, activityId: String) {
+        logDebug("removeCustomSectionActivity ENTER: sectionId=$sectionId activityId=$activityId")
         context.leisureDataStore.edit { prefs ->
             val current = readCustomSections(prefs)
+            logDebug("removeCustomSectionActivity PRE-WRITE: ${customSectionSummary(current)}")
             if (current.none { it.id == sectionId }) return@edit
             val updated = current.map { section ->
                 if (section.id != sectionId) return@map section
+                logDebug("removeCustomSectionActivity MATCH: ${sectionSummary(section)}")
                 section.copy(customActivities = section.customActivities.filter { it.id != activityId })
             }
             prefs[CUSTOM_SECTIONS_KEY] = gson.toJson(updated)
         }
+        logCustomSectionsPostWrite("removeCustomSectionActivity")
     }
+
+    private suspend fun logCustomSectionsPostWrite(functionName: String) {
+        if (!BuildConfig.DEBUG) return
+        val sections = context.leisureDataStore.data.first().let { prefs -> readCustomSections(prefs) }
+        Log.d(LOG_TAG, "$functionName POST-WRITE: ${customSectionSummary(sections)}")
+    }
+
+    private fun logDebug(message: String) {
+        if (BuildConfig.DEBUG) Log.d(LOG_TAG, message)
+    }
+
+    private fun reportMitigation(
+        mitigationId: String,
+        message: String,
+        exception: Throwable,
+        customKeys: Map<String, String> = emptyMap()
+    ) {
+        Log.e(LOG_TAG, message, exception)
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("mitigation_id", mitigationId)
+            customKeys.forEach { (key, value) -> setCustomKey(key, value) }
+            recordException(exception)
+        }
+    }
+
+    private fun customSectionSummary(sections: List<CustomLeisureSection>): String =
+        "size=${sections.size} [" + sections.joinToString { sectionSummary(it) } + "]"
+
+    private fun sectionSummary(section: CustomLeisureSection): String =
+        "${section.idOrNull()}:${section.labelOrNull()}:${section.activityCountOrNull()}"
+
+    private fun CustomLeisureSection.idOrNull(): String? = id as String?
+
+    private fun CustomLeisureSection.labelOrNull(): String? = label as String?
+
+    private fun CustomLeisureSection.activityCountOrNull(): Int? =
+        (customActivities as List<CustomLeisureActivity?>?)?.size
+
+    private fun CustomLeisureActivity.idOrNull(): String? = id as String?
+
+    private fun CustomLeisureActivity.labelOrNull(): String? = label as String?
 
     suspend fun clearAll() {
         context.leisureDataStore.edit { it.clear() }
