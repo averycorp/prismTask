@@ -179,6 +179,7 @@ constructor(
         val task = draft.copy(lifeCategory = resolveLifeCategoryForInsert(draft))
         val id = taskDao.insert(task)
         syncTracker.trackCreate(id, "task")
+        automationEventBus.emit(AutomationEvent.TaskCreated(id))
         calendarPushDispatcher.enqueuePushTask(id)
         widgetUpdateManager.updateTaskWidgets()
         classifyInBackground(id)
@@ -189,6 +190,7 @@ constructor(
         orderedIds.forEachIndexed { index, id ->
             taskDao.updateSortOrder(id, index)
             syncTracker.trackUpdate(id, "task")
+            automationEventBus.emit(AutomationEvent.TaskUpdated(id))
         }
     }
 

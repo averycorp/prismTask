@@ -28,17 +28,21 @@ SQLAlchemy via ``settings.DATABASE_URL``).
 
 import argparse
 import asyncio
+import os
 import sys
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Allow running from repo root
 sys.path.insert(0, "backend")
+# Allow ``from _db import ...`` regardless of the caller's CWD.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.config import settings  # noqa: E402
 from app.models import BetaCode  # noqa: E402
+
+from _db import async_engine_from_settings  # noqa: E402
 
 
 def _parse_date(raw: str | None) -> datetime | None:
@@ -53,7 +57,7 @@ def _parse_date(raw: str | None) -> datetime | None:
 
 
 async def _session() -> AsyncSession:
-    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    engine = async_engine_from_settings()
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     return engine, factory
 
