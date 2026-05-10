@@ -274,6 +274,11 @@ dependencies {
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("androidx.compose.material:material-icons-extended")
 
+    // Window — FoldingFeature + WindowInfoTracker for foldable-aware layout
+    // (F-FOLDABLE-001). 1.3.0 is the recommended floor for the windowLayoutInfo
+    // main-thread Flow + lifecycle fixes during foldable rotation.
+    implementation("androidx.window:window:1.3.0")
+
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.9.8")
 

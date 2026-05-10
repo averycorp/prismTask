@@ -98,6 +98,7 @@ import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.expandedWidthCap
 import com.averycorp.prismtask.ui.theme.gridFloor
+import com.averycorp.prismtask.ui.theme.hingeAwareHorizontalPadding
 import com.averycorp.prismtask.ui.theme.prismGlow
 
 private const val SECTION_OVERDUE = "overdue"
@@ -318,12 +319,18 @@ fun TodayScreen(
                     HabitChipRowSkeleton(count = 4)
                 }
             } else {
+                // F-FOLDABLE-001 — hinge-aware horizontal padding. Reads
+                // LocalFoldingFeature.current; widens horizontal padding on
+                // HALF_OPENED + VERTICAL folds (book posture) so the FAB and
+                // section CTAs don't drift across the crease. No-op on
+                // non-foldable devices and FLAT folds.
+                val hingePadding = hingeAwareHorizontalPadding()
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .gridFloor()
                         .padding(padding)
-                        .padding(horizontal = 16.dp)
+                        .padding(hingePadding)
                         .expandedWidthCap(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {

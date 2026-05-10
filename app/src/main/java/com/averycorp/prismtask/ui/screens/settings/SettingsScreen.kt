@@ -51,6 +51,7 @@ import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
 import com.averycorp.prismtask.ui.theme.expandedWidthCap
 import com.averycorp.prismtask.ui.theme.gridFloor
+import com.averycorp.prismtask.ui.theme.hingeAwareHorizontalPadding
 
 private val ColAccount = Color(0xFFE6F1FB)
 private val ColSubscription = Color(0xFFFAEEDA)
@@ -158,11 +159,15 @@ fun SettingsScreen(
             AnimatedVisibility(visible = isSyncing || isImporting || isExporting) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
+            // F-FOLDABLE-001 — hinge-aware horizontal padding. Default
+            // returns horizontal = 16.dp (no regression on phones), widens
+            // both sides on HALF_OPENED + VERTICAL folds.
+            val hingePadding = hingeAwareHorizontalPadding()
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp)
+                    .padding(hingePadding)
                     .expandedWidthCap()
             ) {
                 item {

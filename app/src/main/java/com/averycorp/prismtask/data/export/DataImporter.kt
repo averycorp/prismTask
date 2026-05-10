@@ -241,6 +241,7 @@ constructor(
         var orphansSkipped = 0
         var schemaVersion = 0
         var derivedDataSkipped = false
+
         // D8 Item 8 — count of `medication_tier_states` rows
         // inserted/updated by the post-restore backfill. Surfaced via
         // logging only; not part of the public ImportResult contract.

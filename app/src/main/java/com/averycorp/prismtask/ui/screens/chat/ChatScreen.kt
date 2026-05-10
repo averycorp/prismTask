@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,6 +81,7 @@ import com.averycorp.prismtask.ui.components.ProFeature
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.theme.expandedWidthCap
+import com.averycorp.prismtask.ui.theme.hingeAwareHorizontalPadding
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -290,6 +294,14 @@ fun ChatScreen(
                 .padding(padding)
                 .imePadding()
         ) {
+            // F-FOLDABLE-001 — hinge-aware horizontal contentPadding (option
+            // b from F3_FOLDABLE_LAYOUT_AUDIT.md). On non-foldable devices
+            // this resolves to horizontal = 16.dp / vertical = 8.dp,
+            // matching the prior PaddingValues exactly. On HALF_OPENED +
+            // VERTICAL folds the horizontal padding widens to keep chat
+            // bubbles off the crease. Full two-pane (option a) deferred
+            // to F-FOLDABLE-002.
+            val hinge = hingeAwareHorizontalPadding()
             // Message list
             LazyColumn(
                 state = listState,
@@ -297,7 +309,12 @@ fun ChatScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .expandedWidthCap(maxWidth = 600.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(
+                    start = hinge.calculateStartPadding(LocalLayoutDirection.current),
+                    end = hinge.calculateEndPadding(LocalLayoutDirection.current),
+                    top = 8.dp,
+                    bottom = 8.dp
+                ),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Welcome message if empty

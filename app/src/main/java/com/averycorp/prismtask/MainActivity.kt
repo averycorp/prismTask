@@ -64,6 +64,7 @@ import com.averycorp.prismtask.ui.rating.PlayReviewLauncher
 import com.averycorp.prismtask.ui.rating.RatingPromptSheet
 import com.averycorp.prismtask.ui.screens.tasklist.components.DayBounds
 import com.averycorp.prismtask.ui.screens.tasklist.components.LocalDayBounds
+import com.averycorp.prismtask.ui.theme.LocalFoldingFeature
 import com.averycorp.prismtask.ui.theme.LocalWindowSizeClass
 import com.averycorp.prismtask.ui.theme.PriorityColors
 import com.averycorp.prismtask.ui.theme.PrismTaskTheme
@@ -632,9 +633,27 @@ class MainActivity : ComponentActivity() {
 
                     val windowSizeClass = androidx.compose.material3.windowsizeclass
                         .calculateWindowSizeClass(this@MainActivity)
+                    // F-FOLDABLE-001 — Activity-scoped Flow of WindowLayoutInfo
+                    // collected via collectAsStateWithLifecycle so the
+                    // FoldingFeature only updates while the Activity is at
+                    // least STARTED. The first emission can lag a frame on
+                    // cold start; an empty displayFeatures list is the
+                    // correct steady state for non-foldable devices, so the
+                    // initialValue is null. Read at every screen via
+                    // LocalFoldingFeature.current.
+                    val windowLayoutInfo by remember {
+                        androidx.window.layout.WindowInfoTracker
+                            .getOrCreate(this@MainActivity)
+                            .windowLayoutInfo(this@MainActivity)
+                    }.collectAsStateWithLifecycle(initialValue = null)
+                    val foldingFeature = windowLayoutInfo
+                        ?.displayFeatures
+                        ?.filterIsInstance<androidx.window.layout.FoldingFeature>()
+                        ?.firstOrNull()
                     CompositionLocalProvider(
                         LocalDayBounds provides dayBounds,
-                        LocalWindowSizeClass provides windowSizeClass
+                        LocalWindowSizeClass provides windowSizeClass,
+                        LocalFoldingFeature provides foldingFeature
                     ) {
                         Box(
                             modifier = Modifier
