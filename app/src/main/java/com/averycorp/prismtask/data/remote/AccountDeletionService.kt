@@ -328,7 +328,8 @@ constructor(
             "sync_device_prefs",
             "advanced_tuning_prefs",
             "productive_streak_prefs",
-            "tour_card_prefs"
+            "tour_card_prefs",
+            "rating_prompt_prefs"
         )
     }
 }
