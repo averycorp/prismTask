@@ -40,7 +40,10 @@ import androidx.room.PrimaryKey
     ],
     indices = [
         Index(value = ["cloud_id"], unique = true),
-        Index(value = ["medication_id", "log_date", "slot_id"], unique = true),
+        Index(
+            value = ["medication_id", "log_date", "slot_id", "time_of_day"],
+            unique = true
+        ),
         Index(value = ["log_date"]),
         Index(value = ["slot_id"])
     ]
@@ -57,6 +60,16 @@ data class MedicationTierStateEntity(
     /** ISO LocalDate in device timezone — mirrors `medication_doses.taken_date_local`. */
     @ColumnInfo(name = "log_date")
     val logDate: String,
+    /**
+     * D8 Item 8 — per-block identity (e.g. `"morning"`, `"night"`). NULL for
+     * legacy `MIGRATION_59_60` rows that were backfilled from
+     * `self_care_logs.tiers_by_time` with no per-block knowledge. Live writes
+     * from `SelfCareRepository.setTierForTime` populate this so the
+     * `HabitListViewModel` reader can count completed blocks without
+     * falling back to the JSON column.
+     */
+    @ColumnInfo(name = "time_of_day")
+    val timeOfDay: String? = null,
     /** Lowercase `AchievedTier` token: `skipped` / `essential` / `prescription` / `complete`. */
     @ColumnInfo(name = "tier")
     val tier: String,

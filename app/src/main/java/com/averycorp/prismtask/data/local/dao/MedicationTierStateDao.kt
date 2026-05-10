@@ -24,6 +24,7 @@ interface MedicationTierStateDao {
         """
         SELECT * FROM medication_tier_states
         WHERE medication_id = :medicationId AND log_date = :date AND slot_id = :slotId
+          AND time_of_day IS NULL
         LIMIT 1
         """
     )
@@ -32,6 +33,40 @@ interface MedicationTierStateDao {
         date: String,
         slotId: Long
     ): MedicationTierStateEntity?
+
+    /**
+     * D8 Item 8 — per-block lookup. Used by the live dual-write +
+     * DataImporter backfill to upsert one row per `(med, slot, date,
+     * timeOfDay)` quadruple.
+     */
+    @Query(
+        """
+        SELECT * FROM medication_tier_states
+        WHERE medication_id = :medicationId AND log_date = :date AND slot_id = :slotId
+          AND time_of_day = :timeOfDay
+        LIMIT 1
+        """
+    )
+    suspend fun getForQuadrupleOnce(
+        medicationId: Long,
+        date: String,
+        slotId: Long,
+        timeOfDay: String
+    ): MedicationTierStateEntity?
+
+    /**
+     * D8 Item 8 — reader query for `HabitListViewModel`. Returns the
+     * distinct non-null `time_of_day` values that have any tier row
+     * for the given date. Used to count completed blocks without
+     * falling back to the legacy `tiers_by_time` JSON column.
+     */
+    @Query(
+        """
+        SELECT DISTINCT time_of_day FROM medication_tier_states
+        WHERE log_date = :date AND time_of_day IS NOT NULL
+        """
+    )
+    suspend fun getDistinctTimeOfDayForDateOnce(date: String): List<String>
 
     @Query("SELECT * FROM medication_tier_states WHERE slot_id = :slotId AND log_date = :date")
     suspend fun getForSlotDateOnce(slotId: Long, date: String): List<MedicationTierStateEntity>

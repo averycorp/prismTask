@@ -48,10 +48,8 @@ import com.averycorp.prismtask.data.remote.sync.PrismSyncLogger
 import com.averycorp.prismtask.data.remote.sync.ReactiveSyncDriver
 import com.averycorp.prismtask.data.remote.sync.SyncStateRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
-import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -125,9 +123,16 @@ constructor(
     private val projectRiskDao: ProjectRiskDao,
     private val taskDependencyDao: TaskDependencyDao,
     private val externalAnchorDao: ExternalAnchorDao,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    /**
+     * D8 Item 7 Strangler Fig 7c — Firestore realtime listener surface
+     * lives in its own class. SyncService still orchestrates start /
+     * stop because the listener's snapshot callback needs to reach back
+     * into pull / processRemoteDeletions, which haven't been extracted
+     * yet (sub-PRs 7b + 7d).
+     */
+    private val listenerManager: SyncListenerManager
 ) {
-    private val listeners = mutableListOf<ListenerRegistration>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile private var isSyncing = false
@@ -3593,73 +3598,16 @@ constructor(
     }
 
     fun startRealtimeListeners() {
-        stopRealtimeListeners()
-        listOf(
-            "tasks", "projects", "tags", "habits", "habit_completions",
-            "habit_logs", "task_completions", "task_timings", "milestones",
-            "project_phases", "project_risks", "external_anchors", "task_dependencies", "task_templates",
-            "courses", "course_completions", "leisure_logs", "self_care_steps", "self_care_logs",
-            "medications", "medication_doses",
-            "medication_slots", "medication_slot_overrides", "medication_tier_states",
-            "notification_profiles", "custom_sounds", "saved_filters", "nlp_shortcuts",
-            "habit_templates", "project_templates", "boundary_rules",
-            "automation_rules",
-            "check_in_logs", "mood_energy_logs", "focus_release_logs",
-            "medication_refills", "weekly_reviews", "daily_essential_slot_completions",
-            "assignments", "attachments", "study_logs"
-        ).forEach { collection ->
-            val reg = userCollection(collection)?.addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    logger.warn(
-                        operation = "listener.error",
-                        entity = "collection",
-                        id = collection,
-                        throwable = error
-                    )
-                    return@addSnapshotListener
-                }
-                if (snapshot == null) return@addSnapshotListener
-                if (snapshot.metadata.hasPendingWrites()) return@addSnapshotListener
-                if (snapshot.documentChanges.isEmpty()) return@addSnapshotListener
-                syncStateRepository.recordListenerSnapshot(collection, snapshot.documentChanges.size)
-                val removedCloudIds = snapshot.documentChanges
-                    .filter { it.type == DocumentChange.Type.REMOVED }
-                    .map { it.document.id }
-                scope.launch {
-                    if (isSyncing) return@launch
-                    val start = System.currentTimeMillis()
-                    syncStateRepository.markSyncStarted(source = SOURCE_FIREBASE, trigger = "listener:$collection")
-                    try {
-                        if (removedCloudIds.isNotEmpty()) {
-                            processRemoteDeletions(collection, removedCloudIds)
-                        }
-                        val pullSummary = pullRemoteChanges()
-                        syncStateRepository.markSyncCompleted(
-                            source = SOURCE_FIREBASE,
-                            success = true,
-                            durationMs = System.currentTimeMillis() - start,
-                            pulled = pullSummary.applied,
-                            permanentlyFailed = pullSummary.skippedPermanent
-                        )
-                    } catch (e: Exception) {
-                        syncStateRepository.markSyncCompleted(
-                            source = SOURCE_FIREBASE,
-                            success = false,
-                            durationMs = System.currentTimeMillis() - start,
-                            throwable = e
-                        )
-                        try {
-                            com.google.firebase.crashlytics.FirebaseCrashlytics
-                                .getInstance()
-                                .recordException(e)
-                        } catch (_: Exception) {
-                        }
-                    }
-                }
-            }
-            if (reg != null) listeners.add(reg)
-        }
-        syncStateRepository.markListenersActive(listeners.isNotEmpty())
+        // D8 Item 7 7c — listener surface extracted to SyncListenerManager.
+        // The orchestrator passes the still-inlined pull + remote-delete
+        // surfaces as lambdas; once those land in their own classes
+        // (sub-PRs 7b + 7d) the lambdas become direct method references.
+        listenerManager.start(
+            scope = scope,
+            isSyncing = { isSyncing },
+            onRemoteDeletes = ::processRemoteDeletions,
+            pull = ::pullRemoteChanges
+        )
     }
 
     private suspend fun processRemoteDeletions(collection: String, cloudIds: List<String>) {
@@ -3738,9 +3686,7 @@ constructor(
     }
 
     fun stopRealtimeListeners() {
-        listeners.forEach { it.remove() }
-        listeners.clear()
-        syncStateRepository.markListenersActive(false)
+        listenerManager.stop()
     }
 
     companion object {
