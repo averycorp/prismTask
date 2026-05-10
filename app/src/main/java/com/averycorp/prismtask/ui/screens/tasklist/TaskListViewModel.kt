@@ -13,8 +13,10 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UrgencyWeights
+import com.averycorp.prismtask.data.local.entity.SavedFilterEntity
 import com.averycorp.prismtask.data.repository.AttachmentRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
+import com.averycorp.prismtask.data.repository.SavedFilterRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.TagFilterMode
@@ -74,6 +76,7 @@ constructor(
     internal val taskRepository: TaskRepository,
     internal val projectRepository: ProjectRepository,
     private val tagRepository: TagRepository,
+    private val savedFilterRepository: SavedFilterRepository,
     private val attachmentRepository: AttachmentRepository,
     internal val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val sortPreferences: SortPreferences,
@@ -538,6 +541,35 @@ constructor(
 
     fun onClearFilters() {
         _currentFilter.value = TaskFilter()
+    }
+
+    val savedFilters: StateFlow<List<SavedFilterEntity>> = savedFilterRepository
+        .getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun onSaveCurrentFilterAsPreset(name: String) {
+        viewModelScope.launch {
+            try {
+                savedFilterRepository.savePreset(name, _currentFilter.value)
+            } catch (e: Exception) {
+                Log.e("TaskListVM", "Failed to save filter preset", e)
+            }
+        }
+    }
+
+    fun onApplyPreset(preset: SavedFilterEntity) {
+        val decoded = savedFilterRepository.decode(preset) ?: return
+        _currentFilter.value = decoded
+    }
+
+    fun onDeletePreset(presetId: Long) {
+        viewModelScope.launch {
+            try {
+                savedFilterRepository.deletePreset(presetId)
+            } catch (e: Exception) {
+                Log.e("TaskListVM", "Failed to delete filter preset", e)
+            }
+        }
     }
 
     fun onSelectProject(projectId: Long?) {

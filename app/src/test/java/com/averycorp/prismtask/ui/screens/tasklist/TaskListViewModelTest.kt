@@ -45,6 +45,7 @@ class TaskListViewModelTest {
     private lateinit var taskRepository: TaskRepository
     private lateinit var projectRepository: ProjectRepository
     private lateinit var tagRepository: TagRepository
+    private lateinit var savedFilterRepository: com.averycorp.prismtask.data.repository.SavedFilterRepository
     private lateinit var attachmentRepository: AttachmentRepository
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var sortPreferences: SortPreferences
@@ -57,6 +58,7 @@ class TaskListViewModelTest {
         taskRepository = mockk(relaxed = true)
         projectRepository = mockk(relaxed = true)
         tagRepository = mockk(relaxed = true)
+        savedFilterRepository = mockk(relaxed = true)
         attachmentRepository = mockk(relaxed = true)
         taskBehaviorPreferences = mockk(relaxed = true)
         sortPreferences = mockk(relaxed = true)
@@ -76,6 +78,7 @@ class TaskListViewModelTest {
         coEvery { projectRepository.getAllProjects() } returns flowOf(emptyList())
         coEvery { tagRepository.getAllTags() } returns flowOf(emptyList())
         coEvery { tagRepository.getTagsForTask(any()) } returns flowOf(emptyList())
+        coEvery { savedFilterRepository.getAll() } returns flowOf(emptyList())
         coEvery { attachmentRepository.getAttachmentCount(any()) } returns flowOf(0)
         coEvery { taskBehaviorPreferences.getDayStartHour() } returns flowOf(0)
         coEvery { taskBehaviorPreferences.getStartOfDay() } returns flowOf(StartOfDay(0, 0, false))
@@ -96,6 +99,7 @@ class TaskListViewModelTest {
         taskRepository,
         projectRepository,
         tagRepository,
+        savedFilterRepository,
         attachmentRepository,
         taskBehaviorPreferences,
         sortPreferences,

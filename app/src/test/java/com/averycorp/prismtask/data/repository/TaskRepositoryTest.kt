@@ -464,6 +464,53 @@ class TaskRepositoryTest {
         assertEquals(0, sub.sortOrder)
     }
 
+    @Test
+    fun addSubtask_emitsTaskCreatedOntoAutomationEventBus() = kotlinx.coroutines.test.runTest {
+        val parentId = taskDao.insert(taskFixture(title = "Parent"))
+        val collected =
+            mutableListOf<com.averycorp.prismtask.domain.automation.AutomationEvent>()
+        val collector = this.launch {
+            automationEventBus.events.collect { collected += it }
+        }
+        kotlinx.coroutines.yield()
+
+        val subId = repo.addSubtask(title = "Step 1", parentTaskId = parentId)
+
+        kotlinx.coroutines.yield()
+        collector.cancel()
+
+        val taskCreated = collected.filterIsInstance<
+            com.averycorp.prismtask.domain.automation.AutomationEvent.TaskCreated
+            >()
+        assertEquals(1, taskCreated.size)
+        assertEquals(subId, taskCreated.first().taskId)
+    }
+
+    @Test
+    fun reorderSubtasks_emitsTaskUpdatedForEachReorderedId() = kotlinx.coroutines.test.runTest {
+        val parentId = taskDao.insert(taskFixture(title = "Parent"))
+        val a = taskDao.insert(taskFixture(title = "a", parentTaskId = parentId, sortOrder = 0))
+        val b = taskDao.insert(taskFixture(title = "b", parentTaskId = parentId, sortOrder = 1))
+        val c = taskDao.insert(taskFixture(title = "c", parentTaskId = parentId, sortOrder = 2))
+
+        val collected =
+            mutableListOf<com.averycorp.prismtask.domain.automation.AutomationEvent>()
+        val collector = this.launch {
+            automationEventBus.events.collect { collected += it }
+        }
+        kotlinx.coroutines.yield()
+
+        repo.reorderSubtasks(parentTaskId = parentId, orderedIds = listOf(c, a, b))
+
+        kotlinx.coroutines.yield()
+        collector.cancel()
+
+        val updates = collected.filterIsInstance<
+            com.averycorp.prismtask.domain.automation.AutomationEvent.TaskUpdated
+            >()
+        assertEquals(setOf(a, b, c), updates.map { it.taskId }.toSet())
+    }
+
     // ---------------------------------------------------------------------
     // Duplication (exercises companion helpers through the public API)
     // ---------------------------------------------------------------------

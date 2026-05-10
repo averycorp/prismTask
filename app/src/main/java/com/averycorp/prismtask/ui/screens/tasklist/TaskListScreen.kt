@@ -82,6 +82,7 @@ import com.averycorp.prismtask.ui.components.MoveToProjectSheet
 import com.averycorp.prismtask.ui.components.QuickAddBar
 import com.averycorp.prismtask.ui.components.QuickReschedulePopup
 import com.averycorp.prismtask.ui.components.RichEmptyState
+import com.averycorp.prismtask.ui.components.SavedFilterPresetsRow
 import com.averycorp.prismtask.ui.components.TaskListSkeleton
 import com.averycorp.prismtask.ui.components.computeInitialTagStates
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
@@ -142,6 +143,7 @@ fun TaskListScreen(
     val overdueCount by viewModel.overdueCount.collectAsStateWithLifecycle()
     val startOfToday by viewModel.startOfToday.collectAsStateWithLifecycle()
     val currentFilter by viewModel.currentFilter.collectAsStateWithLifecycle()
+    val savedFilters by viewModel.savedFilters.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val isMultiSelectMode by viewModel.isMultiSelectMode.collectAsStateWithLifecycle()
     val selectedTaskIds by viewModel.selectedTaskIds.collectAsStateWithLifecycle()
@@ -288,25 +290,43 @@ fun TaskListScreen(
             onDismissRequest = { showFilterSheet = false },
             sheetState = filterSheetState
         ) {
-            FilterPanel(
-                currentFilter = currentFilter,
-                allTags = allTags,
-                allProjects = projects,
-                onFilterChanged = { filter ->
-                    viewModel.onUpdateFilter(filter)
-                    scope.launch {
-                        filterSheetState.hide()
-                        showFilterSheet = false
-                    }
-                },
-                onClearAll = {
-                    viewModel.onClearFilters()
-                    scope.launch {
-                        filterSheetState.hide()
-                        showFilterSheet = false
-                    }
+            Column {
+                if (savedFilters.isNotEmpty() || currentFilter.isActive()) {
+                    SavedFilterPresetsRow(
+                        presets = savedFilters,
+                        canSaveCurrent = currentFilter.isActive(),
+                        onApply = { preset ->
+                            viewModel.onApplyPreset(preset)
+                            scope.launch {
+                                filterSheetState.hide()
+                                showFilterSheet = false
+                            }
+                        },
+                        onDelete = { id -> viewModel.onDeletePreset(id) },
+                        onSaveCurrent = { name -> viewModel.onSaveCurrentFilterAsPreset(name) },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
                 }
-            )
+                FilterPanel(
+                    currentFilter = currentFilter,
+                    allTags = allTags,
+                    allProjects = projects,
+                    onFilterChanged = { filter ->
+                        viewModel.onUpdateFilter(filter)
+                        scope.launch {
+                            filterSheetState.hide()
+                            showFilterSheet = false
+                        }
+                    },
+                    onClearAll = {
+                        viewModel.onClearFilters()
+                        scope.launch {
+                            filterSheetState.hide()
+                            showFilterSheet = false
+                        }
+                    }
+                )
+            }
         }
     }
 
