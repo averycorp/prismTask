@@ -188,12 +188,20 @@ class CoachmarkControllerTest {
     fun finish_action_marks_completed() = runTest(testDispatcher) {
         prefs.markEligible()
         prefs.setCoachmarkStepIndex(3) // start on Finish step
-        val c = controller()
+        val controllerScope = TestScope(testDispatcher)
+        val c = CoachmarkController(
+            tourCardPreferences = prefs,
+            tour = tour,
+            scope = controllerScope
+        )
         c.tryStart()
         advanceUntilIdle()
         c.next() // Finish action → Completed
         advanceUntilIdle()
         assertEquals(CoachmarkState.Completed, c.state.value)
+        // Same off-scheduler DataStore write as dismiss() — join in-flight
+        // children on the controller scope before reading back.
+        controllerScope.coroutineContext.job.children.toList().joinAll()
         assertTrue(prefs.coachmarkCompleted().first())
     }
 
