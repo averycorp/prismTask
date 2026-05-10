@@ -705,7 +705,8 @@ class TaskRepositoryTest {
         recurrenceRule: String? = null,
         reminderOffset: Long? = null,
         isFlagged: Boolean = false,
-        updatedAt: Long = 0L
+        updatedAt: Long = 0L,
+        sortOrder: Int = 0
     ) = TaskEntity(
         id = id,
         title = title,
@@ -721,7 +722,8 @@ class TaskRepositoryTest {
         reminderOffset = reminderOffset,
         isFlagged = isFlagged,
         createdAt = 0L,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        sortOrder = sortOrder
     )
 
     /** Minimal in-memory [TaskDao] for the repository methods we exercise. */

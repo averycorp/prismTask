@@ -234,6 +234,11 @@ class NaturalLanguageParserTest {
             request: com.averycorp.prismtask.data.remote.api.AutomationSummarizeRequest
         ): com.averycorp.prismtask.data.remote.api.AutomationSummarizeResponse =
             error("not used in offline parser tests")
+
+        override suspend fun submitInAppFeedback(
+            body: com.averycorp.prismtask.data.remote.api.InAppFeedbackRequest
+        ): com.averycorp.prismtask.data.remote.api.InAppFeedbackResponse =
+            error("not used in offline parser tests")
     }
 
     private fun dateMillis(date: LocalDate): Long =

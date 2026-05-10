@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.rating
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import com.google.android.play.core.review.ReviewInfo
 import com.google.android.play.core.review.ReviewManagerFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -28,7 +29,7 @@ class PlayReviewLauncher @Inject constructor(
     suspend fun launch(activity: Activity): Boolean {
         return try {
             val manager = ReviewManagerFactory.create(context)
-            val info = suspendCancellableCoroutine { cont ->
+            val info = suspendCancellableCoroutine<ReviewInfo?> { cont ->
                 manager.requestReviewFlow().addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         cont.resume(task.result)
