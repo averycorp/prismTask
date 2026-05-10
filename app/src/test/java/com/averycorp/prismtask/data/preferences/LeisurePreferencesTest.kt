@@ -274,12 +274,11 @@ class LeisurePreferencesTest {
             """.trimIndent()
         }
         val sections = prefs.getCustomSections().first()
-        // sec_1 keeps its label; sec_2's null label is replaced with the
-        // safe default; the id-less row is dropped entirely.
-        assertEquals(2, sections.size)
+        // sec_1 keeps its label; sec_2's null label and the id-less row
+        // are dropped loudly instead of silently coercing malformed data.
+        assertEquals(1, sections.size)
         val byId = sections.associateBy { it.id }
         assertEquals("Reading", byId["sec_1"]?.label)
-        assertEquals("Section", byId["sec_2"]?.label)
     }
 
     @Test
@@ -388,9 +387,9 @@ class LeisurePreferencesTest {
                   ]}]
             """.trimIndent()
         }
-        val activities = prefs.getCustomSections().first().single().customActivities
-        // Only the activity with both id and label survives sanitization.
-        assertEquals(1, activities.size)
-        assertEquals("act_1", activities[0].id)
+        val sections = prefs.getCustomSections().first()
+        // Any invalid activity drops the owning section loudly instead of
+        // silently coercing or partially rewriting malformed data.
+        assertTrue(sections.isEmpty())
     }
 }
