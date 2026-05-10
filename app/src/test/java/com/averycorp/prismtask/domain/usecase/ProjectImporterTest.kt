@@ -267,16 +267,34 @@ class ProjectImporterTest {
         }
 
         val grandchild = ChecklistParsedTask(
-            title = "grandchild", description = "g-desc", dueDate = null, priority = 0,
-            completed = false, tags = emptyList(), subtasks = emptyList(), estimatedMinutes = null
+            title = "grandchild",
+            description = "g-desc",
+            dueDate = null,
+            priority = 0,
+            completed = false,
+            tags = emptyList(),
+            subtasks = emptyList(),
+            estimatedMinutes = null
         )
         val child = ChecklistParsedTask(
-            title = "child", description = "c-desc", dueDate = null, priority = 0,
-            completed = false, tags = emptyList(), subtasks = listOf(grandchild), estimatedMinutes = null
+            title = "child",
+            description = "c-desc",
+            dueDate = null,
+            priority = 0,
+            completed = false,
+            tags = emptyList(),
+            subtasks = listOf(grandchild),
+            estimatedMinutes = null
         )
         val parent = ChecklistParsedTask(
-            title = "parent", description = "p-desc", dueDate = null, priority = 0,
-            completed = false, tags = emptyList(), subtasks = listOf(child), estimatedMinutes = null
+            title = "parent",
+            description = "p-desc",
+            dueDate = null,
+            priority = 0,
+            completed = false,
+            tags = emptyList(),
+            subtasks = listOf(child),
+            estimatedMinutes = null
         )
 
         val outcome = importer.materialise(
