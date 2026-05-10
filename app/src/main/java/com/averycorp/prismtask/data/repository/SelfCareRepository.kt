@@ -7,14 +7,11 @@ import android.content.Intent
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
-import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
 import com.averycorp.prismtask.data.local.dao.MedicationTierStateDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
 import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
-import com.averycorp.prismtask.data.local.entity.MedicationDoseEntity
-import com.averycorp.prismtask.data.local.entity.MedicationEntity
 import com.averycorp.prismtask.data.local.entity.MedicationTierStateEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareStepEntity
@@ -163,17 +160,7 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val gson: Gson,
     private val syncTracker: SyncTracker,
-    /**
-     * v1.4 dual-write shim (spec §3.4) — medication-specific writes also
-     * mirror to `medications` / `medication_doses` so the new top-level
-     * Medication entity stays in sync with ongoing legacy edits during
-     * the convergence window. Nullable via Hilt's
-     * [javax.inject.Provider] pattern to avoid a hard dependency cycle
-     * between SelfCareRepository and any future MedicationRepository
-     * that might take SelfCareRepository as a dep.
-     */
     private val medicationDao: MedicationDao,
-    private val medicationDoseDao: MedicationDoseDao,
     /**
      * Item 8 dual-write (D8 override, 2026-05-10): on every legacy
      * `tiersByTime` write we also upsert a row in `medication_tier_states`
@@ -392,29 +379,15 @@ constructor(
             )
         )
         syncTracker.trackCreate(id, "self_care_step")
-        if (routineType == "medication") {
-            mirrorUpsertMedication(normalizedMedName(label, null), label, tier, timeOfDay)
-        }
     }
 
     suspend fun updateStep(step: SelfCareStepEntity) {
         selfCareDao.updateStep(step.copy(updatedAt = System.currentTimeMillis()))
         syncTracker.trackUpdate(step.id, "self_care_step")
-        if (step.routineType == "medication") {
-            mirrorUpsertMedication(
-                name = normalizedMedName(step.label, step.medicationName),
-                displayLabel = step.label,
-                tier = step.tier,
-                timeOfDay = step.timeOfDay
-            )
-        }
     }
 
     suspend fun deleteStep(step: SelfCareStepEntity) {
         syncTracker.trackDelete(step.id, "self_care_step")
-        if (step.routineType == "medication") {
-            mirrorArchiveMedication(normalizedMedName(step.label, step.medicationName))
-        }
         selfCareDao.deleteStep(step)
     }
 
@@ -674,21 +647,6 @@ constructor(
             selfCareDao.updateLog(updated)
             syncTracker.trackUpdate(existing.id, "self_care_log")
             syncHabitCompletion(routineType, allDone)
-
-            // v1.4 dual-write: mirror the dose change to medication_doses.
-            val stepLookup = step
-            if (stepLookup != null) {
-                val nowLogged = if (block.isEmpty()) {
-                    logs.any { it.id == stepId }
-                } else {
-                    isMedLoggedAt(logs, stepId, block)
-                }
-                mirrorDoseChange(
-                    step = stepLookup,
-                    slotKey = block.ifEmpty { "anytime" },
-                    nowLogged = nowLogged
-                )
-            }
         } else {
             // Non-medication routines: plain string ID list
             val steps = parseSteps(existing.completedSteps).toMutableSet()
@@ -1164,115 +1122,5 @@ constructor(
             totalSeconds > 0 -> "~$totalSeconds sec"
             else -> "0 min"
         }
-    }
-
-    // ------------------------------------------------------------------
-    // v1.4 dual-write shim (spec §3.4)
-    //
-    // Medication-specific writes to self_care_steps / self_care_logs
-    // also mirror to the new `medications` / `medication_doses` tables
-    // so the MedicationEntity path stays in sync with ongoing user
-    // edits during the convergence window. Removed by Phase 2 cleanup
-    // once the Medication screen is rewired to read from
-    // MedicationRepository directly.
-    //
-    // Matching rule: normalize by
-    // `COALESCE(NULLIF(TRIM(medication_name), ''), label)` — same rule
-    // the v53→v54 migration used, so mirrored writes land on the same
-    // medication row the migration created.
-    // ------------------------------------------------------------------
-
-    private fun normalizedMedName(label: String, medicationName: String?): String {
-        val trimmedMedName = medicationName?.trim()
-        return if (!trimmedMedName.isNullOrBlank()) trimmedMedName else label.trim()
-    }
-
-    private suspend fun mirrorUpsertMedication(
-        name: String,
-        displayLabel: String,
-        tier: String,
-        timeOfDay: String
-    ) {
-        if (name.isBlank()) return
-        val existing = medicationDao.getByNameOnce(name)
-        val now = System.currentTimeMillis()
-        if (existing == null) {
-            val inserted = MedicationEntity(
-                name = name,
-                displayLabel = displayLabel,
-                tier = tier.ifBlank { "essential" },
-                scheduleMode = "TIMES_OF_DAY",
-                timesOfDay = timeOfDay.ifBlank { null },
-                createdAt = now,
-                updatedAt = now
-            )
-            // Swallow unique-index collisions so a stale mirror write
-            // after the migration already created the row is a no-op.
-            try {
-                medicationDao.insert(inserted)
-            } catch (_: Exception) {
-                // No-op: another thread or the migration already created
-                // this row. A follow-up update pass below will reconcile.
-            }
-        } else {
-            medicationDao.update(
-                existing.copy(
-                    displayLabel = displayLabel,
-                    tier = tier.ifBlank { existing.tier },
-                    timesOfDay = mergeTimeOfDay(existing.timesOfDay, timeOfDay),
-                    updatedAt = now,
-                    isArchived = false
-                )
-            )
-        }
-    }
-
-    private suspend fun mirrorArchiveMedication(name: String) {
-        if (name.isBlank()) return
-        val existing = medicationDao.getByNameOnce(name) ?: return
-        medicationDao.archive(existing.id, System.currentTimeMillis())
-    }
-
-    private suspend fun mirrorDoseChange(
-        step: SelfCareStepEntity,
-        slotKey: String,
-        nowLogged: Boolean
-    ) {
-        val name = normalizedMedName(step.label, step.medicationName)
-        if (name.isBlank()) return
-        val med = medicationDao.getByNameOnce(name) ?: return
-        val takenDateLocal = todayLocalString()
-        if (nowLogged) {
-            val now = System.currentTimeMillis()
-            medicationDoseDao.insert(
-                MedicationDoseEntity(
-                    medicationId = med.id,
-                    slotKey = slotKey,
-                    takenAt = now,
-                    takenDateLocal = takenDateLocal,
-                    createdAt = now,
-                    updatedAt = now
-                )
-            )
-        } else {
-            // Find today's matching dose by (medicationId, slotKey)
-            // and delete it. takenAt may differ from the log's original
-            // timestamp, so we only key on slot + date.
-            val todaysDoses = medicationDoseDao.getAllForMedOnce(med.id)
-                .filter { it.takenDateLocal == takenDateLocal && it.slotKey == slotKey }
-            for (dose in todaysDoses) {
-                medicationDoseDao.delete(dose)
-            }
-        }
-    }
-
-    private fun mergeTimeOfDay(existing: String?, incoming: String): String? {
-        if (incoming.isBlank()) return existing
-        val existingSlots = existing.orEmpty()
-            .split(',').map { it.trim() }.filter { it.isNotBlank() }
-        val incomingSlots = incoming
-            .split(',').map { it.trim() }.filter { it.isNotBlank() }
-        val merged = (existingSlots + incomingSlots).distinct()
-        return merged.joinToString(",").ifBlank { null }
     }
 }
