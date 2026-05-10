@@ -754,7 +754,7 @@ constructor(
         SelfCareRepository.MORNING_HABIT_NAME,
         SelfCareRepository.BEDTIME_HABIT_NAME,
         SelfCareRepository.MEDICATION_HABIT_NAME,
-        SelfCareRepository.HOUSEWORK_HABIT_NAME,
+        SelfCareRepository.HOUSEWORK_HABIT_NAME
     )
 
     val todayHabits: StateFlow<List<HabitWithStatus>> = allTodayHabits
