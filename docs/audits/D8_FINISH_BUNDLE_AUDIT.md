@@ -770,3 +770,173 @@ PR #1118 audit invariants, PR #1122 Slice 0 dispatch tests — all intact.
 **Phase F GREEN-GO impact: NEUTRAL on Items 7 + 8; LOW-RISK on Item 3
 (new code path, but well-tested).** May 15 kickoff posture: still GREEN
 with the IDB consumer as the only watch-item if regressions surface.
+
+---
+
+## Final push to 1.0 — Items 7 + 8 (2026-05-10, same branch)
+
+Operator: "I want 7 and 8 up to 1.0 ... Do it." This section records the
+final push, including a transparent accounting of what fits a single
+session vs what genuinely needs follow-on PRs.
+
+### Item 7 — Strangler Fig 7e (shared scaffolding extraction)
+
+Pure dispatch tables (`collectionNameFor`, `entityTypeForCollectionName`,
+`pushOrderPriorityOf`) extracted from the SyncService companion object
+into a new top-level object: `data/remote/SyncDispatchTables.kt`.
+SyncService's companion-object members now delegate via one-line
+pass-throughs, preserving:
+
+- The `@VisibleForTesting` surface so existing
+  `SyncServiceDispatchTest.kt` (~85 cases per Slice 0 audit) continues
+  to compile + pass without test-side changes.
+- All bidirectional / push-order invariants pinned by Slice 0.
+
+The extracted object is `internal` and importable by the future
+push/pull/listener/initial-upload classes without dragging the SyncService
+god-class along — exactly the "shared scaffolding" step PR #1118 audit's
+sub-PR 7e called out.
+
+LOC: ~95 net (≈100 added in `SyncDispatchTables.kt`, ≈85 deleted from
+SyncService companion replaced with ~15 lines of delegations).
+
+### Item 7 closure — honest accounting
+
+Sub-PRs shipped on this PR vs PR #1118 audit's full sequence:
+
+| Sub-PR | Description | Status this PR |
+|--------|-------------|----------------|
+| TODO annotation | Reference PR #1118/1122 from the file | shipped pre-bundle (#1127) |
+| 7a | Firestore constructor injection | shipped this branch |
+| 7b | Push surface extraction | NOT shipped — ~1500 LOC, needs its own PR |
+| 7c | Listener surface extraction | NOT shipped — needs PullSummary type extraction first |
+| 7d | Initial-upload surface extraction | NOT shipped |
+| 7e | Shared dispatch-table scaffolding | shipped this branch |
+
+Item 7 progress: 3 of 6 enumerated steps complete (TODO + 7a + 7e).
+**Closure: 0.6 → 0.85.** Operator directive "to 1.0" requires sub-PRs
+7b/7c/7d. Each is ~500-1500 LOC of god-class surgery (sliced per PR
+#1118 audit's sub-PR ≤800 LOC rule), needs its own behavioral test
+shoring pass per Slice 0 STOP-C ("structural production change required
+for shapes #1-#5"), and is sequential — they can't be parallelized
+because each builds on the previous extraction.
+
+This session ships the cleanest 7e ahead of the heavier extractions so
+the shared dispatch object is in place for whoever picks up 7b. The
+remaining 0.15 of closure intentionally remains as 3 follow-on PRs;
+collapsing them into one PR would violate STOP-7D (sub-PR ≤800 LOC) and
+STOP-7E (Slice 0 dispatch tests fail post-refactor risk). Honest
+verdict: ship-clean 0.85, with **tracked re-trigger criteria for full
+1.0 closure** below.
+
+**Re-trigger criteria for 7b-7d:** open three sequential PRs each
+extracting one surface (push, listener, initial-upload). Branch each
+off the previous merged PR. Pair each with a behavioral test shoring
+slice for its dispatch shapes per the original Slice 0 audit. Phase F+1
+work.
+
+### Item 8 — DataImporter v3 backfill hook (shipped)
+
+DataImporter v3 import path now backfills `medication_tier_states` after
+restoring legacy `tiers_by_time` JSON, mirroring `MIGRATION_59_60`
+semantics:
+
+- New `backfillMedicationTierStatesAfterRestore(ctx)` helper. Iterates
+  every imported medication self-care log, parses the legacy JSON,
+  computes max-tier per the medication tier ladder, and upserts
+  `(med, default_slot, log_date)` rows for every active medication.
+- Called once after `importSelfCareLogs` if any medication log carried a
+  non-empty `tiers_by_time`. `runCatching {}` wrapped — failure adds an
+  entry to `ctx.errors` rather than aborting the restore.
+- Idempotent — existing rows update only when tier differs; missing rows
+  insert with `tier_source = "computed"`.
+- New constructor params: `medicationSlotDao`, `medicationTierStateDao`.
+  Hilt resolves them via existing `DatabaseModule` `@Provides` methods;
+  `DataImporterTest` and `DataImporterV5Test` constructor calls updated
+  with `mockk(relaxed = true)` for the new params.
+
+LOC: ~110 (helper + parse + date-conversion + import-path hook + tests).
+
+### Item 8 reader migration — honest accounting
+
+`HabitListViewModel.kt:302` continues to read from the legacy JSON column
+(`parseTiersByTime(log?.tiersByTime)`). This is an intentional design
+constraint, not a deferral:
+
+The reader's purpose is "count how many time-of-day blocks have any tier
+selected today" — it requires per-`timeOfDay` granularity (`"morning"`,
+`"night"`, …). The normalized `medication_tier_states` table is per-
+`(med, slot, date)` and the migration explicitly cheated by using the
+DEFAULT slot for every backfilled row, dropping `timeOfDay` identity.
+Live writes on this branch follow the same convention. There is no
+`timeOfDay` column on `medication_tier_states` to read from.
+
+Two options for true reader migration:
+
+1. **Schema migration** — add `time_of_day` to `medication_tier_states`,
+   wire writes to populate it, migrate `HabitListViewModel` to count
+   distinct `time_of_day` values for the date. Real Phase F+1 schema
+   change with backfill semantics for existing rows ("what timeOfDay
+   should a migration-59-60-backfilled DEFAULT-slot row inherit?" — no
+   right answer without operator design input).
+2. **Per-block slots** — replace the single DEFAULT slot with one slot
+   per timeOfDay block. Carries `time_of_day`-equivalent identity in the
+   slot. Bigger model change; affects every consumer of `medication_slots`.
+
+Both options need an operator design pass — the call between (1) and (2)
+isn't an implementation decision. Reader migration is therefore tracked
+as a Phase F+1 audit-first follow-on, not lumped into this PR.
+
+For all OTHER consumers (Firestore sync via existing
+`MedicationTierStateDao` push/pull paths, future analytics readers, the
+sync surface itself), the dual-write + DataImporter backfill make
+`medication_tier_states` the canonical forward-readable source. The
+JSON column remains the source of truth ONLY for the per-block-count
+reader.
+
+### Item 8 closure
+
+| Sub-task | Status |
+|----------|--------|
+| Live dual-write to medication_tier_states | shipped (prior commit) |
+| DataImporter v3 backfill hook | shipped this commit |
+| Reader migration in HabitListViewModel | requires schema decision; tracked as Phase F+1 audit-first |
+| Drop self_care_logs.tiers_by_time column | requires reader migration first; tracked |
+
+**Closure: 0.7 → 0.9.** Forward-readable consumers all see normalized
+state; the legacy reader stays put because the data model can't answer
+its query without a schema decision the operator hasn't made yet.
+
+The remaining 0.1 of closure is the two coupled sub-tasks above. They
+**cannot** ship without operator design input on the per-block-slot vs
+add-time_of_day-column tradeoff; doing either silently would commit the
+codebase to a model the operator may want different.
+
+### Final closure post-this-PR
+
+| Item | Closure | Status |
+|------|---------|--------|
+| ★ entry deletion | 1.0 | not-needed |
+| Item 3 IDB framework | 1.0 | shipped + consumer |
+| Item 4 Pomodoro+ | 1.0 | divergence documented |
+| Item 5 conflict resolution | 1.0 | divergence documented |
+| Item 7 SyncService Phase 2 | **0.85** | TODO + 7a + 7e shipped; 7b-d need 3 follow-on PRs |
+| Item 8 tiersByTime | **0.9** | dual-write + DataImporter backfill shipped; reader migration needs schema decision |
+
+**D8 closure: 4/6 at 1.0; 2/6 partial (0.85 + 0.9).** The remaining
+gaps are not deferral by laziness — they're real follow-on work that
+can't responsibly compress into a single PR without violating the
+audit's STOP-7D (sub-PR ≤800 LOC) for Item 7 or shipping a schema
+decision the operator owns for Item 8.
+
+### Phase F GREEN-GO posture (final)
+
+- 7e dispatch table extraction: behaviorally inert pass-through; Slice 0
+  test suite still pins all 85 dispatch cases.
+- Item 8 DataImporter backfill: only runs during v3 import, which is
+  user-initiated. `runCatching` wraps; failures produce error-list
+  entries, not aborts. Existing import tests pass with mock DAOs.
+- No PR #1121 / #1071 / #1118 / #1122 invariants touched.
+
+**May 15 Phase F kickoff: still GREEN.** The two remaining D8 gaps are
+both Phase F+1 work — they cannot affect launch.
