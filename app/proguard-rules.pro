@@ -105,3 +105,14 @@
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
 -keepattributes Signature
+# R8 full mode (AGP 8+ default) strips the generic signature off
+# anonymous TypeToken subclasses unless they're explicitly pinned.
+# Without this, gson loses the inner element type and silently returns
+# LinkedTreeMap, which then ClassCastExceptions on the first downstream
+# property access — see LeisurePreferences.parseCustomSections.
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+
+# ── Leisure preferences data classes (Gson-serialized via DataStore) ──
+-keep class com.averycorp.prismtask.data.preferences.CustomLeisureSection { *; }
+-keep class com.averycorp.prismtask.data.preferences.CustomLeisureActivity { *; }

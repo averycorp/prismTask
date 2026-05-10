@@ -169,11 +169,7 @@ constructor(
             runCatching { gson.fromJson<List<String>>(raw, stringListType) }.getOrNull()
         }?.let { list -> (list as List<String?>?).orEmpty().filterNotNull() } ?: emptyList()
         val custom: List<CustomLeisureActivity> = prefs[keys.customKey]?.let { raw ->
-            runCatching { gson.fromJson<List<CustomLeisureActivity>>(raw, activityListType) }.getOrNull()
-        }?.let { list ->
-            (list as List<CustomLeisureActivity?>?).orEmpty()
-                .filterNotNull()
-                .mapNotNull { it.sanitizedActivity() }
+            parseActivityList(raw).mapNotNull { it.sanitizedActivity() }
         } ?: emptyList()
         return LeisureSlotConfig(
             enabled = prefs[keys.enabledKey]?.toBooleanStrictOrNull() ?: default.enabled,
@@ -253,7 +249,7 @@ constructor(
         val key = keysFor(slot).customKey
         context.leisureDataStore.edit { prefs ->
             val current: List<CustomLeisureActivity> = prefs[key]?.let { raw ->
-                runCatching { gson.fromJson<List<CustomLeisureActivity>>(raw, activityListType) }.getOrNull()
+                parseActivityList(raw)
             } ?: emptyList()
             val id = "custom_${slot.name.lowercase()}_${System.currentTimeMillis()}"
             prefs[key] = gson.toJson(current + CustomLeisureActivity(id, label, icon))
@@ -264,7 +260,7 @@ constructor(
         val key = keysFor(slot).customKey
         context.leisureDataStore.edit { prefs ->
             val current: List<CustomLeisureActivity> = prefs[key]?.let { raw ->
-                runCatching { gson.fromJson<List<CustomLeisureActivity>>(raw, activityListType) }.getOrNull()
+                parseActivityList(raw)
             } ?: emptyList()
             prefs[key] = gson.toJson(current.filter { it.id != id })
         }
@@ -272,17 +268,30 @@ constructor(
 
     fun getCustomMusicActivities(): Flow<List<CustomLeisureActivity>> =
         context.leisureDataStore.data.map { prefs ->
-            prefs[CUSTOM_MUSIC_KEY]?.let { raw ->
-                runCatching { gson.fromJson<List<CustomLeisureActivity>>(raw, activityListType) }.getOrNull()
-            } ?: emptyList()
+            prefs[CUSTOM_MUSIC_KEY]?.let { raw -> parseActivityList(raw) } ?: emptyList()
         }
 
     fun getCustomFlexActivities(): Flow<List<CustomLeisureActivity>> =
         context.leisureDataStore.data.map { prefs ->
-            prefs[CUSTOM_FLEX_KEY]?.let { raw ->
-                runCatching { gson.fromJson<List<CustomLeisureActivity>>(raw, activityListType) }.getOrNull()
-            } ?: emptyList()
+            prefs[CUSTOM_FLEX_KEY]?.let { raw -> parseActivityList(raw) } ?: emptyList()
         }
+
+    /**
+     * Defensive parse for `List<CustomLeisureActivity>`. R8 full mode (AGP
+     * 8+ default) strips the generic signature off anonymous TypeToken
+     * subclasses unless they're explicitly pinned, and gson then silently
+     * returns LinkedTreeMap instead of the typed element. The previous
+     * unchecked `as List<CustomLeisureActivity?>?` cast smuggled those past
+     * static typing and the first downstream property access blew up with
+     * ClassCastException. The `filterIsInstance` here is a runtime guard
+     * paired with proguard-rules.pro keeping both the data class and
+     * TypeToken subclasses.
+     */
+    private fun parseActivityList(raw: String): List<CustomLeisureActivity> =
+        runCatching { gson.fromJson<List<Any?>>(raw, activityListType) }
+            .getOrNull()
+            ?.filterIsInstance<CustomLeisureActivity>()
+            .orEmpty()
 
     suspend fun addMusicActivity(label: String, icon: String) = addActivity(LeisureSlotId.MUSIC, label, icon)
 
@@ -345,10 +354,33 @@ constructor(
     }
 
     private fun parseCustomSections(raw: String): List<CustomLeisureSection?> = try {
-        (
-            gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
-                as List<CustomLeisureSection?>?
-            ).orEmpty()
+        // gson's element type comes from `sectionListType` at runtime, but
+        // R8 full mode (AGP 8+ default) can strip the generic signature off
+        // the anonymous TypeToken subclass and gson then silently returns
+        // LinkedTreeMap instead of CustomLeisureSection. The previous
+        // unchecked `as List<CustomLeisureSection?>?` cast smuggled those
+        // past static typing and validateCustomSection's first property
+        // access crashed with ClassCastException (Crashlytics: LinkedTreeMap
+        // cannot be cast to vk1). proguard-rules.pro now pins both the data
+        // class and TypeToken subclasses; the runtime `is`-check below is a
+        // belt-and-suspenders guard plus a Crashlytics breadcrumb if the
+        // keep rules ever drift.
+        @Suppress("UNCHECKED_CAST")
+        val rawList = (gson.fromJson<Any?>(raw, sectionListType) as? List<Any?>).orEmpty()
+        val wrongTypes = rawList.filter { it != null && it !is CustomLeisureSection }
+        if (wrongTypes.isNotEmpty()) {
+            val firstWrongType = wrongTypes.first()?.javaClass?.name ?: "unknown"
+            reportMitigation(
+                mitigationId = "M1_gson_wrong_type",
+                message = "M1_GSON_WRONG_TYPE: dropped=${wrongTypes.size} first_type=$firstWrongType",
+                exception = ClassCastException("M1_GSON_WRONG_TYPE"),
+                customKeys = mapOf(
+                    "dropped_count" to wrongTypes.size.toString(),
+                    "actual_type" to firstWrongType
+                )
+            )
+        }
+        rawList.map { item -> item as? CustomLeisureSection }
     } catch (exception: JsonParseException) {
         reportMitigation(
             mitigationId = "M1_gson_parse_fail",
