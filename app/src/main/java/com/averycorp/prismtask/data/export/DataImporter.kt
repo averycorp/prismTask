@@ -787,7 +787,7 @@ constructor(
 
     private fun epochMillisToLocalDateString(epochMs: Long): String {
         val instant = java.time.Instant.ofEpochMilli(epochMs)
-        return java.time.LocalDate.ofInstant(instant, java.time.ZoneId.systemDefault()).toString()
+        return instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
     }
 
     private suspend fun importSelfCareSteps(ctx: ImportContext, root: JsonObject) {
