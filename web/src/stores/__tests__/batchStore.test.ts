@@ -60,6 +60,8 @@ vi.mock('sonner', () => ({
 
 import { useBatchStore } from '@/stores/batchStore';
 import type { BatchHistoryRecord } from '@/types/batch';
+import { resetIdbForTesting } from '@/lib/idb/database';
+import { replaceBatchHistoryForUser } from '@/lib/idb/batchHistoryStore';
 
 function resetStore() {
   useBatchStore.setState({
@@ -74,14 +76,18 @@ function resetStore() {
 }
 
 describe('useBatchStore', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     resetStore();
     if (typeof localStorage.clear === 'function') localStorage.clear();
+    // Each test gets a clean IDB; the framework is single-DB, so
+    // wipe its `batch_history` store between tests.
+    await replaceBatchHistoryForUser('test-uid', []);
   });
 
   afterEach(() => {
     resetStore();
     if (typeof localStorage.clear === 'function') localStorage.clear();
+    resetIdbForTesting();
   });
 
   it('setPendingCommand resets response and error', () => {
@@ -198,7 +204,7 @@ describe('useBatchStore', () => {
     expect(s.parseError).toBeNull();
   });
 
-  it('hydrate loads saved history from localStorage and drops expired records', () => {
+  it('hydrate migrates legacy localStorage payload into IDB and drops expired records', async () => {
     const now = Date.now();
     const records: BatchHistoryRecord[] = [
       {
@@ -227,14 +233,17 @@ describe('useBatchStore', () => {
       JSON.stringify(records),
     );
 
-    useBatchStore.getState().hydrate('test-uid');
+    await useBatchStore.getState().hydrate('test-uid');
     const loaded = useBatchStore.getState().history;
     expect(loaded.map((r) => r.batch_id)).toEqual(['fresh']);
-    // Expired record should also be purged from the persisted store.
-    const persisted: BatchHistoryRecord[] = JSON.parse(
-      localStorage.getItem('prismtask_batch_history_test-uid') || '[]',
-    );
-    expect(persisted.map((r) => r.batch_id)).toEqual(['fresh']);
+    // Legacy localStorage key was deleted as part of the migration.
+    expect(localStorage.getItem('prismtask_batch_history_test-uid')).toBeNull();
+    // Re-hydrate goes through IDB only and still surfaces the fresh record.
+    resetStore();
+    await useBatchStore.getState().hydrate('test-uid');
+    expect(
+      useBatchStore.getState().history.map((r) => r.batch_id),
+    ).toEqual(['fresh']);
   });
 
   it('commit writes a history record with applied and skipped counts', async () => {

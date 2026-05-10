@@ -63,7 +63,8 @@ import javax.inject.Singleton
 
 // See docs/audits/SYNCSERVICE_GOD_CLASS_REFACTOR_AUDIT.md for the surface-axis
 // refactor plan (operator-confirmed May 4, 2026; Phase 1 + Slice 0 shipped via
-// PRs #1118 + #1122; Phase 2 implementation pending).
+// PRs #1118 + #1122; Phase 2 sub-PR 7a — Firestore constructor injection —
+// shipped via this PR).
 // TODO(sync-refactor): split SyncService — separate push, pull, listener,
 // and initial-upload surfaces. Each PR that touches this file widens the
 // file further; the next refactor should land before the next feature.
@@ -123,9 +124,9 @@ constructor(
     private val projectPhaseDao: ProjectPhaseDao,
     private val projectRiskDao: ProjectRiskDao,
     private val taskDependencyDao: TaskDependencyDao,
-    private val externalAnchorDao: ExternalAnchorDao
+    private val externalAnchorDao: ExternalAnchorDao,
+    private val firestore: FirebaseFirestore
 ) {
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val listeners = mutableListOf<ListenerRegistration>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -3751,109 +3752,21 @@ constructor(
         // missed because no collector was active).
         private const val PERIODIC_SYNC_INTERVAL_MS: Long = 30_000L
 
-        // Pure dispatch tables — hoisted for unit-testability ahead of the
-        // surface-axis refactor. Behaviour identical to the inline `when`
-        // blocks they replaced; see SYNCSERVICE_SLICE_0_TEST_SHORING_AUDIT.md.
+        // D8 Item 7 Strangler Fig 7e — pure dispatch tables now live in
+        // [SyncDispatchTables]; these companion-object members delegate so
+        // existing call-sites + [SyncServiceDispatchTest] keep working
+        // unchanged. Behaviour-identical pass-throughs.
 
         @VisibleForTesting
-        internal fun collectionNameFor(entityType: String): String = when (entityType) {
-            "habit_completion" -> "habit_completions"
-            "habit_log" -> "habit_logs"
-            "task_completion" -> "task_completions"
-            "task_timing" -> "task_timings"
-            "task_template" -> "task_templates"
-            "course_completion" -> "course_completions"
-            "leisure_log" -> "leisure_logs"
-            "self_care_step" -> "self_care_steps"
-            "self_care_log" -> "self_care_logs"
-            "medication" -> "medications"
-            "medication_dose" -> "medication_doses"
-            "medication_slot" -> "medication_slots"
-            "medication_slot_override" -> "medication_slot_overrides"
-            "medication_tier_state" -> "medication_tier_states"
-            "notification_profile" -> "notification_profiles"
-            "custom_sound" -> "custom_sounds"
-            "saved_filter" -> "saved_filters"
-            "nlp_shortcut" -> "nlp_shortcuts"
-            "habit_template" -> "habit_templates"
-            "project_template" -> "project_templates"
-            "project_phase" -> "project_phases"
-            "project_risk" -> "project_risks"
-            "external_anchor" -> "external_anchors"
-            "task_dependency" -> "task_dependencies"
-            "boundary_rule" -> "boundary_rules"
-            "automation_rule" -> "automation_rules"
-            "check_in_log" -> "check_in_logs"
-            "mood_energy_log" -> "mood_energy_logs"
-            "focus_release_log" -> "focus_release_logs"
-            "medication_refill" -> "medication_refills"
-            "weekly_review" -> "weekly_reviews"
-            "daily_essential_slot_completion" -> "daily_essential_slot_completions"
-            "assignment" -> "assignments"
-            "attachment" -> "attachments"
-            "study_log" -> "study_logs"
-            else -> entityType + "s"
-        }
+        internal fun collectionNameFor(entityType: String): String =
+            SyncDispatchTables.collectionNameFor(entityType)
 
-        // Inverse of collectionNameFor for delete-listener routing. Triplicated
-        // historically (forward table + inline inverse + Migration_51_52
-        // syncableTables); the SyncServiceDispatchTest pins the bidirectional
-        // round-trip to surface drift before refactor or feature-add.
         @VisibleForTesting
-        internal fun entityTypeForCollectionName(collection: String): String? = when (collection) {
-            "tasks" -> "task"
-            "projects" -> "project"
-            "tags" -> "tag"
-            "habits" -> "habit"
-            "habit_completions" -> "habit_completion"
-            "habit_logs" -> "habit_log"
-            "task_completions" -> "task_completion"
-            "task_timings" -> "task_timing"
-            "milestones" -> "milestone"
-            "project_phases" -> "project_phase"
-            "project_risks" -> "project_risk"
-            "external_anchors" -> "external_anchor"
-            "task_dependencies" -> "task_dependency"
-            "task_templates" -> "task_template"
-            "courses" -> "course"
-            "course_completions" -> "course_completion"
-            "leisure_logs" -> "leisure_log"
-            "self_care_steps" -> "self_care_step"
-            "self_care_logs" -> "self_care_log"
-            "medications" -> "medication"
-            "medication_doses" -> "medication_dose"
-            "medication_slots" -> "medication_slot"
-            "medication_slot_overrides" -> "medication_slot_override"
-            "medication_tier_states" -> "medication_tier_state"
-            "notification_profiles" -> "notification_profile"
-            "custom_sounds" -> "custom_sound"
-            "saved_filters" -> "saved_filter"
-            "nlp_shortcuts" -> "nlp_shortcut"
-            "habit_templates" -> "habit_template"
-            "project_templates" -> "project_template"
-            "boundary_rules" -> "boundary_rule"
-            "automation_rules" -> "automation_rule"
-            "check_in_logs" -> "check_in_log"
-            "mood_energy_logs" -> "mood_energy_log"
-            "focus_release_logs" -> "focus_release_log"
-            "medication_refills" -> "medication_refill"
-            "weekly_reviews" -> "weekly_review"
-            "daily_essential_slot_completions" -> "daily_essential_slot_completion"
-            "assignments" -> "assignment"
-            "attachments" -> "attachment"
-            "study_logs" -> "study_log"
-            else -> null
-        }
+        internal fun entityTypeForCollectionName(collection: String): String? =
+            SyncDispatchTables.entityTypeForCollectionName(collection)
 
-        // Push-order priority — projects first (parent FK), then tags, then
-        // everything else, with task_completions last because they reference
-        // task cloud ids that must already exist.
         @VisibleForTesting
-        internal fun pushOrderPriorityOf(entityType: String): Int = when (entityType) {
-            "project" -> 0
-            "tag" -> 1
-            "task_completion" -> 3
-            else -> 2
-        }
+        internal fun pushOrderPriorityOf(entityType: String): Int =
+            SyncDispatchTables.pushOrderPriorityOf(entityType)
     }
 }

@@ -73,6 +73,9 @@ class SelfCareRepositoryConflictTest {
             taskBehaviorPreferences = taskBehaviorPreferences,
             gson = Gson(),
             syncTracker = syncTracker,
+            medicationDao = mockk(relaxed = true),
+            medicationSlotDao = mockk(relaxed = true),
+            medicationTierStateDao = mockk(relaxed = true),
             advancedTuningPreferences = advancedTuningPreferences
         )
     }
