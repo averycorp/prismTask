@@ -15,7 +15,11 @@ import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTask
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
+import com.averycorp.prismtask.domain.usecase.ResolvedTask
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifySequence
@@ -60,6 +64,8 @@ class ChatViewModelActionTest {
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
+    private lateinit var naturalLanguageParser: NaturalLanguageParser
+    private lateinit var parsedTaskResolver: ParsedTaskResolver
 
     @Before
     fun setUp() {
@@ -84,6 +90,29 @@ class ChatViewModelActionTest {
             coEvery { aiChatDisclosureShownFlow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV2Flow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV3Flow } returns flowOf(true)
+            coEvery { chatClearSkipConfirmationFlow } returns flowOf(false)
+        }
+        // D13 B.3: chat-create_task pipes title through the parser to surface
+        // any inline recurrence wording. Default-stub returns a no-recurrence
+        // ParsedTask / ResolvedTask so existing tests aren't affected.
+        naturalLanguageParser = mockk(relaxed = true) {
+            every { parse(any()) } answers { ParsedTask(title = firstArg()) }
+        }
+        parsedTaskResolver = mockk(relaxed = true) {
+            coEvery { resolve(any()) } answers {
+                val parsed = firstArg<ParsedTask>()
+                ResolvedTask(
+                    title = parsed.title,
+                    dueDate = null,
+                    dueTime = null,
+                    tagIds = emptyList(),
+                    projectId = null,
+                    priority = 0,
+                    recurrenceRule = null,
+                    unmatchedTags = emptyList(),
+                    unmatchedProject = null
+                )
+            }
         }
     }
 
@@ -103,7 +132,9 @@ class ChatViewModelActionTest {
         habitCompletionDao = habitCompletionDao,
         proFeatureGate = proFeatureGate,
         taskBehaviorPreferences = taskBehaviorPreferences,
-        userPreferencesDataStore = userPreferencesDataStore
+        userPreferencesDataStore = userPreferencesDataStore,
+        naturalLanguageParser = naturalLanguageParser,
+        parsedTaskResolver = parsedTaskResolver
     )
 
     @Test
@@ -441,6 +472,7 @@ class ChatViewModelActionTest {
 
         // Tap the DeleteSweep button → only flips the confirm-flag, no clear yet.
         viewModel.requestClearConversation()
+        advanceUntilIdle()
         assertEquals(true, viewModel.showClearConfirm.value)
         coVerify(exactly = 0) { chatRepository.clearConversation() }
 
@@ -451,8 +483,41 @@ class ChatViewModelActionTest {
 
         // Tap again, this time confirm → repository clears.
         viewModel.requestClearConversation()
+        advanceUntilIdle()
         viewModel.clearConversation()
         assertEquals(false, viewModel.showClearConfirm.value)
+        coVerify(exactly = 1) { chatRepository.clearConversation() }
+    }
+
+    @Test
+    fun request_clear_conversation_skips_dialog_when_dont_ask_again_pref_set() = runTest(dispatcher) {
+        // D13 Item 4: with skip-confirmation pref true, requestClearConversation
+        // bypasses the dialog and clears immediately.
+        coEvery {
+            userPreferencesDataStore.chatClearSkipConfirmationFlow
+        } returns flowOf(true)
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestClearConversation()
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.showClearConfirm.value)
+        coVerify(exactly = 1) { chatRepository.clearConversation() }
+    }
+
+    @Test
+    fun confirm_clear_with_dont_ask_again_persists_skip_pref() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.confirmClearAndPersistSkip(skipFutureConfirmations = true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            userPreferencesDataStore.setChatClearSkipConfirmation(true)
+        }
         coVerify(exactly = 1) { chatRepository.clearConversation() }
     }
 

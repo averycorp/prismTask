@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
+import com.averycorp.prismtask.data.local.converter.RecurrenceConverter
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
@@ -19,6 +20,8 @@ import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.toCalendarDayOfWeek
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -53,7 +56,9 @@ constructor(
     private val habitCompletionDao: HabitCompletionDao,
     private val proFeatureGate: ProFeatureGate,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
-    private val userPreferencesDataStore: UserPreferencesDataStore
+    private val userPreferencesDataStore: UserPreferencesDataStore,
+    private val naturalLanguageParser: NaturalLanguageParser,
+    private val parsedTaskResolver: ParsedTaskResolver
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
     val messages: StateFlow<List<ChatMessage>> = chatRepository.messages
@@ -357,9 +362,32 @@ constructor(
         _error.value = null
     }
 
-    /** Show the C.3 confirm dialog before actually clearing chat. */
+    /**
+     * Show the C.3 confirm dialog before actually clearing chat — unless
+     * the D13 "Don't ask again" pref is set, in which case clear immediately.
+     */
     fun requestClearConversation() {
-        _showClearConfirm.value = true
+        viewModelScope.launch {
+            val skip = userPreferencesDataStore.chatClearSkipConfirmationFlow.first()
+            if (skip) {
+                clearConversation()
+            } else {
+                _showClearConfirm.value = true
+            }
+        }
+    }
+
+    /**
+     * Persist the D13 "Don't ask again" toggle, then clear the conversation.
+     * Called from the dialog's Confirm button when the checkbox is ticked.
+     */
+    fun confirmClearAndPersistSkip(skipFutureConfirmations: Boolean) {
+        viewModelScope.launch {
+            if (skipFutureConfirmations) {
+                userPreferencesDataStore.setChatClearSkipConfirmation(true)
+            }
+            clearConversation()
+        }
     }
 
     /** User cancelled the C.3 confirm dialog; do nothing. */
@@ -530,13 +558,12 @@ constructor(
     }
 
     /**
-     * B.4 (F8 follow-on): emit a navigation request so the screen layer
-     * can route to the Timer screen. We deliberately do NOT pass
-     * [ChatActionResponse.minutes] through the nav route — the timer
-     * screen reads its duration from user preferences and we don't want
-     * an AI-suggested duration to silently override the user's
-     * configured length. The minutes value is surfaced in the snackbar
-     * so the user knows what AI suggested.
+     * B.4 (D13): emit a navigation request so the screen layer can route
+     * to the Timer screen. The AI-suggested duration is forwarded through
+     * the Timer route as a one-shot override — TimerViewModel applies it
+     * to the in-flight session WITHOUT persisting to TimerPreferences, so
+     * the user's configured custom duration is preserved across restarts.
+     * The minutes value is also surfaced in the snackbar text.
      */
     /**
      * Hand the user's natural-language batch phrasing off to
@@ -583,12 +610,27 @@ constructor(
             ?.takeIf { it.isNotBlank() }
             ?.let { projectDao.getProjectByNameOnce(it.trim())?.id }
 
+        // B.3 (D13): the chat backend doesn't carry a recurrence field on
+        // `ChatActionResponse`, so re-run the offline NLP parser over the
+        // title to catch cases where the AI left recurrence wording inline
+        // ("take meds every day", "weekly review"). Only the recurrence
+        // portion of the parse is used — title/due/priority are still the
+        // backend-emitted structured fields. ResolvedTask returns null
+        // recurrenceRule when no `recurrenceHint` was extracted, so the
+        // common case (clean title) costs one extra parser call and a no-op.
+        val recurrenceJson = runCatching {
+            val parsed = naturalLanguageParser.parse(title)
+            parsedTaskResolver.resolve(parsed).recurrenceRule
+                ?.let { RecurrenceConverter.toJson(it) }
+        }.getOrNull()
+
         val taskId = taskRepository.addTask(
             title = title,
             description = description,
             dueDate = dueDate,
             priority = priority,
-            projectId = projectId
+            projectId = projectId,
+            recurrenceRule = recurrenceJson
         )
 
         action.tags

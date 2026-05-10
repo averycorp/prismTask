@@ -345,8 +345,10 @@ constructor(
     }
 
     private fun parseCustomSections(raw: String): List<CustomLeisureSection?> = try {
-        @Suppress("UNCHECKED_CAST")
-        (gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType) as List<CustomLeisureSection?>?).orEmpty()
+        (
+            gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
+                as List<CustomLeisureSection?>?
+            ).orEmpty()
     } catch (exception: JsonParseException) {
         reportMitigation(
             mitigationId = "M1_gson_parse_fail",

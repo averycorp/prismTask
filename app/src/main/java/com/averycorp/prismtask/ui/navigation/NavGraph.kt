@@ -48,10 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors
 import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.screens.habits.HabitListScreen
@@ -125,7 +127,17 @@ sealed class PrismTaskRoute(
 
     data object HabitsRecurring : PrismTaskRoute("habits_recurring")
 
-    data object Timer : PrismTaskRoute("timer")
+    data object Timer : PrismTaskRoute("timer") {
+        const val ARG_MINUTES = "minutes"
+        const val ROUTE_WITH_ARGS = "timer?minutes={minutes}"
+
+        /**
+         * D13 B.4: deep-link route accepting an AI-suggested duration.
+         * Pass `null` to use the user's persisted custom duration.
+         */
+        fun createRoute(minutes: Int? = null): String =
+            if (minutes != null) "timer?minutes=$minutes" else "timer"
+    }
 
     data object AddEditHabit : PrismTaskRoute("add_edit_habit?habitId={habitId}") {
         fun createRoute(habitId: Long? = null): String =
@@ -654,6 +666,27 @@ fun PrismTaskNavGraph(
                         PrismTaskRoute.Settings.route -> SettingsScreen(navController)
                     }
                 }
+            }
+
+            // D13 B.4: chat-driven deep link to the Timer screen with an
+            // optional AI-suggested duration. The bottom-tab Timer is reached
+            // through the MainTabs pager above; this composable handles
+            // out-of-tab `navController.navigate(Timer.createRoute(N))` calls
+            // (chat, coachmark tour) and forwards the suggested minutes as
+            // a one-shot, non-persistent override.
+            composable(
+                route = PrismTaskRoute.Timer.ROUTE_WITH_ARGS,
+                arguments = listOf(
+                    navArgument(PrismTaskRoute.Timer.ARG_MINUTES) {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    }
+                )
+            ) { backStackEntry ->
+                val suggested = backStackEntry.arguments
+                    ?.getInt(PrismTaskRoute.Timer.ARG_MINUTES)
+                    ?.takeIf { it in 1..480 }
+                TimerScreen(navController, suggestedDurationMinutes = suggested)
             }
 
             featureRoutes(navController, initialSharedText = pendingSharedText)

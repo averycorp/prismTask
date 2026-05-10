@@ -1,11 +1,6 @@
 package com.averycorp.prismtask.ui.screens.onboarding
 
-import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -100,7 +95,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val TOTAL_PAGES = 16
+private const val TOTAL_PAGES = 14
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 
 @Composable
@@ -135,13 +130,11 @@ fun OnboardingScreen(
                 5 -> HabitsPage(viewModel = viewModel)
                 6 -> LifeModesPage(viewModel = viewModel)
                 7 -> TemplatesPage(viewModel = viewModel)
-                8 -> ViewsPage()
-                9 -> BrainModePage(viewModel = viewModel)
-                10 -> AccessibilityPage(viewModel = viewModel)
-                11 -> AiOverviewPage()
-                12 -> PrivacyPage(viewModel = viewModel)
-                13 -> NotificationsPage(viewModel = viewModel)
-                14 -> DaySetupPage(viewModel = viewModel)
+                8 -> BrainModePage(viewModel = viewModel)
+                9 -> AccessibilityPage(viewModel = viewModel)
+                10 -> PrivacyPage(viewModel = viewModel)
+                11 -> NotificationsPage(viewModel = viewModel)
+                12 -> DaySetupPage(viewModel = viewModel)
                 LAST_PAGE_INDEX -> SetupPage(
                     viewModel = viewModel,
                     onComplete = {
@@ -775,56 +768,6 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
                 showSelfCare = selfCareEnabled,
                 showHousework = houseworkEnabled
             )
-        }
-    }
-}
-
-@Composable
-private fun ViewsPage() {
-    var animStarted by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { animStarted = true }
-
-    OnboardingPageLayout(
-        emoji = "\uD83D\uDC41\uFE0F",
-        headline = "See Your Way",
-        body = "Today focus, week planner, calendar, timeline, and Eisenhower matrix. Your tasks, your view."
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 24.dp)
-        ) {
-            listOf("Today" to "\u2600\uFE0F", "Week" to "\uD83D\uDCC5", "Month" to "\uD83D\uDDD3\uFE0F").forEachIndexed {
-                    index,
-                    (label, icon)
-                ->
-                AnimatedVisibility(
-                    visible = animStarted,
-                    enter = fadeIn(tween(400, delayMillis = index * 200)) +
-                        slideInVertically(tween(400, delayMillis = index * 200)) { 40 }
-                ) {
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Text(icon, fontSize = 28.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -1475,106 +1418,6 @@ private fun <T> collectAsLocalState(
 // dialog only fires when the user is actually trying to use voice.
 
 @Composable
-private fun AiOverviewPage() {
-    var animStarted by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { animStarted = true }
-
-    data class AiBucket(
-        val emoji: String,
-        val title: String,
-        val description: String,
-        val tier: String
-    )
-
-    val buckets = listOf(
-        AiBucket(
-            emoji = "✍️",
-            title = "Capture",
-            description = "Type or speak naturally — NLP parses dates, tags, projects, and priority. " +
-                "Smart suggestions and defaults learn from your history.",
-            tier = "Free"
-        ),
-        AiBucket(
-            emoji = "🗂️",
-            title = "Plan",
-            description = "Eisenhower auto-classify, daily briefing, and smart Pomodoro coaching pick up where you left off.",
-            tier = "Pro"
-        ),
-        AiBucket(
-            emoji = "🪞",
-            title = "Reflect",
-            description = "Mood + energy correlation, burnout scoring, and weekly review aggregator surface patterns over time.",
-            tier = "Free"
-        ),
-        AiBucket(
-            emoji = "🛡️",
-            title = "Protect",
-            description = "Life-category auto-classify and notification profile auto-switching dial back " +
-                "when you're trending toward overload.",
-            tier = "Free"
-        )
-    )
-
-    OnboardingPageLayout(
-        emoji = "🤖",
-        headline = "AI That Helps, Not Hovers",
-        body = "PrismTask's AI runs across four areas. You can disable any of it on the next step."
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 24.dp)
-        ) {
-            buckets.forEachIndexed { index, bucket ->
-                AnimatedVisibility(
-                    visible = animStarted,
-                    enter = fadeIn(tween(300, delayMillis = index * 120)) +
-                        slideInVertically(tween(300, delayMillis = index * 120)) { it }
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Text(bucket.emoji, fontSize = 22.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = bucket.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    ChipLabel(
-                                        text = bucket.tier,
-                                        color = if (bucket.tier == "Pro") {
-                                            MaterialTheme.colorScheme.tertiary
-                                        } else {
-                                            MaterialTheme.colorScheme.primary
-                                        }
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = bucket.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun PrivacyPage(viewModel: OnboardingViewModel) {
     val voiceEnabled by collectAsLocalState(viewModel.voiceInputEnabled, initial = true)
     val aiEnabled by collectAsLocalState(viewModel.aiFeaturesEnabled, initial = true)
@@ -1644,13 +1487,10 @@ private fun PrivacyPage(viewModel: OnboardingViewModel) {
 
 // ─── Notifications & Briefings Page ───────────────────────────────────────
 //
-// Six default-ON notification streams. Toggling any of these here flips
-// the local `*Enabled` flag and — on Android 13+ — also fires the system
-// POST_NOTIFICATIONS permission dialog the first time this page is reached
-// so the user encounters the permission ask while the consent context
-// (the explanatory page they just landed on) is still on screen, instead
-// of after onboarding completes. `MainActivity.kt` keeps a re-check for
-// users who skipped the page entirely.
+// Six default-ON notification streams. The runtime POST_NOTIFICATIONS ask
+// is owned exclusively by `MainActivity.kt`'s cold-launch LaunchedEffect —
+// onboarding is no longer a re-prompt site, so users who reach this page
+// after already accepting/denying don't see the system dialog twice.
 
 @Composable
 private fun NotificationsPage(viewModel: OnboardingViewModel) {
@@ -1663,22 +1503,6 @@ private fun NotificationsPage(viewModel: OnboardingViewModel) {
     val taskReminders by collectAsLocalState(viewModel.taskRemindersEnabled, initial = true)
     val timerAlerts by collectAsLocalState(viewModel.timerAlertsEnabled, initial = true)
     val medicationReminders by collectAsLocalState(viewModel.medicationRemindersEnabled, initial = true)
-
-    val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* result handled by MainActivity's existing on-resume re-check */ }
-
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = context.checkSelfPermission(
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-    }
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }

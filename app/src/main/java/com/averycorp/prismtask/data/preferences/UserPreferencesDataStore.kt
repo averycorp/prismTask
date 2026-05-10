@@ -296,6 +296,12 @@ class UserPreferencesDataStore(
         val KEY_AI_CHAT_DISCLOSURE_SHOWN_V3 =
             booleanPreferencesKey("ai_chat_disclosure_shown_v3")
 
+        // D13 — when true, the clear-chat AlertDialog is bypassed and
+        // requestClearConversation() clears immediately. User opts in via
+        // a "Don't ask again" checkbox inside the dialog itself.
+        val KEY_CHAT_CLEAR_SKIP_CONFIRMATION =
+            booleanPreferencesKey("chat_clear_skip_confirmation")
+
         // Medication reminder mode global default (v1.6.0)
         val KEY_MED_REMINDER_MODE_DEFAULT = stringPreferencesKey("med_reminder_mode_default")
         val KEY_MED_REMINDER_INTERVAL_DEFAULT_MINUTES =
@@ -635,6 +641,19 @@ class UserPreferencesDataStore(
 
     suspend fun setAiChatDisclosureShownV3(shown: Boolean) {
         dataStore.edit { it[KEY_AI_CHAT_DISCLOSURE_SHOWN_V3] = shown }
+    }
+
+    /**
+     * D13 — when true, [requestClearConversation] in ChatViewModel skips the
+     * AlertDialog and clears immediately. Defaults to false so the dialog
+     * still fires until the user explicitly opts out via the checkbox.
+     */
+    val chatClearSkipConfirmationFlow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_CHAT_CLEAR_SKIP_CONFIRMATION] ?: false
+    }
+
+    suspend fun setChatClearSkipConfirmation(skip: Boolean) {
+        dataStore.edit { it[KEY_CHAT_CLEAR_SKIP_CONFIRMATION] = skip }
     }
 
     /**

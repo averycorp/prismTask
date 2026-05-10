@@ -11,6 +11,8 @@ import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
+import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
+import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -57,6 +59,8 @@ class ChatViewModelDisclosureTest {
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
+    private lateinit var naturalLanguageParser: NaturalLanguageParser
+    private lateinit var parsedTaskResolver: ParsedTaskResolver
 
     @Before
     fun setUp() {
@@ -76,7 +80,11 @@ class ChatViewModelDisclosureTest {
             every { userTier } returns MutableStateFlow(UserTier.PRO)
         }
         taskBehaviorPreferences = mockk(relaxed = true)
-        userPreferencesDataStore = mockk(relaxed = true)
+        userPreferencesDataStore = mockk(relaxed = true) {
+            coEvery { chatClearSkipConfirmationFlow } returns flowOf(false)
+        }
+        naturalLanguageParser = mockk(relaxed = true)
+        parsedTaskResolver = mockk(relaxed = true)
     }
 
     @After
@@ -95,7 +103,9 @@ class ChatViewModelDisclosureTest {
         habitCompletionDao = habitCompletionDao,
         proFeatureGate = proFeatureGate,
         taskBehaviorPreferences = taskBehaviorPreferences,
-        userPreferencesDataStore = userPreferencesDataStore
+        userPreferencesDataStore = userPreferencesDataStore,
+        naturalLanguageParser = naturalLanguageParser,
+        parsedTaskResolver = parsedTaskResolver
     )
 
     @Test
