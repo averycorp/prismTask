@@ -21,7 +21,7 @@ class RatingPromptTriggerHelper @Inject constructor(
     private val prefs: RatingPromptPreferences,
     private val crashSignal: RecentCrashSignal,
     private val onboardingPreferences: OnboardingPreferences,
-    private val clock: () -> Long = { System.currentTimeMillis() }
+    private val clock: RatingClock
 ) {
     @Volatile private var customPromptShownThisSession: Boolean = false
 
@@ -32,7 +32,7 @@ class RatingPromptTriggerHelper @Inject constructor(
      * Call once from `MainActivity.onCreate` per cold start.
      */
     suspend fun onAppStart() {
-        prefs.setFirstLaunchAtIfAbsent(clock())
+        prefs.setFirstLaunchAtIfAbsent(clock.now())
         prefs.incrementSessionCount()
     }
 
@@ -49,12 +49,12 @@ class RatingPromptTriggerHelper @Inject constructor(
 
     suspend fun recordPlayReviewShown() {
         playReviewShownThisSession = true
-        prefs.setLastPlayReviewShownAt(clock())
+        prefs.setLastPlayReviewShownAt(clock.now())
     }
 
     suspend fun recordCustomPromptShown() {
         customPromptShownThisSession = true
-        prefs.setLastCustomPromptShownAt(clock())
+        prefs.setLastCustomPromptShownAt(clock.now())
     }
 
     private suspend fun evaluate(): RatingPromptDecision {
@@ -64,7 +64,7 @@ class RatingPromptTriggerHelper @Inject constructor(
         if (crashSignal.hadRecentCrash(RECENT_CRASH_WINDOW_MS)) return RatingPromptDecision.None
         if (customPromptShownThisSession || playReviewShownThisSession) return RatingPromptDecision.None
 
-        val now = clock()
+        val now = clock.now()
         val firstLaunch = prefs.firstLaunchAt().first()
         val daysSinceFirstLaunch = if (firstLaunch == 0L) 0L else (now - firstLaunch) / DAY_MS
         val tasksCompleted = prefs.tasksCompletedCount().first()

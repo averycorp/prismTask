@@ -21,7 +21,7 @@ class RatingPromptTriggerHelperTest {
             prefs = prefs,
             crashSignal = crash,
             onboardingPreferences = onboarding,
-            clock = { now }
+            clock = RatingClock { now }
         )
 
     private fun stubBaseline(
