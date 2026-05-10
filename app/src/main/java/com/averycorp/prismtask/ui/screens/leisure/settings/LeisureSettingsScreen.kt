@@ -345,6 +345,27 @@ private fun CustomSectionEditor(
                 )
             }
 
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Add as Daily Todo", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Spawns a recurring daily task in your task list for this category.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = section.createDailyTask,
+                    onCheckedChange = { viewModel.setCustomSectionCreateDailyTask(section.id, it) }
+                )
+            }
+
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(Modifier.height(12.dp))
@@ -544,6 +565,27 @@ private fun SlotEditor(
                 Switch(
                     checked = config.autoComplete,
                     onCheckedChange = { viewModel.setAutoComplete(slot, it) }
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Add as Daily Todo", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Spawns a recurring daily task in your task list for this category.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = config.createDailyTask,
+                    onCheckedChange = { viewModel.setSlotCreateDailyTask(slot, it) }
                 )
             }
 

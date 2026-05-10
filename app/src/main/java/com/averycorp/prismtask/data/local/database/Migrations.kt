@@ -2430,7 +2430,32 @@ val MIGRATION_77_78 = object : Migration(77, 78) {
     }
 }
 
-const val CURRENT_DB_VERSION = 78
+/**
+ * Adds the per-course "daily todo" wiring used by the Daily Essentials
+ * Leisure + Schoolwork settings:
+ *  - `courses.create_daily_task` (INTEGER NOT NULL DEFAULT 0) — when 1,
+ *    a recurring DAILY task is auto-spawned for this course so it shows
+ *    up in the regular task list alongside other todos.
+ *  - `courses.daily_task_id` (INTEGER NULL) — the id of the spawned task,
+ *    used to remove it when the toggle flips back off. Nullable so the
+ *    course can advertise intent before the controller has created the
+ *    task row (set during the same write where `create_daily_task` flips
+ *    on, but the FK doesn't exist at the SQL level — clearing the task
+ *    row is best-effort).
+ *
+ * The matching leisure-slot fields live in DataStore, not Room, so they
+ * don't need a migration.
+ */
+val MIGRATION_78_79 = object : Migration(78, 79) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE courses ADD COLUMN create_daily_task INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL("ALTER TABLE courses ADD COLUMN daily_task_id INTEGER")
+    }
+}
+
+const val CURRENT_DB_VERSION = 79
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2509,5 +2534,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_74_75,
     MIGRATION_75_76,
     MIGRATION_76_77,
-    MIGRATION_77_78
+    MIGRATION_77_78,
+    MIGRATION_78_79
 )

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -92,6 +94,7 @@ fun AddEditCourseScreen(
     val code by viewModel.code.collectAsStateWithLifecycle()
     val icon by viewModel.icon.collectAsStateWithLifecycle()
     val color by viewModel.color.collectAsStateWithLifecycle()
+    val createDailyTask by viewModel.createDailyTask.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -226,6 +229,31 @@ fun AddEditCourseScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Add as Daily Todo",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Spawns a recurring daily task for this course in your task list.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = createDailyTask,
+                    onCheckedChange = viewModel::onCreateDailyTaskChange
+                )
             }
 
             Spacer(Modifier.height(32.dp))

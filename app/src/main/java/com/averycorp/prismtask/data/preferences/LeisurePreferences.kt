@@ -38,7 +38,9 @@ data class LeisureSlotConfig(
     val gridColumns: Int,
     val autoComplete: Boolean,
     val hiddenBuiltInIds: List<String>,
-    val customActivities: List<CustomLeisureActivity>
+    val customActivities: List<CustomLeisureActivity>,
+    val createDailyTask: Boolean = false,
+    val dailyTaskId: Long? = null
 ) {
     companion object {
         fun defaultFor(slot: LeisureSlotId): LeisureSlotConfig = when (slot) {
@@ -95,7 +97,9 @@ data class CustomLeisureSection(
     val durationMinutes: Int,
     val gridColumns: Int,
     val autoComplete: Boolean,
-    val customActivities: List<CustomLeisureActivity>
+    val customActivities: List<CustomLeisureActivity>,
+    val createDailyTask: Boolean = false,
+    val dailyTaskId: Long? = null
 )
 
 internal val Context.leisureDataStore: DataStore<Preferences> by preferencesDataStore(name = "leisure_prefs")
@@ -145,6 +149,14 @@ constructor(
         private val FLEX_HIDDEN_KEY = stringPreferencesKey("flex_hidden_builtins")
         private val LANGUAGE_HIDDEN_KEY = stringPreferencesKey("language_hidden_builtins")
 
+        private val MUSIC_DAILY_TASK_KEY = stringPreferencesKey("music_create_daily_task")
+        private val FLEX_DAILY_TASK_KEY = stringPreferencesKey("flex_create_daily_task")
+        private val LANGUAGE_DAILY_TASK_KEY = stringPreferencesKey("language_create_daily_task")
+
+        private val MUSIC_DAILY_TASK_ID_KEY = stringPreferencesKey("music_daily_task_id")
+        private val FLEX_DAILY_TASK_ID_KEY = stringPreferencesKey("flex_daily_task_id")
+        private val LANGUAGE_DAILY_TASK_ID_KEY = stringPreferencesKey("language_daily_task_id")
+
         const val MIN_DURATION_MINUTES = 1
         const val MAX_DURATION_MINUTES = 240
         const val MIN_GRID_COLUMNS = 1
@@ -183,8 +195,18 @@ constructor(
                 ?: default.gridColumns,
             autoComplete = prefs[keys.autoKey]?.toBooleanStrictOrNull() ?: default.autoComplete,
             hiddenBuiltInIds = hidden,
-            customActivities = custom
+            customActivities = custom,
+            createDailyTask = prefs[keys.createDailyTaskKey]?.toBooleanStrictOrNull() ?: false,
+            dailyTaskId = prefs[keys.dailyTaskIdKey]?.toLongOrNull()
         )
+    }
+
+    suspend fun setSlotDailyTask(slot: LeisureSlotId, enabled: Boolean, taskId: Long?) {
+        val keys = keysFor(slot)
+        context.leisureDataStore.edit { prefs ->
+            prefs[keys.createDailyTaskKey] = enabled.toString()
+            if (taskId == null) prefs.remove(keys.dailyTaskIdKey) else prefs[keys.dailyTaskIdKey] = taskId.toString()
+        }
     }
 
     suspend fun updateSlotConfig(
@@ -523,11 +545,15 @@ constructor(
         emoji: String? = null,
         durationMinutes: Int? = null,
         gridColumns: Int? = null,
-        autoComplete: Boolean? = null
+        autoComplete: Boolean? = null,
+        createDailyTask: Boolean? = null,
+        dailyTaskId: Long? = null,
+        clearDailyTaskId: Boolean = false
     ) {
         logDebug(
             "updateCustomSection ENTER: id=$id enabled=$enabled label=$label emoji=$emoji " +
-                "durationMinutes=$durationMinutes gridColumns=$gridColumns autoComplete=$autoComplete"
+                "durationMinutes=$durationMinutes gridColumns=$gridColumns autoComplete=$autoComplete " +
+                "createDailyTask=$createDailyTask dailyTaskId=$dailyTaskId clearDailyTaskId=$clearDailyTaskId"
         )
         context.leisureDataStore.edit { prefs ->
             val current = readCustomSections(prefs)
@@ -553,7 +579,13 @@ constructor(
                     gridColumns = gridColumns
                         ?.coerceIn(MIN_GRID_COLUMNS, MAX_GRID_COLUMNS)
                         ?: section.gridColumns,
-                    autoComplete = autoComplete ?: section.autoComplete
+                    autoComplete = autoComplete ?: section.autoComplete,
+                    createDailyTask = createDailyTask ?: section.createDailyTask,
+                    dailyTaskId = when {
+                        clearDailyTaskId -> null
+                        dailyTaskId != null -> dailyTaskId
+                        else -> section.dailyTaskId
+                    }
                 )
             }
             prefs[CUSTOM_SECTIONS_KEY] = gson.toJson(updated)
@@ -661,7 +693,9 @@ constructor(
         val columnsKey: Preferences.Key<String>,
         val autoKey: Preferences.Key<String>,
         val hiddenKey: Preferences.Key<String>,
-        val customKey: Preferences.Key<String>
+        val customKey: Preferences.Key<String>,
+        val createDailyTaskKey: Preferences.Key<String>,
+        val dailyTaskIdKey: Preferences.Key<String>
     )
 
     private fun keysFor(slot: LeisureSlotId): SlotKeys = when (slot) {
@@ -673,7 +707,9 @@ constructor(
             MUSIC_COLUMNS_KEY,
             MUSIC_AUTO_KEY,
             MUSIC_HIDDEN_KEY,
-            CUSTOM_MUSIC_KEY
+            CUSTOM_MUSIC_KEY,
+            MUSIC_DAILY_TASK_KEY,
+            MUSIC_DAILY_TASK_ID_KEY
         )
         LeisureSlotId.FLEX -> SlotKeys(
             FLEX_ENABLED_KEY,
@@ -683,7 +719,9 @@ constructor(
             FLEX_COLUMNS_KEY,
             FLEX_AUTO_KEY,
             FLEX_HIDDEN_KEY,
-            CUSTOM_FLEX_KEY
+            CUSTOM_FLEX_KEY,
+            FLEX_DAILY_TASK_KEY,
+            FLEX_DAILY_TASK_ID_KEY
         )
         LeisureSlotId.LANGUAGE -> SlotKeys(
             LANGUAGE_ENABLED_KEY,
@@ -693,7 +731,9 @@ constructor(
             LANGUAGE_COLUMNS_KEY,
             LANGUAGE_AUTO_KEY,
             LANGUAGE_HIDDEN_KEY,
-            CUSTOM_LANGUAGE_KEY
+            CUSTOM_LANGUAGE_KEY,
+            LANGUAGE_DAILY_TASK_KEY,
+            LANGUAGE_DAILY_TASK_ID_KEY
         )
     }
 }
