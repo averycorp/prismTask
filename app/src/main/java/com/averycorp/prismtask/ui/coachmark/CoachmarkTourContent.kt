@@ -48,7 +48,6 @@ data class CoachmarkStep(
 object CoachmarkAnchors {
     const val TODAY_OVERLOAD_BANNER = "today_overload_banner"
     const val TODAY_QUICK_ADD = "today_quick_add"
-    const val TODAY_HABIT_CHIPS = "today_habit_chips"
     const val TODAY_AI_TOOLS_CHIP = "today_ai_tools_chip"
     const val NAV_TASKS_TAB = "nav_tasks_tab"
     const val NAV_HABITS_TAB = "nav_habits_tab"
@@ -94,11 +93,6 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
         anchorId = CoachmarkAnchors.TODAY_QUICK_ADD,
         title = "Quick add anything",
         body = "Type or speak a task. \"Buy milk tomorrow at 4pm #shopping\" parses dates, tags, and projects from plain words."
-    ),
-    CoachmarkStep(
-        anchorId = CoachmarkAnchors.TODAY_HABIT_CHIPS,
-        title = "Habit chips",
-        body = "Quick chips for the routines you set up. One tap to mark a habit done — they live here so Today stays Today."
     ),
     CoachmarkStep(
         anchorId = CoachmarkAnchors.TODAY_AI_TOOLS_CHIP,

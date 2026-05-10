@@ -73,29 +73,6 @@ fun TaskListSkeleton(count: Int = 5, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun HabitChipSkeleton(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .width(100.dp)
-            .height(36.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .shimmer()
-    )
-}
-
-@Composable
-fun HabitChipRowSkeleton(count: Int = 4, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        repeat(count) {
-            HabitChipSkeleton()
-        }
-    }
-}
-
-@Composable
 fun ProjectCardSkeleton(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier

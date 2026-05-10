@@ -32,15 +32,15 @@ class DashboardPreferencesTest {
 
     @Test
     fun setSectionOrder_roundTrips() = runTest {
-        val custom = listOf("habits", "overdue", "progress")
+        val custom = listOf("completed", "overdue", "progress")
         prefs.setSectionOrder(custom)
         assertEquals(custom, prefs.getSectionOrder().first())
     }
 
     @Test
-    fun getHiddenSections_defaultsToHabits() = runTest {
+    fun getHiddenSections_defaultsToEmpty() = runTest {
         assertEquals(DashboardPreferences.DEFAULT_HIDDEN, prefs.getHiddenSections().first())
-        assertTrue("habits" in prefs.getHiddenSections().first())
+        assertTrue(prefs.getHiddenSections().first().isEmpty())
     }
 
     @Test
@@ -73,7 +73,7 @@ class DashboardPreferencesTest {
 
     @Test
     fun resetToDefaults_clearsAllOverrides() = runTest {
-        prefs.setSectionOrder(listOf("habits"))
+        prefs.setSectionOrder(listOf("completed"))
         prefs.setHiddenSections(setOf("completed"))
         prefs.setProgressStyle("bar")
         prefs.resetToDefaults()

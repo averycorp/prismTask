@@ -645,17 +645,7 @@ fun PrismTaskNavGraph(
                         PrismTaskRoute.Today.route -> TodayScreen(
                             navController = navController,
                             autoStartVoice = autoStartVoice.value,
-                            onVoiceAutoStartConsumed = { autoStartVoice.value = false },
-                            onNavigateToHabits = {
-                                val habitIndex = bottomNavItems.indexOfFirst {
-                                    it.route == PrismTaskRoute.HabitList.route
-                                }
-                                if (habitIndex >= 0) {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(habitIndex)
-                                    }
-                                }
-                            }
+                            onVoiceAutoStartConsumed = { autoStartVoice.value = false }
                         )
                         PrismTaskRoute.TaskList.route -> TaskListScreen(navController)
                         PrismTaskRoute.HabitList.route -> HabitListScreen(navController, filter = "daily")

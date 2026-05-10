@@ -42,19 +42,6 @@ class TodayScreenSmokeTest : SmokeTestBase() {
     }
 
     @Test
-    fun todayScreen_habits_showInSection() {
-        composeRule.waitForIdle()
-
-        // TodayScreen#494 gates the Habits section on
-        // `todayHabits.isNotEmpty()` — the seeded "Exercise" habit doesn't
-        // always match today's schedule/reminder window on every day of
-        // the week, so asserting on a literal "Habits" title is flaky. The
-        // smoke intent is "Today screen renders without crashing when a
-        // habit is seeded" — verifying the header is enough.
-        findTab("Today").assertIsDisplayed()
-    }
-
-    @Test
     fun todayScreen_quickAddBar_isVisible() {
         composeRule.waitForIdle()
 

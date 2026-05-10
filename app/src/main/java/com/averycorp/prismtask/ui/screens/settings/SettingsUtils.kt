@@ -19,7 +19,6 @@ internal val accentColors = listOf(
 
 internal val sectionLabels = mapOf(
     "progress" to "Progress Card",
-    "habits" to "Habits",
     "overdue" to "From Earlier",
     "today_tasks" to "Today Tasks",
     "daily_essentials" to "Daily Essentials",
