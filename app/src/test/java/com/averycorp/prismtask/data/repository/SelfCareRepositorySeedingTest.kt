@@ -72,8 +72,6 @@ class SelfCareRepositorySeedingTest {
             taskBehaviorPreferences = taskBehaviorPreferences,
             gson = Gson(),
             syncTracker = mockk(relaxed = true),
-            medicationDao = mockk(relaxed = true),
-            medicationDoseDao = mockk(relaxed = true),
             advancedTuningPreferences = advancedTuningPreferences
         )
     }

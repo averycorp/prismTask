@@ -330,11 +330,9 @@ constructor(
                 importSelfCareLogs(ctx, root)
                 importSelfCareSteps(ctx, root)
 
-                // v1.4 medications — imported after self-care so the
-                // dual-write shim's later migration runs see the real
-                // names in place. medication_doses MUST come after
-                // medications because it FK's to medication_id; we use
-                // the export-side id as the join key via medIdRemap.
+                // medication_doses MUST come after medications because
+                // it FK's to medication_id; we use the export-side id
+                // as the join key via medIdRemap.
                 val medIdRemap = importMedications(ctx, root, mode)
                 if (options.restoreDerivedData) {
                     importMedicationDoses(ctx, root, medIdRemap)
