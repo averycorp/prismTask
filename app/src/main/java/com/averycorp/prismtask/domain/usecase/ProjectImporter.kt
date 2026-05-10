@@ -111,9 +111,7 @@ class ProjectImporter @Inject constructor(
             if (taskId > 0) {
                 taskCount++
                 taskIdsByTitle[task.title] = taskId
-            }
-            for (sub in task.subtasks) {
-                insertChecklistTask(sub, projectId, parentTaskId = taskId)
+                taskCount += insertChecklistSubtasks(task.subtasks, projectId, parentTaskId = taskId)
             }
         }
 
@@ -168,8 +166,10 @@ class ProjectImporter @Inject constructor(
         plan.items.forEachIndexed { index, item ->
             if (index in exclusions.excludedTaskIndices) return@forEachIndexed
             val taskId = insertParsedItem(item, projectId, parentTaskId = null)
-            if (taskId > 0) count++
-            for (sub in item.subtasks) insertParsedItem(sub, projectId, parentTaskId = taskId)
+            if (taskId > 0) {
+                count++
+                count += insertParsedSubtasks(item.subtasks, projectId, parentTaskId = taskId)
+            }
         }
         return ImportOutcome.FlatProject(projectName = plan.projectName, taskCount = count)
     }
@@ -182,10 +182,44 @@ class ProjectImporter @Inject constructor(
         plan.items.forEachIndexed { index, item ->
             if (index in exclusions.excludedTaskIndices) return@forEachIndexed
             val taskId = insertParsedItem(item, projectId = null, parentTaskId = null)
-            if (taskId > 0) count++
-            for (sub in item.subtasks) insertParsedItem(sub, projectId = null, parentTaskId = taskId)
+            if (taskId > 0) {
+                count++
+                count += insertParsedSubtasks(item.subtasks, projectId = null, parentTaskId = taskId)
+            }
         }
         return ImportOutcome.FlatOrphans(listName = plan.listName, taskCount = count)
+    }
+
+    private suspend fun insertChecklistSubtasks(
+        subtasks: List<ChecklistParsedTask>,
+        projectId: Long,
+        parentTaskId: Long
+    ): Int {
+        var count = 0
+        for (sub in subtasks) {
+            val subId = insertChecklistTask(sub, projectId, parentTaskId = parentTaskId)
+            if (subId > 0) {
+                count++
+                count += insertChecklistSubtasks(sub.subtasks, projectId, parentTaskId = subId)
+            }
+        }
+        return count
+    }
+
+    private suspend fun insertParsedSubtasks(
+        subtasks: List<ParsedTodoItem>,
+        projectId: Long?,
+        parentTaskId: Long
+    ): Int {
+        var count = 0
+        for (sub in subtasks) {
+            val subId = insertParsedItem(sub, projectId, parentTaskId = parentTaskId)
+            if (subId > 0) {
+                count++
+                count += insertParsedSubtasks(sub.subtasks, projectId, parentTaskId = subId)
+            }
+        }
+        return count
     }
 
     private suspend fun insertChecklistTask(
