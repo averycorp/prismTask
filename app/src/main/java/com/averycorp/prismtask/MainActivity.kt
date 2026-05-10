@@ -53,7 +53,13 @@ import com.averycorp.prismtask.data.remote.SortPreferencesSyncService
 import com.averycorp.prismtask.data.remote.SyncService
 import com.averycorp.prismtask.data.remote.ThemePreferencesSyncService
 import com.averycorp.prismtask.data.remote.sync.BackendSyncService
+import com.averycorp.prismtask.domain.automation.AutomationEvent
+import com.averycorp.prismtask.domain.automation.AutomationEventBus
+import com.averycorp.prismtask.domain.rating.RatingPromptDecision
+import com.averycorp.prismtask.domain.rating.RatingPromptTriggerHelper
 import com.averycorp.prismtask.notifications.NotificationHelper
+import com.averycorp.prismtask.ui.rating.PlayReviewLauncher
+import com.averycorp.prismtask.ui.rating.RatingPromptSheet
 import com.averycorp.prismtask.ui.navigation.PrismTaskNavGraph
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.tasklist.components.DayBounds
@@ -68,6 +74,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -128,6 +135,15 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var coachmarkController: com.averycorp.prismtask.ui.coachmark.CoachmarkController
 
+    @Inject
+    lateinit var ratingPromptTriggerHelper: RatingPromptTriggerHelper
+
+    @Inject
+    lateinit var playReviewLauncher: PlayReviewLauncher
+
+    @Inject
+    lateinit var automationEventBus: AutomationEventBus
+
     companion object {
         /** Intent extra key set by widgets to route deep-links. Wire-id values
          * live on [WidgetLaunchAction] subclasses. */
@@ -136,6 +152,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val launchActionState = mutableStateOf<WidgetLaunchAction?>(null)
+    private val pendingCustomPromptState = mutableStateOf(false)
 
     @OptIn(androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -189,6 +206,43 @@ class MainActivity : ComponentActivity() {
             setCrashlyticsUserId()
         } catch (e: Exception) {
             Log.e("MainActivity", "Crashlytics user ID setup failed", e)
+        }
+        // Rating-prompt counter bookkeeping: stamp first-launch (no-op
+        // after the first cold start) and bump session count.
+        lifecycleScope.launch {
+            try {
+                ratingPromptTriggerHelper.onAppStart()
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Rating prompt onAppStart failed", e)
+            }
+        }
+        // Subscribe to TaskCompleted bus events. On each real completion
+        // (the bus emit guards against no-ops at TaskRepository.kt:412)
+        // the helper updates counters and returns whether to surface a
+        // prompt. Activity-scoped collector means prompts only fire while
+        // the UI is alive — background/widget completions don't trigger.
+        lifecycleScope.launch {
+            automationEventBus.events
+                .filterIsInstance<AutomationEvent.TaskCompleted>()
+                .collect {
+                    try {
+                        when (ratingPromptTriggerHelper.onTaskCompleted()) {
+                            RatingPromptDecision.PlayReview -> {
+                                val launched = playReviewLauncher.launch(this@MainActivity)
+                                if (launched) {
+                                    ratingPromptTriggerHelper.recordPlayReviewShown()
+                                }
+                            }
+                            RatingPromptDecision.CustomPrompt -> {
+                                pendingCustomPromptState.value = true
+                                ratingPromptTriggerHelper.recordCustomPromptShown()
+                            }
+                            RatingPromptDecision.None -> Unit
+                        }
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "Rating prompt evaluation failed", e)
+                    }
+                }
         }
         launchActionState.value = parseLaunchAction(intent)
         // v1.4.0 V9: support Android share-intent entry into the Paste
@@ -636,6 +690,19 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
                                         .padding(end = 16.dp, bottom = 140.dp)
+                                )
+                            }
+
+                            // Custom in-app rating prompt (E2). Shown when
+                            // RatingPromptTriggerHelper.onTaskCompleted
+                            // returned CustomPrompt (gates: post-onboarding,
+                            // sessionCount > 3, no-recent-crash, N/M/cooldown
+                            // satisfied). Posts to /api/v1/feedback/in-app on
+                            // submit; auto-dismisses on success.
+                            val showCustomPrompt by pendingCustomPromptState
+                            if (showCustomPrompt) {
+                                RatingPromptSheet(
+                                    onDismiss = { pendingCustomPromptState.value = false }
                                 )
                             }
                         }
