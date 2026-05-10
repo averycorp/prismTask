@@ -80,8 +80,18 @@ import com.averycorp.prismtask.ui.theme.prismGlow
 @Composable
 fun TimerScreen(
     navController: NavController,
+    suggestedDurationMinutes: Int? = null,
     viewModel: TimerViewModel = hiltViewModel()
 ) {
+    // D13 B.4: chat-driven deep link can pre-load an AI-suggested duration.
+    // Applied once per nav-entry; the override is in-flight only and never
+    // writes through to TimerPreferences so the user's persisted custom
+    // duration stays intact.
+    androidx.compose.runtime.LaunchedEffect(suggestedDurationMinutes) {
+        if (suggestedDurationMinutes != null) {
+            viewModel.applySuggestedDurationMinutes(suggestedDurationMinutes)
+        }
+    }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = LocalPrismColors.current
     val prismTheme = LocalPrismTheme.current

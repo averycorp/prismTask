@@ -247,4 +247,14 @@ interface PrismTaskApi {
      */
     @GET("api/v1/analytics/habit-correlations")
     suspend fun getHabitCorrelations(): HabitCorrelationsResponse
+
+    /**
+     * In-app rating prompt write path (E2). User-scoped; auth enforced
+     * server-side. Free-text is treated as PII — Postgres-only, never
+     * logged through Crashlytics or analytics.
+     */
+    @POST("api/v1/feedback/in-app")
+    suspend fun submitInAppFeedback(
+        @Body body: InAppFeedbackRequest
+    ): InAppFeedbackResponse
 }

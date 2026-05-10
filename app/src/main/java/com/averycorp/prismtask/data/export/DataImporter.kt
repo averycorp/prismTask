@@ -182,6 +182,14 @@ constructor(
     private val schoolworkDao: SchoolworkDao,
     private val medicationDao: com.averycorp.prismtask.data.local.dao.MedicationDao,
     private val medicationDoseDao: com.averycorp.prismtask.data.local.dao.MedicationDoseDao,
+    /**
+     * D8 Item 8 — on-restore backfill of `medication_tier_states`. Mirrors
+     * `MIGRATION_59_60` semantics so a v3 backup restored on a fresh
+     * device sees the normalized table populated immediately rather than
+     * waiting for the next live `setTierForTime` call.
+     */
+    private val medicationSlotDao: com.averycorp.prismtask.data.local.dao.MedicationSlotDao,
+    private val medicationTierStateDao: com.averycorp.prismtask.data.local.dao.MedicationTierStateDao,
     private val transactionRunner: com.averycorp.prismtask.data.local.database.DatabaseTransactionRunner,
     private val themePreferences: ThemePreferences,
     private val archivePreferences: ArchivePreferences,
@@ -233,6 +241,10 @@ constructor(
         var orphansSkipped = 0
         var schemaVersion = 0
         var derivedDataSkipped = false
+        // D8 Item 8 — count of `medication_tier_states` rows
+        // inserted/updated by the post-restore backfill. Surfaced via
+        // logging only; not part of the public ImportResult contract.
+        var medicationTierStatesBackfilled = 0
 
         fun toResult() = ImportResult(
             tasksImported = tasksImported,
@@ -330,11 +342,9 @@ constructor(
                 importSelfCareLogs(ctx, root)
                 importSelfCareSteps(ctx, root)
 
-                // v1.4 medications — imported after self-care so the
-                // dual-write shim's later migration runs see the real
-                // names in place. medication_doses MUST come after
-                // medications because it FK's to medication_id; we use
-                // the export-side id as the join key via medIdRemap.
+                // medication_doses MUST come after medications because
+                // it FK's to medication_id; we use the export-side id
+                // as the join key via medIdRemap.
                 val medIdRemap = importMedications(ctx, root, mode)
                 if (options.restoreDerivedData) {
                     importMedicationDoses(ctx, root, medIdRemap)
@@ -674,6 +684,7 @@ constructor(
             .getAllLogsOnce()
             .map { it.routineType to it.date }
             .toMutableSet()
+        var importedAnyMedicationLog = false
         root.getAsJsonArray("selfCareLogs")?.forEach { elem ->
             try {
                 val obj = elem.asJsonObject
@@ -690,10 +701,92 @@ constructor(
                 selfCareDao.insertLog(merged.copy(id = 0))
                 existingSelfCareLogKeys.add(key)
                 ctx.selfCareLogsImported++
+                if (routineType == "medication" && merged.tiersByTime.isNotBlank() &&
+                    merged.tiersByTime != "{}"
+                ) {
+                    importedAnyMedicationLog = true
+                }
             } catch (e: Exception) {
                 ctx.errors.add("Failed to import self-care log: ${e.message}")
             }
         }
+        if (importedAnyMedicationLog) {
+            runCatching { backfillMedicationTierStatesAfterRestore(ctx) }
+                .onFailure {
+                    ctx.errors.add(
+                        "Failed to backfill medication_tier_states after restore: ${it.message}"
+                    )
+                }
+        }
+    }
+
+    /**
+     * D8 Item 8 — after a v3 backup restore that re-introduces legacy
+     * `tiers_by_time` JSON content, populate `medication_tier_states` so
+     * forward consumers (Firestore sync, future readers) see the
+     * normalized state without waiting for the user to touch the
+     * medication card. Mirrors `MIGRATION_59_60` semantics: DEFAULT slot
+     * only, max-tier across timeOfDay entries, `tier_source = "computed"`.
+     *
+     * Idempotent — if a row already exists for `(med, default_slot, date)`
+     * its tier is updated only when different. Restores executed before
+     * any medications exist (or before the DEFAULT slot is seeded) skip
+     * silently; the next `setTierForTime` call will dual-write the row.
+     */
+    private suspend fun backfillMedicationTierStatesAfterRestore(ctx: ImportContext) {
+        val defaultSlot = medicationSlotDao.getByNameOnce("Default") ?: return
+        val activeMeds = medicationDao.getActiveOnce()
+        if (activeMeds.isEmpty()) return
+        val medicationLogs = selfCareDao.getAllLogsOnce()
+            .filter { it.routineType == "medication" }
+        val tierOrder = listOf("essential", "prescription", "complete")
+        val now = System.currentTimeMillis()
+        for (log in medicationLogs) {
+            val raw = log.tiersByTime
+            if (raw.isBlank() || raw == "{}") continue
+            val parsedTiers = parseTiersByTimeRaw(raw)
+            val maxTier = parsedTiers.values
+                .filter { it in tierOrder }
+                .maxByOrNull { tierOrder.indexOf(it) }
+                ?: continue
+            val date = epochMillisToLocalDateString(log.date)
+            for (med in activeMeds) {
+                val existing = medicationTierStateDao.getForTripleOnce(med.id, date, defaultSlot.id)
+                if (existing == null) {
+                    medicationTierStateDao.insert(
+                        com.averycorp.prismtask.data.local.entity.MedicationTierStateEntity(
+                            medicationId = med.id,
+                            slotId = defaultSlot.id,
+                            logDate = date,
+                            tier = maxTier,
+                            tierSource = "computed",
+                            createdAt = now,
+                            updatedAt = now
+                        )
+                    )
+                    ctx.medicationTierStatesBackfilled++
+                } else if (existing.tier != maxTier) {
+                    medicationTierStateDao.update(
+                        existing.copy(tier = maxTier, updatedAt = now)
+                    )
+                    ctx.medicationTierStatesBackfilled++
+                }
+            }
+        }
+    }
+
+    private fun parseTiersByTimeRaw(json: String): Map<String, String> = try {
+        val obj = com.google.gson.JsonParser.parseString(json).asJsonObject
+        obj.entrySet().associate { (k, v) ->
+            k to (v?.takeIf { !it.isJsonNull }?.asString ?: "")
+        }.filterValues { it.isNotBlank() }
+    } catch (_: Exception) {
+        emptyMap()
+    }
+
+    private fun epochMillisToLocalDateString(epochMs: Long): String {
+        val instant = java.time.Instant.ofEpochMilli(epochMs)
+        return java.time.LocalDate.ofInstant(instant, java.time.ZoneId.systemDefault()).toString()
     }
 
     private suspend fun importSelfCareSteps(ctx: ImportContext, root: JsonObject) {

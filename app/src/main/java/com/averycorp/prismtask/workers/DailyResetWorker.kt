@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.domain.usecase.HabitDailyTaskGenerator
 import com.averycorp.prismtask.notifications.ProductiveStreakNotifier
 import com.averycorp.prismtask.util.DayBoundary
 import com.averycorp.prismtask.widget.WidgetUpdateManager
@@ -42,7 +43,8 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val widgetUpdateManager: WidgetUpdateManager,
     private val productiveStreakResolver: ProductiveStreakResolver,
-    private val productiveStreakNotifier: ProductiveStreakNotifier
+    private val productiveStreakNotifier: ProductiveStreakNotifier,
+    private val habitDailyTaskGenerator: HabitDailyTaskGenerator
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         // Refresh widgets so the new day's tasks/habits are visible immediately.
@@ -52,6 +54,14 @@ constructor(
             } catch (_: Throwable) {
                 // Best-effort: don't fail the worker if widget update throws.
             }
+        }
+
+        // Spawn a Today task per habit with "Create daily to-do" enabled
+        // that's scheduled for the new day. Idempotent — re-runs are safe.
+        try {
+            habitDailyTaskGenerator.ensureTasksForToday()
+        } catch (_: Throwable) {
+            // Best-effort: never fail the day-boundary worker on generator failure.
         }
 
         // Roll the productive-day streak forward for the day that just ended.

@@ -48,10 +48,8 @@ import com.averycorp.prismtask.data.remote.sync.PrismSyncLogger
 import com.averycorp.prismtask.data.remote.sync.ReactiveSyncDriver
 import com.averycorp.prismtask.data.remote.sync.SyncStateRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
-import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,7 +61,8 @@ import javax.inject.Singleton
 
 // See docs/audits/SYNCSERVICE_GOD_CLASS_REFACTOR_AUDIT.md for the surface-axis
 // refactor plan (operator-confirmed May 4, 2026; Phase 1 + Slice 0 shipped via
-// PRs #1118 + #1122; Phase 2 implementation pending).
+// PRs #1118 + #1122; Phase 2 sub-PR 7a — Firestore constructor injection —
+// shipped via this PR).
 // TODO(sync-refactor): split SyncService — separate push, pull, listener,
 // and initial-upload surfaces. Each PR that touches this file widens the
 // file further; the next refactor should land before the next feature.
@@ -123,9 +122,30 @@ constructor(
     private val projectPhaseDao: ProjectPhaseDao,
     private val projectRiskDao: ProjectRiskDao,
     private val taskDependencyDao: TaskDependencyDao,
-    private val externalAnchorDao: ExternalAnchorDao
+    private val externalAnchorDao: ExternalAnchorDao,
+    private val firestore: FirebaseFirestore,
+    /**
+     * D8 Item 7 Strangler Fig 7c — realtime listener surface.
+     */
+    private val listenerManager: SyncListenerManager,
+    /**
+     * D8 Item 7 Strangler Fig 7b — push surface (orchestrator slice).
+     * Owns the sort / iterate / log / retry loop. The 36-branch
+     * pushCreate / pushUpdate / pushDelete dispatch remains on
+     * SyncService for now; the orchestrator routes through a single
+     * dispatch lambda passed in from [pushLocalChanges].
+     */
+    private val pushOrchestrator: SyncPushOrchestrator,
+    /**
+     * D8 Item 7 Strangler Fig 7d — initial-upload surface (orchestrator
+     * slice). Owns the one-shot guard, isSyncing lifecycle, completion
+     * telemetry, and post-release pull. `doInitialUpload` body remains
+     * on SyncService and is passed in as a lambda.
+     */
+    private val initialUploadOrchestrator: SyncInitialUploadOrchestrator
 ) {
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
+    private val firestore: FirebaseFirestore
+) {
     private val listeners = mutableListOf<ListenerRegistration>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -136,74 +156,25 @@ constructor(
 
     suspend fun initialUpload() {
         if (authManager.userId == null) return
-
-        // Fix A — one-shot guard. Every sign-in used to re-run the entire
-        // upload loop and mint brand-new Firestore docs for every local row,
-        // fueling the duplication spiral. The flag is only set on successful
-        // completion so a mid-run failure stays retryable on the next sign-in.
-        if (builtInSyncPreferences.isInitialUploadDone()) {
-            logger.info(operation = "initialUpload.skipped", detail = "reason=already_done")
-            return
-        }
-
-        // Fix B — hold [isSyncing] for the duration of the upload loop so
-        // listener-triggered pulls defer (they already check this flag at
-        // line ~1300). Mirrors the pattern used by [fullSync]. AuthViewModel
-        // serializes fullSync → initialUpload so there is normally no
-        // contention here, but the guard is kept as a defense-in-depth.
-        if (isSyncing) {
-            logger.info(
-                operation = "initialUpload.deferred",
-                detail = "reason=another_sync_running"
-            )
-            return
-        }
-        isSyncing = true
-        logger.info(operation = "initialUpload.started")
-        val uploadStart = System.currentTimeMillis()
-        var success = false
-        try {
-            doInitialUpload()
-            builtInSyncPreferences.setInitialUploadDone(true)
-            success = true
-            logger.info(
-                operation = "initialUpload.completed",
-                status = "success",
-                durationMs = System.currentTimeMillis() - uploadStart
-            )
-        } catch (e: Throwable) {
-            logger.error(
-                operation = "initialUpload.failed",
-                durationMs = System.currentTimeMillis() - uploadStart,
-                throwable = e
-            )
-            throw e
-        } finally {
-            isSyncing = false
-        }
-
-        // Fix B mitigation — while [isSyncing] was held above, any
-        // listener-triggered pull callback short-circuited at
-        // `if (isSyncing) return@launch` (line ~1298). Those callbacks are
-        // fire-and-forget; once dropped, they don't re-run by themselves.
-        // Run exactly one pullRemoteChanges() after release so any cloud
-        // state that changed during the upload window still lands locally.
-        // Realtime listeners keep firing normally for everything after this.
-        if (success) {
-            try {
+        // D8 Item 7 7d — orchestration extracted to
+        // [SyncInitialUploadOrchestrator]. The dispatch (`doInitialUpload`)
+        // and the post-release pull (`pullRemoteChanges`) remain on
+        // SyncService and are passed in as lambdas; once those surfaces
+        // extract in follow-on PRs the lambdas become direct method
+        // references with no signature change.
+        initialUploadOrchestrator.runIfNeeded(
+            isSyncing = { isSyncing },
+            setSyncing = { isSyncing = it },
+            doUpload = { doInitialUpload() },
+            postReleasePull = {
                 val pullSummary = pullRemoteChanges()
                 logger.debug(
                     operation = "initialUpload.post_release_pull",
                     status = "success",
                     detail = "applied=${pullSummary.applied} permanently_failed=${pullSummary.skippedPermanent}"
                 )
-            } catch (e: Throwable) {
-                logger.error(
-                    operation = "initialUpload.post_release_pull",
-                    throwable = e
-                )
             }
-        }
+        )
     }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
@@ -1216,60 +1187,19 @@ constructor(
      * Returns the number of pending operations processed (success + failure).
      * Callers use this to populate the "pushed=N" detail in sync completion
      * logs so we can see partial-push ratios at a glance.
+     *
+     * D8 Item 7 7b — sort / iterate / log / retry orchestration lives in
+     * [SyncPushOrchestrator]; the per-entity create/update/delete
+     * dispatch remains on SyncService until its own follow-on PR.
      */
-    suspend fun pushLocalChanges(): Int {
-        val pending = syncMetadataDao.getPendingActions()
-        // Process in order: projects → tags → everything else → task_completions
-        // task_completions must go last because they reference task cloud IDs.
-        val ordered = pending.sortedBy { pushOrderPriorityOf(it.entityType) }
-
-        var successCount = 0
-        var failureCount = 0
-        for (meta in ordered) {
-            val start = System.currentTimeMillis()
-            try {
-                when (meta.pendingAction) {
-                    "create" -> pushCreate(meta)
-                    "update" -> pushUpdate(meta)
-                    "delete" -> pushDelete(meta)
-                }
-                syncMetadataDao.clearPendingAction(meta.localId, meta.entityType)
-                successCount++
-                logger.debug(
-                    operation = "push.${meta.pendingAction}",
-                    entity = meta.entityType,
-                    id = meta.localId.toString(),
-                    status = "success",
-                    durationMs = System.currentTimeMillis() - start
-                )
-            } catch (e: Exception) {
-                failureCount++
-                logger.error(
-                    operation = "push.${meta.pendingAction ?: "unknown"}",
-                    entity = meta.entityType,
-                    id = meta.localId.toString(),
-                    durationMs = System.currentTimeMillis() - start,
-                    detail = "retry=${meta.retryCount}",
-                    throwable = e
-                )
-                try {
-                    com.google.firebase.crashlytics.FirebaseCrashlytics
-                        .getInstance()
-                        .recordException(e)
-                } catch (_: Exception) {
-                }
-                syncMetadataDao.incrementRetry(meta.localId, meta.entityType)
+    suspend fun pushLocalChanges(): Int =
+        pushOrchestrator.pushAllPending { meta ->
+            when (meta.pendingAction) {
+                "create" -> pushCreate(meta)
+                "update" -> pushUpdate(meta)
+                "delete" -> pushDelete(meta)
             }
         }
-        if (ordered.isNotEmpty()) {
-            logger.info(
-                operation = "push.summary",
-                status = if (failureCount == 0) "success" else "partial",
-                detail = "success=$successCount failed=$failureCount"
-            )
-        }
-        return successCount + failureCount
-    }
 
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
     // Dispatch across every synced entityType — splitting the `when` is not
@@ -3592,73 +3522,16 @@ constructor(
     }
 
     fun startRealtimeListeners() {
-        stopRealtimeListeners()
-        listOf(
-            "tasks", "projects", "tags", "habits", "habit_completions",
-            "habit_logs", "task_completions", "task_timings", "milestones",
-            "project_phases", "project_risks", "external_anchors", "task_dependencies", "task_templates",
-            "courses", "course_completions", "leisure_logs", "self_care_steps", "self_care_logs",
-            "medications", "medication_doses",
-            "medication_slots", "medication_slot_overrides", "medication_tier_states",
-            "notification_profiles", "custom_sounds", "saved_filters", "nlp_shortcuts",
-            "habit_templates", "project_templates", "boundary_rules",
-            "automation_rules",
-            "check_in_logs", "mood_energy_logs", "focus_release_logs",
-            "medication_refills", "weekly_reviews", "daily_essential_slot_completions",
-            "assignments", "attachments", "study_logs"
-        ).forEach { collection ->
-            val reg = userCollection(collection)?.addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    logger.warn(
-                        operation = "listener.error",
-                        entity = "collection",
-                        id = collection,
-                        throwable = error
-                    )
-                    return@addSnapshotListener
-                }
-                if (snapshot == null) return@addSnapshotListener
-                if (snapshot.metadata.hasPendingWrites()) return@addSnapshotListener
-                if (snapshot.documentChanges.isEmpty()) return@addSnapshotListener
-                syncStateRepository.recordListenerSnapshot(collection, snapshot.documentChanges.size)
-                val removedCloudIds = snapshot.documentChanges
-                    .filter { it.type == DocumentChange.Type.REMOVED }
-                    .map { it.document.id }
-                scope.launch {
-                    if (isSyncing) return@launch
-                    val start = System.currentTimeMillis()
-                    syncStateRepository.markSyncStarted(source = SOURCE_FIREBASE, trigger = "listener:$collection")
-                    try {
-                        if (removedCloudIds.isNotEmpty()) {
-                            processRemoteDeletions(collection, removedCloudIds)
-                        }
-                        val pullSummary = pullRemoteChanges()
-                        syncStateRepository.markSyncCompleted(
-                            source = SOURCE_FIREBASE,
-                            success = true,
-                            durationMs = System.currentTimeMillis() - start,
-                            pulled = pullSummary.applied,
-                            permanentlyFailed = pullSummary.skippedPermanent
-                        )
-                    } catch (e: Exception) {
-                        syncStateRepository.markSyncCompleted(
-                            source = SOURCE_FIREBASE,
-                            success = false,
-                            durationMs = System.currentTimeMillis() - start,
-                            throwable = e
-                        )
-                        try {
-                            com.google.firebase.crashlytics.FirebaseCrashlytics
-                                .getInstance()
-                                .recordException(e)
-                        } catch (_: Exception) {
-                        }
-                    }
-                }
-            }
-            if (reg != null) listeners.add(reg)
-        }
-        syncStateRepository.markListenersActive(listeners.isNotEmpty())
+        // D8 Item 7 7c — listener surface extracted to SyncListenerManager.
+        // The orchestrator passes the still-inlined pull + remote-delete
+        // surfaces as lambdas; once those land in their own classes
+        // (sub-PRs 7b + 7d) the lambdas become direct method references.
+        listenerManager.start(
+            scope = scope,
+            isSyncing = { isSyncing },
+            onRemoteDeletes = ::processRemoteDeletions,
+            pull = ::pullRemoteChanges
+        )
     }
 
     private suspend fun processRemoteDeletions(collection: String, cloudIds: List<String>) {
@@ -3737,9 +3610,7 @@ constructor(
     }
 
     fun stopRealtimeListeners() {
-        listeners.forEach { it.remove() }
-        listeners.clear()
-        syncStateRepository.markListenersActive(false)
+        listenerManager.stop()
     }
 
     companion object {
@@ -3751,109 +3622,21 @@ constructor(
         // missed because no collector was active).
         private const val PERIODIC_SYNC_INTERVAL_MS: Long = 30_000L
 
-        // Pure dispatch tables — hoisted for unit-testability ahead of the
-        // surface-axis refactor. Behaviour identical to the inline `when`
-        // blocks they replaced; see SYNCSERVICE_SLICE_0_TEST_SHORING_AUDIT.md.
+        // D8 Item 7 Strangler Fig 7e — pure dispatch tables now live in
+        // [SyncDispatchTables]; these companion-object members delegate so
+        // existing call-sites + [SyncServiceDispatchTest] keep working
+        // unchanged. Behaviour-identical pass-throughs.
 
         @VisibleForTesting
-        internal fun collectionNameFor(entityType: String): String = when (entityType) {
-            "habit_completion" -> "habit_completions"
-            "habit_log" -> "habit_logs"
-            "task_completion" -> "task_completions"
-            "task_timing" -> "task_timings"
-            "task_template" -> "task_templates"
-            "course_completion" -> "course_completions"
-            "leisure_log" -> "leisure_logs"
-            "self_care_step" -> "self_care_steps"
-            "self_care_log" -> "self_care_logs"
-            "medication" -> "medications"
-            "medication_dose" -> "medication_doses"
-            "medication_slot" -> "medication_slots"
-            "medication_slot_override" -> "medication_slot_overrides"
-            "medication_tier_state" -> "medication_tier_states"
-            "notification_profile" -> "notification_profiles"
-            "custom_sound" -> "custom_sounds"
-            "saved_filter" -> "saved_filters"
-            "nlp_shortcut" -> "nlp_shortcuts"
-            "habit_template" -> "habit_templates"
-            "project_template" -> "project_templates"
-            "project_phase" -> "project_phases"
-            "project_risk" -> "project_risks"
-            "external_anchor" -> "external_anchors"
-            "task_dependency" -> "task_dependencies"
-            "boundary_rule" -> "boundary_rules"
-            "automation_rule" -> "automation_rules"
-            "check_in_log" -> "check_in_logs"
-            "mood_energy_log" -> "mood_energy_logs"
-            "focus_release_log" -> "focus_release_logs"
-            "medication_refill" -> "medication_refills"
-            "weekly_review" -> "weekly_reviews"
-            "daily_essential_slot_completion" -> "daily_essential_slot_completions"
-            "assignment" -> "assignments"
-            "attachment" -> "attachments"
-            "study_log" -> "study_logs"
-            else -> entityType + "s"
-        }
+        internal fun collectionNameFor(entityType: String): String =
+            SyncDispatchTables.collectionNameFor(entityType)
 
-        // Inverse of collectionNameFor for delete-listener routing. Triplicated
-        // historically (forward table + inline inverse + Migration_51_52
-        // syncableTables); the SyncServiceDispatchTest pins the bidirectional
-        // round-trip to surface drift before refactor or feature-add.
         @VisibleForTesting
-        internal fun entityTypeForCollectionName(collection: String): String? = when (collection) {
-            "tasks" -> "task"
-            "projects" -> "project"
-            "tags" -> "tag"
-            "habits" -> "habit"
-            "habit_completions" -> "habit_completion"
-            "habit_logs" -> "habit_log"
-            "task_completions" -> "task_completion"
-            "task_timings" -> "task_timing"
-            "milestones" -> "milestone"
-            "project_phases" -> "project_phase"
-            "project_risks" -> "project_risk"
-            "external_anchors" -> "external_anchor"
-            "task_dependencies" -> "task_dependency"
-            "task_templates" -> "task_template"
-            "courses" -> "course"
-            "course_completions" -> "course_completion"
-            "leisure_logs" -> "leisure_log"
-            "self_care_steps" -> "self_care_step"
-            "self_care_logs" -> "self_care_log"
-            "medications" -> "medication"
-            "medication_doses" -> "medication_dose"
-            "medication_slots" -> "medication_slot"
-            "medication_slot_overrides" -> "medication_slot_override"
-            "medication_tier_states" -> "medication_tier_state"
-            "notification_profiles" -> "notification_profile"
-            "custom_sounds" -> "custom_sound"
-            "saved_filters" -> "saved_filter"
-            "nlp_shortcuts" -> "nlp_shortcut"
-            "habit_templates" -> "habit_template"
-            "project_templates" -> "project_template"
-            "boundary_rules" -> "boundary_rule"
-            "automation_rules" -> "automation_rule"
-            "check_in_logs" -> "check_in_log"
-            "mood_energy_logs" -> "mood_energy_log"
-            "focus_release_logs" -> "focus_release_log"
-            "medication_refills" -> "medication_refill"
-            "weekly_reviews" -> "weekly_review"
-            "daily_essential_slot_completions" -> "daily_essential_slot_completion"
-            "assignments" -> "assignment"
-            "attachments" -> "attachment"
-            "study_logs" -> "study_log"
-            else -> null
-        }
+        internal fun entityTypeForCollectionName(collection: String): String? =
+            SyncDispatchTables.entityTypeForCollectionName(collection)
 
-        // Push-order priority — projects first (parent FK), then tags, then
-        // everything else, with task_completions last because they reference
-        // task cloud ids that must already exist.
         @VisibleForTesting
-        internal fun pushOrderPriorityOf(entityType: String): Int = when (entityType) {
-            "project" -> 0
-            "tag" -> 1
-            "task_completion" -> 3
-            else -> 2
-        }
+        internal fun pushOrderPriorityOf(entityType: String): Int =
+            SyncDispatchTables.pushOrderPriorityOf(entityType)
     }
 }

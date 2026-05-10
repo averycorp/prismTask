@@ -212,6 +212,104 @@ class ProjectImporterTest {
         assertEquals(ImportOutcome.Unparseable, outcome)
     }
 
+    @Test
+    fun `materialise FlatProject preserves description and nested subtasks`() = runBlocking {
+        coEvery { projectRepository.addProject(name = any()) } returns 42L
+        val inserted = mutableListOf<TaskEntity>()
+        var nextId = 100L
+        coEvery { taskRepository.insertTask(any()) } answers {
+            inserted += firstArg<TaskEntity>()
+            nextId++
+        }
+
+        val plan = ImportPlan.FlatProject(
+            projectName = "X",
+            items = listOf(
+                ParsedTodoItem(
+                    title = "parent",
+                    description = "parent details",
+                    subtasks = listOf(
+                        ParsedTodoItem(
+                            title = "child",
+                            description = "child details",
+                            subtasks = listOf(
+                                ParsedTodoItem(title = "grandchild", description = "deep details")
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        val outcome = importer.materialise(plan) as ImportOutcome.FlatProject
+
+        assertEquals(3, outcome.taskCount)
+        assertEquals(3, inserted.size)
+        assertEquals("parent details", inserted[0].description)
+        assertEquals("child details", inserted[1].description)
+        assertEquals("deep details", inserted[2].description)
+        // Parent → child → grandchild parent links
+        assertEquals(null, inserted[0].parentTaskId)
+        assertEquals(100L, inserted[1].parentTaskId)
+        assertEquals(101L, inserted[2].parentTaskId)
+    }
+
+    @Test
+    fun `materialise Rich preserves description and nested subtasks`() = runBlocking {
+        coEvery {
+            projectRepository.addProject(name = any(), color = any(), icon = any())
+        } returns 42L
+        val inserted = mutableListOf<TaskEntity>()
+        var nextId = 200L
+        coEvery { taskRepository.insertTask(any()) } answers {
+            inserted += firstArg<TaskEntity>()
+            nextId++
+        }
+
+        val grandchild = ChecklistParsedTask(
+            title = "grandchild",
+            description = "g-desc",
+            dueDate = null,
+            priority = 0,
+            completed = false,
+            tags = emptyList(),
+            subtasks = emptyList(),
+            estimatedMinutes = null
+        )
+        val child = ChecklistParsedTask(
+            title = "child",
+            description = "c-desc",
+            dueDate = null,
+            priority = 0,
+            completed = false,
+            tags = emptyList(),
+            subtasks = listOf(grandchild),
+            estimatedMinutes = null
+        )
+        val parent = ChecklistParsedTask(
+            title = "parent",
+            description = "p-desc",
+            dueDate = null,
+            priority = 0,
+            completed = false,
+            tags = emptyList(),
+            subtasks = listOf(child),
+            estimatedMinutes = null
+        )
+
+        val outcome = importer.materialise(
+            ImportPlan.Rich(richResult(tasks = listOf(parent)))
+        ) as ImportOutcome.Rich
+
+        assertEquals(3, outcome.taskCount)
+        assertEquals("p-desc", inserted[0].description)
+        assertEquals("c-desc", inserted[1].description)
+        assertEquals("g-desc", inserted[2].description)
+        assertEquals(null, inserted[0].parentTaskId)
+        assertEquals(200L, inserted[1].parentTaskId)
+        assertEquals(201L, inserted[2].parentTaskId)
+    }
+
     // ---- helpers ----
 
     private fun richResult(

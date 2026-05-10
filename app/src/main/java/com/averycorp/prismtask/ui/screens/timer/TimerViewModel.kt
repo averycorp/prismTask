@@ -513,6 +513,29 @@ constructor(
         }
     }
 
+    /**
+     * D13 B.4: apply an AI-suggested duration as a one-shot override on the
+     * current session WITHOUT writing through to [TimerPreferences]. Switches
+     * to [TimerMode.CUSTOM] so the suggestion is visually attributed and
+     * resets the running state. The user's persisted custom duration is
+     * untouched, so closing/reopening the screen restores their setting.
+     *
+     * No-ops if a session is already running — interrupting an in-flight
+     * session would surprise the user.
+     */
+    fun applySuggestedDurationMinutes(minutes: Int) {
+        if (minutes !in 1..480) return
+        if (_uiState.value.isRunning) return
+        val totalSeconds = minutes * 60
+        _uiState.value = _uiState.value.copy(
+            mode = TimerMode.CUSTOM,
+            remainingSeconds = totalSeconds,
+            totalSeconds = totalSeconds,
+            isRunning = false,
+            isLongBreak = false
+        )
+    }
+
     private fun sessionTypeFor(state: TimerUiState): String = when {
         state.mode == TimerMode.BREAK && state.isLongBreak ->
             PomodoroTimerService.SESSION_TYPE_LONG_BREAK

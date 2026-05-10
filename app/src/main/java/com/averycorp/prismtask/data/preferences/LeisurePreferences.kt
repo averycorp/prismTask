@@ -345,11 +345,10 @@ constructor(
     }
 
     private fun parseCustomSections(raw: String): List<CustomLeisureSection?> = try {
-        val parsed = gson.fromJson<List<CustomLeisureSection>>(
-            raw,
-            sectionListType
-        ) as List<CustomLeisureSection?>?
-        parsed.orEmpty()
+        (
+            gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
+                as List<CustomLeisureSection?>?
+            ).orEmpty()
     } catch (exception: JsonParseException) {
         reportMitigation(
             mitigationId = "M1_gson_parse_fail",
@@ -590,10 +589,14 @@ constructor(
         customKeys: Map<String, String> = emptyMap()
     ) {
         Log.e(LOG_TAG, message, exception)
-        FirebaseCrashlytics.getInstance().apply {
-            setCustomKey("mitigation_id", mitigationId)
-            customKeys.forEach { (key, value) -> setCustomKey(key, value) }
-            recordException(exception)
+        // Defensive: Crashlytics requires FirebaseApp.initializeApp(); in
+        // Robolectric unit tests it isn't, and getInstance() throws.
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("mitigation_id", mitigationId)
+                customKeys.forEach { (key, value) -> setCustomKey(key, value) }
+                recordException(exception)
+            }
         }
     }
 

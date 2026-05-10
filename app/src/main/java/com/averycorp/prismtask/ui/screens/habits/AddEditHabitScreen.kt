@@ -549,6 +549,28 @@ fun AddEditHabitScreen(
                 )
             }
 
+            // Create daily to-do
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Create Daily To-Do",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Add this habit as a task on Today on each scheduled day. Completing either marks both done.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = viewModel.createDailyTask,
+                    onCheckedChange = viewModel::onCreateDailyTaskChange
+                )
+            }
+
             // Enable logging
             Row(
                 verticalAlignment = Alignment.CenterVertically,

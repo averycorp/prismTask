@@ -20,6 +20,12 @@ import {
   matchMedicationsInCommand,
   type MatchResult,
 } from '@/features/batch/medicationNameMatcher';
+import {
+  getBatchHistoryForUser,
+  migrateFromLocalStorageIfNeeded,
+  putBatchHistoryRecord,
+  replaceBatchHistoryForUser,
+} from '@/lib/idb/batchHistoryStore';
 
 /** Audit failure mode #2 firewall: MEDICATION mutations from Haiku get
  *  auto-stripped below this confidence floor unless the deterministic
@@ -38,29 +44,17 @@ const UNDO_WINDOW_MS = 24 * 60 * 60 * 1000;
  *  framing on Android's BatchHistoryScreen. */
 const MAX_HISTORY_ENTRIES = 25;
 
-function storageKey(uid: string): string {
-  return `prismtask_batch_history_${uid}`;
-}
-
-function loadHistory(uid: string): BatchHistoryRecord[] {
-  try {
-    const raw = localStorage.getItem(storageKey(uid));
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as BatchHistoryRecord[];
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(uid: string, records: BatchHistoryRecord[]): void {
-  try {
-    localStorage.setItem(storageKey(uid), JSON.stringify(records));
-  } catch {
-    // Quota / private-mode — non-fatal.
-  }
-}
+/**
+ * D8 Item 3 — batch history persistence migrated from localStorage to
+ * IndexedDB. The store wrapper is the IDB framework's first consumer (see
+ * `web/src/lib/idb/`). Read/write are async; the store keeps its
+ * synchronous in-memory `history` field as the read source for components
+ * and writes to IDB on commit / undo / purge.
+ *
+ * On first hydrate per uid, any legacy localStorage payload is migrated
+ * into IDB and the legacy key removed; subsequent hydrates read straight
+ * from IDB.
+ */
 
 function randomBatchId(): string {
   // crypto.randomUUID isn't universally available; fall back to a
@@ -280,7 +274,7 @@ interface BatchStoreState {
   resolveAmbiguity: (hintIndex: number, pickedEntityId: string) => void;
   clearPending: () => void;
 
-  hydrate: (uid: string) => void;
+  hydrate: (uid: string) => Promise<void>;
   commit: (
     commandText: string,
     mutations: ProposedMutation[],
@@ -423,12 +417,19 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
       parseError: null,
     }),
 
-  hydrate: (uid) => {
-    const history = loadHistory(uid).filter(
-      (r) => r.expires_at > Date.now(),
-    );
+  hydrate: async (uid) => {
+    const migrated = await migrateFromLocalStorageIfNeeded(uid);
+    const raw = migrated ?? (await getBatchHistoryForUser(uid));
+    const history = raw.filter((r) => r.expires_at > Date.now());
     set({ history });
-    saveHistory(uid, history);
+    if (history.length !== raw.length) {
+      // Some entries were filtered out as expired — sync the IDB store
+      // so it doesn't keep growing forever.
+      await replaceBatchHistoryForUser(uid, history);
+    } else if (migrated !== null) {
+      // We just migrated from localStorage; the IDB store already has
+      // the full payload, no follow-up write needed.
+    }
   },
 
   commit: async (commandText, mutations) => {
@@ -471,7 +472,11 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
 
     const nextHistory = [record, ...get().history].slice(0, MAX_HISTORY_ENTRIES);
     set({ history: nextHistory });
-    saveHistory(uid, nextHistory);
+    // Single record write is cheaper than a full replace; the cap
+    // trim only removes the oldest entry which falls off naturally on
+    // next hydrate (older records remain in IDB until purged on
+    // expiry).
+    await putBatchHistoryRecord(uid, record);
     return record;
   },
 
@@ -495,7 +500,8 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
       r.batch_id === batchId ? { ...r, undone_at: now } : r,
     );
     set({ history: nextHistory });
-    saveHistory(uid, nextHistory);
+    const updated = nextHistory.find((r) => r.batch_id === batchId);
+    if (updated) await putBatchHistoryRecord(uid, updated);
 
     if (restored > 0) {
       toast.success(`Undo complete — restored ${restored} change${restored === 1 ? '' : 's'}`);
@@ -509,13 +515,17 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
     const now = Date.now();
     const nextHistory = get().history.filter((r) => r.expires_at > now);
     if (nextHistory.length !== get().history.length) {
+      let uid: string | null = null;
       try {
-        const uid = getFirebaseUid();
-        saveHistory(uid, nextHistory);
-        set({ history: nextHistory });
+        uid = getFirebaseUid();
       } catch {
         // Not authed — leave history in memory.
+        return;
       }
+      set({ history: nextHistory });
+      // Fire-and-forget; in-memory state is the read source so we
+      // don't need to await.
+      void replaceBatchHistoryForUser(uid, nextHistory);
     }
   },
 }));

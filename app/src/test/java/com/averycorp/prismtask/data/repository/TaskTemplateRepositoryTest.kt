@@ -685,6 +685,12 @@ class TaskTemplateRepositoryTest {
         override suspend fun deleteAll(): Nothing = unsupported()
 
         override suspend fun deleteAllTaskTagCrossRefs(): Nothing = unsupported()
+
+        override suspend fun getLatestHabitTaskForDayOnce(
+            habitId: Long,
+            startDate: Long,
+            endDate: Long
+        ): TaskEntity? = unsupported()
     }
 
     /** In-memory fake of [TagDao]. Records all cross-ref inserts so tests can assert on them. */

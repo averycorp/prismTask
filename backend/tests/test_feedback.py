@@ -168,3 +168,80 @@ async def test_filter_by_severity(client: AsyncClient, auth_headers: dict):
     assert resp.status_code == 200
     data = resp.json()
     assert all(r["severity"] == "CRITICAL" for r in data)
+
+
+@pytest.mark.asyncio
+async def test_in_app_feedback_thumb_up_minimal(client: AsyncClient, auth_headers: dict):
+    """POST /feedback/in-app with thumb_up only returns 201 and persists."""
+    resp = await client.post(
+        "/api/v1/feedback/in-app",
+        json={"sentiment": "thumb_up"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["success"] is True
+    assert isinstance(data["feedback_id"], int)
+
+
+@pytest.mark.asyncio
+async def test_in_app_feedback_thumb_down_with_text(client: AsyncClient, auth_headers: dict):
+    """POST /feedback/in-app with thumb_down + free_text + client_timestamp."""
+    resp = await client.post(
+        "/api/v1/feedback/in-app",
+        json={
+            "sentiment": "thumb_down",
+            "free_text": "Notifications are too noisy",
+            "client_timestamp": 1715299200000,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_in_app_feedback_rating_5_accepted(client: AsyncClient, auth_headers: dict):
+    """POST with sentiment=rating + rating=5 is accepted."""
+    resp = await client.post(
+        "/api/v1/feedback/in-app",
+        json={"sentiment": "rating", "rating": 5},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_in_app_feedback_rating_without_rating_field_rejected(
+    client: AsyncClient, auth_headers: dict
+):
+    """sentiment=rating but rating field missing → 422."""
+    resp = await client.post(
+        "/api/v1/feedback/in-app",
+        json={"sentiment": "rating"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_in_app_feedback_invalid_sentiment_rejected(
+    client: AsyncClient, auth_headers: dict
+):
+    """sentiment outside {thumb_up,thumb_down,rating} → 422."""
+    resp = await client.post(
+        "/api/v1/feedback/in-app",
+        json={"sentiment": "neutral"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_in_app_feedback_requires_auth(client: AsyncClient):
+    """No auth header → 401."""
+    resp = await client.post(
+        "/api/v1/feedback/in-app",
+        json={"sentiment": "thumb_up"},
+    )
+    assert resp.status_code == 401
