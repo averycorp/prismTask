@@ -66,22 +66,30 @@ constructor(
         medicationDao.getAllOnce()
 
     /**
-     * Insert a medication, recovering from a `medications.name` UNIQUE
-     * collision by adopting the existing same-name row. Callers (the
-     * Medication / Refill viewmodels) pre-flight a `getByNameOnce` check,
-     * but two concurrent `viewModelScope.launch` calls — or a sync pull
-     * landing between the pre-flight and the insert — can still race the
-     * unique index and throw `SQLiteConstraintException`. Without this
-     * recovery, that exception propagated out of the otherwise-uncaught
-     * Room insert lambda and crashed the app (Crashlytics signature:
+     * Insert a medication, recovering from either UNIQUE index collision
+     * on [MedicationEntity] — `medications.name` or `medications.cloud_id`
+     * — by adopting the existing row. Callers (the Medication / Refill
+     * viewmodels) pre-flight a `getByNameOnce` check, but two concurrent
+     * `viewModelScope.launch` calls — or a sync pull landing between the
+     * pre-flight and the insert — can still race the unique index and
+     * throw `SQLiteConstraintException`. Without this recovery, that
+     * exception propagated out of the otherwise-uncaught Room insert
+     * lambda and crashed the app (Crashlytics signature:
      * `MedicationDao_Impl.insert$lambda$0` →
      * `UNIQUE constraint failed: medications.name`).
      *
-     * On collision: look up the existing row by name and return its id
-     * so the caller's downstream slot-link / override writes still land
-     * on the surviving medication. Tracking emits `trackCreate` only on
-     * a true insert; the adopt branch leaves the existing row untouched
-     * so its sync state stays accurate.
+     * Recovery probes both unique indices: name first (the common
+     * collision class — same-name dupes from concurrent inserts or a
+     * sync pull) then cloud_id (the rarer cross-device convergence case
+     * where two devices wound up with the same cloud_id mapping for
+     * different local rows). Without the cloud_id branch, a cloud_id
+     * collision rethrows with the same `MedicationDao_Impl.insert$lambda$0`
+     * stack signature — indistinguishable from the name collision at
+     * the call site — and crashes the app on the rethrow.
+     *
+     * Tracking emits `trackCreate` only on a true insert; the adopt
+     * branch leaves the existing row untouched so its sync state stays
+     * accurate.
      */
     suspend fun insert(medication: MedicationEntity): Long {
         val now = System.currentTimeMillis()
@@ -89,7 +97,9 @@ constructor(
         val id = try {
             medicationDao.insert(toInsert)
         } catch (e: SQLiteConstraintException) {
-            val existing = medicationDao.getByNameOnce(toInsert.name) ?: throw e
+            val existing = medicationDao.getByNameOnce(toInsert.name)
+                ?: toInsert.cloudId?.let { medicationDao.getByCloudIdOnce(it) }
+                ?: throw e
             return existing.id
         }
         syncTracker.trackCreate(id, "medication")
