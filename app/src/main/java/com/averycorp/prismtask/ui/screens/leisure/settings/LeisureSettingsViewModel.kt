@@ -6,11 +6,13 @@ import com.averycorp.prismtask.data.preferences.CustomLeisureSection
 import com.averycorp.prismtask.data.preferences.LeisurePreferences
 import com.averycorp.prismtask.data.preferences.LeisureSlotConfig
 import com.averycorp.prismtask.data.preferences.LeisureSlotId
+import com.averycorp.prismtask.domain.usecase.CategoryDailyTaskController
 import com.averycorp.prismtask.ui.screens.leisure.LeisureViewModel.Companion.defaultsFor
 import com.averycorp.prismtask.ui.screens.leisure.components.LeisureOption
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,7 +33,8 @@ data class BuiltInActivityState(
 class LeisureSettingsViewModel
 @Inject
 constructor(
-    private val preferences: LeisurePreferences
+    private val preferences: LeisurePreferences,
+    private val dailyTaskController: CategoryDailyTaskController
 ) : ViewModel() {
 
     val musicState: StateFlow<LeisureSlotEditState> = editStateFlow(LeisureSlotId.MUSIC)
@@ -141,5 +144,39 @@ constructor(
 
     fun removeCustomSectionActivity(sectionId: String, activityId: String) {
         viewModelScope.launch { preferences.removeCustomSectionActivity(sectionId, activityId) }
+    }
+
+    fun setSlotCreateDailyTask(slot: LeisureSlotId, enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferences.getSlotConfig(slot).first()
+            if (enabled) {
+                val taskId = dailyTaskController.ensureDailyTask(
+                    label = current.label,
+                    emoji = current.emoji,
+                    existingId = current.dailyTaskId
+                )
+                preferences.setSlotDailyTask(slot, enabled = true, taskId = taskId)
+            } else {
+                dailyTaskController.removeDailyTask(current.dailyTaskId)
+                preferences.setSlotDailyTask(slot, enabled = false, taskId = null)
+            }
+        }
+    }
+
+    fun setCustomSectionCreateDailyTask(id: String, enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferences.getCustomSections().first().firstOrNull { it.id == id } ?: return@launch
+            if (enabled) {
+                val taskId = dailyTaskController.ensureDailyTask(
+                    label = current.label,
+                    emoji = current.emoji,
+                    existingId = current.dailyTaskId
+                )
+                preferences.updateCustomSection(id, createDailyTask = true, dailyTaskId = taskId)
+            } else {
+                dailyTaskController.removeDailyTask(current.dailyTaskId)
+                preferences.updateCustomSection(id, createDailyTask = false, clearDailyTaskId = true)
+            }
+        }
     }
 }

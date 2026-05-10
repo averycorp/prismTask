@@ -671,7 +671,9 @@ object SyncMapper {
         "active" to course.active,
         "sortOrder" to course.sortOrder,
         "createdAt" to course.createdAt,
-        "updatedAt" to course.updatedAt
+        "updatedAt" to course.updatedAt,
+        "createDailyTask" to course.createDailyTask,
+        "dailyTaskId" to course.dailyTaskId
     )
 
     fun mapToCourse(
@@ -688,7 +690,12 @@ object SyncMapper {
         active = data["active"] as? Boolean ?: true,
         sortOrder = (data["sortOrder"] as? Number)?.toInt() ?: 0,
         createdAt = (data["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-        updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
+        updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
+        createDailyTask = data["createDailyTask"] as? Boolean ?: false,
+        // The daily_task_id is a per-device local FK and intentionally
+        // not round-tripped from the cloud payload \u2014 each device manages
+        // its own copy of the spawned TaskEntity locally.
+        dailyTaskId = null
     )
 
     // [courseCloudId] is the Firestore document ID of the parent CourseEntity from sync_metadata.

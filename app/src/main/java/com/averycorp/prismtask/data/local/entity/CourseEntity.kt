@@ -19,5 +19,7 @@ data class CourseEntity(
     @ColumnInfo(name = "active") val active: Boolean = true,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
-    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0L
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0L,
+    @ColumnInfo(name = "create_daily_task", defaultValue = "0") val createDailyTask: Boolean = false,
+    @ColumnInfo(name = "daily_task_id") val dailyTaskId: Long? = null
 )
