@@ -343,7 +343,55 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew testDebugUnitTest --continue -i \
-            --tests 'com.averycorp.prismtask.ui.*' \
+            --tests 'com.averycorp.prismtask.ui.a11y.*' \
+            --tests 'com.averycorp.prismtask.ui.coachmark.*' \
+            --tests 'com.averycorp.prismtask.ui.components.*' \
+            --tests 'com.averycorp.prismtask.ui.theme.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — UI medication screens
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.ui.screens.medication.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — UI core screens
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.ui.screens.addedittask.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.batch.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.briefing.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.chat.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.eisenhower.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.habits.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.multicreate.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.onboarding.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.pomodoro.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.selfcare.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.templates.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.timeline.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.timer.*' \
+            2>&1 | tee -a unit-test-output.log
+      - name: Unit tests — UI planning screens
+        if: always() && steps.relevance.outputs.android == 'true'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew testDebugUnitTest --continue -i \
+            --tests 'com.averycorp.prismtask.ui.screens.automation.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.planner.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.projects.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.review.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.settings.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.tasklist.*' \
+            --tests 'com.averycorp.prismtask.ui.screens.today.*' \
             2>&1 | tee -a unit-test-output.log
       - name: Unit tests — platform and workers
         if: always() && steps.relevance.outputs.android == 'true'
