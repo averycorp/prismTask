@@ -15,12 +15,12 @@ import com.google.gson.JsonParseException
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
 data class CustomLeisureActivity(
     val id: String,
@@ -345,9 +345,10 @@ constructor(
     }
 
     private fun parseCustomSections(raw: String): List<CustomLeisureSection?> = try {
-        (gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
-            as List<CustomLeisureSection?>?)
-            .orEmpty()
+        (
+            gson.fromJson<List<CustomLeisureSection>>(raw, sectionListType)
+                as List<CustomLeisureSection?>?
+        ).orEmpty()
     } catch (exception: JsonParseException) {
         reportMitigation(
             mitigationId = "M1_gson_parse_fail",
@@ -588,10 +589,14 @@ constructor(
         customKeys: Map<String, String> = emptyMap()
     ) {
         Log.e(LOG_TAG, message, exception)
-        FirebaseCrashlytics.getInstance().apply {
-            setCustomKey("mitigation_id", mitigationId)
-            customKeys.forEach { (key, value) -> setCustomKey(key, value) }
-            recordException(exception)
+        // Defensive: Crashlytics requires FirebaseApp.initializeApp(); in
+        // Robolectric unit tests it isn't, and getInstance() throws.
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("mitigation_id", mitigationId)
+                customKeys.forEach { (key, value) -> setCustomKey(key, value) }
+                recordException(exception)
+            }
         }
     }
 
