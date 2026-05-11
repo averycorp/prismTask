@@ -189,6 +189,11 @@ class FakePrismTaskApi : PrismTaskApi {
             ?: error("extractTasksFromImageResult not set — provide a canned response")
     }
 
+    override suspend fun extractFromFile(
+        file: MultipartBody.Part
+    ): com.averycorp.prismtask.data.remote.api.FileExtractionResponse =
+        error("Not used in offline tests")
+
     override suspend fun getVersion() = error("Not used in offline tests")
 
     override suspend fun syncPush(request: SyncPushRequest): SyncPushResponse {
