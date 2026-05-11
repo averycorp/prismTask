@@ -268,6 +268,13 @@ fun SettingsScreen(
                         // AI Features moved to the Today "AI Tools" hub sheet
                         // (docs/audits/AI_FEATURES_TO_TODAY_RELOCATION_AUDIT.md).
                         SettingsNavRow(
+                            title = "AI Memory",
+                            subtitle = "What the AI Coach remembers about you",
+                            iconEmoji = "\uD83D\uDCAD",
+                            iconBgColor = ColAi,
+                            onClick = { navController.navigate("settings/ai_memory") }
+                        )
+                        SettingsNavRow(
                             title = "Brain Mode",
                             subtitle = "ADHD, Calm, Focus Release",
                             iconEmoji = "\uD83E\uDDE0",

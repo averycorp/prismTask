@@ -28,7 +28,11 @@ sealed interface ChatStreamEvent {
         // against older backends or persistence-failure paths; the
         // repository falls back to fresh client-side UUIDs in that case.
         val userMessageId: String? = null,
-        val assistantMessageId: String? = null
+        val assistantMessageId: String? = null,
+        // Authoritative AI-memory snapshot after this turn. Empty list
+        // when no preferences are stored OR when the backend predates
+        // the AI-memory bundle — both cases collapse to a no-op mirror.
+        val userPreferences: List<UserAiPreferenceDto> = emptyList()
     ) : ChatStreamEvent
 
     data class Error(

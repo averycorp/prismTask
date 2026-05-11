@@ -54,7 +54,8 @@ class ChatRepository
 constructor(
     private val api: PrismTaskApi,
     private val chatMessageDao: ChatMessageDao,
-    private val streamClient: ChatStreamClient
+    private val streamClient: ChatStreamClient,
+    private val userAiPreferenceRepository: UserAiPreferenceRepository
 ) {
     /** Maximum conversation pairs forwarded to the backend (spec: 6). */
     private val maxHistoryPairs = 6
@@ -151,6 +152,12 @@ constructor(
         )
         chatMessageDao.upsertAll(listOf(userRow, assistantRow))
 
+        // Mirror the authoritative AI-memory snapshot the backend includes
+        // on every chat response. REPLACE-all keeps the local view in lockstep
+        // with the server after `remember_preference` / `forget_preference`
+        // tool calls.
+        userAiPreferenceRepository.mirrorFromChat(response.userPreferences)
+
         return response
     }
 
@@ -201,7 +208,8 @@ constructor(
         actions: List<ChatActionResponse>,
         userMessageId: String? = null,
         assistantMessageId: String? = null,
-        userTaskContext: ChatTaskContext? = null
+        userTaskContext: ChatTaskContext? = null,
+        userPreferences: List<com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto> = emptyList()
     ) {
         val convId = _conversationId.value
         val now = System.currentTimeMillis()
@@ -225,6 +233,12 @@ constructor(
         )
         runBlocking {
             chatMessageDao.upsertAll(listOf(userRow, assistantRow))
+            // Mirror the authoritative AI-memory snapshot in lockstep with
+            // the chat messages. Empty list (legacy backend or no prefs)
+            // collapses to a no-op REPLACE-all.
+            if (userPreferences.isNotEmpty()) {
+                userAiPreferenceRepository.mirrorFromChat(userPreferences)
+            }
         }
     }
 

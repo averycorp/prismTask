@@ -14,6 +14,7 @@ import com.averycorp.prismtask.ui.screens.automation.library.AutomationTemplateL
 import com.averycorp.prismtask.ui.screens.settings.AccessibilityScreen
 import com.averycorp.prismtask.ui.screens.settings.AccountSyncScreen
 import com.averycorp.prismtask.ui.screens.settings.AdvancedTuningScreen
+import com.averycorp.prismtask.ui.screens.settings.AiMemoryScreen
 import com.averycorp.prismtask.ui.screens.settings.AppearanceScreen
 import com.averycorp.prismtask.ui.screens.settings.BetaCodeRedemptionScreen
 import com.averycorp.prismtask.ui.screens.settings.BrainModeScreen
@@ -51,6 +52,7 @@ internal fun NavGraphBuilder.settingsSubScreenRoutes(navController: NavHostContr
         "settings/notifications" to { NotificationsScreen(navController) },
         "settings/medication_slots" to { MedicationSlotsScreen(navController) },
         "settings/accessibility" to { AccessibilityScreen(navController) },
+        "settings/ai_memory" to { AiMemoryScreen(navController) },
         "settings/data_backup" to { DataBackupScreen(navController) },
         "settings/advanced_tuning" to { AdvancedTuningScreen(navController) }
     ).forEach { (route, content) ->

@@ -2455,7 +2455,40 @@ val MIGRATION_78_79 = object : Migration(78, 79) {
     }
 }
 
-const val CURRENT_DB_VERSION = 79
+/**
+ * v79 → v80: AI memory — preferences the conversational coach has
+ * learned about the user.
+ *
+ * Greenfield table; populated by the chat handler when the AI emits
+ * `remember_preference` tool calls, and by the user from the new
+ * Settings → AI Memory screen. The 15-row cap is enforced server-side
+ * (see `_apply_preference_diff` in backend/app/routers/ai.py); the
+ * client mirrors the authoritative list via `replaceAll()`.
+ *
+ * No `user_id` column — PrismTaskDatabase is per-account-per-device,
+ * matching the same scoping rule as `chat_messages` (MIGRATION_76_77).
+ */
+val MIGRATION_79_80 = object : Migration(79, 80) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `user_ai_preferences` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `preference_text` TEXT NOT NULL,
+                `source_message_id` TEXT,
+                `created_at` INTEGER NOT NULL,
+                `updated_at` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_user_ai_preferences_updated_at` " +
+                "ON `user_ai_preferences` (`updated_at`)"
+        )
+    }
+}
+
+const val CURRENT_DB_VERSION = 80
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2535,5 +2568,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_75_76,
     MIGRATION_76_77,
     MIGRATION_77_78,
-    MIGRATION_78_79
+    MIGRATION_78_79,
+    MIGRATION_79_80
 )
