@@ -5,14 +5,6 @@ import com.averycorp.prismtask.data.remote.SyncTracker
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The 0-id sentinel a project-only attachment uses for the `taskId`
- * column. The legacy column is `INTEGER NOT NULL` and SQLite ALTER cannot
- * relax that without rebuilding the table; row id `0` never exists in
- * `tasks` so the FK CASCADE is a no-op for these rows.
- */
-private const val PROJECT_ONLY_TASK_SENTINEL: Long = 0L
-
 @Singleton
 class AttachmentRepository
 @Inject
@@ -136,6 +128,17 @@ constructor(
                 } else null
             }
         }.getOrNull()
+    }
+
+    private companion object {
+        /**
+         * Sentinel value for the legacy `taskId NOT NULL` column when an
+         * attachment is project-only. SQLite ALTER cannot relax `NOT NULL`
+         * without a table rebuild, so we use id `0` (which never exists in
+         * `tasks`) and let the repository enforce the "exactly one of"
+         * invariant on insert.
+         */
+        const val PROJECT_ONLY_TASK_SENTINEL: Long = 0L
     }
 }
 

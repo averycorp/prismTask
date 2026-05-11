@@ -219,11 +219,16 @@ class TestFileExtractionService:
 
 
 class TestExtractFromFileRouter:
-    """Integration tests for ``POST /api/v1/ai/files/extract``."""
+    """Integration tests for ``POST /api/v1/ai/files/extract``.
+
+    The endpoint sits behind the AI feature gate (Pro-tier only), so these
+    tests use ``pro_auth_headers`` instead of the bare ``auth_headers``
+    fixture — auth_headers users get 403 from the AI middleware.
+    """
 
     @pytest.mark.asyncio
     async def test_returns_structured_suggestion_for_text_file(
-        self, client: AsyncClient, auth_headers: dict
+        self, client: AsyncClient, pro_auth_headers: dict
     ):
         with patch("app.services.file_extraction.extract_from_file") as mock_svc:
             mock_svc.return_value = {
@@ -248,7 +253,7 @@ class TestExtractFromFileRouter:
             resp = await client.post(
                 "/api/v1/ai/files/extract",
                 files=files,
-                headers=auth_headers,
+                headers=pro_auth_headers,
             )
             assert resp.status_code == 200, resp.text
             body = resp.json()
@@ -261,7 +266,7 @@ class TestExtractFromFileRouter:
 
     @pytest.mark.asyncio
     async def test_drops_subtasks_with_blank_titles(
-        self, client: AsyncClient, auth_headers: dict
+        self, client: AsyncClient, pro_auth_headers: dict
     ):
         with patch("app.services.file_extraction.extract_from_file") as mock_svc:
             mock_svc.return_value = {
@@ -281,7 +286,7 @@ class TestExtractFromFileRouter:
             resp = await client.post(
                 "/api/v1/ai/files/extract",
                 files=files,
-                headers=auth_headers,
+                headers=pro_auth_headers,
             )
             assert resp.status_code == 200, resp.text
             body = resp.json()
@@ -291,7 +296,7 @@ class TestExtractFromFileRouter:
 
     @pytest.mark.asyncio
     async def test_oversize_upload_returns_413(
-        self, client: AsyncClient, auth_headers: dict
+        self, client: AsyncClient, pro_auth_headers: dict
     ):
         from app.routers.ai import FILE_EXTRACT_MAX_BYTES
 
@@ -300,13 +305,13 @@ class TestExtractFromFileRouter:
         resp = await client.post(
             "/api/v1/ai/files/extract",
             files=files,
-            headers=auth_headers,
+            headers=pro_auth_headers,
         )
         assert resp.status_code == 413
 
     @pytest.mark.asyncio
     async def test_service_unavailable_returns_503(
-        self, client: AsyncClient, auth_headers: dict
+        self, client: AsyncClient, pro_auth_headers: dict
     ):
         with patch(
             "app.services.file_extraction.extract_from_file",
@@ -316,13 +321,13 @@ class TestExtractFromFileRouter:
             resp = await client.post(
                 "/api/v1/ai/files/extract",
                 files=files,
-                headers=auth_headers,
+                headers=pro_auth_headers,
             )
             assert resp.status_code == 503
 
     @pytest.mark.asyncio
     async def test_unparseable_ai_response_returns_422(
-        self, client: AsyncClient, auth_headers: dict
+        self, client: AsyncClient, pro_auth_headers: dict
     ):
         with patch(
             "app.services.file_extraction.extract_from_file",
@@ -332,7 +337,7 @@ class TestExtractFromFileRouter:
             resp = await client.post(
                 "/api/v1/ai/files/extract",
                 files=files,
-                headers=auth_headers,
+                headers=pro_auth_headers,
             )
             assert resp.status_code == 422
 

@@ -8,23 +8,24 @@ import androidx.room.PrimaryKey
 
 /**
  * An attachment row points at one of:
- *   - an image / arbitrary file in the app's sandbox (`type = "image"` or
- *     `"file"`), or
- *   - a raw URL (`type = "link"`).
+ *   - an image / arbitrary file in the app's sandbox (type = "image" or
+ *     "file"), or
+ *   - a raw URL (type = "link").
  *
  * Historically attachments were task-only (legacy `taskId` column). The v80
  * migration adds optional `project_id` so a file can also be attached to a
- * project (with no task scope) — the `Files` section on a project surfaces
- * those rows. Exactly one of `taskId` / `project_id` should be set:
+ * project (with no task scope) — the project's Files section surfaces those
+ * rows. Exactly one of `taskId` / `project_id` should be set:
  *  - task attachments: `taskId > 0`, `project_id = null` (matches all
  *    pre-v80 rows; the column nullability lets us avoid recreating the
  *    table to relax the existing NOT NULL).
- *  - project attachments: `taskId = 0` sentinel, `project_id` set. The
- *    `0` sentinel exists because the legacy column is `INTEGER NOT NULL`
- *    and SQLite cannot drop NOT NULL via ALTER without a table rebuild;
- *    the FK to `tasks(id)` is gated by [ForeignKey.CASCADE] on a real id,
- *    and id `0` never exists in the tasks table so the constraint is a
- *    no-op. The repository enforces the "exactly one of" invariant.
+ *  - project attachments: `taskId = 0` sentinel, `project_id` set.
+ *
+ * Cascade-delete on the project side is handled by the repository
+ * (deleting a project clears its attachments) rather than a Room
+ * `ForeignKey` — the second FK on this entity made KSP unhappy on some
+ * Room versions, and a soft delete is fine since attachments are
+ * sandbox-local files we have to unlink anyway.
  */
 @Entity(
     tableName = "attachments",
@@ -33,12 +34,6 @@ import androidx.room.PrimaryKey
             entity = TaskEntity::class,
             parentColumns = ["id"],
             childColumns = ["taskId"],
-            onDelete = ForeignKey.CASCADE
-        ),
-        ForeignKey(
-            entity = ProjectEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["project_id"],
             onDelete = ForeignKey.CASCADE
         )
     ],
@@ -53,10 +48,10 @@ data class AttachmentEntity(
     @ColumnInfo(name = "taskId") val taskId: Long,
     @ColumnInfo(name = "project_id") val projectId: Long? = null,
     /**
-     * One of `"image"`, `"file"`, or `"link"`. `"image"` predates `"file"`
-     * and is preserved for back-compat with rows written before any-MIME
-     * uploads — it always points at an image inside the sandbox. New
-     * non-image uploads are written as `"file"`.
+     * One of "image", "file", or "link". "image" predates "file" and is
+     * preserved for back-compat with rows written before any-MIME uploads
+     * — it always points at an image inside the sandbox. New non-image
+     * uploads are written as "file".
      */
     val type: String,
     /**

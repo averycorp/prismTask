@@ -2468,6 +2468,10 @@ val MIGRATION_78_79 = object : Migration(78, 79) {
  * `taskId = 0` sentinel and the repository enforces the "exactly one of"
  * invariant on insert paths.
  *
+ * No SQL-level FK on `project_id` — the entity matches (no second
+ * `ForeignKey` declared), and cascade-on-project-delete is handled by
+ * the repository so we never had to teach Room about it.
+ *
  * Existing image rows backfill `mime_type = 'image/*'`, `size_bytes = NULL`
  * (we never recorded the original size), `project_id = NULL`. Backfilling
  * a generic `image/*` rather than picking a specific subtype keeps the
@@ -2475,7 +2479,7 @@ val MIGRATION_78_79 = object : Migration(78, 79) {
  */
 val MIGRATION_79_80 = object : Migration(79, 80) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE attachments ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE")
+        db.execSQL("ALTER TABLE attachments ADD COLUMN project_id INTEGER")
         db.execSQL("ALTER TABLE attachments ADD COLUMN mime_type TEXT")
         db.execSQL("ALTER TABLE attachments ADD COLUMN size_bytes INTEGER")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_attachments_project_id` ON `attachments` (`project_id`)")
