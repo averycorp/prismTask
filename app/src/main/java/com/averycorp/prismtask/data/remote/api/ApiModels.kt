@@ -119,6 +119,17 @@ data class ExtractFromTextResponse(
     val tasks: List<ExtractedTaskCandidateResponse> = emptyList()
 )
 
+// G — vision: extract tasks from a screenshot. Reuses
+// ExtractedTaskCandidateResponse so the response shape matches paste-extract.
+data class VisionExtractRequest(
+    @SerializedName("image_base64") val imageBase64: String,
+    @SerializedName("image_media_type") val imageMediaType: String
+)
+
+data class VisionExtractResponse(
+    val tasks: List<ExtractedTaskCandidateResponse> = emptyList()
+)
+
 // endregion
 
 // region App version

@@ -78,6 +78,11 @@ interface PrismTaskApi {
         @Body request: ExtractFromTextRequest
     ): ExtractFromTextResponse
 
+    @POST("api/v1/ai/vision/extract-tasks")
+    suspend fun extractTasksFromImage(
+        @Body request: VisionExtractRequest
+    ): VisionExtractResponse
+
     @GET("api/v1/app/version")
     suspend fun getVersion(): VersionResponse
 
