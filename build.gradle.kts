@@ -8,6 +8,6 @@ plugins {
     id("com.google.dagger.hilt.android") version "2.59.2" apply false
     id("com.google.gms.google-services") version "4.4.4" apply false
     id("com.google.firebase.crashlytics") version "3.0.2" apply false
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.1" apply false
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
 }
