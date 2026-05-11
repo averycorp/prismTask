@@ -147,6 +147,7 @@ data class FileExtractionResponse(
     val notes: String? = null,
     @SerializedName("source_file_name") val sourceFileName: String? = null,
     @SerializedName("source_mime_type") val sourceMimeType: String? = null
+)
 
 // G — vision: extract tasks from a screenshot. Reuses
 // ExtractedTaskCandidateResponse so the response shape matches paste-extract.

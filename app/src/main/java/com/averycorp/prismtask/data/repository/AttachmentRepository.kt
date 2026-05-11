@@ -21,7 +21,7 @@ constructor(
 ) {
     /**
      * Legacy entry point — kept so existing photo-picker callers don't
-     * have to change. Delegates to [addFileAttachment] with `image/*`
+     * have to change. Delegates to [addFileAttachment] with `image/\*`
      * MIME so the new schema fields get filled.
      */
     suspend fun addImageAttachment(context: Context, taskId: Long, sourceUri: Uri): Long =
