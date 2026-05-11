@@ -243,14 +243,17 @@ def _extract_text_from_xlsx(data: bytes) -> str:
     except Exception as e:  # noqa: BLE001 — openpyxl raises InvalidFileException + others
         logger.warning("XLSX could not be opened: %s", e)
         return ""
-    parts: list[str] = []
-    for sheet in wb.worksheets:
-        parts.append(f"# Sheet: {sheet.title}")
-        for row in sheet.iter_rows(values_only=True):
-            cells = [str(c) for c in row if c is not None and str(c).strip()]
-            if cells:
-                parts.append(" | ".join(cells))
-    return "\n".join(parts).strip()
+    try:
+        parts: list[str] = []
+        for sheet in wb.worksheets:
+            parts.append(f"# Sheet: {sheet.title}")
+            for row in sheet.iter_rows(values_only=True):
+                cells = [str(c) for c in row if c is not None and str(c).strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+        return "\n".join(parts).strip()
+    finally:
+        wb.close()
 
 
 def _build_image_message(file_bytes: bytes, filename: str, mime: str) -> list[dict]:
