@@ -128,6 +128,11 @@ class NaturalLanguageParserTest {
         ): com.averycorp.prismtask.data.remote.api.VisionExtractResponse =
             error("not used in offline parser tests")
 
+        override suspend fun extractFromFile(
+            file: MultipartBody.Part
+        ): com.averycorp.prismtask.data.remote.api.FileExtractionResponse =
+            error("not used in offline parser tests")
+
         override suspend fun getVersion(): VersionResponse =
             error("not used in offline parser tests")
 
