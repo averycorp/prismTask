@@ -100,7 +100,8 @@ fun AiMemoryScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(
-                    text = "The AI Coach quietly remembers up to $cap things you tell it about how you work. Edit or delete anything you'd rather it forgot.",
+                    text = "The AI Coach quietly remembers up to $cap things you tell it about how " +
+                        "you work. Edit or delete anything you'd rather it forgot.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
