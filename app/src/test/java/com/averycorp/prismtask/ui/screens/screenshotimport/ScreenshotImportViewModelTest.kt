@@ -65,7 +65,7 @@ class ScreenshotImportViewModelTest {
         parsedTaskResolver = mockk()
         proFeatureGate = mockk()
 
-        every { proFeatureGate.hasAccess(any()) } returns false  // use offline parser path
+        every { proFeatureGate.hasAccess(any()) } returns false // use offline parser path
 
         coEvery {
             taskRepository.addTask(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -119,7 +119,7 @@ class ScreenshotImportViewModelTest {
     @Test
     fun createSelected_skipsUncheckedRows() = runTest(dispatcher) {
         seedTwoCandidates()
-        viewModel.toggle(1)  // uncheck Call Mary
+        viewModel.toggle(1) // uncheck Call Mary
         wireParserAndResolverForOfflineParse()
 
         viewModel.createSelected(context = mockk(relaxed = true))
@@ -134,7 +134,7 @@ class ScreenshotImportViewModelTest {
     @Test
     fun createSelected_skipsBlankTitles() = runTest(dispatcher) {
         seedTwoCandidates()
-        viewModel.editTitle(0, "")  // blank → must be skipped
+        viewModel.editTitle(0, "") // blank → must be skipped
         wireParserAndResolverForOfflineParse()
 
         viewModel.createSelected(context = mockk(relaxed = true))
@@ -218,4 +218,3 @@ class ScreenshotImportViewModelTest {
         }
     }
 }
-
