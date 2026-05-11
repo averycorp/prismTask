@@ -900,12 +900,19 @@ async def extract_from_file(
     tier = await resolve_effective_tier(current_user, db)
     daily_ai_rate_limiter.check(current_user.id, tier)
 
-    contents = await file.read()
-    if len(contents) > FILE_EXTRACT_MAX_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File must be under {FILE_EXTRACT_MAX_BYTES // (1024 * 1024)} MB",
-        )
+    chunk_size = 1024 * 1024
+    contents_buffer = bytearray()
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        contents_buffer.extend(chunk)
+        if len(contents_buffer) > FILE_EXTRACT_MAX_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File must be under {FILE_EXTRACT_MAX_BYTES // (1024 * 1024)} MB",
+            )
+    contents = bytes(contents_buffer)
 
     filename = file.filename or "uploaded-file"
     mime_type = file.content_type or "application/octet-stream"
