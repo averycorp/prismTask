@@ -22,6 +22,7 @@ import com.averycorp.prismtask.ui.screens.projects.ProjectImportPreviewScreen
 import com.averycorp.prismtask.ui.screens.review.WeeklyReviewDetailScreen
 import com.averycorp.prismtask.ui.screens.review.WeeklyReviewScreen
 import com.averycorp.prismtask.ui.screens.review.WeeklyReviewsListScreen
+import com.averycorp.prismtask.ui.screens.screenshotimport.ScreenshotImportScreen
 
 /**
  * AI and productivity-tool route definitions: Eisenhower matrix,
@@ -61,6 +62,10 @@ internal fun NavGraphBuilder.aiRoutes(
             navController = navController,
             sharedText = initialSharedText
         )
+    }
+
+    composable(route = PrismTaskRoute.ScreenshotImport.route) {
+        ScreenshotImportScreen(navController = navController)
     }
 
     composable(route = PrismTaskRoute.WeeklyReview.route) {

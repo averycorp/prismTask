@@ -55,6 +55,10 @@ enum class ProGatedFeature(
         label = "Extract Tasks From Text",
         description = "Paste a chat, email, or meeting note and let Claude pull tasks out of it"
     ),
+    SMART_SCREENSHOT_IMPORT(
+        label = "Extract Tasks From Screenshot",
+        description = "Snap a screenshot of an email, chat, or notebook page and let Claude pull tasks out of it"
+    ),
     WEEKLY_REVIEW(
         label = "Weekly Review",
         description = "Guided end-of-week reflection on what shipped and what's next"

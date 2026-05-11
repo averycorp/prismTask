@@ -47,6 +47,8 @@ from app.schemas.ai import (
     PomodoroResponse,
     TimeBlockRequest,
     TimeBlockResponse,
+    VisionExtractRequest,
+    VisionExtractResponse,
     WeeklyPlanRequest,
     WeeklyPlanResponse,
     WeeklyReviewRequest,
@@ -108,6 +110,11 @@ weekly_review_rate_limiter = RateLimiter(max_requests=1, window_seconds=3600)
 # v1.4.0 V9: paste-to-extract — 10 per minute to cover rapid iteration
 # (user fixing titles and re-extracting).
 extract_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# G — screenshot vision extract. Vision tokens cost ~10x text, so a tighter
+# 5/min cap protects the per-tier daily budget while still allowing a user
+# to retry on a poor-quality screenshot. The daily AI rate limiter is the
+# real budget ceiling.
+vision_extract_rate_limiter = RateLimiter(max_requests=5, window_seconds=60)
 # A2 Pomodoro+ coaching — 3 surfaces fire per session, so the window has to
 # accommodate a normal 4-session flow (pre + 3 breaks + recap = ~8 calls).
 pomodoro_coaching_rate_limiter = RateLimiter(max_requests=15, window_seconds=600)
@@ -848,6 +855,61 @@ async def extract_from_text(
     # Drop anything with an empty title — defensive.
     candidates = [c for c in candidates if c.title]
     return ExtractFromTextResponse(tasks=candidates)
+
+
+# ---------------------------------------------------------------------------
+# G — screenshot -> tasks extraction (Claude Vision)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/vision/extract-tasks", response_model=VisionExtractResponse)
+async def vision_extract_tasks(
+    data: VisionExtractRequest,
+    request: Request,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Extract structured task candidates from a screenshot via Claude Vision.
+
+    Mirrors ``/tasks/extract-from-text`` for the image input path. The
+    Android client packages the response into the same batch-preview
+    UI the paste-extract flow uses.
+
+    Privacy: image bytes are forwarded to Anthropic for extraction and
+    are not persisted server-side. The router-level
+    ``require_ai_features_enabled`` dependency rejects requests where
+    the user has the master AI opt-out enabled.
+    """
+    vision_extract_rate_limiter.check(request)
+    tier = await resolve_effective_tier(current_user, db)
+    daily_ai_rate_limiter.check(current_user.id, tier)
+
+    try:
+        from app.services.ai_productivity import extract_tasks_from_image as ai_vision_extract
+        raw_tasks = ai_vision_extract(
+            image_base64=data.image_base64,
+            image_media_type=data.image_media_type,
+            tier=tier,
+        )
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
+    except ValueError:
+        raise HTTPException(status_code=500, detail="AI returned an invalid response")
+
+    candidates = []
+    for t in raw_tasks:
+        candidates.append(
+            ExtractedTaskCandidate(
+                title=str(t.get("title", "")).strip(),
+                suggested_due_date=t.get("suggested_due_date"),
+                suggested_priority=int(t.get("suggested_priority") or 0),
+                suggested_project=t.get("suggested_project"),
+                confidence=float(t.get("confidence") or 0.5),
+            )
+        )
+    candidates = [c for c in candidates if c.title]
+    return VisionExtractResponse(tasks=candidates)
 
 
 # ---------------------------------------------------------------------------

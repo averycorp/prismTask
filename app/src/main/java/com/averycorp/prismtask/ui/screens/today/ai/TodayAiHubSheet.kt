@@ -84,6 +84,12 @@ fun TodayAiHubSheet(
                 onNavigateToWeeklyPlanner = { gatedNavigate(ProGatedFeature.WEEKLY_PLANNER, PrismTaskRoute.WeeklyPlanner.route) },
                 onNavigateToTimeline = { gatedNavigate(ProGatedFeature.TIME_BLOCKING, PrismTaskRoute.Timeline.route) },
                 onNavigateToPasteExtract = { gatedNavigate(ProGatedFeature.PASTE_EXTRACT, PrismTaskRoute.PasteConversation.route) },
+                onNavigateToScreenshotImport = {
+                    gatedNavigate(
+                        ProGatedFeature.SMART_SCREENSHOT_IMPORT,
+                        PrismTaskRoute.ScreenshotImport.route
+                    )
+                },
                 onNavigateToWeeklyReview = { gatedNavigate(ProGatedFeature.WEEKLY_REVIEW, PrismTaskRoute.WeeklyReview.route) },
                 onNavigateToMoodAnalytics = { navigateAndDismiss(PrismTaskRoute.MoodAnalytics.route) },
                 onNavigateToAiChat = { gatedNavigate(ProGatedFeature.AI_CHAT, PrismTaskRoute.AiChat.createRoute()) },
@@ -100,7 +106,9 @@ fun TodayAiHubSheet(
                 weeklyPlannerFeatureEnabled = perFeatureAiPrefs.weeklyPlannerEnabled,
                 onWeeklyPlannerFeatureEnabledChanged = viewModel::setWeeklyPlannerFeatureEnabled,
                 morningCheckInFeatureEnabled = perFeatureAiPrefs.morningCheckInEnabled,
-                onMorningCheckInFeatureEnabledChanged = viewModel::setMorningCheckInFeatureEnabled
+                onMorningCheckInFeatureEnabledChanged = viewModel::setMorningCheckInFeatureEnabled,
+                screenshotImportFeatureEnabled = perFeatureAiPrefs.screenshotImportEnabled,
+                onScreenshotImportFeatureEnabledChanged = viewModel::setScreenshotImportFeatureEnabled
             )
             Spacer(modifier = Modifier.height(32.dp))
         }

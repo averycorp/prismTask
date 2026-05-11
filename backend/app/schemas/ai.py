@@ -351,6 +351,28 @@ class ExtractFromTextResponse(BaseModel):
     tasks: list[ExtractedTaskCandidate]
 
 
+# --- Vision: extract tasks from a screenshot (G1) ---
+
+
+_VISION_ALLOWED_MEDIA_TYPES = frozenset(
+    {"image/jpeg", "image/png", "image/webp", "image/gif"}
+)
+# 6MB cap on the base64 payload string itself. The Android client compresses
+# images down to ~4MB pre-encoding, leaving headroom for the ~33% base64
+# inflation. Anthropic's own per-request image size limit is 5MB after
+# decoding, which this conservatively respects.
+_VISION_MAX_BASE64_LEN = 6 * 1024 * 1024
+
+
+class VisionExtractRequest(BaseModel):
+    image_base64: str = Field(min_length=1, max_length=_VISION_MAX_BASE64_LEN)
+    image_media_type: str = Field(pattern="^image/(jpeg|png|webp|gif)$")
+
+
+class VisionExtractResponse(BaseModel):
+    tasks: list[ExtractedTaskCandidate]
+
+
 # --- Pomodoro AI Coaching (pre-session / break / recap) ---
 
 

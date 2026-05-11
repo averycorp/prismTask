@@ -242,6 +242,8 @@ sealed class PrismTaskRoute(
 
     data object PasteConversation : PrismTaskRoute("paste_conversation")
 
+    data object ScreenshotImport : PrismTaskRoute("screenshot_import")
+
     data object WeeklyReview : PrismTaskRoute("weekly_review")
 
     data object WeeklyReviewsList : PrismTaskRoute("weekly_reviews_list")
