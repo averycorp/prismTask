@@ -813,6 +813,76 @@ Return an empty array if no action items are found."""
     raise ValueError(f"Failed to parse AI response: {last_error_ex}")
 
 
+# ---------------------------------------------------------------------------
+# G — screenshot -> tasks extraction (Claude Vision)
+# ---------------------------------------------------------------------------
+
+def extract_tasks_from_image(
+    image_base64: str,
+    image_media_type: str,
+    tier: str = "FREE",
+) -> list[dict]:
+    """Extract structured task candidates from a screenshot via Claude Vision.
+
+    Mirrors the response shape of ``extract_tasks_from_text`` so the existing
+    ``ExtractedTaskCandidate`` schema is reused on the wire. The Android
+    client packages the result into the same batch-preview UI the paste
+    flow uses.
+    """
+    if not image_base64 or not image_base64.strip():
+        return []
+
+    client = _get_client()
+    prompt = """You are an assistant that extracts action items from a screenshot.
+
+The image is a screenshot of an email, chat conversation, meeting notes, handwritten list, or similar. Identify clear action items (things the user needs to do).
+
+For each action item, return: title (imperative, Title Case, under 12 words), suggested_due_date (ISO YYYY-MM-DD or null), suggested_priority (0-4: 0=none, 1=low, 2=medium, 3=high, 4=urgent), suggested_project (single short word or null), confidence (0-1).
+
+Only extract clear action items. Ignore general discussion, status updates, or non-actionable content. If the image contains no action items, return an empty array.
+
+Respond ONLY with valid JSON (no markdown, no commentary):
+[{"title": "Send the design mocks to Alice", "suggested_due_date": null, "suggested_priority": 2, "suggested_project": null, "confidence": 0.9}]"""
+
+    model = get_model("screenshot_extraction")
+    last_error_vis = None
+    for attempt in range(2):
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=2048,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": image_media_type,
+                                "data": image_base64,
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            content = message.content[0].text
+            result = _parse_ai_json(content)
+            if not isinstance(result, list):
+                raise ValueError("Expected a JSON array")
+            return result
+        except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
+            last_error_vis = e
+            logger.error(f"Failed to parse vision extraction response (attempt {attempt + 1}): {e}")
+            if attempt == 0:
+                continue
+            raise ValueError(f"Failed to parse AI response after retry: {e}") from e
+        except Exception as e:
+            logger.error(f"Vision extraction AI error: {type(e).__name__}: {e}")
+            raise
+    raise ValueError(f"Failed to parse AI response: {last_error_vis}")
+
+
 # --- Pomodoro AI Coaching (pre-session / break / recap) ---
 
 
