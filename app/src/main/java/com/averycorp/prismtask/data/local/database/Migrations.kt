@@ -2505,9 +2505,9 @@ val MIGRATION_79_80 = object : Migration(79, 80) {
  * `ForeignKey` declared), and cascade-on-project-delete is handled by
  * the repository so we never had to teach Room about it.
  *
- * Existing image rows backfill `mime_type = 'image/*'`, `size_bytes = NULL`
+ * Existing image rows backfill `mime_type = 'image/\*'`, `size_bytes = NULL`
  * (we never recorded the original size), `project_id = NULL`. Backfilling
- * a generic `image/*` rather than picking a specific subtype keeps the
+ * a generic `image/\*` rather than picking a specific subtype keeps the
  * server side from having to disambiguate after sync.
  */
 val MIGRATION_80_81 = object : Migration(80, 81) {
@@ -2604,4 +2604,3 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_79_80,
     MIGRATION_80_81
 )
-

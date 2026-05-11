@@ -63,12 +63,22 @@ internal fun SelfCareRoutineCard(
         "housework" -> c.successColor
         else -> c.primary
     }
+    val cardShape = MaterialTheme.shapes.medium
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
+            .clickable(onClick = onClick)
+            .border(
+                width = 1.dp,
+                color = if (cardData.isComplete) {
+                    c.primary.copy(alpha = 0.4f)
+                } else {
+                    c.border
+                },
+                shape = cardShape
+            ),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (cardData.isComplete) {
                 color.copy(alpha = 0.1f)
