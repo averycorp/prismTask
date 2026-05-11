@@ -7,7 +7,7 @@ PyJWT==2.10.1
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 pydantic[email]==2.10.4
-pydantic-settings==2.7.1
+pydantic-settings==2.14.1
 httpx==0.28.1
 anthropic==0.42.0
 gunicorn==23.0.0
