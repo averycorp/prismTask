@@ -25,7 +25,7 @@ class BatchUndoListenerViewModel
 @Inject
 constructor(
     private val repository: BatchOperationsRepository,
-    bus: BatchUndoEventBus
+    private val bus: BatchUndoEventBus
 ) : ViewModel() {
     val events: SharedFlow<BatchAppliedEvent> = bus.events
 
@@ -34,5 +34,13 @@ constructor(
             val result = repository.undoBatch(batchId)
             onResult(result)
         }
+    }
+
+    /**
+     * Drop the bus's replay cache after the Snackbar has been shown so
+     * navigating back to Today later doesn't re-deliver the same toast.
+     */
+    fun acknowledge() {
+        bus.acknowledge()
     }
 }

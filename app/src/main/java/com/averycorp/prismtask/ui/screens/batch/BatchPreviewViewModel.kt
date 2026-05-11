@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
@@ -46,6 +47,18 @@ constructor(
     /** Per-mutation include flag, keyed by index in the loaded mutations list. */
     private val _excluded = MutableStateFlow<Set<Int>>(emptySet())
     val excluded: StateFlow<Set<Int>> = _excluded.asStateFlow()
+
+    // Synchronous re-entry latch for the approve path. Belt-and-suspenders
+    // on top of the `_state` machine guards: under a lifecycle resume
+    // (foreground after backgrounding) Compose can deliver a second click
+    // event to the freshly re-laid-out button before the first launch's
+    // `_state.value = Committing` mutation has been observed by the next
+    // recomposition. `compareAndSet` is atomic across threads, so the
+    // second call short-circuits before reaching `applyBatch`. The latch
+    // is reset on the Error path so Retry from Error still works; success
+    // leaves it set forever since `Applied` is terminal and the screen
+    // pops on the `Approved` event.
+    private val _isApproving = AtomicBoolean(false)
 
     /**
      * Calm Mode (sensory-reduction tier) suppresses the inline disambiguation
@@ -250,9 +263,20 @@ constructor(
     }
 
     fun approve() {
-        val loaded = _state.value as? BatchPreviewState.Loaded ?: return
+        // Atomic re-entry guard — see `_isApproving` KDoc. Test 1.3d
+        // (May 10, 2026) repro'd `applyBatch` double-firing after a
+        // foreground/background cycle; the state-machine guard alone
+        // had a narrow same-frame race window. CAS closes it without
+        // relying on `_state.value` mutation timing.
+        if (!_isApproving.compareAndSet(false, true)) return
+        val loaded = _state.value as? BatchPreviewState.Loaded
+        if (loaded == null) {
+            _isApproving.set(false)
+            return
+        }
         val toApply = loaded.mutations.filterIndexed { idx, _ -> idx !in _excluded.value }
         if (toApply.isEmpty()) {
+            _isApproving.set(false)
             viewModelScope.launch {
                 _events.emit(BatchEvent.Cancelled(reason = "No mutations selected"))
             }
@@ -282,12 +306,17 @@ constructor(
                         skippedCount = result.skipped.size
                     )
                 )
+                // success: leave _isApproving=true. Applied is terminal;
+                // the screen pops on the Approved event collector.
             } catch (e: Exception) {
                 _state.value = BatchPreviewState.Error(
                     commandText = loaded.commandText,
                     kind = BatchPreviewErrorKind.Network,
                     message = e.message ?: "Failed to commit batch"
                 )
+                // Error is recoverable via Retry → loadPreview → user
+                // re-taps Approve, so the latch must be released.
+                _isApproving.set(false)
             }
         }
     }

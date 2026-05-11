@@ -291,6 +291,88 @@ class BatchPreviewViewModelTest {
     }
 
     @Test
+    fun approve_calledTwiceInSameFrame_invokesApplyBatchExactlyOnce() = runTest(dispatcher) {
+        // Test 1.3d (May 10, 2026) repro: foreground→background→
+        // foreground→tap Approve produced double-applied mutations. The
+        // state-machine guard alone has a narrow race window if a single
+        // physical tap is delivered to the recomposed button as two click
+        // events before the first launch flips state to Committing. The
+        // AtomicBoolean re-entry latch in approve() closes that window
+        // regardless of state-machine timing.
+        stubParse(
+            BatchParseResponse(
+                mutations = listOf(taskRescheduleMutation(entityId = "7", due = "2026-05-03")),
+                confidence = 0.95f,
+                ambiguousEntities = emptyList()
+            )
+        )
+        coEvery { repository.applyBatch(any(), any()) } returns
+            BatchOperationsRepository.BatchApplyResult(
+                batchId = "batch-once",
+                commandText = "push my task to friday",
+                appliedCount = 1,
+                skipped = emptyList()
+            )
+
+        val viewModel = newViewModel()
+        viewModel.loadPreview("push my task to friday")
+        advanceUntilIdle()
+
+        // Synchronously fire approve() twice — simulates a same-frame
+        // double-dispatch from the button's pointer input.
+        viewModel.approve()
+        viewModel.approve()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { repository.applyBatch(any(), any()) }
+        assertTrue(viewModel.state.value is BatchPreviewState.Applied)
+    }
+
+    @Test
+    fun approve_afterErrorRecoveryAndRetry_appliesBatch() = runTest(dispatcher) {
+        // Regression guard: the AtomicBoolean latch must reset on the
+        // Error path so a user who hits Retry → Approve again actually
+        // commits. Without the reset, post-error retries would silently
+        // no-op.
+        coEvery { repository.applyBatch(any(), any()) } throws IllegalStateException("first commit fails")
+        stubParse(
+            BatchParseResponse(
+                mutations = listOf(taskRescheduleMutation(entityId = "7", due = "2026-05-03")),
+                confidence = 0.95f,
+                ambiguousEntities = emptyList()
+            )
+        )
+
+        val viewModel = newViewModel()
+        viewModel.loadPreview("retry me")
+        advanceUntilIdle()
+        viewModel.approve()
+        advanceUntilIdle()
+        assertTrue(
+            "First commit must surface as Error",
+            viewModel.state.value is BatchPreviewState.Error
+        )
+
+        // Operator hits Retry → loadPreview re-runs → state goes Loaded
+        // again. Then they tap Approve. With the latch reset on Error
+        // path, this must reach applyBatch.
+        coEvery { repository.applyBatch(any(), any()) } returns
+            BatchOperationsRepository.BatchApplyResult(
+                batchId = "batch-retry-ok",
+                commandText = "retry me",
+                appliedCount = 1,
+                skipped = emptyList()
+            )
+        viewModel.loadPreview("retry me")
+        advanceUntilIdle()
+        viewModel.approve()
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { repository.applyBatch(any(), any()) }
+        assertTrue(viewModel.state.value is BatchPreviewState.Applied)
+    }
+
+    @Test
     fun loadPreview_reParsesWhenStateIsLoadedButCommandTextDiffers() = runTest(dispatcher) {
         // Regression guard: the same-commandText short-circuit must NOT
         // block legitimate re-parses for a different command (e.g. nav arg

@@ -169,6 +169,11 @@ fun TodayScreen(
             ) {
                 batchUndoListener.undo(event.batchId)
             }
+            // Drain the bus replay cache once the Snackbar has been
+            // shown — `replay = 1` defends the BatchPreview→pop→Today
+            // timing gap (Test 1.6, May 10 2026) but we don't want
+            // unrelated re-entries to Today re-deliver stale events.
+            batchUndoListener.acknowledge()
         }
     }
 
