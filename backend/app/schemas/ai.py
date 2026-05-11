@@ -351,6 +351,36 @@ class ExtractFromTextResponse(BaseModel):
     tasks: list[ExtractedTaskCandidate]
 
 
+# --- File Extraction (single uploaded file -> one task + subtasks) ---
+
+
+class FileExtractedSubtask(BaseModel):
+    title: str
+    suggested_due_date: Optional[str] = None
+
+
+class FileExtractionResponse(BaseModel):
+    """Single-task suggestion derived from an uploaded file.
+
+    Sent back to the Android client which renders it in
+    ``FileImportSuggestionSheet`` for the user to confirm before any task
+    state is mutated. The user may accept/reject individual fields.
+    """
+
+    title: str = ""
+    description: Optional[str] = None
+    suggested_due_date: Optional[str] = None
+    suggested_priority: int = Field(default=0, ge=0, le=4)
+    suggested_project: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    subtasks: list[FileExtractedSubtask] = Field(default_factory=list)
+    detected_dates: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    notes: Optional[str] = None
+    source_file_name: Optional[str] = None
+    source_mime_type: Optional[str] = None
+
+
 # --- Vision: extract tasks from a screenshot (G1) ---
 
 
