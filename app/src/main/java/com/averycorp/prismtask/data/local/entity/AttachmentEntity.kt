@@ -12,12 +12,12 @@ import androidx.room.PrimaryKey
  *     "file"), or
  *   - a raw URL (type = "link").
  *
- * Historically attachments were task-only (legacy `taskId` column). The v80
+ * Historically attachments were task-only (legacy `taskId` column). The v81
  * migration adds optional `project_id` so a file can also be attached to a
  * project (with no task scope) — the project's Files section surfaces those
  * rows. Exactly one of `taskId` / `project_id` should be set:
  *  - task attachments: `taskId > 0`, `project_id = null` (matches all
- *    pre-v80 rows; the column nullability lets us avoid recreating the
+ *    pre-v81 rows; the column nullability lets us avoid recreating the
  *    table to relax the existing NOT NULL).
  *  - project attachments: `taskId = 0` sentinel, `project_id` set.
  *

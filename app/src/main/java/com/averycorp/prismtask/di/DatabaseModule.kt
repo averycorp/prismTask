@@ -45,6 +45,7 @@ import com.averycorp.prismtask.data.local.dao.TaskDependencyDao
 import com.averycorp.prismtask.data.local.dao.TaskTemplateDao
 import com.averycorp.prismtask.data.local.dao.TaskTimingDao
 import com.averycorp.prismtask.data.local.dao.UsageLogDao
+import com.averycorp.prismtask.data.local.dao.UserAiPreferenceDao
 import com.averycorp.prismtask.data.local.dao.WeeklyReviewDao
 import com.averycorp.prismtask.data.local.database.PrismTaskDatabase
 import com.averycorp.prismtask.data.local.database.instrumentedMigrations
@@ -217,6 +218,10 @@ object DatabaseModule {
 
     @Provides
     fun provideChatMessageDao(database: PrismTaskDatabase): ChatMessageDao = database.chatMessageDao()
+
+    @Provides
+    fun provideUserAiPreferenceDao(database: PrismTaskDatabase): UserAiPreferenceDao =
+        database.userAiPreferenceDao()
 }
 
 /**

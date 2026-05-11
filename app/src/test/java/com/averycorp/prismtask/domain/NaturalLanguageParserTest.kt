@@ -123,6 +123,11 @@ class NaturalLanguageParserTest {
         ): com.averycorp.prismtask.data.remote.api.ExtractFromTextResponse =
             error("not used in offline parser tests")
 
+        override suspend fun extractTasksFromImage(
+            request: com.averycorp.prismtask.data.remote.api.VisionExtractRequest
+        ): com.averycorp.prismtask.data.remote.api.VisionExtractResponse =
+            error("not used in offline parser tests")
+
         override suspend fun getVersion(): VersionResponse =
             error("not used in offline parser tests")
 
@@ -179,6 +184,23 @@ class NaturalLanguageParserTest {
             limit: Int,
             before: String?
         ): ChatHistoryResponse =
+            error("not used in offline parser tests")
+
+        override suspend fun listAiMemory(): com.averycorp.prismtask.data.remote.api.UserAiPreferenceListResponse =
+            error("not used in offline parser tests")
+
+        override suspend fun createAiMemory(
+            request: com.averycorp.prismtask.data.remote.api.UserAiPreferenceCreateRequest
+        ): com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto =
+            error("not used in offline parser tests")
+
+        override suspend fun updateAiMemory(
+            preferenceId: String,
+            request: com.averycorp.prismtask.data.remote.api.UserAiPreferenceUpdateRequest
+        ): com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto =
+            error("not used in offline parser tests")
+
+        override suspend fun deleteAiMemory(preferenceId: String) =
             error("not used in offline parser tests")
 
         override suspend fun getEveningSummary(request: EveningSummaryRequest): EveningSummaryResponse =

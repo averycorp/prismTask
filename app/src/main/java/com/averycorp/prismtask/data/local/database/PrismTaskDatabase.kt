@@ -44,6 +44,7 @@ import com.averycorp.prismtask.data.local.dao.TaskDependencyDao
 import com.averycorp.prismtask.data.local.dao.TaskTemplateDao
 import com.averycorp.prismtask.data.local.dao.TaskTimingDao
 import com.averycorp.prismtask.data.local.dao.UsageLogDao
+import com.averycorp.prismtask.data.local.dao.UserAiPreferenceDao
 import com.averycorp.prismtask.data.local.dao.WeeklyReviewDao
 import com.averycorp.prismtask.data.local.entity.AssignmentEntity
 import com.averycorp.prismtask.data.local.entity.AttachmentEntity
@@ -93,6 +94,7 @@ import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
 import com.averycorp.prismtask.data.local.entity.UsageLogEntity
+import com.averycorp.prismtask.data.local.entity.UserAiPreferenceEntity
 import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
 
 @Database(
@@ -145,7 +147,8 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
         ProjectRiskEntity::class,
         TaskDependencyEntity::class,
         ExternalAnchorEntity::class,
-        ChatMessageEntity::class
+        ChatMessageEntity::class,
+        UserAiPreferenceEntity::class
     ],
     version = CURRENT_DB_VERSION,
     exportSchema = false
@@ -236,4 +239,6 @@ abstract class PrismTaskDatabase : RoomDatabase() {
     abstract fun externalAnchorDao(): ExternalAnchorDao
 
     abstract fun chatMessageDao(): ChatMessageDao
+
+    abstract fun userAiPreferenceDao(): UserAiPreferenceDao
 }

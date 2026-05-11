@@ -154,7 +154,8 @@ data class PerFeatureAiPrefs(
     val dailyBriefingEnabled: Boolean = true,
     val smartPomodoroEnabled: Boolean = true,
     val weeklyPlannerEnabled: Boolean = true,
-    val morningCheckInEnabled: Boolean = true
+    val morningCheckInEnabled: Boolean = true,
+    val screenshotImportEnabled: Boolean = true
 )
 
 /**
@@ -268,6 +269,12 @@ class UserPreferencesDataStore(
         // prefs migration. Defaults to true to match the other 4.
         val KEY_AI_MORNING_CHECKIN_ENABLED =
             booleanPreferencesKey("ai_morning_checkin_enabled")
+
+        // G — smart screenshot import per-feature opt-in. Same shape as the
+        // other PR #1214 per-feature flags; the master AI toggle is the
+        // privacy gate, this just hides the screenshot row in the AI hub.
+        val KEY_AI_SCREENSHOT_IMPORT_ENABLED =
+            booleanPreferencesKey("ai_screenshot_import_enabled")
 
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1, Phase 2 #2).
         // Set to true the first time the user dismisses the disclosure
@@ -456,7 +463,8 @@ class UserPreferencesDataStore(
             dailyBriefingEnabled = prefs[KEY_AI_DAILY_BRIEFING_ENABLED] ?: true,
             smartPomodoroEnabled = prefs[KEY_AI_SMART_POMODORO_ENABLED] ?: true,
             weeklyPlannerEnabled = prefs[KEY_AI_WEEKLY_PLANNER_ENABLED] ?: true,
-            morningCheckInEnabled = prefs[KEY_AI_MORNING_CHECKIN_ENABLED] ?: true
+            morningCheckInEnabled = prefs[KEY_AI_MORNING_CHECKIN_ENABLED] ?: true,
+            screenshotImportEnabled = prefs[KEY_AI_SCREENSHOT_IMPORT_ENABLED] ?: true
         )
     }
 
@@ -595,6 +603,10 @@ class UserPreferencesDataStore(
 
     suspend fun setAiMorningCheckInEnabled(enabled: Boolean) {
         dataStore.edit { it[KEY_AI_MORNING_CHECKIN_ENABLED] = enabled }
+    }
+
+    suspend fun setAiScreenshotImportEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_SCREENSHOT_IMPORT_ENABLED] = enabled }
     }
 
     /**

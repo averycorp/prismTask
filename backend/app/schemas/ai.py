@@ -381,6 +381,28 @@ class FileExtractionResponse(BaseModel):
     source_mime_type: Optional[str] = None
 
 
+# --- Vision: extract tasks from a screenshot (G1) ---
+
+
+_VISION_ALLOWED_MEDIA_TYPES = frozenset(
+    {"image/jpeg", "image/png", "image/webp", "image/gif"}
+)
+# 6MB cap on the base64 payload string itself. The Android client compresses
+# images down to ~4MB pre-encoding, leaving headroom for the ~33% base64
+# inflation. Anthropic's own per-request image size limit is 5MB after
+# decoding, which this conservatively respects.
+_VISION_MAX_BASE64_LEN = 6 * 1024 * 1024
+
+
+class VisionExtractRequest(BaseModel):
+    image_base64: str = Field(min_length=1, max_length=_VISION_MAX_BASE64_LEN)
+    image_media_type: str = Field(pattern="^image/(jpeg|png|webp|gif)$")
+
+
+class VisionExtractResponse(BaseModel):
+    tasks: list[ExtractedTaskCandidate]
+
+
 # --- Pomodoro AI Coaching (pre-session / break / recap) ---
 
 
@@ -562,6 +584,39 @@ _CHAT_ACTION_TYPE_PATTERN = (
 )
 
 
+# --- AI memory (preferences the AI auto-extracts from chat) ---
+
+# Hard server-side cap. The AI is also instructed to evict before
+# inserting a 16th, but this is enforced on every write path as a
+# defense in depth so a buggy client can't blow past the limit.
+USER_AI_PREFERENCE_CAP = 15
+
+
+class UserAiPreferenceRecord(BaseModel):
+    """A single AI-remembered user preference."""
+
+    id: str
+    preference_text: str = Field(min_length=1, max_length=500)
+    source_message_id: Optional[str] = None
+    created_at: str  # ISO-8601
+    updated_at: str  # ISO-8601
+
+
+class UserAiPreferenceListResponse(BaseModel):
+    """Full list of the user's stored AI preferences (capped at 15)."""
+
+    preferences: list[UserAiPreferenceRecord] = Field(default_factory=list)
+    cap: int = USER_AI_PREFERENCE_CAP
+
+
+class UserAiPreferenceCreateRequest(BaseModel):
+    preference_text: str = Field(min_length=1, max_length=500)
+
+
+class UserAiPreferenceUpdateRequest(BaseModel):
+    preference_text: str = Field(min_length=1, max_length=500)
+
+
 class ChatActionPayload(BaseModel):
     """One AI-proposed inline action button. Field set varies by ``type`` —
     Pydantic accepts any subset; the Android client picks the fields it
@@ -660,6 +715,12 @@ class ChatResponse(BaseModel):
     # REPLACE-on-PK upsert collapses cleanly to one row per turn.
     user_message_id: Optional[str] = None
     assistant_message_id: Optional[str] = None
+    # Authoritative snapshot of the user's AI-memory preferences after
+    # any ``remember_preference`` / ``forget_preference`` tool calls in
+    # this turn were applied. Always present so the client can mirror
+    # the full list with a REPLACE-all on every response, keeping
+    # cross-device state consistent without a separate GET round-trip.
+    user_preferences: list[UserAiPreferenceRecord] = Field(default_factory=list)
 
 
 class ChatMessageRecord(BaseModel):

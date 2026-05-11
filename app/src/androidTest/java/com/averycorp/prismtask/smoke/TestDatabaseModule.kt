@@ -180,6 +180,10 @@ object TestDatabaseModule {
     fun provideChatMessageDao(database: PrismTaskDatabase) = database.chatMessageDao()
 
     @Provides
+    fun provideUserAiPreferenceDao(database: PrismTaskDatabase) =
+        database.userAiPreferenceDao()
+
+    @Provides
     @Singleton
     fun provideGson(): com.google.gson.Gson = com.google.gson.Gson()
 }

@@ -19,6 +19,7 @@ fun AiSection(
     onNavigateToWeeklyPlanner: () -> Unit,
     onNavigateToTimeline: () -> Unit,
     onNavigateToPasteExtract: () -> Unit = {},
+    onNavigateToScreenshotImport: () -> Unit = {},
     onNavigateToWeeklyReview: () -> Unit = {},
     onNavigateToMoodAnalytics: () -> Unit = {},
     onNavigateToAiChat: () -> Unit = {},
@@ -35,7 +36,9 @@ fun AiSection(
     weeklyPlannerFeatureEnabled: Boolean = true,
     onWeeklyPlannerFeatureEnabledChanged: (Boolean) -> Unit = {},
     morningCheckInFeatureEnabled: Boolean = true,
-    onMorningCheckInFeatureEnabledChanged: (Boolean) -> Unit = {}
+    onMorningCheckInFeatureEnabledChanged: (Boolean) -> Unit = {},
+    screenshotImportFeatureEnabled: Boolean = true,
+    onScreenshotImportFeatureEnabledChanged: (Boolean) -> Unit = {}
 ) {
     SectionHeader("AI Features")
 
@@ -104,6 +107,12 @@ fun AiSection(
         checked = morningCheckInFeatureEnabled,
         onCheckedChange = onMorningCheckInFeatureEnabledChanged
     )
+    SettingsToggleRow(
+        title = "Extract Tasks From Screenshot",
+        subtitle = "Pick a screenshot of an email, chat, or notebook and let Claude pull tasks from it.",
+        checked = screenshotImportFeatureEnabled,
+        onCheckedChange = onScreenshotImportFeatureEnabledChanged
+    )
 
     SettingsRowWithSubtitle(
         title = "Eisenhower Matrix",
@@ -139,6 +148,12 @@ fun AiSection(
         title = "Extract Tasks From Text",
         subtitle = "Paste a chat, email, or meeting note and let Claude pull tasks out of it",
         onClick = onNavigateToPasteExtract
+    )
+
+    SettingsRowWithSubtitle(
+        title = "Extract Tasks From Screenshot",
+        subtitle = "Pick a screenshot and let Claude pull action items out of the image",
+        onClick = onNavigateToScreenshotImport
     )
 
     SettingsRowWithSubtitle(

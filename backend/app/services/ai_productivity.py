@@ -813,6 +813,76 @@ Return an empty array if no action items are found."""
     raise ValueError(f"Failed to parse AI response: {last_error_ex}")
 
 
+# ---------------------------------------------------------------------------
+# G — screenshot -> tasks extraction (Claude Vision)
+# ---------------------------------------------------------------------------
+
+def extract_tasks_from_image(
+    image_base64: str,
+    image_media_type: str,
+    tier: str = "FREE",
+) -> list[dict]:
+    """Extract structured task candidates from a screenshot via Claude Vision.
+
+    Mirrors the response shape of ``extract_tasks_from_text`` so the existing
+    ``ExtractedTaskCandidate`` schema is reused on the wire. The Android
+    client packages the result into the same batch-preview UI the paste
+    flow uses.
+    """
+    if not image_base64 or not image_base64.strip():
+        return []
+
+    client = _get_client()
+    prompt = """You are an assistant that extracts action items from a screenshot.
+
+The image is a screenshot of an email, chat conversation, meeting notes, handwritten list, or similar. Identify clear action items (things the user needs to do).
+
+For each action item, return: title (imperative, Title Case, under 12 words), suggested_due_date (ISO YYYY-MM-DD or null), suggested_priority (0-4: 0=none, 1=low, 2=medium, 3=high, 4=urgent), suggested_project (single short word or null), confidence (0-1).
+
+Only extract clear action items. Ignore general discussion, status updates, or non-actionable content. If the image contains no action items, return an empty array.
+
+Respond ONLY with valid JSON (no markdown, no commentary):
+[{"title": "Send the design mocks to Alice", "suggested_due_date": null, "suggested_priority": 2, "suggested_project": null, "confidence": 0.9}]"""
+
+    model = get_model("screenshot_extraction")
+    last_error_vis = None
+    for attempt in range(2):
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=2048,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": image_media_type,
+                                "data": image_base64,
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            content = message.content[0].text
+            result = _parse_ai_json(content)
+            if not isinstance(result, list):
+                raise ValueError("Expected a JSON array")
+            return result
+        except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
+            last_error_vis = e
+            logger.error(f"Failed to parse vision extraction response (attempt {attempt + 1}): {e}")
+            if attempt == 0:
+                continue
+            raise ValueError(f"Failed to parse AI response after retry: {e}") from e
+        except Exception as e:
+            logger.error(f"Vision extraction AI error: {type(e).__name__}: {e}")
+            raise
+    raise ValueError(f"Failed to parse AI response: {last_error_vis}")
+
+
 # --- Pomodoro AI Coaching (pre-session / break / recap) ---
 
 
@@ -1157,7 +1227,7 @@ def parse_batch_command(
 # Conversational AI Coach (chat)
 # ---------------------------------------------------------------------------
 
-_CHAT_SYSTEM_PROMPT = """You are PrismTask's conversational productivity coach. The user is in a one-on-one chat with you inside an Android task-management app. Be warm, concise, and concrete — never preachy. Default to 1-3 short sentences; only go longer when the user explicitly asks.
+_CHAT_SYSTEM_PROMPT_BASE = """You are PrismTask's conversational productivity coach. The user is in a one-on-one chat with you inside an Android task-management app. Be warm, concise, and concrete — never preachy. Default to 1-3 short sentences; only go longer when the user explicitly asks.
 
 You have access to a set of tools that render as inline action buttons under your reply. Use them when the user has expressed a clear, actionable intent in their most recent message. Prefer no tool call over a weak suggestion. NEVER invent task IDs or fabricate references the user did not give you.
 
@@ -1169,7 +1239,48 @@ Hard rules:
 3. For `breakdown`, propose 2-5 concrete subtasks expressed as imperative phrases (e.g. "Draft outline", "Review with team").
 4. Never invent due dates beyond today/tomorrow/next_week unless the user named one.
 5. Stay supportive and practical. Avoid moralizing about productivity.
-6. If the user message is small talk or unclear, just reply in prose with no tool calls."""
+6. If the user message is small talk or unclear, just reply in prose with no tool calls.
+
+User preferences memory:
+You can remember up to 15 durable preferences this user expresses about how they work, what they like, or how they want the coach to behave. The current stored preferences are listed in the user payload below as `user_preferences`.
+- When the user expresses a clear, durable preference not already stored, emit a `remember_preference` tool call alongside your reply. Keep the text concise (one sentence, under 200 chars), neutral, and first-person ("Prefers ...", "Doesn't like ...", "Works best ...").
+- Do NOT remember one-off facts ("I'm tired today"), ephemeral mood, or anything already covered by an existing preference.
+- If `user_preferences` already contains 15 entries and the new one is genuinely worth keeping, FIRST emit a `forget_preference` for whichever existing preference is least useful or most outdated, in the same turn as the `remember_preference`.
+- You may also emit `forget_preference` alone if the user asks you to forget something or contradicts a stored preference.
+- Tool calls happen silently — do NOT narrate "I'll remember that" in your reply text unless the user explicitly asked you to. Just remember and respond naturally."""
+
+
+_CHAT_USER_PREFERENCES_CAP = 15
+
+
+def _format_chat_system_prompt(user_preferences: list[dict] | None) -> str:
+    """Append the rendered preference list onto the base system prompt.
+
+    Preferences arrive from the chat handler as ``[{"id": str, "text":
+    str}, ...]``. The rendered block lets the AI cite ids verbatim when
+    emitting ``forget_preference`` without having to invent them.
+    """
+    prefs = user_preferences or []
+    if not prefs:
+        rendered = "(no preferences stored yet)"
+    else:
+        lines = []
+        for entry in prefs[:_CHAT_USER_PREFERENCES_CAP]:
+            pid = entry.get("id", "")
+            text = entry.get("text", "")
+            if pid and text:
+                lines.append(f"- [{pid}] {text}")
+        rendered = "\n".join(lines) if lines else "(no preferences stored yet)"
+    return (
+        f"{_CHAT_SYSTEM_PROMPT_BASE}\n\n"
+        f"Current stored preferences ({len(prefs)}/{_CHAT_USER_PREFERENCES_CAP}):\n"
+        f"{rendered}"
+    )
+
+
+# Back-compat alias for callers that still want the base prompt without
+# preferences (notably existing unit tests that monkeypatch this name).
+_CHAT_SYSTEM_PROMPT = _CHAT_SYSTEM_PROMPT_BASE
 
 
 # D12 Item A (B.1) — native Anthropic tool_use migration. Each tool's
@@ -1350,6 +1461,58 @@ _CHAT_TOOL_DEFINITIONS: list[dict] = [
         },
     },
     {
+        "name": "remember_preference",
+        "description": (
+            "Persist a durable user preference into AI memory (capped "
+            "at 15). Use when the user expresses a clear, lasting "
+            "preference about how they work, what they like, or how "
+            "the coach should behave. The text should be a single "
+            "concise sentence (under 200 chars), neutral and "
+            "third-person about the user. Do NOT remember ephemeral "
+            "facts or anything already in the current preferences."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "preference_text": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": (
+                        "Concise statement of the preference, e.g. "
+                        "'Prefers morning workouts before email' or "
+                        "'Doesn't want reminders on weekends'."
+                    ),
+                },
+            },
+            "required": ["preference_text"],
+        },
+    },
+    {
+        "name": "forget_preference",
+        "description": (
+            "Remove a previously-stored preference from AI memory. "
+            "Use when the user asks you to forget something, "
+            "contradicts a stored preference, or when memory is full "
+            "and you must evict one to make room for a more useful "
+            "preference. The id must match an existing entry in "
+            "`user_preferences`."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "preference_id": {
+                    "type": "string",
+                    "description": (
+                        "The id of the stored preference to remove "
+                        "(taken verbatim from the user_preferences "
+                        "list in the system prompt)."
+                    ),
+                },
+            },
+            "required": ["preference_id"],
+        },
+    },
+    {
         "name": "batch_command",
         "description": (
             "Hand the user's natural-language batch phrasing to a "
@@ -1385,6 +1548,7 @@ def _build_chat_messages_array(
     task_context_id: int | None,
     task_context: dict | None,
     history: list[dict] | None,
+    user_preferences: list[dict] | None = None,
 ) -> list[dict]:
     """Build the Anthropic ``messages`` array for a chat turn.
 
@@ -1394,6 +1558,10 @@ def _build_chat_messages_array(
     task_context snapshot). History is defensively re-trimmed to the
     last 12 entries even though ``ChatRequest`` validation already caps
     it — keeps the helper safe for unit tests that bypass the schema.
+
+    ``user_preferences`` is the AI-memory list (already capped at 15)
+    forwarded to the model inside the user payload so the AI sees the
+    same data shape on each turn as the rendered system-prompt block.
     """
     user_block: dict = {
         "conversation_id": conversation_id,
@@ -1402,6 +1570,8 @@ def _build_chat_messages_array(
     }
     if task_context:
         user_block["task_context"] = task_context
+    if user_preferences:
+        user_block["user_preferences"] = user_preferences
     user_payload = json.dumps(user_block, default=str, indent=2)
 
     anthropic_messages: list[dict] = []
@@ -1470,6 +1640,7 @@ def generate_chat_response(
     task_context_id: int | None = None,
     task_context: dict | None = None,
     history: list[dict] | None = None,
+    user_preferences: list[dict] | None = None,
 ) -> dict:
     """Call Claude Haiku to produce a conversational chat reply + optional actions.
 
@@ -1503,8 +1674,14 @@ def generate_chat_response(
     client = _get_client()
     model = get_model("chat")
     anthropic_messages = _build_chat_messages_array(
-        message, conversation_id, task_context_id, task_context, history
+        message,
+        conversation_id,
+        task_context_id,
+        task_context,
+        history,
+        user_preferences,
     )
+    system_prompt = _format_chat_system_prompt(user_preferences)
 
     last_error: Exception | None = None
     for attempt in range(2):
@@ -1512,7 +1689,7 @@ def generate_chat_response(
             ai_message = client.messages.create(
                 model=model,
                 max_tokens=1024,
-                system=_CHAT_SYSTEM_PROMPT,
+                system=system_prompt,
                 tools=_CHAT_TOOL_DEFINITIONS,
                 messages=anthropic_messages,
             )
@@ -1539,6 +1716,7 @@ def generate_chat_response_stream(
     task_context_id: int | None = None,
     task_context: dict | None = None,
     history: list[dict] | None = None,
+    user_preferences: list[dict] | None = None,
 ) -> Iterator[dict]:
     """Stream a conversational chat reply token-by-token.
 
@@ -1568,15 +1746,21 @@ def generate_chat_response_stream(
     client = _get_client()
     model = get_model("chat")
     anthropic_messages = _build_chat_messages_array(
-        message, conversation_id, task_context_id, task_context, history
+        message,
+        conversation_id,
+        task_context_id,
+        task_context,
+        history,
+        user_preferences,
     )
+    system_prompt = _format_chat_system_prompt(user_preferences)
 
     final_message = None
     try:
         with client.messages.stream(
             model=model,
             max_tokens=1024,
-            system=_CHAT_SYSTEM_PROMPT,
+            system=system_prompt,
             tools=_CHAT_TOOL_DEFINITIONS,
             messages=anthropic_messages,
         ) as stream:

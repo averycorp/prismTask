@@ -95,6 +95,11 @@ interface PrismTaskApi {
         @Part file: MultipartBody.Part
     ): FileExtractionResponse
 
+    @POST("api/v1/ai/vision/extract-tasks")
+    suspend fun extractTasksFromImage(
+        @Body request: VisionExtractRequest
+    ): VisionExtractResponse
+
     @GET("api/v1/app/version")
     suspend fun getVersion(): VersionResponse
 
@@ -169,6 +174,25 @@ interface PrismTaskApi {
         @Query("limit") limit: Int = 50,
         @Query("before") before: String? = null
     ): ChatHistoryResponse
+
+    @GET("api/v1/ai/memory")
+    suspend fun listAiMemory(): UserAiPreferenceListResponse
+
+    @POST("api/v1/ai/memory")
+    suspend fun createAiMemory(
+        @Body request: UserAiPreferenceCreateRequest
+    ): UserAiPreferenceDto
+
+    @PATCH("api/v1/ai/memory/{preferenceId}")
+    suspend fun updateAiMemory(
+        @Path("preferenceId") preferenceId: String,
+        @Body request: UserAiPreferenceUpdateRequest
+    ): UserAiPreferenceDto
+
+    @DELETE("api/v1/ai/memory/{preferenceId}")
+    suspend fun deleteAiMemory(
+        @Path("preferenceId") preferenceId: String
+    )
 
     @POST("api/v1/tasks/parse-import")
     suspend fun parseImport(

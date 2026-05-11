@@ -6,6 +6,7 @@ import com.averycorp.prismtask.data.remote.api.ChatMessageRecord
 import com.averycorp.prismtask.data.remote.api.ChatResponse
 import com.averycorp.prismtask.data.remote.api.ChatTokensUsed
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto
 import com.averycorp.prismtask.data.remote.sse.ChatStreamClient
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -37,7 +38,8 @@ class ChatRepositoryPersistenceTest {
             tokensUsed = ChatTokensUsed(input = 8, output = 3)
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.sendMessage(userMessage = "hello")
 
@@ -63,7 +65,8 @@ class ChatRepositoryPersistenceTest {
             message = "ack", actions = emptyList(), conversationId = "x"
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         // Pre-seed a row in a different conversation; it must not surface.
         dao.upsert(
@@ -93,7 +96,8 @@ class ChatRepositoryPersistenceTest {
             message = "ack", actions = emptyList(), conversationId = "x"
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.sendMessage(userMessage = "first")
         val rowsBeforeClear = dao.rowsSnapshot.size
@@ -138,7 +142,8 @@ class ChatRepositoryPersistenceTest {
             nextBefore = null
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.pullHistory("chat_2026-05-08_pull")
 
@@ -165,7 +170,8 @@ class ChatRepositoryPersistenceTest {
             nextBefore = null
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.pullHistory("c")
         repo.pullHistory("c")
@@ -178,7 +184,8 @@ class ChatRepositoryPersistenceTest {
     fun `sendMessage forwards prior turns as chronological history`() = runTest {
         val api = mockk<PrismTaskApi>(relaxed = true)
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
         coEvery { api.aiChat(any()) } returnsMany listOf(
             ChatResponse(message = "first reply", actions = emptyList(), conversationId = "x"),
             ChatResponse(message = "second reply", actions = emptyList(), conversationId = "x")
@@ -210,7 +217,8 @@ class ChatRepositoryPersistenceTest {
             assistantMessageId = "srv-asst-id"
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.sendMessage(userMessage = "hello")
 
@@ -255,7 +263,8 @@ class ChatRepositoryPersistenceTest {
             nextBefore = null
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.sendMessage(userMessage = "hello")
         // Simulate the cross-device pull: identical PKs collapse via
@@ -276,12 +285,51 @@ class ChatRepositoryPersistenceTest {
             // userMessageId / assistantMessageId omitted → null defaults
         )
         val dao = FakeChatMessageDao()
-        val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
+        val repo =
+            ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true), mockk<UserAiPreferenceRepository>(relaxed = true))
 
         repo.sendMessage(userMessage = "hello")
 
         // Two rows still land — just with client-side UUIDs. Behavior is
         // resilient to older backends or persistence-failure responses.
         assertEquals(2, dao.rowsSnapshot.size)
+    }
+
+    @Test
+    fun `sendMessage mirrors AI memory preferences from the chat response`() = runTest {
+        // The chat response carries the authoritative user_preferences
+        // snapshot; the repo must REPLACE-all into the AI-memory mirror so
+        // the Settings screen reflects what the AI just stored/forgot.
+        val api = mockk<PrismTaskApi>()
+        coEvery { api.aiChat(any()) } returns ChatResponse(
+            message = "ok",
+            actions = emptyList(),
+            conversationId = "x",
+            userPreferences = listOf(
+                UserAiPreferenceDto(
+                    id = "p1",
+                    preferenceText = "Prefers morning workouts",
+                    createdAt = "2026-05-11T12:00:00+00:00",
+                    updatedAt = "2026-05-11T12:00:00+00:00"
+                )
+            )
+        )
+        val dao = FakeChatMessageDao()
+        val prefDao = FakeUserAiPreferenceDao()
+        val prefRepo = UserAiPreferenceRepository(
+            api = mockk<PrismTaskApi>(relaxed = true),
+            dao = prefDao
+        )
+        val repo = ChatRepository(
+            api,
+            dao,
+            mockk<ChatStreamClient>(relaxed = true),
+            prefRepo
+        )
+
+        repo.sendMessage(userMessage = "I always work out in the morning")
+
+        assertEquals(1, prefDao.rowsSnapshot.size)
+        assertEquals("Prefers morning workouts", prefDao.rowsSnapshot[0].preferenceText)
     }
 }

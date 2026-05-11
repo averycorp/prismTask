@@ -283,6 +283,10 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setAiMorningCheckInEnabled(enabled) }
     }
 
+    fun setScreenshotImportFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiScreenshotImportEnabled(enabled) }
+    }
+
     /** Boundary rules (v1.4.0 V3). */
     val boundaryRules: StateFlow<List<com.averycorp.prismtask.domain.model.BoundaryRule>> =
         boundaryRuleRepository

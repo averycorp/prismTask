@@ -169,6 +169,26 @@ class FakePrismTaskApi : PrismTaskApi {
             ?: error("extractTasksFromTextResult not set — provide a canned response")
     }
 
+    /**
+     * Programmable response for `/api/v1/ai/vision/extract-tasks` (G —
+     * smart screenshot import). Set [extractTasksFromImageResult] in a
+     * test's `@Before` block to a canned
+     * [com.averycorp.prismtask.data.remote.api.VisionExtractResponse];
+     * leave it null to fail loudly so any unexpected vision call gets
+     * surfaced in the test output.
+     */
+    @Volatile
+    var extractTasksFromImageResult:
+        com.averycorp.prismtask.data.remote.api.VisionExtractResponse? = null
+
+    override suspend fun extractTasksFromImage(
+        request: com.averycorp.prismtask.data.remote.api.VisionExtractRequest
+    ): com.averycorp.prismtask.data.remote.api.VisionExtractResponse {
+        requireOnline()
+        return extractTasksFromImageResult
+            ?: error("extractTasksFromImageResult not set — provide a canned response")
+    }
+
     override suspend fun getVersion() = error("Not used in offline tests")
 
     override suspend fun syncPush(request: SyncPushRequest): SyncPushResponse {
@@ -237,6 +257,23 @@ class FakePrismTaskApi : PrismTaskApi {
         limit: Int,
         before: String?
     ): com.averycorp.prismtask.data.remote.api.ChatHistoryResponse =
+        error("Not used in offline tests")
+
+    override suspend fun listAiMemory(): com.averycorp.prismtask.data.remote.api.UserAiPreferenceListResponse =
+        error("Not used in offline tests")
+
+    override suspend fun createAiMemory(
+        request: com.averycorp.prismtask.data.remote.api.UserAiPreferenceCreateRequest
+    ): com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto =
+        error("Not used in offline tests")
+
+    override suspend fun updateAiMemory(
+        preferenceId: String,
+        request: com.averycorp.prismtask.data.remote.api.UserAiPreferenceUpdateRequest
+    ): com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto =
+        error("Not used in offline tests")
+
+    override suspend fun deleteAiMemory(preferenceId: String) =
         error("Not used in offline tests")
 
     override suspend fun parseImport(

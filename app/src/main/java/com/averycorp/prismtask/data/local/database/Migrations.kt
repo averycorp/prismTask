@@ -2456,7 +2456,40 @@ val MIGRATION_78_79 = object : Migration(78, 79) {
 }
 
 /**
- * v79 → v80 — Extends `attachments` so files can be:
+ * v79 → v80: AI memory — preferences the conversational coach has
+ * learned about the user.
+ *
+ * Greenfield table; populated by the chat handler when the AI emits
+ * `remember_preference` tool calls, and by the user from the new
+ * Settings → AI Memory screen. The 15-row cap is enforced server-side
+ * (see `_apply_preference_diff` in backend/app/routers/ai.py); the
+ * client mirrors the authoritative list via `replaceAll()`.
+ *
+ * No `user_id` column — PrismTaskDatabase is per-account-per-device,
+ * matching the same scoping rule as `chat_messages` (MIGRATION_76_77).
+ */
+val MIGRATION_79_80 = object : Migration(79, 80) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `user_ai_preferences` (
+                `id` TEXT NOT NULL PRIMARY KEY,
+                `preference_text` TEXT NOT NULL,
+                `source_message_id` TEXT,
+                `created_at` INTEGER NOT NULL,
+                `updated_at` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_user_ai_preferences_updated_at` " +
+                "ON `user_ai_preferences` (`updated_at`)"
+        )
+    }
+}
+
+/**
+ * v80 → v81 — Extends `attachments` so files can be:
  *   - attached to a project (not just a task), and
  *   - tagged with their MIME type and size for any-MIME uploads (the
  *     pre-v80 attachment flow only supported images via the photo picker).
@@ -2477,7 +2510,7 @@ val MIGRATION_78_79 = object : Migration(78, 79) {
  * a generic `image/*` rather than picking a specific subtype keeps the
  * server side from having to disambiguate after sync.
  */
-val MIGRATION_79_80 = object : Migration(79, 80) {
+val MIGRATION_80_81 = object : Migration(80, 81) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE attachments ADD COLUMN project_id INTEGER")
         db.execSQL("ALTER TABLE attachments ADD COLUMN mime_type TEXT")
@@ -2487,7 +2520,7 @@ val MIGRATION_79_80 = object : Migration(79, 80) {
     }
 }
 
-const val CURRENT_DB_VERSION = 80
+const val CURRENT_DB_VERSION = 81
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2568,6 +2601,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_76_77,
     MIGRATION_77_78,
     MIGRATION_78_79,
-    MIGRATION_79_80
+    MIGRATION_79_80,
+    MIGRATION_80_81
 )
 

@@ -11,10 +11,11 @@ import org.junit.Test
  * [ProUpsellSheet] hero copy never renders blank.
  *
  * Mirrors the audit-first inventory in
- * `docs/audits/D11_FINISH_BUNDLE_AUDIT.md` § Item 2 — the 8 enum values
- * are the exact Pro-gated AI feature inventory; if a 9th feature is added
- * to ProFeatureGate, [ensureNoFutureFeatureRegression] should fail until
- * the enum is updated.
+ * `docs/audits/D11_FINISH_BUNDLE_AUDIT.md` § Item 2 (8 features) and the
+ * G smart-screenshot-import audit § Item 7 (9th feature added). If a
+ * 10th feature is added to ProFeatureGate,
+ * [ensureNoFutureFeatureRegression] should fail until the enum is
+ * updated.
  */
 class ProGatedFeatureTest {
     @Test
@@ -59,13 +60,14 @@ class ProGatedFeatureTest {
 
     @Test
     fun ensureNoFutureFeatureRegression() {
-        // The audit doc enumerates exactly 8 Pro-gated AI features. If
-        // ProFeatureGate gains a new AI_* constant that maps to the
+        // D11 audit § Item 2 baseline = 8 features.
+        // G smart-screenshot-import added SMART_SCREENSHOT_IMPORT → 9.
+        // If ProFeatureGate gains another AI_* constant that maps to the
         // PRO tier and is reachable from a tap-time entry point, this
         // test should fail until ProGatedFeature is updated.
         assertEquals(
-            "ProGatedFeature inventory drift detected — see D11 audit § Item 2",
-            8,
+            "ProGatedFeature inventory drift detected — see D11 audit § Item 2 + G screenshot-import audit § Item 7",
+            9,
             ProGatedFeature.values().size
         )
     }
