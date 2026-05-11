@@ -150,7 +150,14 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
         ChatMessageEntity::class,
         UserAiPreferenceEntity::class
     ],
-    version = CURRENT_DB_VERSION,
+    // Inlined intentionally: Room/KSP must read this as a literal int.
+    // When any non-trivial compile error elsewhere in the module stops KSP
+    // from resolving the `CURRENT_DB_VERSION` const reference, it surfaces
+    // as the misleading "No property named version was found in annotation
+    // Database" failure, which then breaks ktlint's no-unused-imports
+    // resolution and triggers an autofix-strips-imports cascade. Keep this
+    // in sync with `CURRENT_DB_VERSION` in Migrations.kt.
+    version = 81,
     exportSchema = false
 )
 abstract class PrismTaskDatabase : RoomDatabase() {
