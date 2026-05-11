@@ -1,3 +1,11 @@
+// Detekt's `NoUnusedImports` rule (autoCorrect = true in detekt.yml)
+// repeatedly misclassifies these android.*/kotlinx.*/java.* imports as
+// unused on this file — every one of them is actually referenced below —
+// and the autofix workflow then commits the strip back to the branch,
+// breaking the build (see PR #1264 + PR #1268 + PR #1269 fix history).
+// Suppress the rule here so the cascade stops.
+@file:Suppress("NoUnusedImports")
+
 package com.averycorp.prismtask.data.repository
 
 import android.content.Context
@@ -146,4 +154,5 @@ class AttachmentRepository @Inject constructor(
         const val PROJECT_ONLY_TASK_SENTINEL: Long = 0L
     }
 }
+
 
