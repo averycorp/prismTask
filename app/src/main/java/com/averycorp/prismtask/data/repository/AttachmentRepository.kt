@@ -13,9 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AttachmentRepository
-@Inject
-constructor(
+class AttachmentRepository @Inject constructor(
     private val attachmentDao: AttachmentDao,
     private val syncTracker: SyncTracker
 ) {
@@ -148,4 +146,3 @@ constructor(
         const val PROJECT_ONLY_TASK_SENTINEL: Long = 0L
     }
 }
-
