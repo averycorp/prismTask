@@ -822,8 +822,4 @@ constructor(
 /**
  * Summary of a completed sync round returned by [BackendSyncService.fullSync].
  */
-data class SyncSummary(
-    val pushed: Int,
-    val pulled: Int,
-    val lastSyncAt: Long
-)
+data class SyncSummary(val pushed: Int, val pulled: Int, val lastSyncAt: Long)

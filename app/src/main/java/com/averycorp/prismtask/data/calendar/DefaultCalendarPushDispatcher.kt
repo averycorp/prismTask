@@ -24,9 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class DefaultCalendarPushDispatcher
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) : CalendarPushDispatcher {
+constructor(@ApplicationContext private val context: Context) : CalendarPushDispatcher {
     override fun enqueuePushTask(taskId: Long) {
         enqueue(taskId, CalendarPushWorker.OP_UPSERT)
     }

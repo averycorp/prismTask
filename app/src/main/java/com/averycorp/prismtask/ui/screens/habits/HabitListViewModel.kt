@@ -40,17 +40,11 @@ data class BuiltInHabitProgress(val done: Int, val total: Int)
 sealed class HabitListItem {
     abstract val sortOrder: Int
 
-    data class HabitItem(
-        val habitWithStatus: HabitWithStatus
-    ) : HabitListItem() {
+    data class HabitItem(val habitWithStatus: HabitWithStatus) : HabitListItem() {
         override val sortOrder get() = habitWithStatus.habit.sortOrder
     }
 
-    data class SelfCareItem(
-        val routineType: String,
-        val cardData: SelfCareCardData,
-        override val sortOrder: Int
-    ) : HabitListItem()
+    data class SelfCareItem(val routineType: String, val cardData: SelfCareCardData, override val sortOrder: Int) : HabitListItem()
 
     data class BuiltInHabitItem(
         val type: String,

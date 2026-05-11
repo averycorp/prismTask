@@ -20,9 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class ProductiveStreakNotifier
 @Inject
-constructor(
-    @ApplicationContext private val appContext: Context
-) {
+constructor(@ApplicationContext private val appContext: Context) {
     fun notifyBrokenStreak(brokenLength: Int) {
         if (brokenLength <= 0) return
         ensureChannel()

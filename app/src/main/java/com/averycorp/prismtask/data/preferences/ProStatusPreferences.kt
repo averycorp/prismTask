@@ -18,9 +18,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 @Singleton
 class ProStatusPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val CACHED_TIER_KEY = stringPreferencesKey("cached_tier")
         private val CACHED_BILLING_PERIOD_KEY = stringPreferencesKey("cached_billing_period")

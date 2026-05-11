@@ -241,7 +241,9 @@ class ChatRepositoryTest {
         val api = mockk<PrismTaskApi>()
         val captured = slot<ChatRequest>()
         coEvery { api.aiChat(capture(captured)) } returns ChatResponse(
-            message = "hi", actions = emptyList(), conversationId = "x"
+            message = "hi",
+            actions = emptyList(),
+            conversationId = "x"
         )
         val repo = ChatRepository(
             api,

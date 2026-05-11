@@ -31,13 +31,7 @@ import javax.inject.Singleton
  * admin projected-notification log to surface what's queued up without
  * having to inspect AlarmManager (which Android does not expose to apps).
  */
-data class ProjectedNotification(
-    val triggerAtMillis: Long,
-    val title: String,
-    val body: String,
-    val source: Source,
-    val sourceId: Long?
-) {
+data class ProjectedNotification(val triggerAtMillis: Long, val title: String, val body: String, val source: Source, val sourceId: Long?) {
     enum class Source(val label: String) {
         TASK_REMINDER("Task Reminder"),
         HABIT_DAILY("Habit Reminder (Daily)"),
@@ -395,21 +389,19 @@ class NotificationProjector @Inject constructor(
         clocks: List<String>,
         now: Long,
         horizonEnd: Long
-    ): List<ProjectedNotification> {
-        return clocks.flatMap { hhmm ->
-            val first = HabitReminderScheduler.timeStringToNextTrigger(
-                timeStr = hhmm,
-                now = now
+    ): List<ProjectedNotification> = clocks.flatMap { hhmm ->
+        val first = HabitReminderScheduler.timeStringToNextTrigger(
+            timeStr = hhmm,
+            now = now
+        )
+        expandDailyOccurrencesFromAbsolute(first, horizonEnd).map { trigger ->
+            ProjectedNotification(
+                triggerAtMillis = trigger,
+                title = "${med.displayLabel ?: med.name} — Heads Up",
+                body = "Time for your ${med.name} dose ($hhmm).",
+                source = ProjectedNotification.Source.MEDICATION,
+                sourceId = med.id
             )
-            expandDailyOccurrencesFromAbsolute(first, horizonEnd).map { trigger ->
-                ProjectedNotification(
-                    triggerAtMillis = trigger,
-                    title = "${med.displayLabel ?: med.name} — Heads Up",
-                    body = "Time for your ${med.name} dose ($hhmm).",
-                    source = ProjectedNotification.Source.MEDICATION,
-                    sourceId = med.id
-                )
-            }
         }
     }
 

@@ -27,14 +27,8 @@ import javax.inject.Singleton
 @Singleton
 class EisenhowerClassifier
 @Inject
-constructor(
-    private val api: PrismTaskApi,
-    private val authTokenPreferences: AuthTokenPreferences
-) {
-    data class Classification(
-        val quadrant: EisenhowerQuadrant,
-        val reason: String
-    )
+constructor(private val api: PrismTaskApi, private val authTokenPreferences: AuthTokenPreferences) {
+    data class Classification(val quadrant: EisenhowerQuadrant, val reason: String)
 
     suspend fun classify(task: TaskEntity): Result<Classification> {
         val token = authTokenPreferences.getAccessToken()

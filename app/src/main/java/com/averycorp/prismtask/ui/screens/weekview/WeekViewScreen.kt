@@ -68,10 +68,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
-private data class WeekTaskEditorState(
-    val taskId: Long? = null,
-    val initialDate: Long? = null
-)
+private data class WeekTaskEditorState(val taskId: Long? = null, val initialDate: Long? = null)
 
 private val NeutralGray = Color(0xFF9E9E9E)
 

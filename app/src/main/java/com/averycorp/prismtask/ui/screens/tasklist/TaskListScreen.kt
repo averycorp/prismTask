@@ -117,11 +117,7 @@ import java.util.Locale
 private const val PANE_TASKS = "tasks"
 private const val PANE_PROJECTS = "projects"
 
-private data class TaskEditorSheetState(
-    val taskId: Long? = null,
-    val projectId: Long? = null,
-    val initialDate: Long? = null
-)
+private data class TaskEditorSheetState(val taskId: Long? = null, val projectId: Long? = null, val initialDate: Long? = null)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable

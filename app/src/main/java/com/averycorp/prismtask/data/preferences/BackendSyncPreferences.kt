@@ -25,9 +25,7 @@ private val Context.backendSyncDataStore: DataStore<Preferences> by preferencesD
 @Singleton
 class BackendSyncPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val LAST_SYNC_AT_KEY = longPreferencesKey("last_sync_at")
     }

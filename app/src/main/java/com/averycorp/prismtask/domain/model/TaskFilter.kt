@@ -38,7 +38,4 @@ data class TaskFilter(
 
 enum class TagFilterMode { ANY, ALL }
 
-data class DateRange(
-    val start: Long?,
-    val end: Long?
-)
+data class DateRange(val start: Long?, val end: Long?)

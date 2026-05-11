@@ -23,10 +23,8 @@ import javax.inject.Inject
 @HiltViewModel
 class BatchUndoListenerViewModel
 @Inject
-constructor(
-    private val repository: BatchOperationsRepository,
-    bus: BatchUndoEventBus
-) : ViewModel() {
+constructor(private val repository: BatchOperationsRepository, bus: BatchUndoEventBus) :
+    ViewModel() {
     val events: SharedFlow<BatchAppliedEvent> = bus.events
 
     fun undo(batchId: String, onResult: (BatchOperationsRepository.BatchUndoResult) -> Unit = {}) {

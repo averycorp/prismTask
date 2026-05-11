@@ -10,11 +10,7 @@ import java.util.Locale
  * on/off and reorder them in Settings. Persisted as JSON in the
  * UserPreferencesDataStore under a single key.
  */
-data class TaskMenuAction(
-    val id: String,
-    val enabled: Boolean,
-    val order: Int
-) {
+data class TaskMenuAction(val id: String, val enabled: Boolean, val order: Int) {
     companion object {
         const val QUICK_RESCHEDULE = "quick_reschedule"
         const val DUPLICATE = "duplicate"

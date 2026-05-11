@@ -24,9 +24,7 @@ internal val Context.dailyEssentialsDataStore: DataStore<Preferences> by
 @Singleton
 class DailyEssentialsPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val HOUSEWORK_HABIT_ID = longPreferencesKey("housework_habit_id")
         private val SCHOOLWORK_HABIT_ID = longPreferencesKey("schoolwork_habit_id")

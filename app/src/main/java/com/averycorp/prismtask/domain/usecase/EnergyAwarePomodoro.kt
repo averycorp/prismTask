@@ -8,12 +8,7 @@ import com.averycorp.prismtask.data.preferences.EnergyPomodoroConfig
  * break — all expressed in minutes so the UI can render them without any
  * extra conversion.
  */
-data class PomodoroSessionConfig(
-    val workMinutes: Int,
-    val breakMinutes: Int,
-    val longBreakMinutes: Int,
-    val rationale: String
-)
+data class PomodoroSessionConfig(val workMinutes: Int, val breakMinutes: Int, val longBreakMinutes: Int, val rationale: String)
 
 /**
  * Energy-aware Pomodoro session planner (v1.4.0 V11).
@@ -32,9 +27,7 @@ data class PomodoroSessionConfig(
  * feature roll out safely — users who haven't opted into mood/energy
  * tracking see no change.
  */
-class EnergyAwarePomodoro(
-    private val energyConfig: EnergyPomodoroConfig = EnergyPomodoroConfig()
-) {
+class EnergyAwarePomodoro(private val energyConfig: EnergyPomodoroConfig = EnergyPomodoroConfig()) {
     fun plan(
         latestEnergy: Int?,
         defaults: DefaultPomodoroConfig = DefaultPomodoroConfig()
@@ -98,8 +91,4 @@ class EnergyAwarePomodoro(
  * Classic Pomodoro defaults. When the user hasn't logged energy today,
  * [EnergyAwarePomodoro] returns these unchanged.
  */
-data class DefaultPomodoroConfig(
-    val workMinutes: Int = 25,
-    val breakMinutes: Int = 5,
-    val longBreakMinutes: Int = 15
-)
+data class DefaultPomodoroConfig(val workMinutes: Int = 25, val breakMinutes: Int = 5, val longBreakMinutes: Int = 15)

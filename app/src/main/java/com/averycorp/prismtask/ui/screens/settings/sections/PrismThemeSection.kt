@@ -33,11 +33,7 @@ import com.averycorp.prismtask.ui.theme.ThemeViewModel
  * dominant accent hex from the design spec — the palette itself lives in
  * [com.averycorp.prismtask.ui.theme.prismThemeColors].
  */
-private data class PrismThemeOption(
-    val theme: PrismTheme,
-    val displayName: String,
-    val swatch: Color
-)
+private data class PrismThemeOption(val theme: PrismTheme, val displayName: String, val swatch: Color)
 
 private val ThemeOptions = listOf(
     PrismThemeOption(PrismTheme.CYBERPUNK, "Cyberpunk", Color(0xFF00F5FF)),

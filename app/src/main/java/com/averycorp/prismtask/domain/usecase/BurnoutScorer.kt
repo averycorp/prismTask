@@ -99,9 +99,7 @@ data class BurnoutResult(
  * `CAUTION` / `HIGH_RISK`. The UI renders a gauge + a caption like
  * "Balanced ✨" or "High risk — consider blocking time for rest."
  */
-class BurnoutScorer(
-    private val weights: BurnoutWeights = BurnoutWeights()
-) {
+class BurnoutScorer(private val weights: BurnoutWeights = BurnoutWeights()) {
     fun compute(inputs: BurnoutInputs): BurnoutResult {
         val workPoints = workOvershoot(inputs.workRatio, inputs.workTarget)
         val overduePoints = overdueComponent(inputs.overdueCount)

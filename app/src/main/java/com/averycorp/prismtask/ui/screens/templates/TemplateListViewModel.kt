@@ -23,10 +23,7 @@ import javax.inject.Inject
  * actions. Using a dedicated state model instead of [androidx.compose.material3.SnackbarHostState]
  * because Material's Snackbar only supports a single action button.
  */
-data class QuickUseBanner(
-    val newTaskId: Long,
-    val taskTitle: String
-)
+data class QuickUseBanner(val newTaskId: Long, val taskTitle: String)
 
 @HiltViewModel
 class TemplateListViewModel

@@ -1044,11 +1044,9 @@ private fun PreviewBlockCard(block: AiScheduleBlock) {
     }
 }
 
-private fun formatPreviewDay(isoDate: String): String {
-    return try {
-        val parsed = LocalDate.parse(isoDate)
-        parsed.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
-    } catch (_: Exception) {
-        isoDate
-    }
+private fun formatPreviewDay(isoDate: String): String = try {
+    val parsed = LocalDate.parse(isoDate)
+    parsed.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+} catch (_: Exception) {
+    isoDate
 }

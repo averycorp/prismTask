@@ -32,9 +32,4 @@ class BatchUndoEventBus @Inject constructor() {
  * Snackbar with an "Undo" action that calls
  * `BatchOperationsRepository.undoBatch(batchId)`.
  */
-data class BatchAppliedEvent(
-    val batchId: String,
-    val commandText: String,
-    val appliedCount: Int,
-    val skippedCount: Int
-)
+data class BatchAppliedEvent(val batchId: String, val commandText: String, val appliedCount: Int, val skippedCount: Int)

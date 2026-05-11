@@ -19,9 +19,7 @@ internal val Context.timerDataStore: DataStore<Preferences> by preferencesDataSt
 @Singleton
 class TimerPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val WORK_DURATION_SECONDS = intPreferencesKey("work_duration_seconds")
         private val BREAK_DURATION_SECONDS = intPreferencesKey("break_duration_seconds")

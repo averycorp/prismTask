@@ -31,9 +31,7 @@ import javax.inject.Singleton
 @Singleton
 class VoiceInputManager
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 

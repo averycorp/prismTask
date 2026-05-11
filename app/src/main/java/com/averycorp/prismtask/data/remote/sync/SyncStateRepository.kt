@@ -237,8 +237,4 @@ constructor(
  * One recent sync error surfaced in the details sheet. Kept small — at most
  * [SyncStateRepository.MAX_ERRORS] in memory at a time.
  */
-data class SyncErrorSample(
-    val timestampMs: Long,
-    val source: String,
-    val message: String
-)
+data class SyncErrorSample(val timestampMs: Long, val source: String, val message: String)

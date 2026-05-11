@@ -10,12 +10,7 @@ import javax.inject.Singleton
 
 enum class LogLevel { DEBUG, INFO, WARN, ERROR }
 
-data class LogEntry(
-    val timestamp: Long,
-    val tag: String,
-    val level: LogLevel,
-    val message: String
-)
+data class LogEntry(val timestamp: Long, val tag: String, val level: LogLevel, val message: String)
 
 @Singleton
 class DiagnosticLogger

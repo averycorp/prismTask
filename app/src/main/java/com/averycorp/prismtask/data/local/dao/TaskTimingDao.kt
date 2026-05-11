@@ -12,11 +12,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Projection used by aggregations: total minutes per group key.
  */
-data class TimingGroupTotal(
-    val groupKey: String,
-    val totalMinutes: Int,
-    val taskCount: Int
-)
+data class TimingGroupTotal(val groupKey: String, val totalMinutes: Int, val taskCount: Int)
 
 @Dao
 interface TaskTimingDao {

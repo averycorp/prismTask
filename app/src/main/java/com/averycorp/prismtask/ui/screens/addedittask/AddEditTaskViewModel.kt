@@ -64,11 +64,7 @@ import javax.inject.Inject
  * templates pre-fill a list of titles that the user can tweak before the
  * save path flushes them into [TaskRepository] as real [TaskEntity] rows.
  */
-data class PendingSubtask(
-    val id: Long,
-    val title: String,
-    val isCompleted: Boolean = false
-)
+data class PendingSubtask(val id: Long, val title: String, val isCompleted: Boolean = false)
 
 @HiltViewModel
 class AddEditTaskViewModel

@@ -635,10 +635,7 @@ internal fun SectionLabel(text: String) {
     )
 }
 
-private enum class PriorityOption(
-    val value: Int,
-    val label: String
-) {
+private enum class PriorityOption(val value: Int, val label: String) {
     NONE(0, "None"),
     LOW(1, "Low"),
     MEDIUM(2, "Med"),
@@ -823,10 +820,7 @@ internal fun reminderOffsetLabel(offset: Long?): String = when (offset) {
     }
 }
 
-private data class ReminderOption(
-    val label: String,
-    val offset: Long?
-)
+private data class ReminderOption(val label: String, val offset: Long?)
 
 private val DEFAULT_REMINDER_OFFSETS = listOf(0L, 900_000L, 1_800_000L, 3_600_000L, 86_400_000L)
 

@@ -19,12 +19,7 @@ class ProfileAutoSwitcher {
      * A single rule. [trigger] tags the rule for UI grouping; [matches]
      * is the opaque predicate the rule evaluates against a [Context].
      */
-    data class Rule(
-        val id: String,
-        val profileId: Long,
-        val trigger: ProfileAutoSwitchTrigger,
-        val matches: (Context) -> Boolean
-    )
+    data class Rule(val id: String, val profileId: Long, val trigger: ProfileAutoSwitchTrigger, val matches: (Context) -> Boolean)
 
     data class Context(
         val time: LocalTime,

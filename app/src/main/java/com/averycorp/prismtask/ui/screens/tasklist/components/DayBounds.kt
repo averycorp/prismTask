@@ -15,11 +15,7 @@ import java.time.ZoneId
  * [DayBoundary.logicalDate]), so display-side labels classify tasks
  * the same way the SoD-aware Today filter and TaskList grouping do.
  */
-internal data class DayBounds(
-    val startOfToday: Long,
-    val startOfTomorrow: Long,
-    val startOfDayAfter: Long
-) {
+internal data class DayBounds(val startOfToday: Long, val startOfTomorrow: Long, val startOfDayAfter: Long) {
     companion object {
         fun calendar(
             now: Long = System.currentTimeMillis(),

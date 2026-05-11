@@ -18,9 +18,7 @@ import javax.inject.Singleton
  * § A6.
  */
 @Singleton
-class AutomationTemplateRepository @Inject constructor(
-    private val ruleRepository: AutomationRuleRepository
-) {
+class AutomationTemplateRepository @Inject constructor(private val ruleRepository: AutomationRuleRepository) {
 
     /** All shipped templates, in inventory order. */
     fun templates(): List<AutomationTemplate> = AutomationStarterLibrary.ALL_TEMPLATES

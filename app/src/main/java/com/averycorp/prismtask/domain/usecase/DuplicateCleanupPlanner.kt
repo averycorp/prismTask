@@ -29,26 +29,17 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
  */
 object DuplicateCleanupPlanner {
     /** Per-task data the planner needs for its completeness score. */
-    data class TaskExtras(
-        val subtaskCount: Int,
-        val tagCount: Int
-    )
+    data class TaskExtras(val subtaskCount: Int, val tagCount: Int)
 
     /** Per-habit data the planner needs for its completeness score. */
-    data class HabitExtras(
-        val completionCount: Int,
-        val logCount: Int
-    )
+    data class HabitExtras(val completionCount: Int, val logCount: Int)
 
     /**
      * Describes a merge operation: the habit with [keeperId] is kept and
      * all habits in [loserIds] should have their completions reassigned to
      * [keeperId] before being deleted.
      */
-    data class HabitMerge(
-        val keeperId: Long,
-        val loserIds: List<Long>
-    )
+    data class HabitMerge(val keeperId: Long, val loserIds: List<Long>)
 
     fun findTaskDuplicatesToDelete(
         tasks: List<TaskEntity>,

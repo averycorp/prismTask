@@ -6,10 +6,7 @@ import java.time.LocalDate
  * Per-day total of logged minutes within an analytics window. Bars in the
  * `TimeTrackingSection` chart map 1:1 to one of these.
  */
-data class DailyTimeBucket(
-    val date: LocalDate,
-    val totalMinutes: Int
-)
+data class DailyTimeBucket(val date: LocalDate, val totalMinutes: Int)
 
 /**
  * Aggregated logged-time response for the analytics time-tracking chart.

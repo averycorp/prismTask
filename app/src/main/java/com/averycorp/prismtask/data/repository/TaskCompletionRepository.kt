@@ -34,10 +34,7 @@ data class TaskCompletionStats(
 @Singleton
 class TaskCompletionRepository
 @Inject
-constructor(
-    private val taskCompletionDao: TaskCompletionDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val taskCompletionDao: TaskCompletionDao, private val syncTracker: SyncTracker) {
     /**
      * Records a completion entry for [task]. When the parent carries a
      * recurrence rule, [spawnedRecurrenceId] is the id of the next-instance

@@ -21,14 +21,8 @@ import javax.inject.Singleton
 @Singleton
 class ExternalAnchorRepository
 @Inject
-constructor(
-    private val externalAnchorDao: ExternalAnchorDao,
-    private val syncTracker: SyncTracker
-) {
-    data class Decoded(
-        val entity: ExternalAnchorEntity,
-        val anchor: ExternalAnchor?
-    )
+constructor(private val externalAnchorDao: ExternalAnchorDao, private val syncTracker: SyncTracker) {
+    data class Decoded(val entity: ExternalAnchorEntity, val anchor: ExternalAnchor?)
 
     fun observeAnchors(projectId: Long): Flow<List<Decoded>> =
         externalAnchorDao.observeAnchors(projectId).map { rows ->

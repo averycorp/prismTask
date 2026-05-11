@@ -71,9 +71,7 @@ import com.averycorp.prismtask.ui.theme.prismGlow
 import com.averycorp.prismtask.widget.launch.WidgetLaunchAction
 import kotlinx.coroutines.launch
 
-sealed class PrismTaskRoute(
-    val route: String
-) {
+sealed class PrismTaskRoute(val route: String) {
     data object Today : PrismTaskRoute("today")
 
     data object TaskList : PrismTaskRoute("task_list")
@@ -328,12 +326,7 @@ sealed class PrismTaskRoute(
     }
 }
 
-data class BottomNavItem(
-    val route: String,
-    val label: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
-)
+data class BottomNavItem(val route: String, val label: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector)
 
 val ALL_BOTTOM_NAV_ITEMS = listOf(
     BottomNavItem(PrismTaskRoute.Today.route, "Today", Icons.Filled.Today, Icons.Outlined.Today),

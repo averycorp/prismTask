@@ -22,9 +22,7 @@ private val Context.builtInSyncDataStore: DataStore<Preferences> by preferencesD
 @Singleton
 class BuiltInSyncPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val BUILT_INS_RECONCILED = booleanPreferencesKey("built_ins_reconciled")
         private val DRIFT_CLEANUP_DONE = booleanPreferencesKey("drift_cleanup_done")

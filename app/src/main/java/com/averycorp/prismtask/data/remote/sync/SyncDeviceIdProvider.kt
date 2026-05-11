@@ -29,9 +29,7 @@ private val Context.syncDeviceDataStore: DataStore<Preferences> by preferencesDa
 @Singleton
 class SyncDeviceIdProvider
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val DEVICE_ID_KEY = stringPreferencesKey("sync_device_id")
     }

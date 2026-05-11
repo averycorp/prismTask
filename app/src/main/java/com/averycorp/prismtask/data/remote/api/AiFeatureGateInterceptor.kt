@@ -34,9 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class AiFeatureGateInterceptor
 @Inject
-constructor(
-    private val userPreferencesDataStore: UserPreferencesDataStore
-) : Interceptor {
+constructor(private val userPreferencesDataStore: UserPreferencesDataStore) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()

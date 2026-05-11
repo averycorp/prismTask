@@ -23,10 +23,7 @@ import com.averycorp.prismtask.data.billing.UserTier
  * added to cover the full inventory enumerated in the D11 finish bundle
  * audit (`docs/audits/D11_FINISH_BUNDLE_AUDIT.md`).
  */
-enum class ProGatedFeature(
-    val label: String,
-    val description: String
-) {
+enum class ProGatedFeature(val label: String, val description: String) {
     AI_CHAT(
         label = "AI Coach",
         description = "Get personalized coaching and task help through natural conversation"

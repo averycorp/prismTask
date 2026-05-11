@@ -18,16 +18,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class LeisureSlotEditState(
-    val slot: LeisureSlotId,
-    val config: LeisureSlotConfig,
-    val builtIns: List<BuiltInActivityState>
-)
+data class LeisureSlotEditState(val slot: LeisureSlotId, val config: LeisureSlotConfig, val builtIns: List<BuiltInActivityState>)
 
-data class BuiltInActivityState(
-    val option: LeisureOption,
-    val hidden: Boolean
-)
+data class BuiltInActivityState(val option: LeisureOption, val hidden: Boolean)
 
 @HiltViewModel
 class LeisureSettingsViewModel

@@ -18,9 +18,7 @@ internal val Context.a11yDataStore: DataStore<Preferences> by preferencesDataSto
 @Singleton
 class A11yPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
         private val HIGH_CONTRAST = booleanPreferencesKey("high_contrast")

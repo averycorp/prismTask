@@ -219,10 +219,7 @@ fun DebugLogScreen(navController: NavController) {
     }
 }
 
-private data class LogReadResult(
-    val lines: List<String>,
-    val error: String?
-)
+private data class LogReadResult(val lines: List<String>, val error: String?)
 
 /**
  * Reads the current process's logcat output. On modern Android (API 16+),

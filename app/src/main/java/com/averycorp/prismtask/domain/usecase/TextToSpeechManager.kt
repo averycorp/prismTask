@@ -16,9 +16,7 @@ import javax.inject.Singleton
 @Singleton
 class TextToSpeechManager
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     private var tts: TextToSpeech? = null
     private val ready = AtomicBoolean(false)
     private var pending: String? = null

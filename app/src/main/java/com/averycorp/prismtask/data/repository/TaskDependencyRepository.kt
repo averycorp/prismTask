@@ -19,10 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class TaskDependencyRepository
 @Inject
-constructor(
-    private val taskDependencyDao: TaskDependencyDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val taskDependencyDao: TaskDependencyDao, private val syncTracker: SyncTracker) {
 
     fun observeBlockersOf(taskId: Long): Flow<List<TaskDependencyEntity>> =
         taskDependencyDao.observeBlockersOf(taskId)

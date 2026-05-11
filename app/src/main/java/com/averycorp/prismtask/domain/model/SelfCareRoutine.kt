@@ -1,25 +1,10 @@
 package com.averycorp.prismtask.domain.model
 
-data class RoutineStep(
-    val id: String,
-    val label: String,
-    val duration: String,
-    val tier: String,
-    val note: String = "",
-    val phase: String
-)
+data class RoutineStep(val id: String, val label: String, val duration: String, val tier: String, val note: String = "", val phase: String)
 
-data class RoutineTier(
-    val id: String,
-    val label: String,
-    val time: String,
-    val color: Long
-)
+data class RoutineTier(val id: String, val label: String, val time: String, val color: Long)
 
-data class RoutinePhase(
-    val name: String,
-    val steps: List<RoutineStep>
-)
+data class RoutinePhase(val name: String, val steps: List<RoutineStep>)
 
 object SelfCareRoutines {
     val morningTiers = listOf(
@@ -161,12 +146,7 @@ object SelfCareRoutines {
 
     val isMedicationType: (String) -> Boolean = { it == "medication" }
 
-    data class TimeOfDayInfo(
-        val id: String,
-        val label: String,
-        val icon: String,
-        val color: Long
-    )
+    data class TimeOfDayInfo(val id: String, val label: String, val icon: String, val color: Long)
 
     val timesOfDay = listOf(
         TimeOfDayInfo("morning", "Morning", "\uD83C\uDF05", 0xFFF59E0B),

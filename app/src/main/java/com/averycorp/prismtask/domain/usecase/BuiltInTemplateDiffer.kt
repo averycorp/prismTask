@@ -101,8 +101,12 @@ class BuiltInTemplateDiffer @Inject constructor() {
         val phaseChanged = current.phase != proposed.phase
         val sortOrderChanged = current.sortOrder != proposed.sortOrder
         val noteChanged = current.note != proposed.note
-        val anyChange = labelChanged || durationChanged || tierChanged ||
-            phaseChanged || sortOrderChanged || noteChanged
+        val anyChange = labelChanged ||
+            durationChanged ||
+            tierChanged ||
+            phaseChanged ||
+            sortOrderChanged ||
+            noteChanged
         if (!anyChange) return null
         return StepChange(
             stepId = current.stepId,

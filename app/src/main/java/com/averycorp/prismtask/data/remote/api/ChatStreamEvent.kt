@@ -31,8 +31,5 @@ sealed interface ChatStreamEvent {
         val assistantMessageId: String? = null
     ) : ChatStreamEvent
 
-    data class Error(
-        val message: String,
-        val code: String?
-    ) : ChatStreamEvent
+    data class Error(val message: String, val code: String?) : ChatStreamEvent
 }

@@ -19,9 +19,7 @@ internal val Context.onboardingDataStore: DataStore<Preferences> by preferencesD
 @Singleton
 class OnboardingPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
         private val ONBOARDING_COMPLETED_AT = longPreferencesKey("onboarding_completed_at")

@@ -25,10 +25,8 @@ data class HabitDetailStats(
 @HiltViewModel
 class HabitDetailViewModel
 @Inject
-constructor(
-    private val habitRepository: HabitRepository,
-    savedStateHandle: SavedStateHandle
-) : ViewModel() {
+constructor(private val habitRepository: HabitRepository, savedStateHandle: SavedStateHandle) :
+    ViewModel() {
     private val habitId: Long = savedStateHandle.get<Long>("habitId") ?: -1L
 
     val habit: StateFlow<HabitEntity?> = habitRepository

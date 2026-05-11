@@ -26,12 +26,7 @@ enum class RefillUrgency {
  *                              the refill date minus [MedicationRefillEntity.reminderDaysBefore].
  * @property urgency UI-facing bucket (HEALTHY / UPCOMING / URGENT / OUT_OF_STOCK).
  */
-data class RefillForecast(
-    val daysRemaining: Int,
-    val refillDateMillis: Long,
-    val reminderDateMillis: Long,
-    val urgency: RefillUrgency
-)
+data class RefillForecast(val daysRemaining: Int, val refillDateMillis: Long, val reminderDateMillis: Long, val urgency: RefillUrgency)
 
 /**
  * Pure-function refill date + adherence calculator (v1.4.0 V10).

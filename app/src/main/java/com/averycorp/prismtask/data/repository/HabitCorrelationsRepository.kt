@@ -28,9 +28,7 @@ sealed class HabitCorrelationsOutcome {
 @Singleton
 class HabitCorrelationsRepository
 @Inject
-constructor(
-    private val api: PrismTaskApi
-) {
+constructor(private val api: PrismTaskApi) {
     suspend fun fetch(): HabitCorrelationsOutcome = try {
         HabitCorrelationsOutcome.Success(api.getHabitCorrelations())
     } catch (e: HttpException) {

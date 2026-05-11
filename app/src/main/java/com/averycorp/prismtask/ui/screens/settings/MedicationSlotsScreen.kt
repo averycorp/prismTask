@@ -143,7 +143,8 @@ fun MedicationSlotsScreen(
                     SlotRow(
                         slot = slot,
                         canMoveUp = slot.isActive && indexInActive > 0,
-                        canMoveDown = slot.isActive && indexInActive >= 0 &&
+                        canMoveDown = slot.isActive &&
+                            indexInActive >= 0 &&
                             indexInActive < activeSlots.size - 1,
                         onEdit = { editingSlot = slot },
                         onDelete = { deletingSlot = slot },

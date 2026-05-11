@@ -26,9 +26,7 @@ internal val Context.coachingDataStore: DataStore<Preferences> by preferencesDat
 @Singleton
 class CoachingPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val BREAKDOWN_COUNT_KEY = intPreferencesKey("ai_breakdown_count")
         private val BREAKDOWN_DATE_KEY = stringPreferencesKey("ai_breakdown_date")

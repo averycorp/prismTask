@@ -71,22 +71,11 @@ data class PomodoroConfig(
     val focusPreference: String = "balanced"
 )
 
-data class SessionTask(
-    val taskId: Long,
-    val title: String,
-    val allocatedMinutes: Int
-)
+data class SessionTask(val taskId: Long, val title: String, val allocatedMinutes: Int)
 
-data class PomodoroSession(
-    val sessionNumber: Int,
-    val tasks: List<SessionTask>,
-    val rationale: String
-)
+data class PomodoroSession(val sessionNumber: Int, val tasks: List<SessionTask>, val rationale: String)
 
-data class SkippedTask(
-    val taskId: Long,
-    val reason: String
-)
+data class SkippedTask(val taskId: Long, val reason: String)
 
 data class PomodoroPlan(
     val sessions: List<PomodoroSession>,
@@ -95,11 +84,7 @@ data class PomodoroPlan(
     val skippedTasks: List<SkippedTask>
 )
 
-data class FocusStats(
-    val sessionsCompleted: Int = 0,
-    val tasksCompleted: Int = 0,
-    val totalFocusSeconds: Int = 0
-)
+data class FocusStats(val sessionsCompleted: Int = 0, val tasksCompleted: Int = 0, val totalFocusSeconds: Int = 0)
 
 /**
  * A2 Pomodoro+ AI coaching — UI state for the pre-session coaching modal.

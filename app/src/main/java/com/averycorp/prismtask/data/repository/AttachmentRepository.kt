@@ -14,10 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class AttachmentRepository
 @Inject
-constructor(
-    private val attachmentDao: AttachmentDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val attachmentDao: AttachmentDao, private val syncTracker: SyncTracker) {
     suspend fun addImageAttachment(context: Context, taskId: Long, sourceUri: Uri): Long {
         val fileName = "img_${UUID.randomUUID()}"
         val destDir = File(context.filesDir, "attachments")

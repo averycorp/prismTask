@@ -615,13 +615,7 @@ private fun ConfettiCanvas(modifier: Modifier = Modifier) {
     }
 }
 
-private data class ConfettiParticle(
-    val x: Float,
-    val y: Float,
-    val size: Float,
-    val color: Color,
-    val speed: Float
-)
+private data class ConfettiParticle(val x: Float, val y: Float, val size: Float, val color: Color, val speed: Float)
 
 // endregion
 

@@ -15,18 +15,10 @@ sealed class MigrationTelemetryEvent {
     abstract val versionFrom: Int
     abstract val versionTo: Int
 
-    data class Started(
-        override val versionFrom: Int,
-        override val versionTo: Int,
-        val dbSizeBytes: Long
-    ) : MigrationTelemetryEvent()
+    data class Started(override val versionFrom: Int, override val versionTo: Int, val dbSizeBytes: Long) : MigrationTelemetryEvent()
 
-    data class Completed(
-        override val versionFrom: Int,
-        override val versionTo: Int,
-        val durationMs: Long,
-        val cumulativeMs: Long
-    ) : MigrationTelemetryEvent()
+    data class Completed(override val versionFrom: Int, override val versionTo: Int, val durationMs: Long, val cumulativeMs: Long) :
+        MigrationTelemetryEvent()
 
     data class Failed(
         override val versionFrom: Int,
@@ -45,9 +37,5 @@ sealed class MigrationTelemetryEvent {
      * `shimAgeDays` therefore measures days since v54 was applied,
      * not days the shim has been live.
      */
-    data class PostV54Install(
-        override val versionFrom: Int,
-        override val versionTo: Int,
-        val shimAgeDays: Long
-    ) : MigrationTelemetryEvent()
+    data class PostV54Install(override val versionFrom: Int, override val versionTo: Int, val shimAgeDays: Long) : MigrationTelemetryEvent()
 }

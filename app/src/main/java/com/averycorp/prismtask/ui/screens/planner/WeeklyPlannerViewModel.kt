@@ -26,13 +26,7 @@ data class WeeklyPlanConfig(
     val preferFrontLoading: Boolean = true
 )
 
-data class PlannedTask(
-    val taskId: Long,
-    val title: String,
-    val suggestedTime: String,
-    val durationMinutes: Int,
-    val reason: String
-)
+data class PlannedTask(val taskId: Long, val title: String, val suggestedTime: String, val durationMinutes: Int, val reason: String)
 
 data class DayPlan(
     val date: String,
@@ -52,12 +46,7 @@ data class UnscheduledTask(
     val reason: String
 )
 
-data class WeeklyPlan(
-    val days: List<DayPlan>,
-    val unscheduled: List<UnscheduledTask>,
-    val weekSummary: String,
-    val tips: List<String>
-)
+data class WeeklyPlan(val days: List<DayPlan>, val unscheduled: List<UnscheduledTask>, val weekSummary: String, val tips: List<String>)
 
 @HiltViewModel
 class WeeklyPlannerViewModel

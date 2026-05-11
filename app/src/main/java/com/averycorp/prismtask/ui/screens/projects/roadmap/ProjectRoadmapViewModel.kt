@@ -46,10 +46,7 @@ data class ProjectRoadmapState(
     val projectTasks: List<TaskEntity> = emptyList()
 )
 
-data class PhaseWithTasks(
-    val phase: ProjectPhaseEntity,
-    val tasks: List<TaskEntity>
-)
+data class PhaseWithTasks(val phase: ProjectPhaseEntity, val tasks: List<TaskEntity>)
 
 /**
  * Sealed editor surface — exactly one editor is open at a time, or

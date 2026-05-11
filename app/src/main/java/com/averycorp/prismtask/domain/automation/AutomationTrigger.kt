@@ -20,9 +20,7 @@ sealed class AutomationTrigger(val type: String) {
      * `simpleName` of the event sealed type (e.g. "TaskCreated",
      * "HabitCompleted"); see [AutomationEvent] for the canonical list.
      */
-    data class EntityEvent(
-        val eventKind: String
-    ) : AutomationTrigger(TYPE) {
+    data class EntityEvent(val eventKind: String) : AutomationTrigger(TYPE) {
         companion object {
             const val TYPE = "ENTITY_EVENT"
         }
@@ -37,10 +35,7 @@ sealed class AutomationTrigger(val type: String) {
      * may defer firings to the next maintenance window on sleeping
      * devices — see worker kdoc for caveats.
      */
-    data class TimeOfDay(
-        val hour: Int,
-        val minute: Int
-    ) : AutomationTrigger(TYPE) {
+    data class TimeOfDay(val hour: Int, val minute: Int) : AutomationTrigger(TYPE) {
         companion object {
             const val TYPE = "TIME_OF_DAY"
         }
@@ -54,11 +49,7 @@ sealed class AutomationTrigger(val type: String) {
      * [AutomationEvent.TimeTick] lands on one of [daysOfWeek] and
      * `hour`/`minute` line up.
      */
-    data class DayOfWeekTime(
-        val daysOfWeek: Set<String>,
-        val hour: Int,
-        val minute: Int
-    ) : AutomationTrigger(TYPE) {
+    data class DayOfWeekTime(val daysOfWeek: Set<String>, val hour: Int, val minute: Int) : AutomationTrigger(TYPE) {
         companion object {
             const val TYPE = "DAY_OF_WEEK_TIME"
         }
@@ -73,9 +64,7 @@ sealed class AutomationTrigger(val type: String) {
      * Composed trigger — fires when [parentRuleId] fires. Cycle detection
      * lives in [AutomationEngine]; a chain of length 5+ aborts.
      */
-    data class Composed(
-        val parentRuleId: Long
-    ) : AutomationTrigger(TYPE) {
+    data class Composed(val parentRuleId: Long) : AutomationTrigger(TYPE) {
         companion object {
             const val TYPE = "COMPOSED"
         }

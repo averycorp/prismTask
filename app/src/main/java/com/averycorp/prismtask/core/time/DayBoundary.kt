@@ -105,7 +105,8 @@ object DayBoundary {
                 val nextCandidate = nextDate
                     .atTime(targetHour, targetMinute).atZone(zone).toInstant()
                 val nextEnd = nextLogicalDayStart(nextLogicalStart, sodHour, sodMinute, zone)
-                if (!nextCandidate.isBefore(nextLogicalStart) && nextCandidate.isBefore(nextEnd) &&
+                if (!nextCandidate.isBefore(nextLogicalStart) &&
+                    nextCandidate.isBefore(nextEnd) &&
                     !nextCandidate.isBefore(now)
                 ) {
                     nextCandidate

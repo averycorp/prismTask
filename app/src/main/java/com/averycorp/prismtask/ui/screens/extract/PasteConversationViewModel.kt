@@ -124,12 +124,7 @@ constructor(
     }
 }
 
-data class EditableCandidate(
-    val title: String,
-    val confidence: Float,
-    val source: String?,
-    val selected: Boolean
-) {
+data class EditableCandidate(val title: String, val confidence: Float, val source: String?, val selected: Boolean) {
     fun toExtracted(): ExtractedTask = ExtractedTask(
         title = title,
         confidence = confidence,

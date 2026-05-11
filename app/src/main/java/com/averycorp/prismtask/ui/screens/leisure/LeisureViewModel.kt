@@ -45,10 +45,8 @@ data class LeisureSlotState(
 @HiltViewModel
 class LeisureViewModel
 @Inject
-constructor(
-    private val repository: LeisureRepository,
-    private val leisurePreferences: LeisurePreferences
-) : ViewModel() {
+constructor(private val repository: LeisureRepository, private val leisurePreferences: LeisurePreferences) :
+    ViewModel() {
     val todayLog: StateFlow<LeisureLogEntity?> = repository
         .getTodayLog()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

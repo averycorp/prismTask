@@ -100,12 +100,7 @@ object NotificationHelper {
      * immutable for sound / vibration / importance, so each unique
      * combination gets its own channel ID via [channelSuffix].
      */
-    private data class Style(
-        val importance: String,
-        val fullScreen: Boolean,
-        val overrideVolume: Boolean,
-        val repeatingVibration: Boolean
-    )
+    private data class Style(val importance: String, val fullScreen: Boolean, val overrideVolume: Boolean, val repeatingVibration: Boolean)
 
     private suspend fun currentStyle(context: Context): Style {
         val prefs = NotificationPreferences.from(context)

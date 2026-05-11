@@ -6,11 +6,7 @@ import androidx.room.Query
 import com.averycorp.prismtask.data.local.entity.UsageLogEntity
 import kotlinx.coroutines.flow.Flow
 
-data class EntityFrequency(
-    val entityId: Long,
-    val entityName: String,
-    val count: Int
-)
+data class EntityFrequency(val entityId: Long, val entityName: String, val count: Int)
 
 @Dao
 interface UsageLogDao {

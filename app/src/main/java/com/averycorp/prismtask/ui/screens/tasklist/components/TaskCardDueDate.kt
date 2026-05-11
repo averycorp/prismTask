@@ -13,10 +13,7 @@ import java.util.Locale
  * Overdue dates keep the normal on-surface-variant color; "Today"
  * picks up [warningColor] for the quick visual scan.
  */
-internal data class DueDateLabel(
-    val text: String,
-    val color: Color
-)
+internal data class DueDateLabel(val text: String, val color: Color)
 
 /**
  * Format a task's due date into its card-row label: "Today" for

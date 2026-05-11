@@ -12,22 +12,11 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class TaskSuggestions(
-    val suggestedTags: List<SuggestedTag> = emptyList(),
-    val suggestedProject: SuggestedProject? = null
-)
+data class TaskSuggestions(val suggestedTags: List<SuggestedTag> = emptyList(), val suggestedProject: SuggestedProject? = null)
 
-data class SuggestedTag(
-    val tag: TagEntity,
-    val confidence: Float,
-    val reason: String
-)
+data class SuggestedTag(val tag: TagEntity, val confidence: Float, val reason: String)
 
-data class SuggestedProject(
-    val project: ProjectEntity,
-    val confidence: Float,
-    val reason: String
-)
+data class SuggestedProject(val project: ProjectEntity, val confidence: Float, val reason: String)
 
 private val STOP_WORDS = setOf(
     "the",

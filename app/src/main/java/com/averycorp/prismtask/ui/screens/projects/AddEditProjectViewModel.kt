@@ -21,10 +21,8 @@ import javax.inject.Inject
 @HiltViewModel
 class AddEditProjectViewModel
 @Inject
-constructor(
-    private val projectRepository: ProjectRepository,
-    savedStateHandle: SavedStateHandle
-) : ViewModel() {
+constructor(private val projectRepository: ProjectRepository, savedStateHandle: SavedStateHandle) :
+    ViewModel() {
     private val _errorMessages = MutableSharedFlow<String>()
     val errorMessages: SharedFlow<String> = _errorMessages.asSharedFlow()
 

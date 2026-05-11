@@ -19,12 +19,7 @@ import javax.inject.Singleton
 
 internal val Context.taskBehaviorDataStore: DataStore<Preferences> by preferencesDataStore(name = "task_behavior_prefs")
 
-data class UrgencyWeights(
-    val dueDate: Float = 0.40f,
-    val priority: Float = 0.30f,
-    val age: Float = 0.15f,
-    val subtasks: Float = 0.15f
-)
+data class UrgencyWeights(val dueDate: Float = 0.40f, val priority: Float = 0.30f, val age: Float = 0.15f, val subtasks: Float = 0.15f)
 
 /**
  * User-configured Start of Day (SoD). Hour is 0..23, minute is 0..59.
@@ -33,11 +28,7 @@ data class UrgencyWeights(
  * the app behaves identically to midnight-based day boundaries until
  * the user opts in.
  */
-data class StartOfDay(
-    val hour: Int = 0,
-    val minute: Int = 0,
-    val hasBeenSet: Boolean = false
-)
+data class StartOfDay(val hour: Int = 0, val minute: Int = 0, val hasBeenSet: Boolean = false)
 
 /**
  * Read-only source of truth for the current Start of Day, used by components
@@ -54,9 +45,7 @@ interface StartOfDayProvider {
 @Singleton
 class TaskBehaviorPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val DEFAULT_SORT = stringPreferencesKey("default_sort")
         private val DEFAULT_VIEW_MODE = stringPreferencesKey("default_view_mode")

@@ -39,24 +39,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-data class WidgetCalendarEvent(
-    val title: String,
-    val startTime: Long,
-    val endTime: Long,
-    val isAllDay: Boolean,
-    val calendarColor: Int?
-)
+data class WidgetCalendarEvent(val title: String, val startTime: Long, val endTime: Long, val isAllDay: Boolean, val calendarColor: Int?)
 
-private sealed class TimelineItem(
-    val sortTime: Long
-) {
-    class Task(
-        val row: WidgetTaskRow
-    ) : TimelineItem(row.dueDate ?: Long.MAX_VALUE)
+private sealed class TimelineItem(val sortTime: Long) {
+    class Task(val row: WidgetTaskRow) : TimelineItem(row.dueDate ?: Long.MAX_VALUE)
 
-    class Event(
-        val event: WidgetCalendarEvent
-    ) : TimelineItem(event.startTime)
+    class Event(val event: WidgetCalendarEvent) : TimelineItem(event.startTime)
 }
 
 class CalendarWidget : GlanceAppWidget() {

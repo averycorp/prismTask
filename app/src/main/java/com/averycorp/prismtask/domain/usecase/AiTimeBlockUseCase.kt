@@ -45,10 +45,7 @@ enum class TimeBlockHorizon(val days: Int) {
  * not an ongoing observed stream.
  */
 @Singleton
-class AiTimeBlockUseCase @Inject constructor(
-    private val taskDao: TaskDao,
-    private val api: PrismTaskApi
-) {
+class AiTimeBlockUseCase @Inject constructor(private val taskDao: TaskDao, private val api: PrismTaskApi) {
     // Seam for tests that need a deterministic zone. Prod reads
     // ``ZoneId.systemDefault()`` on every call so a timezone change
     // during the app lifetime is picked up.

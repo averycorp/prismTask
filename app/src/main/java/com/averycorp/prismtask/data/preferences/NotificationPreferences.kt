@@ -36,9 +36,7 @@ internal val Context.notificationDataStore: DataStore<Preferences> by preference
  * (workers, the notification helper, ViewModels) read with `.first()`
  * before posting, or collect the flow when they need live updates.
  */
-class NotificationPreferences(
-    private val dataStore: DataStore<Preferences>
-) {
+class NotificationPreferences(private val dataStore: DataStore<Preferences>) {
     companion object {
         // Per-type enable flags (default true)
         private val TASK_REMINDERS_ENABLED = booleanPreferencesKey("task_reminders_enabled")

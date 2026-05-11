@@ -18,11 +18,7 @@ import com.averycorp.prismtask.ui.theme.LocalPrismColors
  * [swipeActionStyle] and used by task/habit cards when rendering the
  * swipe-to-action background.
  */
-data class SwipeActionStyle(
-    val backgroundColor: Color,
-    val icon: ImageVector?,
-    val label: String
-)
+data class SwipeActionStyle(val backgroundColor: Color, val icon: ImageVector?, val label: String)
 
 /**
  * Returns the background color, icon, and label associated with the given

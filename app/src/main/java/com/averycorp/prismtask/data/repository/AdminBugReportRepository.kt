@@ -9,9 +9,7 @@ import javax.inject.Singleton
 @Singleton
 class AdminBugReportRepository
 @Inject
-constructor(
-    private val api: PrismTaskApi
-) {
+constructor(private val api: PrismTaskApi) {
     suspend fun listReports(
         statusFilter: String? = null,
         severity: String? = null,

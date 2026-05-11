@@ -53,10 +53,7 @@ import kotlin.time.Duration.Companion.seconds
  * harness.cleanupFirestoreUser()
  * ```
  */
-class SyncTestHarness private constructor(
-    private val context: Context,
-    private val deviceBApp: FirebaseApp
-) {
+class SyncTestHarness private constructor(private val context: Context, private val deviceBApp: FirebaseApp) {
     /** The Hilt-visible default Firestore — what production `SyncService` uses. */
     val deviceAFirestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 
@@ -270,24 +267,22 @@ class SyncTestHarness private constructor(
             return SyncTestHarness(context, deviceBApp)
         }
 
-        private fun getOrCreateDeviceBApp(context: Context): FirebaseApp {
-            return try {
-                FirebaseApp.getInstance("deviceB")
-            } catch (_: IllegalStateException) {
-                val options = FirebaseApp.getInstance().options
-                val app = FirebaseApp.initializeApp(context, options, "deviceB")
-                // useEmulator / firestoreSettings can only be called before
-                // the first request and only once per FirebaseApp — so we
-                // do it here, at creation time, and never again.
-                FirebaseFirestore.getInstance(app).apply {
-                    useEmulator(EMULATOR_HOST, FIRESTORE_PORT)
-                    firestoreSettings = FirebaseFirestoreSettings.Builder()
-                        .setPersistenceEnabled(false)
-                        .build()
-                }
-                FirebaseAuth.getInstance(app).useEmulator(EMULATOR_HOST, AUTH_PORT)
-                app
+        private fun getOrCreateDeviceBApp(context: Context): FirebaseApp = try {
+            FirebaseApp.getInstance("deviceB")
+        } catch (_: IllegalStateException) {
+            val options = FirebaseApp.getInstance().options
+            val app = FirebaseApp.initializeApp(context, options, "deviceB")
+            // useEmulator / firestoreSettings can only be called before
+            // the first request and only once per FirebaseApp — so we
+            // do it here, at creation time, and never again.
+            FirebaseFirestore.getInstance(app).apply {
+                useEmulator(EMULATOR_HOST, FIRESTORE_PORT)
+                firestoreSettings = FirebaseFirestoreSettings.Builder()
+                    .setPersistenceEnabled(false)
+                    .build()
             }
+            FirebaseAuth.getInstance(app).useEmulator(EMULATOR_HOST, AUTH_PORT)
+            app
         }
 
         /**

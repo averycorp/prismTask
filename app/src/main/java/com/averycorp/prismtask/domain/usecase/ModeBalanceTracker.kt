@@ -35,11 +35,7 @@ data class ModeBalanceState(
  * is explicit that mode is descriptive-only — they only colour the
  * progress bars to indicate the user's chosen mix.
  */
-data class ModeBalanceConfig(
-    val workTarget: Float = 1f / 3f,
-    val playTarget: Float = 1f / 3f,
-    val relaxTarget: Float = 1f / 3f
-) {
+data class ModeBalanceConfig(val workTarget: Float = 1f / 3f, val playTarget: Float = 1f / 3f, val relaxTarget: Float = 1f / 3f) {
     fun asMap(): Map<TaskMode, Float> = mapOf(
         TaskMode.WORK to workTarget,
         TaskMode.PLAY to playTarget,

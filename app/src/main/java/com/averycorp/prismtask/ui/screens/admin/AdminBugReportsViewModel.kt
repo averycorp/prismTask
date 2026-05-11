@@ -18,9 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AdminBugReportsViewModel
 @Inject
-constructor(
-    private val repository: AdminBugReportRepository
-) : ViewModel() {
+constructor(private val repository: AdminBugReportRepository) : ViewModel() {
     private val _reports = MutableStateFlow<List<AdminBugReportResponse>>(emptyList())
     val reports: StateFlow<List<AdminBugReportResponse>> = _reports.asStateFlow()
 

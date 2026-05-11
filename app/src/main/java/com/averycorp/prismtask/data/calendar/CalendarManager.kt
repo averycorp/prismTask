@@ -22,12 +22,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class CalendarInfo(
-    val id: String,
-    val name: String,
-    val color: String,
-    val isPrimary: Boolean
-)
+data class CalendarInfo(val id: String, val name: String, val color: String, val isPrimary: Boolean)
 
 sealed class CalendarConnectionResult {
     data object Connected : CalendarConnectionResult()
@@ -40,9 +35,7 @@ sealed class CalendarConnectionResult {
 @Singleton
 class CalendarManager
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     private val _isCalendarConnected = MutableStateFlow(false)
     val isCalendarConnected: StateFlow<Boolean> = _isCalendarConnected.asStateFlow()
 
@@ -234,6 +227,4 @@ constructor(
  * Thrown when the calendar OAuth scope is not granted and the caller
  * needs to trigger re-consent.
  */
-class CalendarScopeRequiredException(
-    message: String
-) : Exception(message)
+class CalendarScopeRequiredException(message: String) : Exception(message)

@@ -78,10 +78,7 @@ import java.util.Locale
 
 private val NeutralGray = Color(0xFF9E9E9E)
 
-private data class MonthTaskEditorState(
-    val taskId: Long? = null,
-    val initialDate: Long? = null
-)
+private data class MonthTaskEditorState(val taskId: Long? = null, val initialDate: Long? = null)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

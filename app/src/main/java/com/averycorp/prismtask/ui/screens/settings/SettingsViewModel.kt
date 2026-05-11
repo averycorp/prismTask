@@ -1336,7 +1336,9 @@ constructor(
                     } else {
                         DuplicateCleanupState(
                             pendingPreview = DuplicateCleanupState.Preview(
-                                result.taskIds.size, habitCount, result.projectIds.size
+                                result.taskIds.size,
+                                habitCount,
+                                result.projectIds.size
                             )
                         )
                     }

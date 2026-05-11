@@ -17,9 +17,7 @@ import kotlinx.coroutines.flow.map
  * Takes a [DataStore] directly so it can be unit-tested without an Android
  * Context; production wiring lives in [com.averycorp.prismtask.di.PreferencesModule].
  */
-class CalendarSyncPreferences(
-    private val dataStore: DataStore<Preferences>
-) {
+class CalendarSyncPreferences(private val dataStore: DataStore<Preferences>) {
     companion object {
         val CALENDAR_SYNC_ENABLED = booleanPreferencesKey("gcal_sync_enabled")
         val SYNC_CALENDAR_ID = stringPreferencesKey("gcal_sync_calendar_id")

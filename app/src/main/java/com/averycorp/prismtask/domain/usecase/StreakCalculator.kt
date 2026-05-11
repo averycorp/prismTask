@@ -22,11 +22,7 @@ import java.time.temporal.TemporalAdjusters
  * behavior (resilientStreak == strictStreak). The user can opt out via
  * the "Forgiveness-first streaks" toggle in Settings.
  */
-data class ForgivenessConfig(
-    val enabled: Boolean = true,
-    val gracePeriodDays: Int = 7,
-    val allowedMisses: Int = 1
-) {
+data class ForgivenessConfig(val enabled: Boolean = true, val gracePeriodDays: Int = 7, val allowedMisses: Int = 1) {
     companion object {
         val STRICT = ForgivenessConfig(enabled = false)
         val DEFAULT = ForgivenessConfig()

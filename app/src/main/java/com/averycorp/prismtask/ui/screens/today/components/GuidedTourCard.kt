@@ -37,11 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Immutable
-data class GuidedTourStep(
-    val emoji: String,
-    val title: String,
-    val body: String
-)
+data class GuidedTourStep(val emoji: String, val title: String, val body: String)
 
 /**
  * Step content for the post-onboarding Guided Tour card on Today.

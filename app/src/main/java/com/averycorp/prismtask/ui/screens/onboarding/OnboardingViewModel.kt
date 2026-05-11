@@ -548,13 +548,9 @@ sealed class SignInState {
 
     data object Loading : SignInState()
 
-    data class SignedIn(
-        val email: String
-    ) : SignInState()
+    data class SignedIn(val email: String) : SignInState()
 
-    data class Error(
-        val message: String
-    ) : SignInState()
+    data class Error(val message: String) : SignInState()
 
     data object ExistingUserDetected : SignInState()
 
@@ -571,7 +567,5 @@ sealed class SignInState {
      * surfaces a non-blocking message so the failure isn't silent. [email] is
      * preserved so downstream UI can still show the signed-in account.
      */
-    data class ExistingUserCheckFailed(
-        val email: String
-    ) : SignInState()
+    data class ExistingUserCheckFailed(val email: String) : SignInState()
 }

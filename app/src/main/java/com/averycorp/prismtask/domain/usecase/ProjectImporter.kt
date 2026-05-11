@@ -50,12 +50,13 @@ class ProjectImporter @Inject constructor(
         }
 
         val checklist = checklistParser.parse(content)
-        val hasRichExtras = checklist != null && (
-            checklist.phases.isNotEmpty() ||
-                checklist.risks.isNotEmpty() ||
-                checklist.externalAnchors.isNotEmpty() ||
-                checklist.taskDependencies.isNotEmpty()
-            )
+        val hasRichExtras = checklist != null &&
+            (
+                checklist.phases.isNotEmpty() ||
+                    checklist.risks.isNotEmpty() ||
+                    checklist.externalAnchors.isNotEmpty() ||
+                    checklist.taskDependencies.isNotEmpty()
+                )
         if (checklist != null && hasRichExtras) {
             return ImportPlan.Rich(checklist)
         }
@@ -286,18 +287,12 @@ sealed interface ImportPlan {
         val taskDependencies: List<ParsedTaskDependencyDomain> get() = result.taskDependencies
     }
 
-    data class FlatProject(
-        override val projectName: String,
-        val items: List<ParsedTodoItem>
-    ) : ImportPlan {
+    data class FlatProject(override val projectName: String, val items: List<ParsedTodoItem>) : ImportPlan {
         override val taskTitles: List<String> get() = items.map { it.title }
         override val riskTitles: List<String> get() = emptyList()
     }
 
-    data class FlatOrphans(
-        val listName: String?,
-        val items: List<ParsedTodoItem>
-    ) : ImportPlan {
+    data class FlatOrphans(val listName: String?, val items: List<ParsedTodoItem>) : ImportPlan {
         override val projectName: String get() = listName ?: "Imported List"
         override val taskTitles: List<String> get() = items.map { it.title }
         override val riskTitles: List<String> get() = emptyList()
@@ -310,22 +305,14 @@ sealed interface ImportPlan {
  * sections (phases, anchors, dependencies) are read-only in v1 and
  * always materialised.
  */
-data class ImportExclusions(
-    val excludedTaskIndices: Set<Int> = emptySet(),
-    val excludedRiskIndices: Set<Int> = emptySet()
-) {
+data class ImportExclusions(val excludedTaskIndices: Set<Int> = emptySet(), val excludedRiskIndices: Set<Int> = emptySet()) {
     companion object {
         val EMPTY = ImportExclusions()
     }
 }
 
 sealed interface ImportOutcome {
-    data class Rich(
-        val projectName: String,
-        val taskCount: Int,
-        val phaseCount: Int,
-        val riskCount: Int
-    ) : ImportOutcome
+    data class Rich(val projectName: String, val taskCount: Int, val phaseCount: Int, val riskCount: Int) : ImportOutcome
 
     data class FlatProject(val projectName: String, val taskCount: Int) : ImportOutcome
 

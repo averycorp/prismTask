@@ -14,9 +14,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AdminNotificationLogViewModel
 @Inject
-constructor(
-    private val projector: NotificationProjector
-) : ViewModel() {
+constructor(private val projector: NotificationProjector) : ViewModel() {
     private val _notifications = MutableStateFlow<List<ProjectedNotification>>(emptyList())
     val notifications: StateFlow<List<ProjectedNotification>> = _notifications.asStateFlow()
 

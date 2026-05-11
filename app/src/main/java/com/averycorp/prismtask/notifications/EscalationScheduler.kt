@@ -25,9 +25,7 @@ import javax.inject.Singleton
 @Singleton
 class EscalationScheduler
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     private val alarmManager: AlarmManager?
         get() = context.getSystemService(AlarmManager::class.java)
 

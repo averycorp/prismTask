@@ -26,9 +26,7 @@ import javax.inject.Singleton
 @Singleton
 class AuthInterceptor
 @Inject
-constructor(
-    private val tokenPreferences: AuthTokenPreferences
-) : Interceptor {
+constructor(private val tokenPreferences: AuthTokenPreferences) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()
         if (isAuthEndpoint(original)) {

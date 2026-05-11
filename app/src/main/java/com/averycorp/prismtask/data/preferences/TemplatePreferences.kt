@@ -27,9 +27,7 @@ internal val Context.templateDataStore: DataStore<Preferences> by preferencesDat
 @Singleton
 class TemplatePreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val TEMPLATES_SEEDED_KEY = booleanPreferencesKey("templates_seeded")
         private val TEMPLATES_FIRST_SYNC_DONE_KEY =

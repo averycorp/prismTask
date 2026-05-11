@@ -29,10 +29,7 @@ data class ResolvedTask(
 @Singleton
 class ParsedTaskResolver
 @Inject
-constructor(
-    private val tagRepository: TagRepository,
-    private val projectRepository: ProjectRepository
-) {
+constructor(private val tagRepository: TagRepository, private val projectRepository: ProjectRepository) {
     suspend fun resolve(parsed: ParsedTask): ResolvedTask {
         val tagIds = mutableListOf<Long>()
         val unmatchedTags = mutableListOf<String>()

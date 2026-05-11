@@ -27,10 +27,7 @@ constructor(
     private val api: PrismTaskApi,
     private val authTokenPreferences: AuthTokenPreferences
 ) {
-    data class Classification(
-        val category: LifeCategory,
-        val reason: String
-    )
+    data class Classification(val category: LifeCategory, val reason: String)
 
     suspend fun classify(title: String, description: String?): Result<Classification> {
         val token = authTokenPreferences.getAccessToken()

@@ -18,9 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class WeeklyReviewsListViewModel
 @Inject
-constructor(
-    repository: WeeklyReviewRepository
-) : ViewModel() {
+constructor(repository: WeeklyReviewRepository) : ViewModel() {
     val reviews: StateFlow<List<WeeklyReviewEntity>> = repository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }

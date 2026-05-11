@@ -21,17 +21,10 @@ internal val Context.advancedTuningDataStore: DataStore<Preferences> by
  * Bands the urgency score is bucketed into. Sliders in Settings → Task Defaults
  * → Urgency. Defaults match the values shipped through v1.6.
  */
-data class UrgencyBands(
-    val critical: Float = 0.7f,
-    val high: Float = 0.5f,
-    val medium: Float = 0.3f
-)
+data class UrgencyBands(val critical: Float = 0.7f, val high: Float = 0.5f, val medium: Float = 0.3f)
 
 /** Day windows that bend the score curve in [UrgencyScorer.calculateScore]. */
-data class UrgencyWindows(
-    val overdueCeilingDays: Int = 7,
-    val imminentWindowDays: Int = 7
-)
+data class UrgencyWindows(val overdueCeilingDays: Int = 7, val imminentWindowDays: Int = 7)
 
 /** Maximum-points caps for each component of the burnout score (sum to 100). */
 data class BurnoutWeights(
@@ -54,17 +47,10 @@ data class ProductivityWeights(
 )
 
 /** Mood correlation gating: minimum samples and label cutoffs. */
-data class MoodCorrelationConfig(
-    val minObservations: Int = 7,
-    val strongThreshold: Float = 0.5f,
-    val moderateThreshold: Float = 0.3f
-)
+data class MoodCorrelationConfig(val minObservations: Int = 7, val strongThreshold: Float = 0.5f, val moderateThreshold: Float = 0.3f)
 
 /** Days-of-supply thresholds that drive medication refill urgency labels. */
-data class RefillUrgencyConfig(
-    val urgentDays: Int = 3,
-    val upcomingDays: Int = 7
-)
+data class RefillUrgencyConfig(val urgentDays: Int = 3, val upcomingDays: Int = 7)
 
 /** Per-energy-band Pomodoro session timing (minutes). */
 data class EnergyPomodoroConfig(
@@ -94,58 +80,33 @@ data class GoodEnoughTimerConfig(
 )
 
 /** Smart-suggestion confidence cutoffs and result count. */
-data class SuggestionConfig(
-    val tagThreshold: Float = 0.2f,
-    val projectThreshold: Float = 0.3f,
-    val maxResults: Int = 3
-)
+data class SuggestionConfig(val tagThreshold: Float = 0.2f, val projectThreshold: Float = 0.3f, val maxResults: Int = 3)
 
 /** Conversation extractor input/title caps. */
-data class ExtractorConfig(
-    val maxInputChars: Int = 10_000,
-    val maxTitleChars: Int = 120
-)
+data class ExtractorConfig(val maxInputChars: Int = 10_000, val maxTitleChars: Int = 120)
 
 /** Sample-size + duration granularity gates for SmartDefaultsEngine. */
-data class SmartDefaultsConfig(
-    val minHistory: Int = 5,
-    val durationGranularityMinutes: Int = 15
-)
+data class SmartDefaultsConfig(val minHistory: Int = 5, val durationGranularityMinutes: Int = 15)
 
 /** Hard cutoff hour (0..23) for the morning check-in prompt. */
-data class MorningCheckInPromptCutoff(
-    val latestHour: Int = 11
-)
+data class MorningCheckInPromptCutoff(val latestHour: Int = 11)
 
 /** Per-category extra keywords (CSV) appended to the built-in classifier list. */
-data class LifeCategoryCustomKeywords(
-    val work: String = "",
-    val personal: String = "",
-    val selfCare: String = "",
-    val health: String = ""
-)
+data class LifeCategoryCustomKeywords(val work: String = "", val personal: String = "", val selfCare: String = "", val health: String = "")
 
 /**
  * Per-mode extra keywords (CSV) appended to the built-in
  * [com.averycorp.prismtask.domain.usecase.TaskModeClassifier] list.
  * See `docs/WORK_PLAY_RELAX.md` § Inference rules.
  */
-data class TaskModeCustomKeywords(
-    val work: String = "",
-    val play: String = "",
-    val relax: String = ""
-)
+data class TaskModeCustomKeywords(val work: String = "", val play: String = "", val relax: String = "")
 
 /**
  * Per-load extra keywords (CSV) appended to the built-in
  * [com.averycorp.prismtask.domain.usecase.CognitiveLoadClassifier] list.
  * See `docs/COGNITIVE_LOAD.md` § Inference rules.
  */
-data class CognitiveLoadCustomKeywords(
-    val easy: String = "",
-    val medium: String = "",
-    val hard: String = ""
-)
+data class CognitiveLoadCustomKeywords(val easy: String = "", val medium: String = "", val hard: String = "")
 
 /** Day-of-week (1=Mon..7=Sun) and clock time for weekly summary workers. */
 data class WeeklySummarySchedule(
@@ -165,64 +126,38 @@ data class WeeklySummarySchedule(
 )
 
 /** Re-engagement nudge thresholds. */
-data class ReengagementConfig(
-    val absenceDays: Int = 2,
-    val maxNudges: Int = 1
-)
+data class ReengagementConfig(val absenceDays: Int = 2, val maxNudges: Int = 1)
 
 /** Hour of day (0..23) the OverloadCheckWorker fires its periodic check. */
-data class OverloadCheckSchedule(
-    val hourOfDay: Int = 16,
-    val minute: Int = 0
-)
+data class OverloadCheckSchedule(val hourOfDay: Int = 16, val minute: Int = 0)
 
 /** Days a soft-deleted batch (undo tail) lingers before sweep. */
-data class BatchUndoConfig(
-    val tailDays: Int = 7
-)
+data class BatchUndoConfig(val tailDays: Int = 7)
 
 /** Fallback hour-of-day applied when a habit's reminderTime CSV is malformed. */
-data class HabitReminderFallback(
-    val hour: Int = 8,
-    val minute: Int = 0
-)
+data class HabitReminderFallback(val hour: Int = 8, val minute: Int = 0)
 
 /** OkHttp + token-refresh retry knobs for power users on flaky networks. */
-data class ApiNetworkConfig(
-    val timeoutSeconds: Int = 30,
-    val retryAttempts: Int = 2
-)
+data class ApiNetworkConfig(val timeoutSeconds: Int = 30, val retryAttempts: Int = 2)
 
 /** Periodic widget refresh cadence (15 = WorkManager floor, 240 = battery-saver ceiling). */
-data class WidgetRefreshConfig(
-    val intervalMinutes: Int = 15
-)
+data class WidgetRefreshConfig(val intervalMinutes: Int = 15)
 
 /** Productivity widget score-to-color thresholds (≥green = green, ≥orange = orange, below = red). */
-data class ProductivityWidgetThresholds(
-    val greenScore: Int = 80,
-    val orangeScore: Int = 60
-)
+data class ProductivityWidgetThresholds(val greenScore: Int = 80, val orangeScore: Int = 60)
 
 /**
  * Editor field row caps for long-form planners. These are the
  * `maxLines` values applied to the description and notes fields in
  * the Add/Edit Task editor (E1).
  */
-data class EditorFieldRows(
-    val descriptionRows: Int = 5,
-    val notesRows: Int = 8
-)
+data class EditorFieldRows(val descriptionRows: Int = 5, val notesRows: Int = 8)
 
 /** QuickAdd / paste-multi-task field max-lines (E2). */
-data class QuickAddRows(
-    val maxLines: Int = 5
-)
+data class QuickAddRows(val maxLines: Int = 5)
 
 /** Search results description preview line count (E5). */
-data class SearchPreview(
-    val previewLines: Int = 2
-)
+data class SearchPreview(val previewLines: Int = 2)
 
 /**
  * First-display tier per Self-Care routine, applied when no log exists for
@@ -250,9 +185,7 @@ data class SelfCareTierDefaults(
 @Singleton
 class AdvancedTuningPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         // B1 — urgency bands
         private val URGENCY_BAND_CRITICAL = floatPreferencesKey("urgency_band_critical")

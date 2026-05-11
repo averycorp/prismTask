@@ -12,9 +12,7 @@ import javax.inject.Singleton
  * (P2-D, see `docs/audits/ANALYTICS_C4_C5_TIME_TRACKING_DESIGN.md`).
  */
 @Singleton
-class TaskTimingRepository @Inject constructor(
-    private val taskTimingDao: TaskTimingDao
-) {
+class TaskTimingRepository @Inject constructor(private val taskTimingDao: TaskTimingDao) {
     suspend fun logTime(
         taskId: Long,
         durationMinutes: Int,

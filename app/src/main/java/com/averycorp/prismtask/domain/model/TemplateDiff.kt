@@ -11,12 +11,7 @@ import com.averycorp.prismtask.data.seed.BuiltInStepDefinition
  * field on this habit. The UI uses it to default the per-field checkbox
  * to unchecked so we don't silently overwrite user edits.
  */
-data class FieldChange(
-    val fieldName: String,
-    val currentValue: String?,
-    val proposedValue: String?,
-    val userModified: Boolean
-)
+data class FieldChange(val fieldName: String, val currentValue: String?, val proposedValue: String?, val userModified: Boolean)
 
 /**
  * One step that exists in both the user's instance and the proposed

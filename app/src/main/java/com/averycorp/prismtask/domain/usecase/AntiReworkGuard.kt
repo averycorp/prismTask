@@ -60,22 +60,13 @@ sealed class ReworkDecision {
     data object Allow : ReworkDecision()
 
     /** Soft warning: "You already finished this — sure?" */
-    data class SoftWarning(
-        val revisionCount: Int,
-        val adhdModeActive: Boolean
-    ) : ReworkDecision()
+    data class SoftWarning(val revisionCount: Int, val adhdModeActive: Boolean) : ReworkDecision()
 
     /** Task is in cooling-off period — can't edit yet. */
-    data class CoolingOff(
-        val remainingMinutes: Int,
-        val minutesAgo: Int
-    ) : ReworkDecision()
+    data class CoolingOff(val remainingMinutes: Int, val minutesAgo: Int) : ReworkDecision()
 
     /** Task has reached the max revision limit. */
-    data class MaxRevisionsReached(
-        val revisionCount: Int,
-        val maxRevisions: Int
-    ) : ReworkDecision()
+    data class MaxRevisionsReached(val revisionCount: Int, val maxRevisions: Int) : ReworkDecision()
 
     /** Task is revision-locked — requires explicit unlock. */
     data object RevisionLocked : ReworkDecision()

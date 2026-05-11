@@ -297,12 +297,7 @@ constructor(
         }
     }
 
-    private data class ParsedStep(
-        val stepId: String,
-        val note: String?,
-        val takenAt: Long?,
-        val timeOfDay: String?
-    )
+    private data class ParsedStep(val stepId: String, val note: String?, val takenAt: Long?, val timeOfDay: String?)
 
     private fun parseCompletedSteps(json: String?): List<ParsedStep> {
         if (json.isNullOrBlank() || json == "[]") return emptyList()

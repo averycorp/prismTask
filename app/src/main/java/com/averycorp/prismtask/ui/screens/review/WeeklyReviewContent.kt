@@ -25,12 +25,7 @@ data class WeeklyReviewContent(
     val wins: List<String>,
     val slips: List<String>
 ) {
-    data class ActivitySummary(
-        val completed: Int,
-        val slipped: Int,
-        val rescheduled: Int,
-        val byCategory: Map<String, Int>
-    )
+    data class ActivitySummary(val completed: Int, val slipped: Int, val rescheduled: Int, val byCategory: Map<String, Int>)
 
     companion object {
         fun parseMetrics(metricsJson: String?): ActivitySummary {

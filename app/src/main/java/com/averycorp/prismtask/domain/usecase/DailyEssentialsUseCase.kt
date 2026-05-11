@@ -30,41 +30,17 @@ import javax.inject.Singleton
 
 enum class LeisureKind { MUSIC, FLEX }
 
-data class StepState(
-    val stepId: String,
-    val label: String,
-    val completedToday: Boolean,
-    val timeOfDay: String
-)
+data class StepState(val stepId: String, val label: String, val completedToday: Boolean, val timeOfDay: String)
 
-data class RoutineCardState(
-    val routineType: String,
-    val displayName: String,
-    val steps: List<StepState>
-) {
+data class RoutineCardState(val routineType: String, val displayName: String, val steps: List<StepState>) {
     val allComplete: Boolean get() = steps.isNotEmpty() && steps.all { it.completedToday }
 }
 
-data class HabitCardState(
-    val habitId: Long,
-    val name: String,
-    val icon: String,
-    val color: String,
-    val completedToday: Boolean
-)
+data class HabitCardState(val habitId: Long, val name: String, val icon: String, val color: String, val completedToday: Boolean)
 
-data class AssignmentSummary(
-    val id: Long,
-    val title: String,
-    val courseName: String,
-    val courseColor: Int,
-    val completed: Boolean
-)
+data class AssignmentSummary(val id: Long, val title: String, val courseName: String, val courseColor: Int, val completed: Boolean)
 
-data class SchoolworkCardState(
-    val habit: HabitCardState?,
-    val assignmentsDueToday: List<AssignmentSummary>
-) {
+data class SchoolworkCardState(val habit: HabitCardState?, val assignmentsDueToday: List<AssignmentSummary>) {
     val hasContent: Boolean get() = habit != null || assignmentsDueToday.isNotEmpty()
 }
 

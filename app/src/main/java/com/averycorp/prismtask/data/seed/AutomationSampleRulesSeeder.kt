@@ -18,9 +18,7 @@ import javax.inject.Singleton
  * browse it via the Template Library screen and import any rule on demand.
  */
 @Singleton
-class AutomationSampleRulesSeeder @Inject constructor(
-    private val ruleRepository: AutomationRuleRepository
-) {
+class AutomationSampleRulesSeeder @Inject constructor(private val ruleRepository: AutomationRuleRepository) {
     suspend fun seedIfNeeded() {
         val seedTemplates = AutomationStarterLibrary.ALL_TEMPLATES
             .filter { it.id in AutomationStarterLibrary.FIRST_INSTALL_SEED_IDS }

@@ -120,10 +120,7 @@ enum class ReplaceSection {
  *   listed sections so a user can replace their task list while preserving
  *   habit history. Ignored in [ImportMode.MERGE].
  */
-data class ImportOptions(
-    val restoreDerivedData: Boolean = true,
-    val replaceScope: Set<ReplaceSection> = ReplaceSection.ALL
-)
+data class ImportOptions(val restoreDerivedData: Boolean = true, val replaceScope: Set<ReplaceSection> = ReplaceSection.ALL)
 
 data class ImportResult(
     val tasksImported: Int = 0,
@@ -702,7 +699,8 @@ constructor(
                 selfCareDao.insertLog(merged.copy(id = 0))
                 existingSelfCareLogKeys.add(key)
                 ctx.selfCareLogsImported++
-                if (routineType == "medication" && merged.tiersByTime.isNotBlank() &&
+                if (routineType == "medication" &&
+                    merged.tiersByTime.isNotBlank() &&
                     merged.tiersByTime != "{}"
                 ) {
                     importedAnyMedicationLog = true

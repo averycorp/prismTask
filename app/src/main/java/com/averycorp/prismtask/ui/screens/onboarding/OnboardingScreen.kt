@@ -1793,11 +1793,7 @@ private val ThemePickerText = Color(0xFFE8E8F0)
 private val ThemePickerSubtext = Color(0xFF8A8AA8)
 private val ThemePickerBorder = Color(0xFF2A2A3A)
 
-private data class OnboardingThemeEntry(
-    val theme: PrismTheme,
-    val displayName: String,
-    val tagline: String
-)
+private data class OnboardingThemeEntry(val theme: PrismTheme, val displayName: String, val tagline: String)
 
 private val OnboardingThemeEntries = listOf(
     OnboardingThemeEntry(PrismTheme.CYBERPUNK, "Cyberpunk", "Neon and precise"),

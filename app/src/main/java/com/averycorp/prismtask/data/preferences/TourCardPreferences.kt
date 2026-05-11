@@ -42,9 +42,7 @@ internal val Context.tourCardDataStore: DataStore<Preferences> by
 @Singleton
 class TourCardPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val TOUR_CARD_ELIGIBLE = booleanPreferencesKey("tour_card_eligible")
         private val TOUR_CARD_DISMISSED = booleanPreferencesKey("tour_card_dismissed")

@@ -20,9 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MedicationSlotsViewModel
 @Inject
-constructor(
-    private val repository: MedicationSlotRepository
-) : ViewModel() {
+constructor(private val repository: MedicationSlotRepository) : ViewModel() {
 
     val allSlots: StateFlow<List<MedicationSlotEntity>> =
         repository.observeAllSlots().stateIn(

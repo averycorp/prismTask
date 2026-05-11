@@ -15,21 +15,12 @@ import javax.inject.Singleton
 
 internal val Context.habitListDataStore: DataStore<Preferences> by preferencesDataStore(name = "habit_list_prefs")
 
-data class BuiltInSortOrders(
-    val morning: Int,
-    val bedtime: Int,
-    val medication: Int,
-    val school: Int,
-    val leisure: Int,
-    val housework: Int
-)
+data class BuiltInSortOrders(val morning: Int, val bedtime: Int, val medication: Int, val school: Int, val leisure: Int, val housework: Int)
 
 @Singleton
 class HabitListPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val MORNING_SORT_ORDER = intPreferencesKey("morning_sort_order")
         private val BEDTIME_SORT_ORDER = intPreferencesKey("bedtime_sort_order")

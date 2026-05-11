@@ -23,10 +23,7 @@ import javax.inject.Singleton
 @Singleton
 class NotificationProfileRepository
 @Inject
-constructor(
-    private val dao: NotificationProfileDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val dao: NotificationProfileDao, private val syncTracker: SyncTracker) {
     fun getAll(): Flow<List<NotificationProfileEntity>> = dao.getAll()
 
     suspend fun getById(id: Long): NotificationProfileEntity? = dao.getById(id)

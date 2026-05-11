@@ -23,9 +23,7 @@ enum class RatingSentiment(val wireValue: String) {
 }
 
 @HiltViewModel
-class RatingPromptViewModel @Inject constructor(
-    private val repository: RatingFeedbackRepository
-) : ViewModel() {
+class RatingPromptViewModel @Inject constructor(private val repository: RatingFeedbackRepository) : ViewModel() {
     private val _state = MutableStateFlow<RatingPromptUiState>(RatingPromptUiState.Idle)
     val state: StateFlow<RatingPromptUiState> = _state.asStateFlow()
 

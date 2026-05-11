@@ -19,12 +19,7 @@ import kotlin.math.roundToInt
  * is non-zero only when the call demoted an active run to zero (so the
  * caller can fire the empathetic notification once and only once).
  */
-data class ProductiveStreakResolution(
-    val day: LocalDate,
-    val score: Int,
-    val brokenStreakLength: Int,
-    val streakAdvanced: Boolean
-)
+data class ProductiveStreakResolution(val day: LocalDate, val score: Int, val brokenStreakLength: Int, val streakAdvanced: Boolean)
 
 /**
  * Computes yesterday's productivity score and updates

@@ -21,21 +21,13 @@ import javax.inject.Singleton
  * Result wrapper for coaching API calls that includes tier gating outcomes.
  */
 sealed class CoachingResult {
-    data class Success(
-        val response: CoachingResponse
-    ) : CoachingResult()
+    data class Success(val response: CoachingResponse) : CoachingResult()
 
-    data class UpgradeRequired(
-        val requiredTier: UserTier
-    ) : CoachingResult()
+    data class UpgradeRequired(val requiredTier: UserTier) : CoachingResult()
 
-    data class FreeLimitReached(
-        val dailyLimit: Int
-    ) : CoachingResult()
+    data class FreeLimitReached(val dailyLimit: Int) : CoachingResult()
 
-    data class Error(
-        val message: String
-    ) : CoachingResult()
+    data class Error(val message: String) : CoachingResult()
 }
 
 @Singleton

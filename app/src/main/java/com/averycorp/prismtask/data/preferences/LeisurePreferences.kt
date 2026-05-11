@@ -22,11 +22,7 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class CustomLeisureActivity(
-    val id: String,
-    val label: String,
-    val icon: String
-)
+data class CustomLeisureActivity(val id: String, val label: String, val icon: String)
 
 enum class LeisureSlotId { MUSIC, FLEX, LANGUAGE }
 
@@ -107,9 +103,7 @@ internal val Context.leisureDataStore: DataStore<Preferences> by preferencesData
 @Singleton
 class LeisurePreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     private val gson = Gson()
     private val activityListType = object : TypeToken<List<CustomLeisureActivity>>() {}.type
     private val stringListType = object : TypeToken<List<String>>() {}.type

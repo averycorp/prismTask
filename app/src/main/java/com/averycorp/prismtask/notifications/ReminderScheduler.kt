@@ -17,10 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class ReminderScheduler
 @Inject
-constructor(
-    @ApplicationContext private val context: Context,
-    private val taskDao: TaskDao
-) {
+constructor(@ApplicationContext private val context: Context, private val taskDao: TaskDao) {
     // Android's AlarmManager service is platform-defined as non-null in
     // practice, but the framework API returns a nullable getSystemService.
     // Stripped-down OEM ROMs have been observed returning null. Guard here

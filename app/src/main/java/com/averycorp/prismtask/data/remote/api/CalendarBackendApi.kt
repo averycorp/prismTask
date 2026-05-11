@@ -75,10 +75,7 @@ interface CalendarBackendApi {
 
 data class CalendarAuthorizeResponse(val url: String)
 
-data class CalendarStatusResponse(
-    val connected: Boolean,
-    val email: String? = null
-)
+data class CalendarStatusResponse(val connected: Boolean, val email: String? = null)
 
 data class CalendarListResponse(val calendars: List<CalendarListItem>)
 
@@ -105,21 +102,11 @@ data class CalendarPushRequest(
     val knownCalendarId: String? = null
 )
 
-data class CalendarPushResponse(
-    val eventId: String? = null,
-    val calendarId: String? = null,
-    val etag: String? = null
-)
+data class CalendarPushResponse(val eventId: String? = null, val calendarId: String? = null, val etag: String? = null)
 
-data class EventsPullRequest(
-    val calendarIds: List<String>
-)
+data class EventsPullRequest(val calendarIds: List<String>)
 
-data class EventsPullResponse(
-    val created: Int = 0,
-    val updated: Int = 0,
-    val deleted: Int = 0
-)
+data class EventsPullResponse(val created: Int = 0, val updated: Int = 0, val deleted: Int = 0)
 
 data class EventsListResponse(val events: List<CalendarEventDto>)
 
@@ -134,12 +121,7 @@ data class CalendarEventDto(
 
 data class EventSearchResponse(val events: List<EventSearchItem>)
 
-data class EventSearchItem(
-    val id: String,
-    val summary: String,
-    val startMillis: Long,
-    val allDay: Boolean = false
-)
+data class EventSearchItem(val id: String, val summary: String, val startMillis: Long, val allDay: Boolean = false)
 
 data class CalendarSettingsPayload(
     val enabled: Boolean = false,

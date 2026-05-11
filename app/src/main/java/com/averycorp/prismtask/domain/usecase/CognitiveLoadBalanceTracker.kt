@@ -41,11 +41,7 @@ data class CognitiveLoadBalanceState(
  * philosophy doc is explicit that load is descriptive-only — they only
  * colour the progress bars to indicate the user's chosen mix.
  */
-data class CognitiveLoadBalanceConfig(
-    val easyTarget: Float = 1f / 3f,
-    val mediumTarget: Float = 1f / 3f,
-    val hardTarget: Float = 1f / 3f
-) {
+data class CognitiveLoadBalanceConfig(val easyTarget: Float = 1f / 3f, val mediumTarget: Float = 1f / 3f, val hardTarget: Float = 1f / 3f) {
     fun asMap(): Map<CognitiveLoad, Float> = mapOf(
         CognitiveLoad.EASY to easyTarget,
         CognitiveLoad.MEDIUM to mediumTarget,

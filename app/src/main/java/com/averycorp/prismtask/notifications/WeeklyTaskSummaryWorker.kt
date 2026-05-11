@@ -27,11 +27,7 @@ import java.util.concurrent.TimeUnit
  * notification-building logic so [WeeklyTaskSummaryCalculator] can be
  * exercised in unit tests without a WorkManager harness.
  */
-data class WeeklyTaskSummaryData(
-    val completedCount: Int,
-    val overdueClearedCount: Int,
-    val stillOpenCount: Int
-)
+data class WeeklyTaskSummaryData(val completedCount: Int, val overdueClearedCount: Int, val stillOpenCount: Int)
 
 /**
  * Weekly task summary notification. Sibling of

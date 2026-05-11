@@ -19,11 +19,7 @@ import com.averycorp.prismtask.R
  * Prefer reading from [LocalPrismFonts] inside composables rather than calling
  * [prismThemeFonts] directly.
  */
-data class PrismThemeFonts(
-    val body: FontFamily,
-    val display: FontFamily,
-    val mono: FontFamily
-)
+data class PrismThemeFonts(val body: FontFamily, val display: FontFamily, val mono: FontFamily)
 
 // ── Chakra Petch — Cyberpunk body/mono ──────────────────────────────────────
 // Angular techno sans-serif with sci-fi flair.

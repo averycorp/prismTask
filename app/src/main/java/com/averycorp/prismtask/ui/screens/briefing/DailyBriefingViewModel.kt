@@ -15,18 +15,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-data class BriefingPriority(
-    val taskId: Long,
-    val title: String,
-    val reason: String
-)
+data class BriefingPriority(val taskId: Long, val title: String, val reason: String)
 
-data class SuggestedTask(
-    val taskId: Long,
-    val title: String,
-    val suggestedTime: String,
-    val reason: String
-)
+data class SuggestedTask(val taskId: Long, val title: String, val suggestedTime: String, val reason: String)
 
 data class DailyBriefing(
     val greeting: String,

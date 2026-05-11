@@ -53,9 +53,7 @@ import javax.inject.Singleton
  *   If false, only user-authored core data is exported and streak fields are
  *   expected to be recomputed from history on import (see [DataImporter]).
  */
-data class ExportOptions(
-    val includeDerivedData: Boolean = true
-)
+data class ExportOptions(val includeDerivedData: Boolean = true)
 
 /**
  * Exports all app data to JSON.

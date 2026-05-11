@@ -88,11 +88,7 @@ data class MedicationSlotTodayState(
  * junction membership). [takenAt] is the most recent non-synthetic dose's
  * `taken_at` for today, used to render a "Last taken at HH:mm" label.
  */
-data class UnslottedMedicationState(
-    val medication: MedicationEntity,
-    val takenToday: Boolean,
-    val takenAt: Long? = null
-)
+data class UnslottedMedicationState(val medication: MedicationEntity, val takenToday: Boolean, val takenAt: Long? = null)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel

@@ -21,9 +21,7 @@ import com.averycorp.prismtask.domain.model.TaskMode
  *    can't tell, it deliberately does not inflate Work.
  *  - No keyword hits → [TaskMode.UNCATEGORIZED].
  */
-class TaskModeClassifier(
-    private val keywords: Map<TaskMode, List<String>> = DEFAULT_KEYWORDS
-) {
+class TaskModeClassifier(private val keywords: Map<TaskMode, List<String>> = DEFAULT_KEYWORDS) {
     fun classify(title: String, description: String? = null): TaskMode {
         val haystack = buildString {
             append(title.lowercase())

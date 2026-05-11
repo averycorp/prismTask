@@ -29,10 +29,7 @@ sealed interface BetaRedeemOutcome {
 @Singleton
 class BetaCodeRepository
 @Inject
-constructor(
-    private val api: PrismTaskApi,
-    private val backendSyncService: BackendSyncService
-) {
+constructor(private val api: PrismTaskApi, private val backendSyncService: BackendSyncService) {
     suspend fun redeem(code: String): BetaRedeemOutcome {
         val trimmed = code.trim()
         return try {

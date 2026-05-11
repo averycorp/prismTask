@@ -22,9 +22,7 @@ enum class MedicationScheduleMode { INTERVAL, SPECIFIC_TIMES }
 @Singleton
 class MedicationPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val REMINDER_INTERVAL_MINUTES = intPreferencesKey("reminder_interval_minutes")
         private val SCHEDULE_MODE = stringPreferencesKey("schedule_mode")

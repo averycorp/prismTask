@@ -27,9 +27,7 @@ import javax.inject.Singleton
  * channel ID stable across rule edits.
  */
 @Singleton
-class NotifyActionHandler @Inject constructor(
-    @ApplicationContext private val context: Context
-) : AutomationActionHandler {
+class NotifyActionHandler @Inject constructor(@ApplicationContext private val context: Context) : AutomationActionHandler {
     override val type: String = "notify"
 
     override suspend fun execute(
@@ -82,10 +80,8 @@ class NotifyActionHandler @Inject constructor(
  * (`docs/audits/D_AUTOMATION_ACTION_SILENT_FAILURE_AUDIT.md` § A2).
  */
 @Singleton
-class MutateTaskActionHandler @Inject constructor(
-    private val taskRepository: TaskRepository,
-    private val tagDao: TagDao
-) : AutomationActionHandler {
+class MutateTaskActionHandler @Inject constructor(private val taskRepository: TaskRepository, private val tagDao: TagDao) :
+    AutomationActionHandler {
     override val type: String = "mutate.task"
 
     override suspend fun execute(
@@ -221,9 +217,7 @@ class MutateTaskActionHandler @Inject constructor(
  * (`docs/audits/D_AUTOMATION_ACTION_SILENT_FAILURE_AUDIT.md` § A3).
  */
 @Singleton
-class MutateHabitActionHandler @Inject constructor(
-    private val habitRepository: HabitRepository
-) : AutomationActionHandler {
+class MutateHabitActionHandler @Inject constructor(private val habitRepository: HabitRepository) : AutomationActionHandler {
     override val type: String = "mutate.habit"
 
     override suspend fun execute(
@@ -298,9 +292,7 @@ class LogActionHandler @Inject constructor() : AutomationActionHandler {
  * is in the foreground and are unaffected.
  */
 @Singleton
-class ScheduleTimerActionHandler @Inject constructor(
-    @ApplicationContext private val context: Context
-) : AutomationActionHandler {
+class ScheduleTimerActionHandler @Inject constructor(@ApplicationContext private val context: Context) : AutomationActionHandler {
     override val type: String = "schedule.timer"
 
     override suspend fun execute(
@@ -347,9 +339,7 @@ class ScheduleTimerActionHandler @Inject constructor(
  * instead.
  */
 @Singleton
-class MutateMedicationActionHandler @Inject constructor(
-    private val medicationRepository: MedicationRepository
-) : AutomationActionHandler {
+class MutateMedicationActionHandler @Inject constructor(private val medicationRepository: MedicationRepository) : AutomationActionHandler {
     override val type: String = "mutate.medication"
 
     override suspend fun execute(

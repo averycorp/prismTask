@@ -19,9 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class PomodoroAICoach
 @Inject
-constructor(
-    private val api: PrismTaskApi
-) {
+constructor(private val api: PrismTaskApi) {
     /** Pre-session coaching: given the tasks about to be worked on, suggest an approach. */
     suspend fun suggestPreSession(
         upcomingTasks: List<SessionTask>,

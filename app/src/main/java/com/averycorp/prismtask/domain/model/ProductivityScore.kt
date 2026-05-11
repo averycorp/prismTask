@@ -16,11 +16,7 @@ data class ProductivityScoreResponse(
     val worstDay: BestWorstDay?
 )
 
-data class DailyScore(
-    val date: LocalDate,
-    val score: Double,
-    val breakdown: ScoreBreakdown
-)
+data class DailyScore(val date: LocalDate, val score: Double, val breakdown: ScoreBreakdown)
 
 data class ScoreBreakdown(
     /** 0-100 — completed-due / due, 100 when no tasks were due. */
@@ -40,7 +36,4 @@ data class ScoreBreakdown(
 
 enum class ProductivityTrend { IMPROVING, DECLINING, STABLE }
 
-data class BestWorstDay(
-    val date: LocalDate,
-    val score: Double
-)
+data class BestWorstDay(val date: LocalDate, val score: Double)

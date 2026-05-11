@@ -167,18 +167,10 @@ constructor(
 sealed class ImportPreviewState {
     data object Idle : ImportPreviewState()
     data class Loading(val sourceKey: String) : ImportPreviewState()
-    data class Loaded(
-        val sourceKey: String,
-        val plan: ImportPlan,
-        val asProject: Boolean
-    ) : ImportPreviewState()
+    data class Loaded(val sourceKey: String, val plan: ImportPlan, val asProject: Boolean) : ImportPreviewState()
     data class Committing(val sourceKey: String) : ImportPreviewState()
     data class Applied(val sourceKey: String, val outcome: ImportOutcome) : ImportPreviewState()
-    data class Error(
-        val sourceKey: String,
-        val kind: ImportPreviewErrorKind,
-        val message: String
-    ) : ImportPreviewState()
+    data class Error(val sourceKey: String, val kind: ImportPreviewErrorKind, val message: String) : ImportPreviewState()
 }
 
 enum class ImportPreviewErrorKind { ReadFailure, Unparseable, WriteFailure }

@@ -22,9 +22,7 @@ import javax.inject.Singleton
  * The 24h window in [RatingPromptTriggerHelper] reads from this signal.
  */
 @Singleton
-class RecentCrashSignal @Inject constructor(
-    private val prefs: RatingPromptPreferences
-) {
+class RecentCrashSignal @Inject constructor(private val prefs: RatingPromptPreferences) {
     suspend fun recordCrash() {
         prefs.setLastCrashAt(System.currentTimeMillis())
     }

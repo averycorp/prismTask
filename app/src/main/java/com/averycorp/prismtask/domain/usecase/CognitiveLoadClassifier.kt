@@ -24,9 +24,7 @@ import com.averycorp.prismtask.domain.model.CognitiveLoad
  *    the inverted axis.
  *  - No keyword hits → [CognitiveLoad.UNCATEGORIZED].
  */
-class CognitiveLoadClassifier(
-    private val keywords: Map<CognitiveLoad, List<String>> = DEFAULT_KEYWORDS
-) {
+class CognitiveLoadClassifier(private val keywords: Map<CognitiveLoad, List<String>> = DEFAULT_KEYWORDS) {
     fun classify(title: String, description: String? = null): CognitiveLoad {
         val haystack = buildString {
             append(title.lowercase())

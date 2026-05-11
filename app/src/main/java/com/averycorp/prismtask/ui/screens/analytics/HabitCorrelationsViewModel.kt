@@ -13,10 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class HabitCorrelationsUiState(
-    val isLoading: Boolean = false,
-    val outcome: HabitCorrelationsOutcome? = null
-)
+data class HabitCorrelationsUiState(val isLoading: Boolean = false, val outcome: HabitCorrelationsOutcome? = null)
 
 @HiltViewModel
 class HabitCorrelationsViewModel

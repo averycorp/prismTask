@@ -29,11 +29,7 @@ import com.averycorp.prismtask.ui.components.settings.SettingsGroup
 import com.averycorp.prismtask.ui.theme.PrismTheme
 import com.averycorp.prismtask.ui.theme.ThemeViewModel
 
-private data class WidgetThemeOption(
-    val theme: PrismTheme?,
-    val displayName: String,
-    val swatch: Color?
-)
+private data class WidgetThemeOption(val theme: PrismTheme?, val displayName: String, val swatch: Color?)
 
 private val WidgetThemeOptions = listOf(
     WidgetThemeOption(null, "Follow App Theme", null),

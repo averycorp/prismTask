@@ -12,10 +12,7 @@ import kotlinx.coroutines.flow.Flow
  * Top-level so Room's KSP processor can reflect on its constructor without
  * the awkwardness of a nested class on an interface.
  */
-data class HabitLastCompletion(
-    val habitId: Long,
-    val lastCompletedDate: Long
-)
+data class HabitLastCompletion(val habitId: Long, val lastCompletedDate: Long)
 
 @Dao
 interface HabitCompletionDao {

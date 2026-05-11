@@ -336,20 +336,32 @@ class MedicationRepositoryTest {
     @Test
     fun countDosesForMedOnDate_returnsMatchingCount() = runBlocking {
         medicationDoseDao.rows += MedicationDoseEntity(
-            id = 1, medicationId = 1, slotKey = "morning",
-            takenAt = 1L, takenDateLocal = "2026-04-22"
+            id = 1,
+            medicationId = 1,
+            slotKey = "morning",
+            takenAt = 1L,
+            takenDateLocal = "2026-04-22"
         )
         medicationDoseDao.rows += MedicationDoseEntity(
-            id = 2, medicationId = 1, slotKey = "evening",
-            takenAt = 2L, takenDateLocal = "2026-04-22"
+            id = 2,
+            medicationId = 1,
+            slotKey = "evening",
+            takenAt = 2L,
+            takenDateLocal = "2026-04-22"
         )
         medicationDoseDao.rows += MedicationDoseEntity(
-            id = 3, medicationId = 1, slotKey = "morning",
-            takenAt = 3L, takenDateLocal = "2026-04-21"
+            id = 3,
+            medicationId = 1,
+            slotKey = "morning",
+            takenAt = 3L,
+            takenDateLocal = "2026-04-21"
         )
         medicationDoseDao.rows += MedicationDoseEntity(
-            id = 4, medicationId = 2, slotKey = "morning",
-            takenAt = 4L, takenDateLocal = "2026-04-22"
+            id = 4,
+            medicationId = 2,
+            slotKey = "morning",
+            takenAt = 4L,
+            takenDateLocal = "2026-04-22"
         )
 
         assertEquals(2, repo.countDosesForMedOnDateOnce(medicationId = 1, date = "2026-04-22"))

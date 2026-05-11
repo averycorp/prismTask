@@ -65,12 +65,7 @@ class InboxWidget : GlanceAppWidget() {
     }
 }
 
-private data class InboxRowVm(
-    val text: String,
-    val age: String,
-    val priorityChipColor: ColorProvider,
-    val priorityLabel: String
-)
+private data class InboxRowVm(val text: String, val age: String, val priorityChipColor: ColorProvider, val priorityLabel: String)
 
 @Composable
 private fun InboxContent(

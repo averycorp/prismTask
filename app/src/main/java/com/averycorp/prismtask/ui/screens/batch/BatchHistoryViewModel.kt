@@ -37,10 +37,8 @@ import javax.inject.Inject
 @HiltViewModel
 class BatchHistoryViewModel
 @Inject
-constructor(
-    private val dao: BatchUndoLogDao,
-    private val repository: BatchOperationsRepository
-) : ViewModel() {
+constructor(private val dao: BatchUndoLogDao, private val repository: BatchOperationsRepository) :
+    ViewModel() {
     /** All batches in the table, newest first. Each batch is a list of
      *  per-entity entries — they're rendered as a single grouped card. */
     val batches: StateFlow<List<BatchSummary>> = dao

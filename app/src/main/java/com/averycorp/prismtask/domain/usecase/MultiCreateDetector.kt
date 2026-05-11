@@ -87,10 +87,7 @@ class MultiCreateDetector {
          * exposed for callers that want a count for telemetry / preview
          * but not used as the canonical task list.
          */
-        data class MultiCreate(
-            val rawText: String,
-            val segments: List<String>
-        ) : Result()
+        data class MultiCreate(val rawText: String, val segments: List<String>) : Result()
     }
 
     companion object {

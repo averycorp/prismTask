@@ -43,11 +43,7 @@ import com.averycorp.prismtask.data.local.entity.MedicationSlotEntity
  * "Use different time" switch for that specific slot — null fields mean
  * "inherit slot defaults".
  */
-data class MedicationSlotSelection(
-    val slotId: Long,
-    val overrideIdealTime: String? = null,
-    val overrideDriftMinutes: Int? = null
-) {
+data class MedicationSlotSelection(val slotId: Long, val overrideIdealTime: String? = null, val overrideDriftMinutes: Int? = null) {
     val hasOverride: Boolean
         get() = overrideIdealTime != null || overrideDriftMinutes != null
 }

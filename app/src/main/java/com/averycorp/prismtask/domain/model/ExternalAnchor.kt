@@ -24,11 +24,7 @@ sealed class ExternalAnchor {
      * The comparison runs at evaluation time against the named
      * [metric] resolved by the caller's metric registry.
      */
-    data class NumericThreshold(
-        val metric: String,
-        val op: ComparisonOp,
-        val value: Double
-    ) : ExternalAnchor()
+    data class NumericThreshold(val metric: String, val op: ComparisonOp, val value: Double) : ExternalAnchor()
 
     /**
      * A boolean release gate (e.g. "phase-f-kickoff has passed",
@@ -36,10 +32,7 @@ sealed class ExternalAnchor {
      * evaluation time; [expectedState] is what the gate must read for
      * the anchor to be considered satisfied.
      */
-    data class BooleanGate(
-        val gateKey: String,
-        val expectedState: Boolean
-    ) : ExternalAnchor()
+    data class BooleanGate(val gateKey: String, val expectedState: Boolean) : ExternalAnchor()
 }
 
 /**

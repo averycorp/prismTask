@@ -67,9 +67,7 @@ object WidgetConfigDataStore {
     }
 
     // ---- Inbox widget ----
-    data class InboxConfig(
-        val maxItems: Int = 5
-    )
+    data class InboxConfig(val maxItems: Int = 5)
 
     fun inboxConfigFlow(context: Context, appWidgetId: Int): Flow<InboxConfig> =
         context.widgetConfigDataStore.data.map { prefs ->
@@ -145,10 +143,7 @@ object WidgetConfigDataStore {
         projectConfigFlow(context, appWidgetId).first()
 
     // ---- Quick add widget ----
-    data class QuickAddConfig(
-        val placeholder: String = "Add a task...",
-        val defaultProjectId: Long? = null
-    )
+    data class QuickAddConfig(val placeholder: String = "Add a task...", val defaultProjectId: Long? = null)
 
     fun quickAddConfigFlow(context: Context, appWidgetId: Int): Flow<QuickAddConfig> =
         context.widgetConfigDataStore.data.map { prefs ->

@@ -39,10 +39,7 @@ sealed interface EisenhowerUiState {
     data object Loading : EisenhowerUiState
 
     /** Categorize returned at least one quadrant assignment. */
-    data class Success(
-        val categorizations: List<EisenhowerCategorization>,
-        val summary: EisenhowerSummary
-    ) : EisenhowerUiState
+    data class Success(val categorizations: List<EisenhowerCategorization>, val summary: EisenhowerSummary) : EisenhowerUiState
 
     /**
      * Categorize returned an empty response — usually because the user

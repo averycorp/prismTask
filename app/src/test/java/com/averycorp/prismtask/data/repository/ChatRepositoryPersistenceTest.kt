@@ -60,7 +60,9 @@ class ChatRepositoryPersistenceTest {
     fun `messages Flow exposes rows for current conversation only`() = runTest {
         val api = mockk<PrismTaskApi>()
         coEvery { api.aiChat(any()) } returns ChatResponse(
-            message = "ack", actions = emptyList(), conversationId = "x"
+            message = "ack",
+            actions = emptyList(),
+            conversationId = "x"
         )
         val dao = FakeChatMessageDao()
         val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
@@ -90,7 +92,9 @@ class ChatRepositoryPersistenceTest {
     fun `clearConversation rotates conversationId without deleting rows`() = runTest {
         val api = mockk<PrismTaskApi>()
         coEvery { api.aiChat(any()) } returns ChatResponse(
-            message = "ack", actions = emptyList(), conversationId = "x"
+            message = "ack",
+            actions = emptyList(),
+            conversationId = "x"
         )
         val dao = FakeChatMessageDao()
         val repo = ChatRepository(api, dao, mockk<ChatStreamClient>(relaxed = true))
@@ -114,7 +118,9 @@ class ChatRepositoryPersistenceTest {
     fun `pullHistory upserts API response into DAO`() = runTest {
         val api = mockk<PrismTaskApi>()
         coEvery { api.aiChat(any()) } returns ChatResponse(
-            message = "x", actions = emptyList(), conversationId = "x"
+            message = "x",
+            actions = emptyList(),
+            conversationId = "x"
         )
         coEvery {
             api.aiChatHistory(any(), any(), any())

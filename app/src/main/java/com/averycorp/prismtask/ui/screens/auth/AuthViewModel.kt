@@ -35,9 +35,7 @@ sealed class AuthState {
      *  the UI shows a final "your account has been deleted" screen. */
     data object AccountPurged : AuthState()
 
-    data class Error(
-        val message: String
-    ) : AuthState()
+    data class Error(val message: String) : AuthState()
 }
 
 @HiltViewModel

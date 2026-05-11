@@ -17,10 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class CheckInLogRepository
 @Inject
-constructor(
-    private val dao: CheckInLogDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val dao: CheckInLogDao, private val syncTracker: SyncTracker) {
     suspend fun record(
         date: Long,
         stepsCompleted: List<CheckInStep>,

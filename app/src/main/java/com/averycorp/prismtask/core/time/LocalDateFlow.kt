@@ -31,9 +31,7 @@ import javax.inject.Singleton
  * `taskBehaviorPreferences.getStartOfDay()` flow in.
  */
 @Singleton
-class LocalDateFlow @Inject constructor(
-    private val timeProvider: TimeProvider
-) {
+class LocalDateFlow @Inject constructor(private val timeProvider: TimeProvider) {
     /**
      * Emit the current logical [LocalDate] on subscription, then re-emit
      * at every logical-day boundary crossing. Re-keys when [sodSource]

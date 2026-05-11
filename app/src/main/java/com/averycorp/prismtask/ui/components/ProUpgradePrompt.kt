@@ -178,10 +178,7 @@ fun ProUpgradePrompt(
     )
 }
 
-enum class ProFeature(
-    val label: String,
-    val description: String
-) {
+enum class ProFeature(val label: String, val description: String) {
     AI_BRIEFING("AI Briefing", "Get AI-powered daily briefings and task prioritization"),
     AI_WEEKLY_PLAN("AI Weekly Planner", "Let AI plan your week for optimal productivity"),
     AI_CHAT("AI Coach", "Get personalized coaching and task help through natural conversation"),

@@ -46,11 +46,7 @@ constructor(
 
         data object Confirming : UiState()
 
-        data class Success(
-            val tasksCreated: Int,
-            val eventsCreated: Int,
-            val recurringCreated: Int
-        ) : UiState()
+        data class Success(val tasksCreated: Int, val eventsCreated: Int, val recurringCreated: Int) : UiState()
 
         data class Error(val message: String) : UiState()
     }
@@ -153,21 +149,14 @@ constructor(
         _editedRecurring.value = _editedRecurring.value + (index to item)
     }
 
-    fun totalCheckedCount(): Int {
-        return _checkedTasks.value.size + _checkedEvents.value.size + _checkedRecurring.value.size
-    }
+    fun totalCheckedCount(): Int = _checkedTasks.value.size + _checkedEvents.value.size + _checkedRecurring.value.size
 
-    fun getEffectiveTask(index: Int, original: SyllabusTaskResponse): SyllabusTaskResponse {
-        return _editedTasks.value[index] ?: original
-    }
+    fun getEffectiveTask(index: Int, original: SyllabusTaskResponse): SyllabusTaskResponse = _editedTasks.value[index] ?: original
 
-    fun getEffectiveEvent(index: Int, original: SyllabusEventResponse): SyllabusEventResponse {
-        return _editedEvents.value[index] ?: original
-    }
+    fun getEffectiveEvent(index: Int, original: SyllabusEventResponse): SyllabusEventResponse = _editedEvents.value[index] ?: original
 
-    fun getEffectiveRecurring(index: Int, original: SyllabusRecurringItemResponse): SyllabusRecurringItemResponse {
-        return _editedRecurring.value[index] ?: original
-    }
+    fun getEffectiveRecurring(index: Int, original: SyllabusRecurringItemResponse): SyllabusRecurringItemResponse =
+        _editedRecurring.value[index] ?: original
 
     fun onConfirm() {
         val state = _uiState.value

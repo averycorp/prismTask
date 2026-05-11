@@ -24,10 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class ClaudeParserService
 @Inject
-constructor(
-    private val api: PrismTaskApi,
-    private val authTokenPreferences: AuthTokenPreferences
-) {
+constructor(private val api: PrismTaskApi, private val authTokenPreferences: AuthTokenPreferences) {
     suspend fun parse(content: String): ParsedTodoList? {
         // Require an active session; offline / logged-out users fall back to regex.
         val token = authTokenPreferences.getAccessToken()

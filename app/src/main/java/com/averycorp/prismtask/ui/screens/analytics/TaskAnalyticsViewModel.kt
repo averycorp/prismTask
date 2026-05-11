@@ -41,10 +41,7 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-enum class AnalyticsPeriod(
-    val days: Int,
-    val label: String
-) {
+enum class AnalyticsPeriod(val days: Int, val label: String) {
     WEEK(7, "7 Days"),
     MONTH(30, "30 Days"),
     QUARTER(90, "90 Days"),

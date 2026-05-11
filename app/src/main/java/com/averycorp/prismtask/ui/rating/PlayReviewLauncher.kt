@@ -23,9 +23,7 @@ import kotlin.coroutines.resume
  * -too-often" guard.
  */
 @Singleton
-class PlayReviewLauncher @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
+class PlayReviewLauncher @Inject constructor(@ApplicationContext private val context: Context) {
     suspend fun launch(activity: Activity): Boolean {
         return try {
             val manager = ReviewManagerFactory.create(context)

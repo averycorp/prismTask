@@ -20,9 +20,7 @@ import javax.inject.Singleton
  * overridable via JSON `"maxFiresPerDay": N` on the rule's trigger blob.
  */
 @Singleton
-class AutomationRateLimiter @Inject constructor(
-    private val logDao: AutomationLogDao
-) {
+class AutomationRateLimiter @Inject constructor(private val logDao: AutomationLogDao) {
     suspend fun canFire(rule: AutomationRuleEntity, now: Long): Decision {
         // Per-rule daily cap.
         val cap = rule.perRuleDailyCap()

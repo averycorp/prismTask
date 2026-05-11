@@ -21,9 +21,7 @@ import kotlinx.coroutines.flow.map
  * without an Android [android.content.Context]; production wiring lives in
  * [com.averycorp.prismtask.di.PreferencesModule].
  */
-class SortPreferences(
-    private val dataStore: DataStore<Preferences>
-) {
+class SortPreferences(private val dataStore: DataStore<Preferences>) {
     object ScreenKeys {
         const val TASK_LIST = "sort_task_list"
         const val TODAY = "sort_today"

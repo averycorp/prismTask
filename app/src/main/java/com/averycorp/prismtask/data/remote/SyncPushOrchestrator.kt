@@ -30,10 +30,7 @@ import javax.inject.Singleton
 @Singleton
 class SyncPushOrchestrator
 @Inject
-constructor(
-    private val syncMetadataDao: SyncMetadataDao,
-    private val logger: PrismSyncLogger
-) {
+constructor(private val syncMetadataDao: SyncMetadataDao, private val logger: PrismSyncLogger) {
     /**
      * Push every pending SyncMetadata row through [pushOne]. Returns the
      * count of processed entries (success + failure) so callers can

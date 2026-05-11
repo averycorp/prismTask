@@ -232,45 +232,43 @@ constructor(
         mutationType: BatchMutationType,
         entityId: Long,
         mutation: ProposedMutationResponse
-    ): MutationOutcome {
-        return when (entityType) {
-            BatchEntityType.TASK -> applyTaskMutation(
-                batchId,
-                commandText,
-                expiresAt,
-                now,
-                mutationType,
-                entityId,
-                mutation
-            )
-            BatchEntityType.HABIT -> applyHabitMutation(
-                batchId,
-                commandText,
-                expiresAt,
-                now,
-                mutationType,
-                entityId,
-                mutation
-            )
-            BatchEntityType.PROJECT -> applyProjectMutation(
-                batchId,
-                commandText,
-                expiresAt,
-                now,
-                mutationType,
-                entityId,
-                mutation
-            )
-            BatchEntityType.MEDICATION -> applyMedicationMutation(
-                batchId,
-                commandText,
-                expiresAt,
-                now,
-                mutationType,
-                entityId,
-                mutation
-            )
-        }
+    ): MutationOutcome = when (entityType) {
+        BatchEntityType.TASK -> applyTaskMutation(
+            batchId,
+            commandText,
+            expiresAt,
+            now,
+            mutationType,
+            entityId,
+            mutation
+        )
+        BatchEntityType.HABIT -> applyHabitMutation(
+            batchId,
+            commandText,
+            expiresAt,
+            now,
+            mutationType,
+            entityId,
+            mutation
+        )
+        BatchEntityType.PROJECT -> applyProjectMutation(
+            batchId,
+            commandText,
+            expiresAt,
+            now,
+            mutationType,
+            entityId,
+            mutation
+        )
+        BatchEntityType.MEDICATION -> applyMedicationMutation(
+            batchId,
+            commandText,
+            expiresAt,
+            now,
+            mutationType,
+            entityId,
+            mutation
+        )
     }
 
     private suspend fun applyTaskMutation(
@@ -1024,23 +1022,11 @@ constructor(
         val committedMedicationIds: Set<String>
     )
 
-    data class BatchApplyResult(
-        val batchId: String,
-        val commandText: String,
-        val appliedCount: Int,
-        val skipped: List<SkippedMutation>
-    )
+    data class BatchApplyResult(val batchId: String, val commandText: String, val appliedCount: Int, val skipped: List<SkippedMutation>)
 
-    data class SkippedMutation(
-        val mutation: ProposedMutationResponse,
-        val reason: String
-    )
+    data class SkippedMutation(val mutation: ProposedMutationResponse, val reason: String)
 
-    data class BatchUndoResult(
-        val batchId: String,
-        val restored: Int,
-        val failed: List<UndoFailure>
-    )
+    data class BatchUndoResult(val batchId: String, val restored: Int, val failed: List<UndoFailure>)
 
     data class UndoFailure(val entryId: Long, val reason: String)
 

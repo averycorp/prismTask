@@ -271,11 +271,7 @@ data class CheckInScreenState(
  * "Medications" step. Pairs the entity with its computed refill forecast
  * and a transient "taken this morning" flag held in the ViewModel.
  */
-data class MedicationCheckInItem(
-    val refill: MedicationRefillEntity,
-    val forecast: RefillForecast,
-    val taken: Boolean
-) {
+data class MedicationCheckInItem(val refill: MedicationRefillEntity, val forecast: RefillForecast, val taken: Boolean) {
     val isRefillUrgent: Boolean
         get() = forecast.urgency == RefillUrgency.URGENT ||
             forecast.urgency == RefillUrgency.OUT_OF_STOCK

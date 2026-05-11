@@ -40,10 +40,7 @@ import javax.inject.Singleton
 @Singleton
 class ChatStreamClient
 @Inject
-constructor(
-    private val httpClient: OkHttpClient,
-    private val gson: Gson
-) {
+constructor(private val httpClient: OkHttpClient, private val gson: Gson) {
     private val baseUrl: String = normalizeBaseUrl(BuildConfig.API_BASE_URL)
 
     fun stream(request: ChatRequest): Flow<ChatStreamEvent> = callbackFlow {
@@ -88,48 +85,46 @@ constructor(
         awaitClose { source.cancel() }
     }
 
-    private fun parseEvent(type: String?, data: String): ChatStreamEvent? {
-        return try {
-            val json = gson.fromJson(data, JsonObject::class.java)
-            when (type) {
-                "token" -> ChatStreamEvent.Token(
-                    text = json.get("text")?.asString.orEmpty()
-                )
-                "done" -> {
-                    val message = json.get("message")?.asString.orEmpty()
-                    val actionsType = object : TypeToken<List<ChatActionResponse>>() {}.type
-                    val actions: List<ChatActionResponse> =
-                        json.get("actions")?.let { gson.fromJson(it, actionsType) }
-                            ?: emptyList()
-                    val tokensUsed = json.get("tokens_used")?.takeIf { !it.isJsonNull }?.let {
-                        gson.fromJson(it, ChatTokensUsed::class.java)
-                    }
-                    // D12 Gate (b): forwarded server PKs.
-                    val userMessageId =
-                        json.get("user_message_id")?.takeIf { !it.isJsonNull }?.asString
-                    val assistantMessageId =
-                        json.get("assistant_message_id")?.takeIf { !it.isJsonNull }?.asString
-                    ChatStreamEvent.Done(
-                        message = message,
-                        actions = actions,
-                        tokensUsed = tokensUsed,
-                        userMessageId = userMessageId,
-                        assistantMessageId = assistantMessageId
-                    )
-                }
-                "error" -> ChatStreamEvent.Error(
-                    message = json.get("message")?.asString
-                        ?: "Chat stream failed.",
-                    code = json.get("code")?.takeIf { !it.isJsonNull }?.asString
-                )
-                else -> null
-            }
-        } catch (_: Exception) {
-            ChatStreamEvent.Error(
-                message = "Chat stream returned a malformed event.",
-                code = "client_parse_error"
+    private fun parseEvent(type: String?, data: String): ChatStreamEvent? = try {
+        val json = gson.fromJson(data, JsonObject::class.java)
+        when (type) {
+            "token" -> ChatStreamEvent.Token(
+                text = json.get("text")?.asString.orEmpty()
             )
+            "done" -> {
+                val message = json.get("message")?.asString.orEmpty()
+                val actionsType = object : TypeToken<List<ChatActionResponse>>() {}.type
+                val actions: List<ChatActionResponse> =
+                    json.get("actions")?.let { gson.fromJson(it, actionsType) }
+                        ?: emptyList()
+                val tokensUsed = json.get("tokens_used")?.takeIf { !it.isJsonNull }?.let {
+                    gson.fromJson(it, ChatTokensUsed::class.java)
+                }
+                // D12 Gate (b): forwarded server PKs.
+                val userMessageId =
+                    json.get("user_message_id")?.takeIf { !it.isJsonNull }?.asString
+                val assistantMessageId =
+                    json.get("assistant_message_id")?.takeIf { !it.isJsonNull }?.asString
+                ChatStreamEvent.Done(
+                    message = message,
+                    actions = actions,
+                    tokensUsed = tokensUsed,
+                    userMessageId = userMessageId,
+                    assistantMessageId = assistantMessageId
+                )
+            }
+            "error" -> ChatStreamEvent.Error(
+                message = json.get("message")?.asString
+                    ?: "Chat stream failed.",
+                code = json.get("code")?.takeIf { !it.isJsonNull }?.asString
+            )
+            else -> null
         }
+    } catch (_: Exception) {
+        ChatStreamEvent.Error(
+            message = "Chat stream returned a malformed event.",
+            code = "client_parse_error"
+        )
     }
 
     private fun mapFailure(t: Throwable?, response: Response?): ChatStreamEvent.Error {

@@ -41,11 +41,7 @@ data class MorningCheckInConfig(
  * lives in [MorningCheckInBannerDecider]; this plan describes only the
  * body of the guided flow once the user opens it.
  */
-data class CheckInPlan(
-    val steps: List<CheckInStep>,
-    val topTasks: List<TaskEntity>,
-    val todayHabits: List<HabitWithStatus>
-)
+data class CheckInPlan(val steps: List<CheckInStep>, val topTasks: List<TaskEntity>, val todayHabits: List<HabitWithStatus>)
 
 /**
  * Pure-function planner for the morning check-in (v1.4.0 V4).

@@ -19,9 +19,7 @@ import com.google.api.services.drive.model.File as DriveFile
 @Singleton
 class GoogleDriveService
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private const val APP_FOLDER_NAME = "PrismTask Backups"
         private const val BACKUP_FILE_NAME = "prismtask_backup.json"

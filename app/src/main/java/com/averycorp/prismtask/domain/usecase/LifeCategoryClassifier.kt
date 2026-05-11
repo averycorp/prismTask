@@ -19,9 +19,7 @@ import com.averycorp.prismtask.domain.model.LifeCategory
  *    (Health wins ties because missing it is the most harmful misclassification.)
  *  - No keyword hits → [LifeCategory.UNCATEGORIZED].
  */
-class LifeCategoryClassifier(
-    private val keywords: Map<LifeCategory, List<String>> = DEFAULT_KEYWORDS
-) {
+class LifeCategoryClassifier(private val keywords: Map<LifeCategory, List<String>> = DEFAULT_KEYWORDS) {
     /**
      * Classify a task's text into one of the four tracked [LifeCategory] values,
      * or [LifeCategory.UNCATEGORIZED] when nothing matches.

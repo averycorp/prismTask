@@ -29,25 +29,15 @@ import java.util.Locale
  */
 object MedicationNameMatcher {
 
-    data class Medication(
-        val id: String,
-        val name: String,
-        val displayLabel: String? = null
-    )
+    data class Medication(val id: String, val name: String, val displayLabel: String? = null)
 
-    data class AmbiguousPhrase(
-        val phrase: String,
-        val candidateEntityIds: List<String>
-    )
+    data class AmbiguousPhrase(val phrase: String, val candidateEntityIds: List<String>)
 
     sealed class MatchResult {
         data object NoMatch : MatchResult()
         data class Unambiguous(val matches: Map<String, String>) : MatchResult()
         data class Ambiguous(val phrases: List<AmbiguousPhrase>) : MatchResult()
-        data class Mixed(
-            val unambiguous: Map<String, String>,
-            val ambiguous: List<AmbiguousPhrase>
-        ) : MatchResult()
+        data class Mixed(val unambiguous: Map<String, String>, val ambiguous: List<AmbiguousPhrase>) : MatchResult()
     }
 
     fun match(commandText: String, medications: List<Medication>): MatchResult {

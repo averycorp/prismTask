@@ -11,25 +11,13 @@ import com.google.gson.annotations.SerializedName
  * Sections below are delineated with `// region` / `// endregion` markers.
  */
 
-data class RegisterRequest(
-    val email: String,
-    val password: String,
-    val name: String
-)
+data class RegisterRequest(val email: String, val password: String, val name: String)
 
-data class LoginRequest(
-    val email: String,
-    val password: String
-)
+data class LoginRequest(val email: String, val password: String)
 
-data class FirebaseTokenRequest(
-    @SerializedName("firebase_token") val firebaseToken: String,
-    val name: String? = null
-)
+data class FirebaseTokenRequest(@SerializedName("firebase_token") val firebaseToken: String, val name: String? = null)
 
-data class RefreshRequest(
-    @SerializedName("refresh_token") val refreshToken: String
-)
+data class RefreshRequest(@SerializedName("refresh_token") val refreshToken: String)
 
 data class TokenResponse(
     @SerializedName("access_token") val accessToken: String,
@@ -52,18 +40,11 @@ data class UpdateTierRequest(
     @SerializedName("product_id") val productId: String? = null
 )
 
-data class DeletionRequest(
-    @SerializedName("initiated_from") val initiatedFrom: String = "android"
-)
+data class DeletionRequest(@SerializedName("initiated_from") val initiatedFrom: String = "android")
 
-data class BetaRedeemRequest(
-    val code: String
-)
+data class BetaRedeemRequest(val code: String)
 
-data class BetaRedeemResponse(
-    val granted: Boolean,
-    @SerializedName("pro_until") val proUntil: String? = null
-)
+data class BetaRedeemResponse(val granted: Boolean, @SerializedName("pro_until") val proUntil: String? = null)
 
 data class DeletionStatusResponse(
     @SerializedName("deletion_pending_at") val deletionPendingAt: String? = null,
@@ -102,10 +83,7 @@ data class ParsedTaskResponse(
     val confidence: Double?
 )
 
-data class ExtractFromTextRequest(
-    val text: String,
-    val source: String? = null
-)
+data class ExtractFromTextRequest(val text: String, val source: String? = null)
 
 data class ExtractedTaskCandidateResponse(
     val title: String,
@@ -115,9 +93,7 @@ data class ExtractedTaskCandidateResponse(
     val confidence: Float = 0.5f
 )
 
-data class ExtractFromTextResponse(
-    val tasks: List<ExtractedTaskCandidateResponse> = emptyList()
-)
+data class ExtractFromTextResponse(val tasks: List<ExtractedTaskCandidateResponse> = emptyList())
 
 // endregion
 
@@ -156,10 +132,7 @@ data class EisenhowerSummary(
     @SerializedName("Q4") val q4: Int = 0
 )
 
-data class EisenhowerResponse(
-    val categorizations: List<EisenhowerCategorization>,
-    val summary: EisenhowerSummary
-)
+data class EisenhowerResponse(val categorizations: List<EisenhowerCategorization>, val summary: EisenhowerSummary)
 
 /**
  * Single-task text-based Eisenhower classification. Unlike the batch endpoint
@@ -173,10 +146,7 @@ data class EisenhowerClassifyTextRequest(
     val priority: Int = 0
 )
 
-data class EisenhowerClassifyTextResponse(
-    val quadrant: String,
-    val reason: String
-)
+data class EisenhowerClassifyTextResponse(val quadrant: String, val reason: String)
 
 /**
  * Single-task text-based Work-Life Balance category classification. Invoked
@@ -185,15 +155,9 @@ data class EisenhowerClassifyTextResponse(
  * for instant feedback; this AI path overwrites the on-device guess when the
  * remote call succeeds.
  */
-data class LifeCategoryClassifyTextRequest(
-    val title: String,
-    val description: String? = null
-)
+data class LifeCategoryClassifyTextRequest(val title: String, val description: String? = null)
 
-data class LifeCategoryClassifyTextResponse(
-    val category: String,
-    val reason: String
-)
+data class LifeCategoryClassifyTextResponse(val category: String, val reason: String)
 
 data class PomodoroRequest(
     @SerializedName("available_minutes") val availableMinutes: Int = 120,
@@ -217,10 +181,7 @@ data class PomodoroSessionResponse(
     val rationale: String
 )
 
-data class SkippedTaskResponse(
-    @SerializedName("task_id") val taskId: String,
-    val reason: String
-)
+data class SkippedTaskResponse(@SerializedName("task_id") val taskId: String, val reason: String)
 
 data class PomodoroResponse(
     val sessions: List<PomodoroSessionResponse>,
@@ -251,17 +212,13 @@ data class PomodoroCoachingRequest(
     @SerializedName("session_duration_minutes") val sessionDurationMinutes: Int? = null
 )
 
-data class PomodoroCoachingResponse(
-    val message: String
-)
+data class PomodoroCoachingResponse(val message: String)
 
 // endregion
 
 // region AI Daily Briefing
 
-data class DailyBriefingRequest(
-    val date: String? = null
-)
+data class DailyBriefingRequest(val date: String? = null)
 
 data class BriefingPriorityResponse(
     // Firestore document ID (alphanumeric). Resolved to a local Long task id
@@ -474,23 +431,11 @@ data class BatchTaskContext(
     @SerializedName("is_completed") val isCompleted: Boolean = false
 )
 
-data class BatchHabitContext(
-    val id: String,
-    val name: String,
-    @SerializedName("is_archived") val isArchived: Boolean = false
-)
+data class BatchHabitContext(val id: String, val name: String, @SerializedName("is_archived") val isArchived: Boolean = false)
 
-data class BatchProjectContext(
-    val id: String,
-    val name: String,
-    val status: String? = null
-)
+data class BatchProjectContext(val id: String, val name: String, val status: String? = null)
 
-data class BatchMedicationContext(
-    val id: String,
-    val name: String,
-    @SerializedName("display_label") val displayLabel: String? = null
-)
+data class BatchMedicationContext(val id: String, val name: String, @SerializedName("display_label") val displayLabel: String? = null)
 
 data class BatchUserContext(
     val today: String,
@@ -559,10 +504,7 @@ data class BatchParseResponse(
  * One prior turn forwarded by the client so the AI has multi-turn memory.
  * Role is "user" or "assistant"; the backend rejects anything else.
  */
-data class ChatHistoryEntry(
-    val role: String,
-    val content: String
-)
+data class ChatHistoryEntry(val role: String, val content: String)
 
 /**
  * Snapshot of the task the user is talking about, sent when chat is
@@ -608,10 +550,7 @@ data class ChatActionResponse(
     @SerializedName("command_text") val commandText: String? = null
 )
 
-data class ChatTokensUsed(
-    val input: Int,
-    val output: Int
-)
+data class ChatTokensUsed(val input: Int, val output: Int)
 
 data class ChatResponse(
     val message: String,
@@ -663,9 +602,7 @@ data class EveningSummaryRequest(
     @SerializedName("completed_stalled") val completedStalled: Boolean
 )
 
-data class EveningSummaryResponse(
-    val summary: String
-)
+data class EveningSummaryResponse(val summary: String)
 
 // endregion
 
@@ -677,9 +614,7 @@ data class ReengagementRequest(
     @SerializedName("total_pending") val totalPending: Int
 )
 
-data class ReengagementResponse(
-    val nudge: String
-)
+data class ReengagementResponse(val nudge: String)
 
 // endregion
 
@@ -733,10 +668,7 @@ data class CoachingRequest(
     val tier: String
 )
 
-data class CoachingResponse(
-    val message: String? = null,
-    val subtasks: List<String>? = null
-)
+data class CoachingResponse(val message: String? = null, val subtasks: List<String>? = null)
 
 // endregion
 
@@ -750,10 +682,7 @@ data class ImportResponse(
     val mode: String
 )
 
-data class BugReportMirrorResponse(
-    val id: String,
-    val status: String
-)
+data class BugReportMirrorResponse(val id: String, val status: String)
 
 data class AdminBugReportResponse(
     val id: Int,
@@ -787,18 +716,13 @@ data class AdminBugReportResponse(
     @SerializedName("updated_at") val updatedAt: String? = null
 )
 
-data class BugReportStatusUpdateRequest(
-    val status: String,
-    @SerializedName("admin_notes") val adminNotes: String? = null
-)
+data class BugReportStatusUpdateRequest(val status: String, @SerializedName("admin_notes") val adminNotes: String? = null)
 
 // endregion
 
 // region AI Import Parse
 
-data class ParseImportRequest(
-    val content: String
-)
+data class ParseImportRequest(val content: String)
 
 data class ParsedImportItemResponse(
     val title: String,
@@ -809,10 +733,7 @@ data class ParsedImportItemResponse(
     val subtasks: List<ParsedImportItemResponse> = emptyList()
 )
 
-data class ParseImportResponse(
-    val name: String? = null,
-    val items: List<ParsedImportItemResponse>
-)
+data class ParseImportResponse(val name: String? = null, val items: List<ParsedImportItemResponse>)
 
 // endregion
 
@@ -867,25 +788,13 @@ data class SyllabusConfirmResponse(
 
 // region AI Checklist Parse
 
-data class ParseChecklistRequest(
-    val content: String
-)
+data class ParseChecklistRequest(val content: String)
 
-data class ParsedChecklistCourseResponse(
-    val code: String,
-    val name: String
-)
+data class ParsedChecklistCourseResponse(val code: String, val name: String)
 
-data class ParsedChecklistProjectResponse(
-    val name: String,
-    val color: String,
-    val icon: String
-)
+data class ParsedChecklistProjectResponse(val name: String, val color: String, val icon: String)
 
-data class ParsedChecklistTagResponse(
-    val name: String,
-    val color: String? = null
-)
+data class ParsedChecklistTagResponse(val name: String, val color: String? = null)
 
 data class ParsedChecklistTaskResponse(
     val title: String,
@@ -908,11 +817,7 @@ data class ParsedProjectPhaseResponse(
     val orderIndex: Int = 0
 )
 
-data class ParsedProjectRiskResponse(
-    val title: String,
-    val description: String? = null,
-    val level: String = "MEDIUM"
-)
+data class ParsedProjectRiskResponse(val title: String, val description: String? = null, val level: String = "MEDIUM")
 
 data class ParsedExternalAnchorResponse(
     val title: String,
@@ -921,10 +826,7 @@ data class ParsedExternalAnchorResponse(
     val targetDate: String? = null
 )
 
-data class ParsedTaskDependencyResponse(
-    val blockerTitle: String,
-    val blockedTitle: String
-)
+data class ParsedTaskDependencyResponse(val blockerTitle: String, val blockedTitle: String)
 
 data class ParseChecklistResponse(
     val course: ParsedChecklistCourseResponse,
@@ -972,14 +874,9 @@ data class HabitCorrelationsResponse(
 // inherit `AiFeatureGateInterceptor`'s 451 short-circuit when the master
 // AI toggle is off — no `AI_PATH_PREFIXES` update required.
 
-data class AutomationCompleteRequest(
-    val prompt: String,
-    val context: Map<String, @JvmSuppressWildcards Any?>? = null
-)
+data class AutomationCompleteRequest(val prompt: String, val context: Map<String, @JvmSuppressWildcards Any?>? = null)
 
-data class AutomationCompleteResponse(
-    val text: String
-)
+data class AutomationCompleteResponse(val text: String)
 
 data class AutomationSummarizeRequest(
     val scope: String,
@@ -987,9 +884,7 @@ data class AutomationSummarizeRequest(
     val context: Map<String, @JvmSuppressWildcards Any?>? = null
 )
 
-data class AutomationSummarizeResponse(
-    val summary: String
-)
+data class AutomationSummarizeResponse(val summary: String)
 
 // region In-App Feedback (E2 in-app ratings)
 data class InAppFeedbackRequest(
@@ -999,10 +894,7 @@ data class InAppFeedbackRequest(
     @SerializedName("client_timestamp") val clientTimestamp: Long? = null
 )
 
-data class InAppFeedbackResponse(
-    val success: Boolean,
-    @SerializedName("feedback_id") val feedbackId: Long
-)
+data class InAppFeedbackResponse(val success: Boolean, @SerializedName("feedback_id") val feedbackId: Long)
 // endregion
 
 // endregion

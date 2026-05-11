@@ -55,11 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
 
-data class LeisureOption(
-    val id: String,
-    val label: String,
-    val icon: String
-)
+data class LeisureOption(val id: String, val label: String, val icon: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

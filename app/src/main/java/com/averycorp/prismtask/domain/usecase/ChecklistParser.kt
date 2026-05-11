@@ -34,49 +34,19 @@ data class ParsedProjectPhaseDomain(
     val orderIndex: Int
 )
 
-data class ParsedProjectRiskDomain(
-    val title: String,
-    val description: String?,
-    val level: String
-)
+data class ParsedProjectRiskDomain(val title: String, val description: String?, val level: String)
 
-data class ParsedExternalAnchorDomain(
-    val title: String,
-    val type: String,
-    val phaseName: String?,
-    val targetDate: Long?
-)
+data class ParsedExternalAnchorDomain(val title: String, val type: String, val phaseName: String?, val targetDate: Long?)
 
-data class ParsedTaskDependencyDomain(
-    val blockerTitle: String,
-    val blockedTitle: String
-)
+data class ParsedTaskDependencyDomain(val blockerTitle: String, val blockedTitle: String)
 
-data class ParsedCourse(
-    val code: String,
-    val name: String,
-    val deadline: Long?,
-    val assignments: List<ParsedAssignment>
-)
+data class ParsedCourse(val code: String, val name: String, val deadline: Long?, val assignments: List<ParsedAssignment>)
 
-data class ParsedAssignment(
-    val title: String,
-    val dueDate: Long?,
-    val time: String?,
-    val type: String?,
-    val completed: Boolean
-)
+data class ParsedAssignment(val title: String, val dueDate: Long?, val time: String?, val type: String?, val completed: Boolean)
 
-data class ParsedProject(
-    val name: String,
-    val color: String,
-    val icon: String
-)
+data class ParsedProject(val name: String, val color: String, val icon: String)
 
-data class ParsedTag(
-    val name: String,
-    val color: String
-)
+data class ParsedTag(val name: String, val color: String)
 
 data class ChecklistParsedTask(
     val title: String,
@@ -101,10 +71,7 @@ data class ChecklistParsedTask(
 @Singleton
 class ChecklistParser
 @Inject
-constructor(
-    private val api: PrismTaskApi,
-    private val authTokenPreferences: AuthTokenPreferences
-) {
+constructor(private val api: PrismTaskApi, private val authTokenPreferences: AuthTokenPreferences) {
     suspend fun parse(content: String): ComprehensiveImportResult? {
         // Try backend (Claude Haiku) first when the user is logged in
         val token = authTokenPreferences.getAccessToken()

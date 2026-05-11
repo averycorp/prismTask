@@ -23,9 +23,7 @@ import kotlinx.coroutines.flow.map
  *   zero overlap so toggling one off never affects the others.
  * - Individual sub-setting changes do NOT auto-disable the parent mode toggle.
  */
-class NdPreferencesDataStore(
-    private val dataStore: DataStore<Preferences>
-) {
+class NdPreferencesDataStore(private val dataStore: DataStore<Preferences>) {
     companion object {
         // Top-level mode toggles
         val KEY_ADHD_MODE = booleanPreferencesKey("nd_adhd_mode_enabled")

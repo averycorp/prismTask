@@ -18,10 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class MedicationRefillRepository
 @Inject
-constructor(
-    private val dao: MedicationRefillDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val dao: MedicationRefillDao, private val syncTracker: SyncTracker) {
     fun observeAll(): Flow<List<MedicationRefillEntity>> = dao.observeAll()
 
     suspend fun getAll(): List<MedicationRefillEntity> = dao.getAll()

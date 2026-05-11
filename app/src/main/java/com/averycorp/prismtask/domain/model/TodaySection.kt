@@ -11,12 +11,7 @@ package com.averycorp.prismtask.domain.model
  *  - [requiresTier]: minimum user tier, or null for Free
  *  - [displayName]: label shown in Settings
  */
-enum class TodaySectionId(
-    val key: String,
-    val defaultVisible: Boolean,
-    val requiresTier: String?,
-    val displayName: String
-) {
+enum class TodaySectionId(val key: String, val defaultVisible: Boolean, val requiresTier: String?, val displayName: String) {
     PROGRESS("progress", true, null, "Progress Header"),
     OVERDUE("overdue", true, null, "Overdue Tasks"),
     TODAY_TASKS("today_tasks", true, null, "Today's Tasks"),
@@ -40,12 +35,7 @@ enum class TodaySectionId(
  * the renderer to iterate. [tierAllows] is populated by the caller based on
  * the current user's tier so gated sections can be silently dropped.
  */
-data class TodaySection(
-    val id: TodaySectionId,
-    val visible: Boolean,
-    val order: Int,
-    val tierAllows: Boolean
-) {
+data class TodaySection(val id: TodaySectionId, val visible: Boolean, val order: Int, val tierAllows: Boolean) {
     val render: Boolean get() = visible && tierAllows
 }
 

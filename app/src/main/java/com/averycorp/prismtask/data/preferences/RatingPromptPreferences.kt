@@ -30,9 +30,7 @@ internal val Context.ratingPromptDataStore: DataStore<Preferences> by preference
 @Singleton
 class RatingPromptPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val KEY_TASKS_COMPLETED_COUNT = longPreferencesKey("tasks_completed_count")
         private val KEY_SESSION_COUNT = longPreferencesKey("session_count")

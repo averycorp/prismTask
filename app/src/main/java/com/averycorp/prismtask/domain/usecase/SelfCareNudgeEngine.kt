@@ -6,11 +6,7 @@ package com.averycorp.prismtask.domain.usecase
  * The [id] is a stable key so the UI can persist "don't show this
  * consecutive time" state; the [kind] bucket lets the UI pick an icon.
  */
-data class SelfCareNudge(
-    val id: String,
-    val kind: NudgeKind,
-    val message: String
-)
+data class SelfCareNudge(val id: String, val kind: NudgeKind, val message: String)
 
 enum class NudgeKind {
     REST_BREAK,

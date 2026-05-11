@@ -5,26 +5,15 @@ import javax.inject.Singleton
 
 /** Structured voice command recognised from a raw transcript. */
 sealed class VoiceCommand {
-    data class CompleteTask(
-        val query: String
-    ) : VoiceCommand()
+    data class CompleteTask(val query: String) : VoiceCommand()
 
-    data class DeleteTask(
-        val query: String
-    ) : VoiceCommand()
+    data class DeleteTask(val query: String) : VoiceCommand()
 
-    data class RescheduleTask(
-        val query: String,
-        val dateText: String
-    ) : VoiceCommand()
+    data class RescheduleTask(val query: String, val dateText: String) : VoiceCommand()
 
-    data class MoveToProject(
-        val projectQuery: String
-    ) : VoiceCommand()
+    data class MoveToProject(val projectQuery: String) : VoiceCommand()
 
-    data class StartTimer(
-        val query: String
-    ) : VoiceCommand()
+    data class StartTimer(val query: String) : VoiceCommand()
 
     object StopTimer : VoiceCommand()
 

@@ -20,10 +20,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ArchiveViewModel
 @Inject
-constructor(
-    private val taskRepository: TaskRepository,
-    private val sortPreferences: SortPreferences
-) : ViewModel() {
+constructor(private val taskRepository: TaskRepository, private val sortPreferences: SortPreferences) :
+    ViewModel() {
     val searchQuery = MutableStateFlow("")
 
     val currentSort: StateFlow<String> =

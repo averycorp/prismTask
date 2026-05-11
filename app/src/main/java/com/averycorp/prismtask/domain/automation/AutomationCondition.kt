@@ -34,11 +34,7 @@ sealed class AutomationCondition(val op: String) {
      * `habit.streakCount`, etc.). [value] is a literal; the special object
      * `{"@now": null}` resolves to current millis.
      */
-    data class Compare(
-        val opType: Op,
-        val field: String,
-        val value: Any? = null
-    ) : AutomationCondition(opType.key)
+    data class Compare(val opType: Op, val field: String, val value: Any? = null) : AutomationCondition(opType.key)
 
     data class And(val children: List<AutomationCondition>) : AutomationCondition("AND")
 

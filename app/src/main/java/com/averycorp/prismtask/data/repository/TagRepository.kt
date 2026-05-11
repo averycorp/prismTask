@@ -11,10 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class TagRepository
 @Inject
-constructor(
-    private val tagDao: TagDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val tagDao: TagDao, private val syncTracker: SyncTracker) {
     fun getAllTags(): Flow<List<TagEntity>> = tagDao.getAllTags()
 
     fun searchTags(query: String): Flow<List<TagEntity>> = tagDao.searchTags(query)

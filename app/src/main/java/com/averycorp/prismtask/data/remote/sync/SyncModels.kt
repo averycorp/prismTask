@@ -26,10 +26,7 @@ data class SyncOperation(
     @SerializedName("client_timestamp") val clientTimestamp: String
 )
 
-data class SyncPushRequest(
-    val operations: List<SyncOperation>,
-    @SerializedName("last_sync") val lastSync: String? = null
-)
+data class SyncPushRequest(val operations: List<SyncOperation>, @SerializedName("last_sync") val lastSync: String? = null)
 
 data class SyncPushResponse(
     val processed: Int = 0,

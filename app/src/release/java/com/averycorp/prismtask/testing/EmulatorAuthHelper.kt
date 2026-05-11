@@ -15,9 +15,7 @@ object EmulatorAuthHelper {
     suspend fun signInAsTestUser(
         @Suppress("UNUSED_PARAMETER") email: String = DEFAULT_EMAIL,
         @Suppress("UNUSED_PARAMETER") password: String = DEFAULT_PASSWORD
-    ) {
-        throw UnsupportedOperationException(
-            "EmulatorAuthHelper is not available in release builds"
-        )
-    }
+    ): Unit = throw UnsupportedOperationException(
+        "EmulatorAuthHelper is not available in release builds"
+    )
 }

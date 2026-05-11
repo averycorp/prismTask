@@ -270,10 +270,7 @@ fun FilterPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            data class DateOption(
-                val label: String,
-                val range: DateRange?
-            )
+            data class DateOption(val label: String, val range: DateRange?)
             val dateOptions = listOf(
                 DateOption("Today", DateRange(startOfToday, endOfToday)),
                 DateOption("This Week", DateRange(startOfToday, endOfWeek)),

@@ -956,8 +956,11 @@ class TaskRepositoryTest {
         override suspend fun getInboxCandidatesOnce(limit: Int): List<TaskEntity> =
             tasks
                 .filter {
-                    !it.isCompleted && it.parentTaskId == null && it.archivedAt == null &&
-                        it.projectId == null && it.dueDate == null
+                    !it.isCompleted &&
+                        it.parentTaskId == null &&
+                        it.archivedAt == null &&
+                        it.projectId == null &&
+                        it.dueDate == null
                 }
                 .sortedByDescending { it.createdAt }
                 .take(limit)

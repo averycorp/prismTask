@@ -87,8 +87,4 @@ enum class SyncFuzzDevice { A, B }
  * concrete entity field carries identity for their domain (e.g. Task title,
  * Medication name).
  */
-data class SyncFuzzOp(
-    val type: SyncFuzzOpType,
-    val device: SyncFuzzDevice,
-    val key: String
-)
+data class SyncFuzzOp(val type: SyncFuzzOpType, val device: SyncFuzzDevice, val key: String)

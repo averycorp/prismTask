@@ -13,11 +13,7 @@ package com.averycorp.prismtask.ui.screens.medication.components
  * @property outOfRange True when the user has typed something the field can
  *   parse but that falls outside `[minMinutes, maxMinutes]`. Drives `isError`.
  */
-internal data class MinuteFieldUpdate(
-    val text: String,
-    val newMinutes: Int?,
-    val outOfRange: Boolean
-)
+internal data class MinuteFieldUpdate(val text: String, val newMinutes: Int?, val outOfRange: Boolean)
 
 internal fun applyMinuteFieldEdit(
     raw: String,

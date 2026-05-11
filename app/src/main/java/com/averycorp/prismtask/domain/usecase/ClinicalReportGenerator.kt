@@ -48,23 +48,14 @@ enum class ClinicalReportSection {
  * pasting into a patient portal message or sharing via email, plus a
  * structured section breakdown the PDF writer will walk over.
  */
-data class ClinicalReport(
-    val title: String,
-    val subtitle: String,
-    val sections: List<ClinicalReportSectionBlock>,
-    val plainText: String
-)
+data class ClinicalReport(val title: String, val subtitle: String, val sections: List<ClinicalReportSectionBlock>, val plainText: String)
 
 /**
  * One section of the report with a header and a list of body lines.
  * The PDF writer renders each line as a row; the text version joins
  * them with newlines.
  */
-data class ClinicalReportSectionBlock(
-    val id: ClinicalReportSection,
-    val header: String,
-    val lines: List<String>
-)
+data class ClinicalReportSectionBlock(val id: ClinicalReportSection, val header: String, val lines: List<String>)
 
 /**
  * On-device clinical report generator.

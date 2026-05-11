@@ -20,9 +20,7 @@ class ProFeatureGateTest {
      * Mirrors [ProFeatureGate] logic for unit-testability without Android
      * dependencies.
      */
-    private class TestableFeatureGate(
-        initialTier: UserTier = UserTier.FREE
-    ) {
+    private class TestableFeatureGate(initialTier: UserTier = UserTier.FREE) {
         private val _userTier = MutableStateFlow(initialTier)
         val userTier: StateFlow<UserTier> = _userTier.asStateFlow()
 

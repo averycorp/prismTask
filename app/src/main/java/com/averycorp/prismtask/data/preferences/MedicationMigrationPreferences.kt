@@ -26,9 +26,7 @@ private val Context.medicationMigrationDataStore: DataStore<Preferences> by pref
 @Singleton
 class MedicationMigrationPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val SCHEDULE_PRESERVED = booleanPreferencesKey("schedule_preserved")
         private val DOSE_BACKFILL_DONE = booleanPreferencesKey("dose_backfill_done")

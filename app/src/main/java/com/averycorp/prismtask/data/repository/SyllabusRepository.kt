@@ -19,9 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class SyllabusRepository
 @Inject
-constructor(
-    private val api: PrismTaskApi
-) {
+constructor(private val api: PrismTaskApi) {
     suspend fun parseSyllabus(uri: Uri, context: Context): SyllabusParseResponse {
         val bytes = withContext(Dispatchers.IO) {
             // Check declared size before reading to reject oversized files early
@@ -64,9 +62,7 @@ constructor(
         return api.parseSyllabus(part)
     }
 
-    suspend fun confirmSyllabus(request: SyllabusConfirmRequest): SyllabusConfirmResponse {
-        return api.confirmSyllabus(request)
-    }
+    suspend fun confirmSyllabus(request: SyllabusConfirmRequest): SyllabusConfirmResponse = api.confirmSyllabus(request)
 
     companion object {
         private const val MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB

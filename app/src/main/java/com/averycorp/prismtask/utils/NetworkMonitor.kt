@@ -20,9 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class NetworkMonitor
 @Inject
-constructor(
-    @ApplicationContext context: Context
-) {
+constructor(@ApplicationContext context: Context) {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

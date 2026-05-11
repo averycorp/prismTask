@@ -11,11 +11,7 @@ import javax.inject.Singleton
  * Single point on the burndown curve. [actualRemaining] is null for any
  * day after "today" — those days only show the ideal line.
  */
-data class BurndownPoint(
-    val date: LocalDate,
-    val actualRemaining: Int?,
-    val idealRemaining: Double
-)
+data class BurndownPoint(val date: LocalDate, val actualRemaining: Int?, val idealRemaining: Double)
 
 data class ProjectBurndown(
     val points: List<BurndownPoint>,

@@ -15,9 +15,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TagManagementViewModel
 @Inject
-constructor(
-    private val tagRepository: TagRepository
-) : ViewModel() {
+constructor(private val tagRepository: TagRepository) : ViewModel() {
     val tags: StateFlow<List<TagEntity>> = tagRepository
         .getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

@@ -71,9 +71,7 @@ enum class CorrelationStrength { WEAK, MODERATE, STRONG }
  * [CorrelationResult]s. The caller is responsible for stitching mood logs
  * together with task/habit/med stats into observations.
  */
-class MoodCorrelationEngine(
-    private val config: MoodCorrelationConfig = MoodCorrelationConfig()
-) {
+class MoodCorrelationEngine(private val config: MoodCorrelationConfig = MoodCorrelationConfig()) {
     /**
      * Correlate mood against every supported factor. Returns a list sorted
      * by absolute coefficient (strongest first).

@@ -44,12 +44,7 @@ import com.averycorp.prismtask.ui.theme.LocalPrismShapes
  * [MaterialTheme.colorScheme] so the chip respects the user's theme, accent,
  * and high-contrast overrides instead of hardcoded hex.
  */
-private data class BurnoutBandStyle(
-    val background: Color,
-    val foreground: Color,
-    val icon: ImageVector,
-    val label: String
-)
+private data class BurnoutBandStyle(val background: Color, val foreground: Color, val icon: ImageVector, val label: String)
 
 @Composable
 private fun burnoutBandStyle(band: BurnoutBand): BurnoutBandStyle {
@@ -117,12 +112,7 @@ internal fun BurnoutBadge(
  * the points this factor contributed to the overall score, and the factor's
  * individual cap (so we can render a proportional progress bar).
  */
-private data class BurnoutContribution(
-    val name: String,
-    val points: Int,
-    val max: Int,
-    val suggestion: String
-)
+private data class BurnoutContribution(val name: String, val points: Int, val max: Int, val suggestion: String)
 
 private fun BurnoutResult.contributions(): List<BurnoutContribution> = listOf(
     BurnoutContribution(

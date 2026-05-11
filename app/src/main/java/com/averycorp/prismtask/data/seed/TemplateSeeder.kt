@@ -17,9 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class TemplatePreferencesSeededFlagStore
 @Inject
-constructor(
-    private val templatePreferences: TemplatePreferences
-) : TemplateSeeder.SeededFlagStore {
+constructor(private val templatePreferences: TemplatePreferences) :
+    TemplateSeeder.SeededFlagStore {
     override suspend fun isSeeded(): Boolean = templatePreferences.isSeeded()
 
     override suspend fun setSeeded(seeded: Boolean) =
@@ -42,10 +41,7 @@ constructor(
 @Singleton
 class TemplateSeeder
 @Inject
-constructor(
-    private val templateDao: TaskTemplateDao,
-    private val seededFlag: SeededFlagStore
-) {
+constructor(private val templateDao: TaskTemplateDao, private val seededFlag: SeededFlagStore) {
     /**
      * Minimal view of the "seeded" flag storage the seeder depends on.
      * Pulled into its own interface so unit tests can supply an in-memory

@@ -19,9 +19,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class AutomationTemplateLibraryViewModel @Inject constructor(
-    private val templateRepository: AutomationTemplateRepository
-) : ViewModel() {
+class AutomationTemplateLibraryViewModel @Inject constructor(private val templateRepository: AutomationTemplateRepository) : ViewModel() {
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -78,7 +76,4 @@ class AutomationTemplateLibraryViewModel @Inject constructor(
 }
 
 /** Render-side projection: one row per category, ordered by enum decl. */
-data class AutomationTemplateCategorySection(
-    val category: AutomationTemplateCategory,
-    val templates: List<AutomationTemplate>
-)
+data class AutomationTemplateCategorySection(val category: AutomationTemplateCategory, val templates: List<AutomationTemplate>)

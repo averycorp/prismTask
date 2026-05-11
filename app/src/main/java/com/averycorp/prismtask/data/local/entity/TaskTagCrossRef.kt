@@ -13,7 +13,4 @@ import androidx.room.Index
     ],
     indices = [Index("taskId"), Index("tagId")]
 )
-data class TaskTagCrossRef(
-    val taskId: Long,
-    val tagId: Long
-)
+data class TaskTagCrossRef(val taskId: Long, val tagId: Long)

@@ -46,10 +46,7 @@ class ConversationTaskExtractor(
     private val config: com.averycorp.prismtask.data.preferences.ExtractorConfig =
         com.averycorp.prismtask.data.preferences.ExtractorConfig()
 ) {
-    data class Pattern(
-        val regex: Regex,
-        val confidence: Float
-    )
+    data class Pattern(val regex: Regex, val confidence: Float)
 
     private val patterns: List<Pattern> = listOf(
         // Explicit TODO / Action item markers — highest confidence.

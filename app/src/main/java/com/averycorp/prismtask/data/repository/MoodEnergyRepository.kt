@@ -16,10 +16,7 @@ import javax.inject.Singleton
 @Singleton
 class MoodEnergyRepository
 @Inject
-constructor(
-    private val dao: MoodEnergyLogDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val dao: MoodEnergyLogDao, private val syncTracker: SyncTracker) {
     suspend fun upsertForDate(
         date: Long,
         mood: Int,

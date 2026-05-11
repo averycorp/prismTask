@@ -8,9 +8,7 @@ import com.averycorp.prismtask.data.preferences.NdPreferences
  * Manages Good Enough Timer state for a single task editing session.
  * Tracks cumulative editing time and determines when/how to escalate.
  */
-class GoodEnoughTimerManager(
-    timerConfig: GoodEnoughTimerConfig = GoodEnoughTimerConfig()
-) {
+class GoodEnoughTimerManager(timerConfig: GoodEnoughTimerConfig = GoodEnoughTimerConfig()) {
     private var sessionStartTimeMs: Long = 0L
     private var isPaused: Boolean = true
     private var accumulatedMs: Long = 0L
@@ -124,15 +122,9 @@ class GoodEnoughTimerManager(
 sealed class TimerEvent {
     abstract val editingMinutes: Int
 
-    data class Nudge(
-        override val editingMinutes: Int
-    ) : TimerEvent()
+    data class Nudge(override val editingMinutes: Int) : TimerEvent()
 
-    data class Dialog(
-        override val editingMinutes: Int
-    ) : TimerEvent()
+    data class Dialog(override val editingMinutes: Int) : TimerEvent()
 
-    data class Lock(
-        override val editingMinutes: Int
-    ) : TimerEvent()
+    data class Lock(override val editingMinutes: Int) : TimerEvent()
 }

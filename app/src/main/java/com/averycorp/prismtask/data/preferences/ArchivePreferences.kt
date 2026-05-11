@@ -17,9 +17,7 @@ internal val Context.archiveDataStore: DataStore<Preferences> by preferencesData
 @Singleton
 class ArchivePreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val AUTO_ARCHIVE_DAYS_KEY = intPreferencesKey("auto_archive_days")
     }

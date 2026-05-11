@@ -28,9 +28,7 @@ sealed interface BetaCodeUiState {
 @HiltViewModel
 class BetaCodeViewModel
 @Inject
-constructor(
-    private val repository: BetaCodeRepository
-) : ViewModel() {
+constructor(private val repository: BetaCodeRepository) : ViewModel() {
     private val _state = MutableStateFlow<BetaCodeUiState>(BetaCodeUiState.Idle)
     val state: StateFlow<BetaCodeUiState> = _state.asStateFlow()
 

@@ -23,9 +23,7 @@ import javax.inject.Singleton
 @Singleton
 class WidgetUpdateManager
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob())
 
     private var allWidgetsJob: Job? = null

@@ -24,9 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class NotificationTester
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     @Volatile
     private var player: MediaPlayer? = null
 

@@ -14,17 +14,12 @@ data class ParsedTodoItem(
     val subtasks: List<ParsedTodoItem> = emptyList()
 )
 
-data class ParsedTodoList(
-    val name: String?,
-    val items: List<ParsedTodoItem>
-)
+data class ParsedTodoList(val name: String?, val items: List<ParsedTodoItem>)
 
 @Singleton
 class TodoListParser
 @Inject
-constructor(
-    private val claudeParserService: ClaudeParserService
-) {
+constructor(private val claudeParserService: ClaudeParserService) {
     suspend fun parse(content: String): ParsedTodoList? {
         // Try Claude API first (if key is configured)
         val claudeResult = claudeParserService.parse(content)

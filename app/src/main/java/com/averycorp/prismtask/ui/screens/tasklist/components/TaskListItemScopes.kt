@@ -58,11 +58,7 @@ import sh.calvin.reorderable.ReorderableLazyListState
  * as a parameter-less callback so the screen composable can keep its
  * own state for which task is currently being confirmed.
  */
-internal data class DuplicateDialogState(
-    val taskId: Long,
-    val dueDate: Long?,
-    val subtaskCount: Int
-)
+internal data class DuplicateDialogState(val taskId: Long, val dueDate: Long?, val subtaskCount: Int)
 
 /**
  * LazyListScope extension that emits a task card + its subtask

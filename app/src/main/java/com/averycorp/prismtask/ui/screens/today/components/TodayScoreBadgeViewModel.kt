@@ -23,10 +23,7 @@ import kotlin.math.roundToInt
  * users where the score would trivially max at 100 (no tasks due → 100%
  * task-completion default).
  */
-data class TodayScoreBadgeState(
-    val todayScore: Int? = null,
-    val hasEnoughHistory: Boolean = false
-)
+data class TodayScoreBadgeState(val todayScore: Int? = null, val hasEnoughHistory: Boolean = false)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel

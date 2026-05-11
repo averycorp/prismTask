@@ -115,11 +115,7 @@ constructor(
      * carry an undo callback; non-destructive ops (start_timer,
      * create_task) leave [undoAction] null.
      */
-    data class ChatActionResult(
-        val message: String,
-        val undoLabel: String? = null,
-        val undoAction: (suspend () -> Unit)? = null
-    )
+    data class ChatActionResult(val message: String, val undoLabel: String? = null, val undoAction: (suspend () -> Unit)? = null)
 
     private val _actionResults = MutableSharedFlow<ChatActionResult>(
         extraBufferCapacity = 4

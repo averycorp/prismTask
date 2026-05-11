@@ -18,10 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class WeeklyReviewRepository
 @Inject
-constructor(
-    private val dao: WeeklyReviewDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val dao: WeeklyReviewDao, private val syncTracker: SyncTracker) {
     suspend fun save(
         weekStart: Long,
         metricsJson: String,

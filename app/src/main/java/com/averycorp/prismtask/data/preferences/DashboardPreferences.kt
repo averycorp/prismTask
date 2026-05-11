@@ -18,9 +18,7 @@ internal val Context.dashboardDataStore: DataStore<Preferences> by preferencesDa
 @Singleton
 class DashboardPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val SECTION_ORDER = stringPreferencesKey("section_order")
         private val HIDDEN_SECTIONS = stringSetPreferencesKey("hidden_sections")

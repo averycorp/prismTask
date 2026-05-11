@@ -18,9 +18,7 @@ internal val Context.voiceDataStore: DataStore<Preferences> by preferencesDataSt
 @Singleton
 class VoicePreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val VOICE_INPUT_ENABLED = booleanPreferencesKey("voice_input_enabled")
         private val VOICE_FEEDBACK_ENABLED = booleanPreferencesKey("voice_feedback_enabled")

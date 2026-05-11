@@ -59,10 +59,7 @@ data class TodayWidgetData(
     val productivityScore: Int
 )
 
-data class HabitWidgetData(
-    val habits: List<HabitWidgetItem>,
-    val longestStreak: Int
-)
+data class HabitWidgetData(val habits: List<HabitWidgetItem>, val longestStreak: Int)
 
 data class HabitWidgetItem(
     val id: Long,
@@ -82,18 +79,9 @@ data class UpcomingWidgetData(
     val totalCount: Int get() = overdue.size + today.size + tomorrow.size + dayAfter.size
 }
 
-data class ProductivityWidgetData(
-    val score: Int,
-    val completed: Int,
-    val total: Int,
-    val trendPoints: Int
-)
+data class ProductivityWidgetData(val score: Int, val completed: Int, val total: Int, val trendPoints: Int)
 
-data class TemplateShortcut(
-    val id: Long,
-    val name: String,
-    val icon: String
-)
+data class TemplateShortcut(val id: Long, val name: String, val icon: String)
 
 /**
  * Snapshot of a single project for the [ProjectWidget]. `nextDueTaskTitle`
@@ -119,16 +107,9 @@ data class EisenhowerQuadrantSummary(
     val topTaskDueDate: Long? = null
 )
 
-data class InboxWidgetData(
-    val items: List<InboxWidgetItem>
-)
+data class InboxWidgetData(val items: List<InboxWidgetItem>)
 
-data class InboxWidgetItem(
-    val id: Long,
-    val title: String,
-    val ageLabel: String,
-    val priority: Int
-)
+data class InboxWidgetItem(val id: Long, val title: String, val ageLabel: String, val priority: Int)
 
 data class StatsSparklineWidgetData(
     val thisWeek: List<Int>,
@@ -139,19 +120,9 @@ data class StatsSparklineWidgetData(
     val up: Boolean
 )
 
-data class StreakCalendarWidgetData(
-    val intensities: List<Int>,
-    val activeDays: Int,
-    val longestStreak: Int,
-    val weeks: Int
-)
+data class StreakCalendarWidgetData(val intensities: List<Int>, val activeDays: Int, val longestStreak: Int, val weeks: Int)
 
-data class MedicationWidgetData(
-    val slots: List<MedicationWidgetSlot>,
-    val totalDoses: Int,
-    val takenDoses: Int,
-    val nextSlotIndex: Int
-) {
+data class MedicationWidgetData(val slots: List<MedicationWidgetSlot>, val totalDoses: Int, val takenDoses: Int, val nextSlotIndex: Int) {
     val nextSlot: MedicationWidgetSlot? get() = slots.getOrNull(nextSlotIndex)
 }
 

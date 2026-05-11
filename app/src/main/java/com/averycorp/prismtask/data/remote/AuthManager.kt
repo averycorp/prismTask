@@ -26,10 +26,7 @@ import javax.inject.Singleton
 @Singleton
 class AuthManager
 @Inject
-constructor(
-    @ApplicationContext private val context: Context,
-    private val syncMetadataDao: SyncMetadataDao
-) {
+constructor(@ApplicationContext private val context: Context, private val syncMetadataDao: SyncMetadataDao) {
     private val auth: FirebaseAuth? = try {
         FirebaseAuth.getInstance()
     } catch (e: Exception) {

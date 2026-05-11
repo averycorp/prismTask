@@ -891,9 +891,13 @@ constructor(
         val medicationsOk = runMedicationsBackfillIfNeeded()
         val medicationDosesOk = runMedicationDosesBackfillIfNeeded()
 
-        val allSucceeded = coursesOk && courseCompletionsOk && leisureLogsOk &&
-            selfCareStepsOk && selfCareLogsOk &&
-            medicationsOk && medicationDosesOk
+        val allSucceeded = coursesOk &&
+            courseCompletionsOk &&
+            leisureLogsOk &&
+            selfCareStepsOk &&
+            selfCareLogsOk &&
+            medicationsOk &&
+            medicationDosesOk
         if (allSucceeded) {
             builtInSyncPreferences.setNewEntitiesBackfillDone(true)
             logger.info("upload.new_entities_backfill", status = "success")
@@ -3161,11 +3165,7 @@ constructor(
         return PullResult(applied, skippedTransient, skippedPermanent)
     }
 
-    private data class PullResult(
-        val applied: Int,
-        val skippedTransient: Int,
-        val skippedPermanent: Int
-    ) {
+    private data class PullResult(val applied: Int, val skippedTransient: Int, val skippedPermanent: Int) {
         val skipped: Int get() = skippedTransient + skippedPermanent
     }
 

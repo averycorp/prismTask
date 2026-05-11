@@ -141,9 +141,7 @@ class TemplateSeederTest {
         flag: TemplateSeeder.SeededFlagStore
     ): TemplateSeeder = TemplateSeeder(dao, flag)
 
-    private class FakeSeededFlagStore(
-        initiallySeeded: Boolean
-    ) : TemplateSeeder.SeededFlagStore {
+    private class FakeSeededFlagStore(initiallySeeded: Boolean) : TemplateSeeder.SeededFlagStore {
         private var seeded = initiallySeeded
 
         override suspend fun isSeeded(): Boolean = seeded

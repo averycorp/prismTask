@@ -18,9 +18,7 @@ internal val Context.tabDataStore: DataStore<Preferences> by preferencesDataStor
 @Singleton
 class TabPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val TAB_ORDER = stringPreferencesKey("tab_order")
         private val HIDDEN_TABS = stringSetPreferencesKey("hidden_tabs")

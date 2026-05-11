@@ -20,9 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class CategoryDailyTaskController
 @Inject
-constructor(
-    private val taskRepository: TaskRepository
-) {
+constructor(private val taskRepository: TaskRepository) {
     /**
      * Creates a recurring DAILY task with `"$emoji $label"` as the title
      * if [existingId] is null or points at a missing row. Returns the

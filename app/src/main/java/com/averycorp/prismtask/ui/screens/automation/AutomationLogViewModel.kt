@@ -13,10 +13,8 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
-class AutomationLogViewModel @Inject constructor(
-    private val ruleRepository: AutomationRuleRepository,
-    savedStateHandle: SavedStateHandle
-) : ViewModel() {
+class AutomationLogViewModel @Inject constructor(private val ruleRepository: AutomationRuleRepository, savedStateHandle: SavedStateHandle) :
+    ViewModel() {
 
     private val ruleIdFilter: Long? = savedStateHandle.get<String?>("ruleId")?.toLongOrNull()
 

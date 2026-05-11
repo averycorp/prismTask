@@ -31,13 +31,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
 
-data class DayInfo(
-    val taskCount: Int,
-    val completedCount: Int,
-    val hasOverdue: Boolean,
-    val hasUrgent: Boolean,
-    val topPriority: Int
-)
+data class DayInfo(val taskCount: Int, val completedCount: Int, val hasOverdue: Boolean, val hasUrgent: Boolean, val topPriority: Int)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel

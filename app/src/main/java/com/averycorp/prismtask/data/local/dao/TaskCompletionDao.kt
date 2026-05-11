@@ -7,20 +7,11 @@ import androidx.room.Query
 import com.averycorp.prismtask.data.local.entity.TaskCompletionEntity
 import kotlinx.coroutines.flow.Flow
 
-data class DateCount(
-    val date: Long,
-    val count: Int
-)
+data class DateCount(val date: Long, val count: Int)
 
-data class DayOfWeekCount(
-    val dayOfWeek: Int,
-    val count: Int
-)
+data class DayOfWeekCount(val dayOfWeek: Int, val count: Int)
 
-data class HourCount(
-    val hour: Int,
-    val count: Int
-)
+data class HourCount(val hour: Int, val count: Int)
 
 @Dao
 interface TaskCompletionDao {

@@ -31,20 +31,14 @@ internal val Context.productiveStreakDataStore: DataStore<Preferences>
  * intentionally empathetic ("Take care of yourself today — start fresh
  * tomorrow"), not punishing.
  */
-data class ProductiveStreakSnapshot(
-    val currentDays: Int,
-    val longestDays: Int,
-    val lastProductiveDate: LocalDate?
-) {
+data class ProductiveStreakSnapshot(val currentDays: Int, val longestDays: Int, val lastProductiveDate: LocalDate?) {
     val hasAnyHistory: Boolean get() = lastProductiveDate != null || currentDays > 0 || longestDays > 0
 }
 
 @Singleton
 class ProductiveStreakPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         const val PRODUCTIVE_DAY_SCORE_THRESHOLD = 60
         const val BROKEN_STREAK_NOTIFICATION_TITLE = "Streak Reset"

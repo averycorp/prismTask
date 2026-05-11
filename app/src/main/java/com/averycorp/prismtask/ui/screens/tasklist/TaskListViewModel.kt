@@ -41,10 +41,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class SortOption(
-    val label: String,
-    val token: String
-) {
+enum class SortOption(val label: String, val token: String) {
     DUE_DATE("Due Date", SortPreferences.SortModes.DUE_DATE),
     PRIORITY("Priority", SortPreferences.SortModes.PRIORITY),
     URGENCY("Urgency", SortPreferences.SortModes.URGENCY),
@@ -58,9 +55,7 @@ enum class SortOption(
     }
 }
 
-enum class ViewMode(
-    val label: String
-) {
+enum class ViewMode(val label: String) {
     UPCOMING("Upcoming"),
     LIST("List"),
     BY_PROJECT("By Project"),

@@ -206,12 +206,7 @@ data class MedicationLogDay(
  * (set via long-press → Edit Time) and the database-write [loggedAt] —
  * UI prefers `intendedTime` and falls back to `loggedAt`.
  */
-data class SlotTierEntry(
-    val slot: MedicationSlotEntity,
-    val tier: AchievedTier,
-    val intendedTime: Long?,
-    val loggedAt: Long?
-) {
+data class SlotTierEntry(val slot: MedicationSlotEntity, val tier: AchievedTier, val intendedTime: Long?, val loggedAt: Long?) {
     /** The best-effort wall-clock for display, or null if both are missing. */
     val displayTime: Long? get() = intendedTime ?: loggedAt
 }

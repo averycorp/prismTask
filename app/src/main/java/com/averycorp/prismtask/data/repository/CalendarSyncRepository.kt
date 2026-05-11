@@ -161,33 +161,29 @@ constructor(
         }
     }
 
-    suspend fun syncNow(): Result<Unit> {
-        return try {
-            api.fullSync()
-            calendarSyncPreferences.setLastSyncTimestamp(System.currentTimeMillis())
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.w(TAG, "Manual sync failed", e)
-            Result.failure(e)
-        }
+    suspend fun syncNow(): Result<Unit> = try {
+        api.fullSync()
+        calendarSyncPreferences.setLastSyncTimestamp(System.currentTimeMillis())
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.w(TAG, "Manual sync failed", e)
+        Result.failure(e)
     }
 
-    suspend fun listCalendars(): Result<List<com.averycorp.prismtask.data.calendar.CalendarInfo>> {
-        return try {
-            val response = api.listCalendars()
-            Result.success(
-                response.calendars.map { dto ->
-                    com.averycorp.prismtask.data.calendar.CalendarInfo(
-                        id = dto.id,
-                        name = dto.name,
-                        color = dto.color ?: "#4285F4",
-                        isPrimary = dto.primary
-                    )
-                }
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    suspend fun listCalendars(): Result<List<com.averycorp.prismtask.data.calendar.CalendarInfo>> = try {
+        val response = api.listCalendars()
+        Result.success(
+            response.calendars.map { dto ->
+                com.averycorp.prismtask.data.calendar.CalendarInfo(
+                    id = dto.id,
+                    name = dto.name,
+                    color = dto.color ?: "#4285F4",
+                    isPrimary = dto.primary
+                )
+            }
+        )
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     /**
@@ -196,23 +192,21 @@ constructor(
      * periodic job respects the user's current direction / frequency /
      * target-calendar choices.
      */
-    suspend fun syncSettingsToBackend(): Result<Unit> {
-        return try {
-            val payload = CalendarSettingsPayload(
-                enabled = calendarSyncPreferences.getCalendarSyncEnabled(),
-                direction = calendarSyncPreferences.getSyncDirectionOnce(),
-                frequency = calendarSyncPreferences.getSyncFrequency().first(),
-                targetCalendarId = calendarSyncPreferences.getSyncCalendarIdOnce(),
-                displayCalendarIds = calendarSyncPreferences.getSelectedDisplayCalendarIds().first().toList(),
-                showEvents = calendarSyncPreferences.getShowCalendarEvents().first(),
-                syncCompletedTasks = calendarSyncPreferences.getSyncCompletedTasks().first()
-            )
-            api.updateSettings(payload)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.w(TAG, "Settings push failed", e)
-            Result.failure(e)
-        }
+    suspend fun syncSettingsToBackend(): Result<Unit> = try {
+        val payload = CalendarSettingsPayload(
+            enabled = calendarSyncPreferences.getCalendarSyncEnabled(),
+            direction = calendarSyncPreferences.getSyncDirectionOnce(),
+            frequency = calendarSyncPreferences.getSyncFrequency().first(),
+            targetCalendarId = calendarSyncPreferences.getSyncCalendarIdOnce(),
+            displayCalendarIds = calendarSyncPreferences.getSelectedDisplayCalendarIds().first().toList(),
+            showEvents = calendarSyncPreferences.getShowCalendarEvents().first(),
+            syncCompletedTasks = calendarSyncPreferences.getSyncCompletedTasks().first()
+        )
+        api.updateSettings(payload)
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Log.w(TAG, "Settings push failed", e)
+        Result.failure(e)
     }
 
     /**
@@ -225,18 +219,16 @@ constructor(
         calendarId: String = "primary",
         timeMinMillis: Long? = null,
         timeMaxMillis: Long? = null
-    ): List<com.averycorp.prismtask.data.remote.api.EventSearchItem> {
-        return try {
-            api.searchEvents(
-                pattern = pattern,
-                calendarId = calendarId,
-                timeMin = timeMinMillis,
-                timeMax = timeMaxMillis
-            ).events
-        } catch (e: Exception) {
-            Log.w(TAG, "Event search failed", e)
-            emptyList()
-        }
+    ): List<com.averycorp.prismtask.data.remote.api.EventSearchItem> = try {
+        api.searchEvents(
+            pattern = pattern,
+            calendarId = calendarId,
+            timeMin = timeMinMillis,
+            timeMax = timeMaxMillis
+        ).events
+    } catch (e: Exception) {
+        Log.w(TAG, "Event search failed", e)
+        emptyList()
     }
 
     override suspend fun getTodayUpcomingEvents(
@@ -261,11 +253,7 @@ constructor(
         }
     }
 
-    data class PullSummary(
-        val created: Int,
-        val updated: Int,
-        val deleted: Int
-    ) {
+    data class PullSummary(val created: Int, val updated: Int, val deleted: Int) {
         companion object {
             val EMPTY = PullSummary(0, 0, 0)
         }

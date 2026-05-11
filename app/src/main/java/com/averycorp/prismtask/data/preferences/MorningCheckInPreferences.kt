@@ -28,9 +28,7 @@ internal val Context.morningCheckInDataStore: DataStore<Preferences> by
 @Singleton
 class MorningCheckInPreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val BANNER_DISMISSED_DATE_KEY = stringPreferencesKey("banner_dismissed_date")
         private val FEATURE_ENABLED_KEY = booleanPreferencesKey("feature_enabled")

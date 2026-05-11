@@ -23,10 +23,7 @@ import javax.inject.Singleton
 @Singleton
 class BoundaryRuleRepository
 @Inject
-constructor(
-    private val dao: BoundaryRuleDao,
-    private val syncTracker: SyncTracker
-) {
+constructor(private val dao: BoundaryRuleDao, private val syncTracker: SyncTracker) {
     fun observeRules(): Flow<List<BoundaryRule>> = dao.observeAll().map { list ->
         list.map { it.toDomain() }
     }

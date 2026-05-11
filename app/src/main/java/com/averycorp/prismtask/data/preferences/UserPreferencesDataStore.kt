@@ -19,19 +19,12 @@ import kotlinx.coroutines.runBlocking
 /**
  * Appearance/display preferences used by v1.3.0 customizability features.
  */
-data class AppearancePrefs(
-    val compactMode: Boolean = false,
-    val showTaskCardBorders: Boolean = true,
-    val cardCornerRadius: Int = 12
-)
+data class AppearancePrefs(val compactMode: Boolean = false, val showTaskCardBorders: Boolean = true, val cardCornerRadius: Int = 12)
 
 /**
  * Swipe gesture preferences for task cards.
  */
-data class SwipePrefs(
-    val right: SwipeAction = SwipeAction.COMPLETE,
-    val left: SwipeAction = SwipeAction.DELETE
-)
+data class SwipePrefs(val right: SwipeAction = SwipeAction.COMPLETE, val left: SwipeAction = SwipeAction.DELETE)
 
 /**
  * Default values applied when creating a new task.
@@ -49,10 +42,7 @@ data class TaskDefaults(
 /**
  * Preferences for the quick-add bar.
  */
-data class QuickAddPrefs(
-    val showConfirmation: Boolean = true,
-    val autoAssignProject: Boolean = false
-)
+data class QuickAddPrefs(val showConfirmation: Boolean = true, val autoAssignProject: Boolean = false)
 
 /**
  * Forgiveness-first streak preferences (v1.4.0 V5).
@@ -62,11 +52,7 @@ data class QuickAddPrefs(
  * resetting the streak. When disabled, streak calculation reverts to classic
  * strict behavior (a single miss hard-resets the run).
  */
-data class ForgivenessPrefs(
-    val enabled: Boolean = true,
-    val gracePeriodDays: Int = 7,
-    val allowedMisses: Int = 1
-)
+data class ForgivenessPrefs(val enabled: Boolean = true, val gracePeriodDays: Int = 7, val allowedMisses: Int = 1)
 
 /**
  * Work-Life Balance Engine preferences (v1.4.0 V1).
@@ -113,9 +99,7 @@ data class UserPreferencesSnapshot(
  * Failures (offline, rate-limit, 5xx) leave the task's quadrant unchanged;
  * the user can explicitly re-run classification from the Matrix screen.
  */
-data class EisenhowerPrefs(
-    val autoClassifyEnabled: Boolean = true
-)
+data class EisenhowerPrefs(val autoClassifyEnabled: Boolean = true)
 
 /**
  * Master AI-feature opt-out (PII egress audit, 2026-04-26).
@@ -132,9 +116,7 @@ data class EisenhowerPrefs(
  * upgrade. The disclosure / opt-out path is documented in
  * `docs/privacy/index.md` and `docs/store-listing/compliance/data-safety-form.md`.
  */
-data class AiFeaturePrefs(
-    val enabled: Boolean = true
-)
+data class AiFeaturePrefs(val enabled: Boolean = true)
 
 /**
  * Per-feature AI opt-ins (F3 low-risk bundle).
@@ -193,9 +175,7 @@ enum class MedicationReminderMode {
  * Context; production wiring lives in
  * [com.averycorp.prismtask.di.PreferencesModule].
  */
-class UserPreferencesDataStore(
-    private val dataStore: DataStore<Preferences>
-) {
+class UserPreferencesDataStore(private val dataStore: DataStore<Preferences>) {
     companion object {
         // Appearance
         val KEY_COMPACT_MODE = booleanPreferencesKey("compact_mode")

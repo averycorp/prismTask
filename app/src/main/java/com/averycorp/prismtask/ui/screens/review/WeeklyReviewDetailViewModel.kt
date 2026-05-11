@@ -15,10 +15,7 @@ import javax.inject.Inject
 @HiltViewModel
 class WeeklyReviewDetailViewModel
 @Inject
-constructor(
-    savedStateHandle: SavedStateHandle,
-    private val dao: WeeklyReviewDao
-) : ViewModel() {
+constructor(savedStateHandle: SavedStateHandle, private val dao: WeeklyReviewDao) : ViewModel() {
     private val reviewId: Long = savedStateHandle.get<String>("reviewId")?.toLongOrNull() ?: -1L
 
     private val _review = MutableStateFlow<WeeklyReviewEntity?>(null)

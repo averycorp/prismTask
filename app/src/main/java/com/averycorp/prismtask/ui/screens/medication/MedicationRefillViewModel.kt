@@ -40,9 +40,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MedicationRefillViewModel
 @Inject
-constructor(
-    private val repository: MedicationRepository
-) : ViewModel() {
+constructor(private val repository: MedicationRepository) : ViewModel() {
     private val _errorMessages = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val errorMessages: SharedFlow<String> = _errorMessages.asSharedFlow()
 
@@ -163,7 +161,4 @@ constructor(
     }
 }
 
-data class MedicationWithForecast(
-    val row: MedicationEntity,
-    val forecast: RefillForecast
-)
+data class MedicationWithForecast(val row: MedicationEntity, val forecast: RefillForecast)

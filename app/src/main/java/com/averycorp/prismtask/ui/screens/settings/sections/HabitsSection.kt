@@ -132,7 +132,13 @@ private fun TodaySkipDaysDialog(
         text = {
             Column {
                 Text(
-                    text = if (value == 0) "Disabled" else if (value == 1) "1 day" else "$value days",
+                    text = if (value == 0) {
+                        "Disabled"
+                    } else if (value == 1) {
+                        "1 day"
+                    } else {
+                        "$value days"
+                    },
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,

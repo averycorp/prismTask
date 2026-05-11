@@ -16,15 +16,9 @@ import java.time.ZoneId
 sealed class BoundaryDecision {
     data object Allow : BoundaryDecision()
 
-    data class Block(
-        val rule: BoundaryRule,
-        val reason: String
-    ) : BoundaryDecision()
+    data class Block(val rule: BoundaryRule, val reason: String) : BoundaryDecision()
 
-    data class Suggest(
-        val rule: BoundaryRule,
-        val category: LifeCategory
-    ) : BoundaryDecision()
+    data class Suggest(val rule: BoundaryRule, val category: LifeCategory) : BoundaryDecision()
 }
 
 /**

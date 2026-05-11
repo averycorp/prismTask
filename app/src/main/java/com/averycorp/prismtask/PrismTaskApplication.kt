@@ -243,7 +243,8 @@ class PrismTaskApplication :
             Build.MODEL.contains("Emulator") ||
             Build.MODEL.contains("Android SDK built for x86") ||
             Build.MANUFACTURER.contains("Genymotion") ||
-            Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic") ||
+            Build.BRAND.startsWith("generic") &&
+            Build.DEVICE.startsWith("generic") ||
             Build.PRODUCT == "google_sdk" ||
             Build.PRODUCT == "sdk_google_phone_x86" ||
             Build.HARDWARE.contains("goldfish") ||

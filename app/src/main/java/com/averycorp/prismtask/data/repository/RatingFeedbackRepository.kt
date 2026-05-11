@@ -11,9 +11,7 @@ import javax.inject.Singleton
  * unauthenticated calls.
  */
 @Singleton
-class RatingFeedbackRepository @Inject constructor(
-    private val api: PrismTaskApi
-) {
+class RatingFeedbackRepository @Inject constructor(private val api: PrismTaskApi) {
     suspend fun submit(
         sentiment: String,
         freeText: String?,

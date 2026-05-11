@@ -65,10 +65,7 @@ import sh.calvin.reorderable.ReorderableColumn
  * tokens in the displayed title so that the user can still see them after
  * creation - full subtask scheduling is not supported yet.
  */
-data class ParsedSubtaskInput(
-    val title: String,
-    val priority: Int
-)
+data class ParsedSubtaskInput(val title: String, val priority: Int)
 
 /**
  * Parses minimal NLP out of a raw subtask input string.

@@ -354,16 +354,8 @@ sealed class BatchPreviewState {
      * short-circuit a re-fire of `loadPreview` if `LaunchedEffect`
      * recomposes during the pop transition.
      */
-    data class Applied(
-        val batchId: String,
-        val appliedCount: Int,
-        val skippedCount: Int
-    ) : BatchPreviewState()
-    data class Error(
-        val commandText: String,
-        val kind: BatchPreviewErrorKind,
-        val message: String
-    ) : BatchPreviewState()
+    data class Applied(val batchId: String, val appliedCount: Int, val skippedCount: Int) : BatchPreviewState()
+    data class Error(val commandText: String, val kind: BatchPreviewErrorKind, val message: String) : BatchPreviewState()
 }
 
 /**
@@ -376,11 +368,7 @@ sealed class BatchPreviewState {
  */
 enum class BatchPreviewErrorKind { AiGate451, Network, ParseFailure }
 
-data class MedicationCandidate(
-    val entityId: String,
-    val name: String,
-    val displayLabel: String?
-)
+data class MedicationCandidate(val entityId: String, val name: String, val displayLabel: String?)
 
 sealed class BatchEvent {
     data class Approved(val batchId: String, val appliedCount: Int, val skippedCount: Int) : BatchEvent()

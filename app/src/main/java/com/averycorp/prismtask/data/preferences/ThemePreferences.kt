@@ -23,9 +23,7 @@ internal val Context.themePrefsDataStore: DataStore<Preferences> by preferencesD
 @Singleton
 class ThemePreferences
 @Inject
-constructor(
-    @ApplicationContext private val context: Context
-) {
+constructor(@ApplicationContext private val context: Context) {
     companion object {
         private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
         private val ACCENT_COLOR_KEY = stringPreferencesKey("accent_color")

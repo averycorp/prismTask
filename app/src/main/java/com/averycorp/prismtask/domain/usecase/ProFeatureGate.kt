@@ -40,9 +40,7 @@ fun aiModelForFeature(feature: AiFeature): String = when (feature) {
 @Singleton
 class ProFeatureGate
 @Inject
-constructor(
-    private val billingManager: BillingManager
-) {
+constructor(private val billingManager: BillingManager) {
     val userTier: StateFlow<UserTier> = billingManager.userTier
 
     fun isPro(): Boolean = userTier.value == UserTier.PRO

@@ -64,11 +64,7 @@ import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.theme.LocalPriorityColors
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 
-private data class QuadrantInfo(
-    val key: String,
-    val title: String,
-    val subtitle: String
-)
+private data class QuadrantInfo(val key: String, val title: String, val subtitle: String)
 
 private val QUADRANTS = listOf(
     QuadrantInfo("Q1", "Do First", "Urgent + Important"),

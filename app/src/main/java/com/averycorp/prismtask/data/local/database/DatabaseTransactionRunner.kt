@@ -13,9 +13,7 @@ import javax.inject.Singleton
  * [withTransaction] to simply invoke the block inline.
  */
 @Singleton
-open class DatabaseTransactionRunner @Inject constructor(
-    private val database: PrismTaskDatabase
-) {
+open class DatabaseTransactionRunner @Inject constructor(private val database: PrismTaskDatabase) {
     open suspend fun <R> withTransaction(block: suspend () -> R): R =
         database.withTransaction(block)
 }
