@@ -2566,3 +2566,4 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_78_79,
     MIGRATION_79_80
 )
+

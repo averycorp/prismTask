@@ -125,7 +125,9 @@ constructor(
             if (cursor.moveToFirst()) {
                 val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 if (idx >= 0) cursor.getString(idx) else null
-            } else null
+            } else {
+                null
+            }
         }
     }.getOrNull()
 
