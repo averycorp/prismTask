@@ -3,7 +3,6 @@ package com.averycorp.prismtask.data.remote
 import com.averycorp.prismtask.data.remote.api.FileExtractedSubtaskResponse
 import com.averycorp.prismtask.data.remote.api.FileExtractionResponse
 import com.averycorp.prismtask.domain.model.FileExtractionSuggestion
-// `fromResponse` is declared alongside FileExtractionService.kt's mapping logic.
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

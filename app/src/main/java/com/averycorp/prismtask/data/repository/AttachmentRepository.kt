@@ -1,21 +1,12 @@
 package com.averycorp.prismtask.data.repository
 
-import android.content.Context
-import android.net.Uri
-import android.provider.OpenableColumns
 import com.averycorp.prismtask.data.local.dao.AttachmentDao
-import com.averycorp.prismtask.data.local.entity.AttachmentEntity
 import com.averycorp.prismtask.data.remote.SyncTracker
-import kotlinx.coroutines.flow.Flow
-import java.io.File
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AttachmentRepository
-@Inject
-constructor(
+class AttachmentRepository @Inject constructor(
     private val attachmentDao: AttachmentDao,
     private val syncTracker: SyncTracker
 ) {
