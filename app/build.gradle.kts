@@ -375,7 +375,7 @@ dependencies {
     testImplementation("app.cash.turbine:turbine:1.1.0")
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
-    testImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("androidx.test.ext:junit:1.3.0")
     testImplementation("androidx.work:work-testing:2.9.1")
     // InstantTaskExecutorRule for Robolectric unit tests that need it
     // (e.g. TaskDependencyRepositoryTest from PR-2 #1086 which uses
@@ -383,7 +383,7 @@ dependencies {
     // Already present in androidTestImplementation; mirror here so
     // Robolectric-driven unit tests can use the same rule.
     testImplementation("androidx.arch.core:core-testing:2.2.0")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
