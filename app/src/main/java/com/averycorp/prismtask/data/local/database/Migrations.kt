@@ -2455,7 +2455,35 @@ val MIGRATION_78_79 = object : Migration(78, 79) {
     }
 }
 
-const val CURRENT_DB_VERSION = 79
+/**
+ * v79 → v80 — Extends `attachments` so files can be:
+ *   - attached to a project (not just a task), and
+ *   - tagged with their MIME type and size for any-MIME uploads (the
+ *     pre-v80 attachment flow only supported images via the photo picker).
+ *
+ * Adds three nullable columns + an index on `project_id` so the project
+ * Files section can `SELECT … WHERE project_id = ?` cheaply. The
+ * pre-existing `taskId` column stays `NOT NULL` (SQLite ALTER cannot
+ * relax that without a table rebuild); project-only attachments use the
+ * `taskId = 0` sentinel and the repository enforces the "exactly one of"
+ * invariant on insert paths.
+ *
+ * Existing image rows backfill `mime_type = 'image/*'`, `size_bytes = NULL`
+ * (we never recorded the original size), `project_id = NULL`. Backfilling
+ * a generic `image/*` rather than picking a specific subtype keeps the
+ * server side from having to disambiguate after sync.
+ */
+val MIGRATION_79_80 = object : Migration(79, 80) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE attachments ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE")
+        db.execSQL("ALTER TABLE attachments ADD COLUMN mime_type TEXT")
+        db.execSQL("ALTER TABLE attachments ADD COLUMN size_bytes INTEGER")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_attachments_project_id` ON `attachments` (`project_id`)")
+        db.execSQL("UPDATE attachments SET mime_type = 'image/*' WHERE type = 'image' AND mime_type IS NULL")
+    }
+}
+
+const val CURRENT_DB_VERSION = 80
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2535,5 +2563,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_75_76,
     MIGRATION_76_77,
     MIGRATION_77_78,
-    MIGRATION_78_79
+    MIGRATION_78_79,
+    MIGRATION_79_80
 )

@@ -20,6 +20,7 @@ import com.averycorp.prismtask.data.local.entity.TaskDependencyEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.remote.FileExtractionService
 import com.averycorp.prismtask.data.remote.LifeCategoryRemoteClassifier
 import com.averycorp.prismtask.data.repository.AttachmentRepository
 import com.averycorp.prismtask.data.repository.BoundaryRuleRepository
@@ -30,6 +31,7 @@ import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.TaskTemplateRepository
 import com.averycorp.prismtask.data.repository.TaskTimingRepository
 import com.averycorp.prismtask.domain.model.CognitiveLoad
+import com.averycorp.prismtask.domain.model.FileExtractionSuggestion
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.model.RecurrenceRule
 import com.averycorp.prismtask.domain.model.TaskMode
@@ -90,6 +92,7 @@ constructor(
     private val parsedTaskResolver: ParsedTaskResolver,
     private val proFeatureGate: ProFeatureGate,
     private val lifeCategoryRemoteClassifier: LifeCategoryRemoteClassifier,
+    private val fileExtractionService: FileExtractionService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val boundaryEnforcer = BoundaryEnforcer()
@@ -1011,6 +1014,155 @@ constructor(
                 _errorMessages.emit("Failed to add attachment")
             }
         }
+    }
+
+    /**
+     * Attach an arbitrary file (any MIME — text, source code, PDF, DOCX,
+     * XLSX, image) to the task being edited. Wraps
+     * [AttachmentRepository.addFileAttachment] so the existing photo-picker
+     * path stays unchanged.
+     */
+    fun onAddFileAttachment(context: Context, uri: Uri) {
+        val id = currentTaskId ?: return
+        viewModelScope.launch {
+            try {
+                attachmentRepository.addFileAttachment(
+                    context = context,
+                    taskId = id,
+                    sourceUri = uri
+                )
+            } catch (e: Exception) {
+                Log.e("AddEditTaskVM", "Failed to add file attachment", e)
+                _errorMessages.emit("Failed to add attachment")
+            }
+        }
+    }
+
+    /**
+     * UI state for the "Extract from file" affordance. ``isInFlight`` is
+     * set while the backend round-trip is happening so the picker can
+     * disable the button + show a spinner. ``suggestion`` is set once the
+     * backend returns something actionable — the sheet renders it.
+     * Errors flow out via the shared [errorMessages] snackbar channel
+     * rather than living on this state.
+     */
+    data class FileExtractionUiState(
+        val isInFlight: Boolean = false,
+        val pendingFileName: String? = null,
+        val suggestion: FileExtractionSuggestion? = null
+    )
+
+    private val _fileExtractionState = MutableStateFlow(FileExtractionUiState())
+    val fileExtractionState: StateFlow<FileExtractionUiState> = _fileExtractionState
+
+    /**
+     * Fire the backend extraction round-trip. The result lands in
+     * [fileExtractionState] for the UI to render in
+     * `FileImportSuggestionSheet`. Failures emit on the shared
+     * [errorMessages] snackbar channel — the sheet stays closed.
+     */
+    fun extractFromFile(context: Context, uri: Uri, displayName: String? = null) {
+        _fileExtractionState.value = FileExtractionUiState(
+            isInFlight = true,
+            pendingFileName = displayName
+        )
+        viewModelScope.launch {
+            val result = fileExtractionService.extract(context, uri, displayName = displayName)
+            result.fold(
+                onSuccess = { suggestion ->
+                    if (!suggestion.hasAnyContent) {
+                        _fileExtractionState.value = FileExtractionUiState()
+                        _errorMessages.emit("Nothing actionable found in this file")
+                    } else {
+                        _fileExtractionState.value = FileExtractionUiState(
+                            suggestion = suggestion,
+                            pendingFileName = displayName ?: suggestion.sourceFileName
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _fileExtractionState.value = FileExtractionUiState()
+                    val msg = when (e) {
+                        is FileExtractionService.NotAuthenticatedException ->
+                            "Sign in to extract task details from files"
+                        is FileExtractionService.FileTooLargeException ->
+                            "File is over the ${e.maxBytes / (1024 * 1024)} MB limit"
+                        is FileExtractionService.ExtractionFailedException ->
+                            e.message ?: "Couldn't extract details from this file"
+                        else -> "Couldn't extract details from this file"
+                    }
+                    Log.w("AddEditTaskVM", "extractFromFile failed", e)
+                    _errorMessages.emit(msg)
+                }
+            )
+        }
+    }
+
+    fun dismissFileExtractionSheet() {
+        _fileExtractionState.value = FileExtractionUiState()
+    }
+
+    /**
+     * Apply the user-confirmed fields from [suggestion] onto the editor's
+     * draft state. Each ``apply*`` flag is the user's checkbox in the
+     * suggestion sheet — a field is overwritten only when both the flag is
+     * set *and* the suggestion has a value for it. Project / tag matches
+     * resolve case-insensitively against existing rows; misses create a new
+     * project / tag with the default color so the user doesn't lose the
+     * suggestion to a typo.
+     */
+    fun applyFileExtractionSuggestion(
+        suggestion: FileExtractionSuggestion,
+        applyTitle: Boolean,
+        applyDescription: Boolean,
+        applyDueDate: Boolean,
+        applyPriority: Boolean,
+        applyProject: Boolean,
+        applyTags: Boolean,
+        applySubtasks: Boolean
+    ) {
+        if (applyTitle && suggestion.title.isNotBlank()) {
+            title = suggestion.title
+            titleError = false
+        }
+        if (applyDescription && !suggestion.description.isNullOrBlank()) {
+            description = suggestion.description
+        }
+        if (applyDueDate && suggestion.suggestedDueDateMillis != null) {
+            dueDate = suggestion.suggestedDueDateMillis
+        }
+        if (applyPriority && suggestion.suggestedPriority > 0) {
+            priority = suggestion.suggestedPriority
+        }
+        if (applyProject && !suggestion.suggestedProject.isNullOrBlank()) {
+            viewModelScope.launch {
+                try {
+                    val name = suggestion.suggestedProject
+                    val match = projects.value.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                    projectId = match?.id ?: projectRepository.addProject(name = name)
+                } catch (e: Exception) {
+                    Log.w("AddEditTaskVM", "Failed to apply project from extraction", e)
+                }
+            }
+        }
+        if (applyTags && suggestion.tags.isNotEmpty()) {
+            viewModelScope.launch {
+                try {
+                    val existing = allTags.value
+                    val resolved = suggestion.tags.map { tagName ->
+                        existing.firstOrNull { it.name.equals(tagName, ignoreCase = true) }?.id
+                            ?: tagRepository.addTag(name = tagName)
+                    }
+                    selectedTagIds = selectedTagIds + resolved.toSet()
+                } catch (e: Exception) {
+                    Log.w("AddEditTaskVM", "Failed to apply tags from extraction", e)
+                }
+            }
+        }
+        if (applySubtasks) {
+            suggestion.subtasks.forEach { addPendingSubtask(it.title) }
+        }
+        dismissFileExtractionSheet()
     }
 
     fun onAddLinkAttachment(url: String) {

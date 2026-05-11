@@ -119,6 +119,36 @@ data class ExtractFromTextResponse(
     val tasks: List<ExtractedTaskCandidateResponse> = emptyList()
 )
 
+/**
+ * Single subtask returned by `POST /api/v1/ai/files/extract`. Mirrors
+ * `app.schemas.ai.FileExtractedSubtask` on the backend.
+ */
+data class FileExtractedSubtaskResponse(
+    val title: String,
+    @SerializedName("suggested_due_date") val suggestedDueDate: String? = null
+)
+
+/**
+ * Suggestion payload for `POST /api/v1/ai/files/extract`. The Android UI
+ * renders this in `FileImportSuggestionSheet`; the user picks which fields
+ * to apply before any task state is mutated. All list fields default to
+ * empty so a missing JSON field never NPEs the deserializer.
+ */
+data class FileExtractionResponse(
+    val title: String = "",
+    val description: String? = null,
+    @SerializedName("suggested_due_date") val suggestedDueDate: String? = null,
+    @SerializedName("suggested_priority") val suggestedPriority: Int = 0,
+    @SerializedName("suggested_project") val suggestedProject: String? = null,
+    val tags: List<String> = emptyList(),
+    val subtasks: List<FileExtractedSubtaskResponse> = emptyList(),
+    @SerializedName("detected_dates") val detectedDates: List<String> = emptyList(),
+    val confidence: Float = 0f,
+    val notes: String? = null,
+    @SerializedName("source_file_name") val sourceFileName: String? = null,
+    @SerializedName("source_mime_type") val sourceMimeType: String? = null
+)
+
 // endregion
 
 // region App version

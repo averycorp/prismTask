@@ -13,6 +13,12 @@ interface AttachmentDao {
     @Query("SELECT * FROM attachments WHERE taskId = :taskId ORDER BY created_at ASC")
     fun getAttachmentsForTask(taskId: Long): Flow<List<AttachmentEntity>>
 
+    @Query("SELECT * FROM attachments WHERE project_id = :projectId ORDER BY created_at ASC")
+    fun getAttachmentsForProject(projectId: Long): Flow<List<AttachmentEntity>>
+
+    @Query("SELECT COUNT(*) FROM attachments WHERE project_id = :projectId")
+    fun getAttachmentCountForProject(projectId: Long): Flow<Int>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(attachment: AttachmentEntity): Long
 

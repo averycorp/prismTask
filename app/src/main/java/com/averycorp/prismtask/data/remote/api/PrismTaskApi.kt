@@ -78,6 +78,23 @@ interface PrismTaskApi {
         @Body request: ExtractFromTextRequest
     ): ExtractFromTextResponse
 
+    /**
+     * Upload a file (image / text / source code / PDF / DOCX / XLSX) and
+     * receive a single structured task suggestion derived from its
+     * contents. Wired into the Android task editor's "Extract from file"
+     * action; the response feeds `FileImportSuggestionSheet` for review.
+     *
+     * Returns 413 when the upload exceeds the backend cap (10 MB), 422
+     * when the file contents can't be parsed into a structured suggestion,
+     * 503 when the backend is missing the optional parser dependency or
+     * the Anthropic key.
+     */
+    @Multipart
+    @POST("api/v1/ai/files/extract")
+    suspend fun extractFromFile(
+        @Part file: MultipartBody.Part
+    ): FileExtractionResponse
+
     @GET("api/v1/app/version")
     suspend fun getVersion(): VersionResponse
 

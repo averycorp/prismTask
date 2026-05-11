@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,6 +69,7 @@ import com.averycorp.prismtask.ui.components.TierBadge
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.screens.addedittask.AddEditTaskViewModel
 import com.averycorp.prismtask.ui.screens.addedittask.AttachmentRow
+import com.averycorp.prismtask.ui.screens.addedittask.FileImportSuggestionSheet
 import com.averycorp.prismtask.ui.screens.addedittask.PendingSubtask
 import com.averycorp.prismtask.ui.screens.addedittask.SectionLabel
 import com.averycorp.prismtask.ui.screens.coaching.CoachingViewModel
@@ -170,6 +173,16 @@ internal fun DetailsTabContent(
         uri?.let { viewModel.onAddImageAttachment(context, it) }
     }
 
+    // Any-MIME picker for the "Extract from File" affordance — accepts
+    // images, source code, PDFs, DOCX, XLSX, etc. The result feeds the
+    // backend extraction round-trip rather than the attachment table.
+    val fileExtractLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.extractFromFile(context, it) }
+    }
+    val fileExtractionState by viewModel.fileExtractionState.collectAsStateWithLifecycle()
+
     // --- AI Coaching: "Help Me Start" button + stuck coaching card (edit mode) ---
     if (viewModel.isEditMode) {
         Row(
@@ -253,6 +266,33 @@ internal fun DetailsTabContent(
             onUpgrade = { _ -> coachingViewModel.dismissUpgradePrompt() },
             onDismiss = { coachingViewModel.dismissUpgradePrompt() }
         )
+    }
+
+    // --- Extract From File ---
+    // Drops the user into the system file picker; on selection, the VM
+    // posts the bytes to the backend and the suggestion sheet renders.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(
+            onClick = { fileExtractLauncher.launch("*/*") },
+            enabled = !fileExtractionState.isInFlight
+        ) {
+            if (fileExtractionState.isInFlight) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.UploadFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                if (fileExtractionState.isInFlight) "Reading File\u2026" else "Extract Details from File"
+            )
+        }
     }
 
     // --- Description ---
@@ -376,6 +416,27 @@ internal fun DetailsTabContent(
                 Text("Add Attachment")
             }
         }
+    }
+
+    // File-extraction suggestion sheet — renders once the backend returns
+    // a non-empty suggestion; the user picks which fields to apply.
+    fileExtractionState.suggestion?.let { suggestion ->
+        FileImportSuggestionSheet(
+            suggestion = suggestion,
+            onDismiss = { viewModel.dismissFileExtractionSheet() },
+            onApply = { selections ->
+                viewModel.applyFileExtractionSuggestion(
+                    suggestion = suggestion,
+                    applyTitle = selections.applyTitle,
+                    applyDescription = selections.applyDescription,
+                    applyDueDate = selections.applyDueDate,
+                    applyPriority = selections.applyPriority,
+                    applyProject = selections.applyProject,
+                    applyTags = selections.applyTags,
+                    applySubtasks = selections.applySubtasks
+                )
+            }
+        )
     }
 
     // Add link dialog

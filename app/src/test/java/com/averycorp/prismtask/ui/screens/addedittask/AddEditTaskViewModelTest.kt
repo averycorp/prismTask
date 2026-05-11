@@ -70,6 +70,7 @@ class AddEditTaskViewModelTest {
     private lateinit var parsedTaskResolver: ParsedTaskResolver
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var lifeCategoryRemoteClassifier: LifeCategoryRemoteClassifier
+    private lateinit var fileExtractionService: com.averycorp.prismtask.data.remote.FileExtractionService
     private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
@@ -112,6 +113,7 @@ class AddEditTaskViewModelTest {
         parsedTaskResolver = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
         lifeCategoryRemoteClassifier = mockk(relaxed = true)
+        fileExtractionService = mockk(relaxed = true)
         // Default: Auto-button remote classifier returns failure (offline /
         // logged-out). Tests that exercise the Claude-backed upgrade path
         // override this stub.
@@ -179,6 +181,7 @@ class AddEditTaskViewModelTest {
         parsedTaskResolver,
         proFeatureGate,
         lifeCategoryRemoteClassifier,
+        fileExtractionService,
         savedStateHandle
     )
 

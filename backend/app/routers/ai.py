@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,8 @@ from app.schemas.ai import (
     ExtractFromTextRequest,
     ExtractFromTextResponse,
     ExtractedTaskCandidate,
+    FileExtractedSubtask,
+    FileExtractionResponse,
     PomodoroCoachingRequest,
     PomodoroCoachingResponse,
     PomodoroRequest,
@@ -108,6 +110,13 @@ weekly_review_rate_limiter = RateLimiter(max_requests=1, window_seconds=3600)
 # v1.4.0 V9: paste-to-extract — 10 per minute to cover rapid iteration
 # (user fixing titles and re-extracting).
 extract_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# v1.7 file-extract — heavier per-call (multimodal + DOCX/XLSX parse + Claude),
+# so cap tighter than paste-to-extract. 5/min still covers a user iterating on
+# the same upload (re-pick → re-extract) without burning Claude budget.
+file_extract_rate_limiter = RateLimiter(max_requests=5, window_seconds=60)
+# Hard cap on uploaded bytes — mirrors MAX_FILE_BYTES in
+# app/services/file_extraction.py. Keep both in lockstep.
+FILE_EXTRACT_MAX_BYTES = 10 * 1024 * 1024
 # A2 Pomodoro+ coaching — 3 surfaces fire per session, so the window has to
 # accommodate a normal 4-session flow (pre + 3 breaks + recap = ~8 calls).
 pomodoro_coaching_rate_limiter = RateLimiter(max_requests=15, window_seconds=600)
@@ -848,6 +857,98 @@ async def extract_from_text(
     # Drop anything with an empty title — defensive.
     candidates = [c for c in candidates if c.title]
     return ExtractFromTextResponse(tasks=candidates)
+
+
+# ---------------------------------------------------------------------------
+# v1.7 — File -> task extraction
+# ---------------------------------------------------------------------------
+
+
+@router.post("/files/extract", response_model=FileExtractionResponse)
+async def extract_from_file(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Extract a single structured task suggestion from an uploaded file.
+
+    Supports text-like uploads (markdown, source code, json, csv, jsx, ts,
+    etc.), PDFs, DOCX, XLSX, and images. The Android client renders the
+    response in ``FileImportSuggestionSheet`` so the user can confirm
+    before any task state is mutated. This endpoint never writes — it's
+    pure suggestion.
+    """
+    file_extract_rate_limiter.check(request)
+    tier = await resolve_effective_tier(current_user, db)
+    daily_ai_rate_limiter.check(current_user.id, tier)
+
+    contents = await file.read()
+    if len(contents) > FILE_EXTRACT_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File must be under {FILE_EXTRACT_MAX_BYTES // (1024 * 1024)} MB",
+        )
+
+    filename = file.filename or "uploaded-file"
+    mime_type = file.content_type or "application/octet-stream"
+
+    try:
+        from app.services.file_extraction import extract_from_file as do_extract
+
+        result = do_extract(
+            file_bytes=contents,
+            filename=filename,
+            mime_type=mime_type,
+            tier=tier,
+        )
+    except RuntimeError as e:
+        # Missing optional dep (python-docx / openpyxl) or missing API key.
+        logger.error("File extraction service unavailable: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="File extraction is temporarily unavailable",
+        )
+    except ValueError as e:
+        # File too large (already caught above) or AI returned bad JSON
+        # after retry — surface as 422 so the client knows it's a content
+        # problem, not a server problem.
+        logger.warning("File extraction rejected: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not extract structured data from this file",
+        )
+
+    # Validate + coerce — the AI occasionally drops fields or returns the
+    # wrong types. Be permissive: drop unknown keys, default missing ones.
+    subtasks = []
+    for raw in (result.get("subtasks") or []):
+        if not isinstance(raw, dict):
+            continue
+        title = str(raw.get("title", "")).strip()
+        if not title:
+            continue
+        subtasks.append(
+            FileExtractedSubtask(
+                title=title,
+                suggested_due_date=raw.get("suggested_due_date"),
+            )
+        )
+
+    return FileExtractionResponse(
+        title=str(result.get("title", "")).strip(),
+        description=(result.get("description") or None),
+        suggested_due_date=result.get("suggested_due_date"),
+        suggested_priority=int(result.get("suggested_priority") or 0),
+        suggested_project=result.get("suggested_project"),
+        tags=[str(t).strip().lstrip("#") for t in (result.get("tags") or []) if str(t).strip()],
+        subtasks=subtasks,
+        detected_dates=[str(d) for d in (result.get("detected_dates") or []) if d],
+        confidence=float(result.get("confidence") or 0.0),
+        notes=(result.get("notes") or None),
+        source_file_name=result.get("source_file_name") or filename,
+        source_mime_type=result.get("source_mime_type") or mime_type,
+    )
 
 
 # ---------------------------------------------------------------------------
