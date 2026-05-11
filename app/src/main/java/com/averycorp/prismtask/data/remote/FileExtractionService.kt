@@ -193,8 +193,13 @@ internal fun parseIsoDateToEndOfDay(input: String): Long? {
     val day = match.groupValues[3].toIntOrNull() ?: return null
     if (month !in 0..11 || day !in 1..31) return null
     val cal = Calendar.getInstance()
+    cal.isLenient = false
     cal.clear()
     cal.set(year, month, day, 23, 59, 0)
     cal.set(Calendar.MILLISECOND, 0)
-    return cal.timeInMillis
+    return try {
+        cal.timeInMillis
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 }
