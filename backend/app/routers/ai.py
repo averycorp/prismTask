@@ -12,7 +12,12 @@ from app.database import get_db
 from app.middleware.ai_gate import require_ai_features_enabled
 from app.middleware.auth import get_active_user
 from app.middleware.rate_limit import RateLimiter, daily_ai_rate_limiter
-from app.models import ChatMessage as ChatMessageModel, Habit, User
+from app.models import (
+    ChatMessage as ChatMessageModel,
+    Habit,
+    User,
+    UserAiPreference as UserAiPreferenceModel,
+)
 from app.schemas.ai import (
     AutomationCompleteRequest,
     AutomationCompleteResponse,
@@ -27,6 +32,11 @@ from app.schemas.ai import (
     ChatResponse,
     ChatTaskContext,
     ChatTokensUsed,
+    USER_AI_PREFERENCE_CAP,
+    UserAiPreferenceCreateRequest,
+    UserAiPreferenceListResponse,
+    UserAiPreferenceRecord,
+    UserAiPreferenceUpdateRequest,
     DailyBriefingRequest,
     DailyBriefingResponse,
     CognitiveLoadClassifyTextRequest,
@@ -990,6 +1000,15 @@ async def chat(
     tier = await resolve_effective_tier(current_user, db)
     daily_ai_rate_limiter.check(current_user.id, tier)
 
+    # Load the user's stored AI-memory preferences once up-front so we can
+    # both forward them to Claude as context AND apply the diff after the
+    # turn returns. Capped at 15; kept in updated_at-desc order so the AI's
+    # eviction prompt biases toward the most recently touched entries.
+    existing_prefs = await _load_user_preferences(db, current_user.id)
+    prefs_for_prompt = [
+        {"id": p.id, "text": p.preference_text} for p in existing_prefs
+    ]
+
     try:
         from app.services.ai_productivity import generate_chat_response
 
@@ -1003,6 +1022,7 @@ async def chat(
                 else None
             ),
             history=[h.model_dump() for h in data.history],
+            user_preferences=prefs_for_prompt,
         )
     except RuntimeError:
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
@@ -1013,9 +1033,25 @@ async def chat(
     # any that don't conform. The model occasionally invents new action
     # `type` values or omits required fields — silently filtering keeps
     # the response usable rather than 500-ing the whole turn.
+    # ``remember_preference`` / ``forget_preference`` are server-only
+    # tool calls (no client-side UI) and get split out for in-handler
+    # processing so they don't pollute the action chips.
     validated_actions: list[ChatActionPayload] = []
+    pending_remembers: list[str] = []
+    pending_forgets: list[str] = []
     for raw in result.get("actions", []) or []:
         if not isinstance(raw, dict):
+            continue
+        action_type = raw.get("type")
+        if action_type == "remember_preference":
+            text = raw.get("preference_text")
+            if isinstance(text, str) and text.strip():
+                pending_remembers.append(text.strip())
+            continue
+        if action_type == "forget_preference":
+            pid = raw.get("preference_id")
+            if isinstance(pid, str) and pid.strip():
+                pending_forgets.append(pid.strip())
             continue
         try:
             validated_actions.append(ChatActionPayload(**raw))
@@ -1085,6 +1121,26 @@ async def chat(
         user_msg_id = None
         assistant_msg_id = None
 
+    # Apply AI-proposed preference diff (forgets first so a same-turn
+    # forget+remember can re-occupy a freed slot). Persistence failures
+    # are logged but never bubble — the chat reply already succeeded.
+    try:
+        await _apply_preference_diff(
+            db=db,
+            user_id=current_user.id,
+            forgets=pending_forgets,
+            remembers=pending_remembers,
+            source_message_id=assistant_msg_id,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to apply preference diff for user_id=%s",
+            current_user.id,
+        )
+        await db.rollback()
+
+    updated_prefs = await _load_user_preferences(db, current_user.id)
+
     return ChatResponse(
         message=result["message"],
         actions=validated_actions,
@@ -1092,6 +1148,7 @@ async def chat(
         tokens_used=tokens_used,
         user_message_id=user_msg_id,
         assistant_message_id=assistant_msg_id,
+        user_preferences=[_to_preference_record(p) for p in updated_prefs],
     )
 
 
@@ -1145,6 +1202,15 @@ async def chat_stream(
     user_msg_id = uuid.uuid4().hex
     assistant_msg_id = uuid.uuid4().hex
 
+    # Snapshot AI-memory preferences before the turn so the streaming
+    # service has the same context as the single-shot endpoint. The diff
+    # is applied after the upstream stream finishes and the updated list
+    # is surfaced in the SSE done payload (mirrors ChatResponse.user_preferences).
+    existing_prefs = await _load_user_preferences(db, current_user.id)
+    prefs_for_prompt = [
+        {"id": p.id, "text": p.preference_text} for p in existing_prefs
+    ]
+
     async def event_generator():
         persisted = False
         try:
@@ -1160,6 +1226,7 @@ async def chat_stream(
                     else None
                 ),
                 history=[h.model_dump() for h in data.history],
+                user_preferences=prefs_for_prompt,
             )
             for event in stream_iter:
                 if event.get("type") == "done":
@@ -1167,9 +1234,25 @@ async def chat_stream(
                     # ChatActionPayload and drop any that don't conform.
                     # Keeps the streaming path's action grammar identical
                     # to the single-shot endpoint at ai.py:944-960.
+                    # ``remember_preference`` / ``forget_preference`` are
+                    # server-only — split out for in-handler processing,
+                    # same as the non-streaming /chat endpoint.
                     validated: list[dict] = []
+                    pending_remembers: list[str] = []
+                    pending_forgets: list[str] = []
                     for raw in event.get("actions", []) or []:
                         if not isinstance(raw, dict):
+                            continue
+                        action_type = raw.get("type")
+                        if action_type == "remember_preference":
+                            text = raw.get("preference_text")
+                            if isinstance(text, str) and text.strip():
+                                pending_remembers.append(text.strip())
+                            continue
+                        if action_type == "forget_preference":
+                            pid = raw.get("preference_id")
+                            if isinstance(pid, str) and pid.strip():
+                                pending_forgets.append(pid.strip())
                             continue
                         try:
                             validated.append(
@@ -1238,6 +1321,32 @@ async def chat_stream(
                     # lockstep so pullHistory() upserts are idempotent.
                     event["user_message_id"] = user_msg_id
                     event["assistant_message_id"] = assistant_msg_id
+
+                    # Apply preference diff in lockstep with the
+                    # non-streaming handler. Failures don't bubble; the
+                    # done payload always carries the up-to-date list.
+                    try:
+                        await _apply_preference_diff(
+                            db=db,
+                            user_id=current_user.id,
+                            forgets=pending_forgets,
+                            remembers=pending_remembers,
+                            source_message_id=assistant_msg_id,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to apply preference diff (stream) for"
+                            " user_id=%s",
+                            current_user.id,
+                        )
+                        await db.rollback()
+                    updated_prefs = await _load_user_preferences(
+                        db, current_user.id
+                    )
+                    event["user_preferences"] = [
+                        _to_preference_record(p).model_dump()
+                        for p in updated_prefs
+                    ]
                 yield _format_sse_event(event)
         except RuntimeError:
             yield _format_sse_event({
@@ -1343,6 +1452,202 @@ async def chat_history(
         )
 
     return ChatHistoryResponse(messages=records, next_before=next_before)
+
+
+# ---------------------------------------------------------------------------
+# AI memory — user preferences the AI auto-extracts from chat
+# ---------------------------------------------------------------------------
+#
+# The AI Coach emits ``remember_preference`` / ``forget_preference`` tool
+# calls during chat and the chat handler persists them via
+# ``_apply_preference_diff``. The endpoints below expose the same data
+# to the Android Settings UI so the user can view, edit, or delete what
+# the AI has learned. The 15-slot cap is enforced on every write path.
+
+
+async def _load_user_preferences(
+    db: AsyncSession,
+    user_id: int,
+) -> list[UserAiPreferenceModel]:
+    """Return the user's preferences ordered by ``updated_at`` desc.
+
+    The desc ordering biases the AI's eviction heuristic toward the most
+    recently touched entries — older / stale preferences naturally sink
+    to the bottom of the list and become eviction candidates first.
+    """
+    stmt = (
+        select(UserAiPreferenceModel)
+        .where(UserAiPreferenceModel.user_id == user_id)
+        .order_by(desc(UserAiPreferenceModel.updated_at))
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+def _to_preference_record(row: UserAiPreferenceModel) -> UserAiPreferenceRecord:
+    return UserAiPreferenceRecord(
+        id=row.id,
+        preference_text=row.preference_text,
+        source_message_id=row.source_message_id,
+        created_at=row.created_at.isoformat(),
+        updated_at=row.updated_at.isoformat(),
+    )
+
+
+async def _apply_preference_diff(
+    db: AsyncSession,
+    user_id: int,
+    forgets: list[str],
+    remembers: list[str],
+    source_message_id: str | None,
+) -> None:
+    """Apply ``forget_preference`` + ``remember_preference`` tool calls.
+
+    Order: forgets fire first so a same-turn forget+remember can re-occupy
+    a freed slot. Each remember is deduped against existing rows by
+    case-insensitive text match so the AI doesn't store the same idea
+    twice. When the cap is hit and the AI didn't emit its own evict,
+    fall back to dropping the least-recently-updated row.
+    """
+    if not forgets and not remembers:
+        return
+
+    if forgets:
+        from sqlalchemy import delete
+
+        await db.execute(
+            delete(UserAiPreferenceModel)
+            .where(UserAiPreferenceModel.user_id == user_id)
+            .where(UserAiPreferenceModel.id.in_(forgets))
+        )
+
+    for text in remembers:
+        text = text.strip()
+        if not text:
+            continue
+        # Re-read remaining prefs after each insert so we know the
+        # current count and can dedup against fresh state.
+        existing = await _load_user_preferences(db, user_id)
+        lowered = text.lower()
+        if any(p.preference_text.strip().lower() == lowered for p in existing):
+            continue
+        # Cap enforcement (defense in depth — the AI is also prompted
+        # to evict before exceeding). Drop the oldest by updated_at.
+        if len(existing) >= USER_AI_PREFERENCE_CAP:
+            oldest = existing[-1]
+            await db.delete(oldest)
+            await db.flush()
+        row = UserAiPreferenceModel(
+            id=uuid.uuid4().hex,
+            user_id=user_id,
+            preference_text=text[:500],
+            source_message_id=source_message_id,
+        )
+        db.add(row)
+        await db.flush()
+
+    await db.commit()
+
+
+@router.get("/memory", response_model=UserAiPreferenceListResponse)
+async def list_ai_memory(
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List the user's stored AI preferences.
+
+    Returned in ``updated_at`` desc order so the Settings UI naturally
+    shows the most recently touched preferences first.
+    """
+    rows = await _load_user_preferences(db, current_user.id)
+    return UserAiPreferenceListResponse(
+        preferences=[_to_preference_record(r) for r in rows],
+        cap=USER_AI_PREFERENCE_CAP,
+    )
+
+
+@router.post("/memory", response_model=UserAiPreferenceRecord, status_code=201)
+async def create_ai_memory(
+    data: UserAiPreferenceCreateRequest,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually add a preference from the Settings UI.
+
+    Enforces the 15-slot cap (returns 409 when full so the UI can show a
+    clear error instead of silently dropping). Dedupes against existing
+    entries by case-insensitive text match.
+    """
+    text = data.preference_text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="preference_text is empty")
+
+    existing = await _load_user_preferences(db, current_user.id)
+    if any(p.preference_text.strip().lower() == text.lower() for p in existing):
+        # Already stored — surface the existing row rather than 409 so
+        # the client can settle on the canonical row id.
+        for p in existing:
+            if p.preference_text.strip().lower() == text.lower():
+                return _to_preference_record(p)
+    if len(existing) >= USER_AI_PREFERENCE_CAP:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Memory is full (max {USER_AI_PREFERENCE_CAP})",
+        )
+    row = UserAiPreferenceModel(
+        id=uuid.uuid4().hex,
+        user_id=current_user.id,
+        preference_text=text[:500],
+        source_message_id=None,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return _to_preference_record(row)
+
+
+@router.patch("/memory/{preference_id}", response_model=UserAiPreferenceRecord)
+async def update_ai_memory(
+    preference_id: str,
+    data: UserAiPreferenceUpdateRequest,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edit the text of an existing preference.
+
+    404 if the id doesn't belong to the current user — multi-tenant
+    isolation enforced at the WHERE clause; never trust the path.
+    """
+    text = data.preference_text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="preference_text is empty")
+    stmt = select(UserAiPreferenceModel).where(
+        UserAiPreferenceModel.id == preference_id,
+        UserAiPreferenceModel.user_id == current_user.id,
+    )
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Preference not found")
+    row.preference_text = text[:500]
+    await db.commit()
+    await db.refresh(row)
+    return _to_preference_record(row)
+
+
+@router.delete("/memory/{preference_id}", status_code=204)
+async def delete_ai_memory(
+    preference_id: str,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove a preference. Idempotent — 204 even if it didn't exist."""
+    from sqlalchemy import delete
+
+    await db.execute(
+        delete(UserAiPreferenceModel)
+        .where(UserAiPreferenceModel.id == preference_id)
+        .where(UserAiPreferenceModel.user_id == current_user.id)
+    )
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------

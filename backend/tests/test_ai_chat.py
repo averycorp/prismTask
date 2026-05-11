@@ -178,6 +178,7 @@ class TestChatService:
             assert tool_names == {
                 "complete", "reschedule", "reschedule_batch", "breakdown",
                 "archive", "start_timer", "create_task", "batch_command",
+                "remember_preference", "forget_preference",
             }
 
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})

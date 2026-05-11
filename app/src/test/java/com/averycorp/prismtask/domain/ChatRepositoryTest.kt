@@ -246,7 +246,8 @@ class ChatRepositoryTest {
         val repo = ChatRepository(
             api,
             com.averycorp.prismtask.data.repository.FakeChatMessageDao(),
-            mockk<ChatStreamClient>(relaxed = true)
+            mockk<ChatStreamClient>(relaxed = true),
+            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true)
         )
 
         repo.sendMessage(userMessage = "hello")
@@ -270,7 +271,8 @@ class ChatRepositoryTest {
         val repo = ChatRepository(
             api,
             com.averycorp.prismtask.data.repository.FakeChatMessageDao(),
-            mockk<ChatStreamClient>(relaxed = true)
+            mockk<ChatStreamClient>(relaxed = true),
+            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true)
         )
 
         repo.sendMessage(userMessage = "first user message")
@@ -298,7 +300,8 @@ class ChatRepositoryTest {
         val repo = ChatRepository(
             api,
             com.averycorp.prismtask.data.repository.FakeChatMessageDao(),
-            mockk<ChatStreamClient>(relaxed = true)
+            mockk<ChatStreamClient>(relaxed = true),
+            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true)
         )
 
         // 8 turns → after the 8th send, repo would hold 14 messages pre-trim;

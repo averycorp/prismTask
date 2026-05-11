@@ -292,7 +292,8 @@ constructor(
                             actions = event.actions,
                             userMessageId = event.userMessageId,
                             assistantMessageId = event.assistantMessageId,
-                            userTaskContext = snapshot
+                            userTaskContext = snapshot,
+                            userPreferences = event.userPreferences
                         )
                         finishTurn()
                     }

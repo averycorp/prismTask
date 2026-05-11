@@ -635,7 +635,42 @@ data class ChatResponse(
     // Nullable to tolerate older mocks / persistence-failure responses;
     // the repository falls back to a fresh client-side UUID in that case.
     @SerializedName("user_message_id") val userMessageId: String? = null,
-    @SerializedName("assistant_message_id") val assistantMessageId: String? = null
+    @SerializedName("assistant_message_id") val assistantMessageId: String? = null,
+    // Authoritative AI-memory snapshot after this turn. Empty when no
+    // preferences are stored. The client mirrors the full list with a
+    // REPLACE-all into Room so cross-device state stays consistent.
+    @SerializedName("user_preferences")
+    val userPreferences: List<UserAiPreferenceDto> = emptyList()
+)
+
+/**
+ * One AI-remembered preference returned by `/api/v1/ai/chat` and the
+ * `/api/v1/ai/memory` CRUD endpoints. Mirrors `UserAiPreferenceRecord`
+ * on the backend.
+ */
+data class UserAiPreferenceDto(
+    val id: String,
+    @SerializedName("preference_text") val preferenceText: String,
+    @SerializedName("source_message_id") val sourceMessageId: String? = null,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("updated_at") val updatedAt: String
+)
+
+/**
+ * Response of `GET /api/v1/ai/memory` — full snapshot of the user's
+ * stored AI preferences plus the server-enforced cap.
+ */
+data class UserAiPreferenceListResponse(
+    val preferences: List<UserAiPreferenceDto> = emptyList(),
+    val cap: Int = 15
+)
+
+data class UserAiPreferenceCreateRequest(
+    @SerializedName("preference_text") val preferenceText: String
+)
+
+data class UserAiPreferenceUpdateRequest(
+    @SerializedName("preference_text") val preferenceText: String
 )
 
 /**

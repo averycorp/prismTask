@@ -831,6 +831,47 @@ class ChatMessage(Base):
     user = relationship("User")
 
 
+class UserAiPreference(Base):
+    """Single AI-remembered user preference (max 15 per user).
+
+    The AI Coach emits ``remember_preference`` / ``forget_preference``
+    tool calls during chat; the chat handler persists them here and
+    injects the full list into subsequent chat system prompts so the
+    coach replies consistently with what the user has told it. Users
+    can also view, edit, and delete preferences from the Settings UI
+    via the CRUD endpoints under ``/api/v1/ai/memory``.
+
+    The 15-slot cap is enforced in the chat handler — when full, the
+    AI is instructed to emit a ``forget_preference`` for an existing
+    row in the same turn as the new ``remember_preference``. The CRUD
+    POST endpoint also enforces the cap as a defense in depth.
+    """
+
+    __tablename__ = "user_ai_preferences"
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    preference_text = Column(Text, nullable=False)
+    # When the preference was extracted from a chat turn, the originating
+    # ``chat_messages.id``. NULL for entries authored from the Settings UI.
+    # No FK constraint — chat messages may be purged independently and we
+    # don't want a cascade-delete to drop preferences.
+    source_message_id = Column(String(64), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user = relationship("User")
+
+
 class InAppFeedback(Base):
     """In-app rating / sentiment feedback (E2 in-app ratings).
 

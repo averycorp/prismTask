@@ -158,6 +158,25 @@ interface PrismTaskApi {
         @Query("before") before: String? = null
     ): ChatHistoryResponse
 
+    @GET("api/v1/ai/memory")
+    suspend fun listAiMemory(): UserAiPreferenceListResponse
+
+    @POST("api/v1/ai/memory")
+    suspend fun createAiMemory(
+        @Body request: UserAiPreferenceCreateRequest
+    ): UserAiPreferenceDto
+
+    @PATCH("api/v1/ai/memory/{preferenceId}")
+    suspend fun updateAiMemory(
+        @Path("preferenceId") preferenceId: String,
+        @Body request: UserAiPreferenceUpdateRequest
+    ): UserAiPreferenceDto
+
+    @DELETE("api/v1/ai/memory/{preferenceId}")
+    suspend fun deleteAiMemory(
+        @Path("preferenceId") preferenceId: String
+    )
+
     @POST("api/v1/tasks/parse-import")
     suspend fun parseImport(
         @Body request: ParseImportRequest

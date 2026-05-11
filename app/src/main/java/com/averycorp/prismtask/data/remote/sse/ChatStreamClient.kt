@@ -5,6 +5,7 @@ import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatStreamEvent
 import com.averycorp.prismtask.data.remote.api.ChatTokensUsed
+import com.averycorp.prismtask.data.remote.api.UserAiPreferenceDto
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
@@ -109,12 +110,20 @@ constructor(
                         json.get("user_message_id")?.takeIf { !it.isJsonNull }?.asString
                     val assistantMessageId =
                         json.get("assistant_message_id")?.takeIf { !it.isJsonNull }?.asString
+                    val preferencesType =
+                        object : TypeToken<List<UserAiPreferenceDto>>() {}.type
+                    val userPreferences: List<UserAiPreferenceDto> =
+                        json.get("user_preferences")
+                            ?.takeIf { !it.isJsonNull }
+                            ?.let { gson.fromJson<List<UserAiPreferenceDto>>(it, preferencesType) }
+                            ?: emptyList()
                     ChatStreamEvent.Done(
                         message = message,
                         actions = actions,
                         tokensUsed = tokensUsed,
                         userMessageId = userMessageId,
-                        assistantMessageId = assistantMessageId
+                        assistantMessageId = assistantMessageId,
+                        userPreferences = userPreferences
                     )
                 }
                 "error" -> ChatStreamEvent.Error(
