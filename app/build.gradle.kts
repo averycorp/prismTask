@@ -277,7 +277,7 @@ dependencies {
     // Window — FoldingFeature + WindowInfoTracker for foldable-aware layout
     // (F-FOLDABLE-001). 1.3.0 is the recommended floor for the windowLayoutInfo
     // main-thread Flow + lifecycle fixes during foldable rotation.
-    implementation("androidx.window:window:1.3.0")
+    implementation("androidx.window:window:1.5.1")
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.9.8")
