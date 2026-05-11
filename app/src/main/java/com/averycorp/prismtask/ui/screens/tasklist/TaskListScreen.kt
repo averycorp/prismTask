@@ -207,6 +207,12 @@ fun TaskListScreen(
             if (result == SnackbarResult.ActionPerformed) {
                 batchUndoListener.undo(event.batchId)
             }
+            // Drain the bus replay cache once the Snackbar has been
+            // dismissed/acted-on — `replay = 1` defends the
+            // BatchPreview→pop→host re-subscribe timing gap (Test 1.6,
+            // May 10 2026); without this, unrelated re-entries to
+            // TaskList would re-deliver stale events.
+            batchUndoListener.acknowledge()
         }
     }
 
