@@ -5,7 +5,6 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.RecurrenceRule
 import com.averycorp.prismtask.domain.model.RecurrenceType
-import io.mockk.captureNullable
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
