@@ -61,7 +61,8 @@ class UserAiPreferenceRepositoryTest {
         repo.mirrorFromChat(emptyList())
         assertEquals(
             "empty server snapshot must drop all local rows",
-            0, dao.rowsSnapshot.size
+            0,
+            dao.rowsSnapshot.size
         )
     }
 
