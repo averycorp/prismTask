@@ -181,8 +181,7 @@ class NaturalLanguageParserTest {
         ): ChatHistoryResponse =
             error("not used in offline parser tests")
 
-        override suspend fun listAiMemory():
-            com.averycorp.prismtask.data.remote.api.UserAiPreferenceListResponse =
+        override suspend fun listAiMemory(): com.averycorp.prismtask.data.remote.api.UserAiPreferenceListResponse =
             error("not used in offline parser tests")
 
         override suspend fun createAiMemory(

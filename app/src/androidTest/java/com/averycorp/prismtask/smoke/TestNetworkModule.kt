@@ -239,8 +239,7 @@ class FakePrismTaskApi : PrismTaskApi {
     ): com.averycorp.prismtask.data.remote.api.ChatHistoryResponse =
         error("Not used in offline tests")
 
-    override suspend fun listAiMemory():
-        com.averycorp.prismtask.data.remote.api.UserAiPreferenceListResponse =
+    override suspend fun listAiMemory(): com.averycorp.prismtask.data.remote.api.UserAiPreferenceListResponse =
         error("Not used in offline tests")
 
     override suspend fun createAiMemory(
