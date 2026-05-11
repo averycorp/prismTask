@@ -31,7 +31,7 @@ class CategoryDailyTaskControllerTest {
         coEvery {
             taskRepository.addTask(
                 title = capture(titleSlot),
-                recurrenceRule = capture(ruleSlot)
+                recurrenceRule = captureNullable(ruleSlot)
             )
         } returns 42L
 

@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.theme
 import androidx.window.layout.FoldingFeature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -55,8 +56,12 @@ class LocalFoldingFeatureTest {
 
     @Test
     fun previewFold_passesBoundsThrough() {
+        // Reference equality: android.jar's Rect is unmocked in plain JVM
+        // unit tests, so Rect.equals returns the default Boolean (false)
+        // even for the same reference. Identity is the semantic we want
+        // anyway — previewFold should hand the same Rect back, not a copy.
         val customBounds = android.graphics.Rect(100, 200, 300, 400)
         val fold = previewFold(bounds = customBounds)
-        assertEquals(customBounds, fold.bounds)
+        assertSame(customBounds, fold.bounds)
     }
 }
