@@ -1,6 +1,7 @@
 package com.averycorp.prismtask.ui.screens.habits.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,12 +75,19 @@ internal fun BookableHabitItem(
         LocalPrismColors.current.primary
     }
     val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
+    val prismColors = LocalPrismColors.current
+    val cardShape = MaterialTheme.shapes.medium
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() },
-        shape = MaterialTheme.shapes.medium,
+            .clickable { onClick() }
+            .border(
+                width = 1.dp,
+                color = prismColors.border,
+                shape = cardShape
+            ),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )

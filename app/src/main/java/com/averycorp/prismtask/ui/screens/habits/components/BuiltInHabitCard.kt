@@ -63,12 +63,22 @@ internal fun BuiltInHabitCard(
         "leisure" -> palette.getOrElse(1) { prismColors.primary }
         else -> prismColors.primary
     }
+    val cardShape = MaterialTheme.shapes.medium
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
+            .clickable(onClick = onClick)
+            .border(
+                width = 1.dp,
+                color = if (habitWithStatus.isCompletedToday) {
+                    prismColors.primary.copy(alpha = 0.4f)
+                } else {
+                    prismColors.border
+                },
+                shape = cardShape
+            ),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (habitWithStatus.isCompletedToday) {
                 color.copy(alpha = 0.1f)
