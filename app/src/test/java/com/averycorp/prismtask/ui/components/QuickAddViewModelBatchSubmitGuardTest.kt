@@ -20,13 +20,18 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -182,6 +187,94 @@ class QuickAddViewModelBatchSubmitGuardTest {
 
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    /**
+     * Defense-in-depth regression test. The screen-level fix gives each
+     * `QuickAddBar` composition site under the `MainTabs` pager a distinct
+     * `hiltViewModel(key = …)` so two bars never share one VM. But the VM
+     * itself also defends: `_batchIntents` is backed by a [Channel]
+     * (`receiveAsFlow()`), not a `MutableSharedFlow`, so a single emission
+     * is delivered to **exactly one** collector. Even if a future
+     * composition site regresses and two `LaunchedEffect` collectors
+     * share this VM, only one will fire `onBatchCommand` — the host
+     * navigates once, not twice.
+     *
+     * Pre-Channel (when `_batchIntents` was `MutableSharedFlow`), the
+     * single emit fanned out to both collectors and this assertion read
+     * 2, not 1 — the user-visible "preview, accept, then it runs a
+     * second time" bug.
+     *
+     * Each collector is bounded by a `withTimeoutOrNull` against the
+     * test scheduler's virtual clock so the "loser" returns null rather
+     * than hanging `runTest` forever (which is what the unbounded
+     * `launch { collect { … } }` shape did and was killed by the
+     * 12-minute CI step timeout — see PR #1273 attempt 2).
+     */
+    @Test
+    fun onSubmit_batch_twoCollectors_emitDeliveredToExactlyOne() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        viewModel.inputText.value = "complete all tasks today"
+
+        val received1 = async {
+            withTimeoutOrNull(1_000) { viewModel.batchIntents.first() }
+        }
+        val received2 = async {
+            withTimeoutOrNull(1_000) { viewModel.batchIntents.first() }
+        }
+        // Run pending tasks at t=0 so both collectors subscribe, but DON'T
+        // advance virtual time — `advanceUntilIdle` would auto-fire the
+        // pending `withTimeoutOrNull(1_000)` delays at t=1000 before the
+        // emit ever runs, leaving both async results null (CI attempt 3
+        // failure shape).
+        runCurrent()
+
+        viewModel.onSubmit()
+        // Past the 1s virtual-time bound so the loser's withTimeoutOrNull
+        // returns null instead of hanging on `first()`.
+        advanceTimeBy(2_000)
+        advanceUntilIdle()
+
+        val r1 = received1.await()
+        val r2 = received2.await()
+
+        // Exactly one collector received the emit; the other timed out.
+        // Which one wins is racy (dispatcher order), but the count must
+        // be 1, not 2.
+        assertEquals(1, listOf(r1, r2).count { it != null })
+    }
+
+    /**
+     * Same defense for the multi-create path. The bug class is identical
+     * (single emit fanning out to two `LaunchedEffect` collectors that
+     * share a `QuickAddViewModel`), so the `Channel` defense applies the
+     * same way.
+     */
+    @Test
+    fun onSubmit_multiCreate_twoCollectors_emitDeliveredToExactlyOne() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        // Newline-separated input is rule-(a) of MultiCreateDetector.
+        val multiLine = "buy milk\nfeed cat\ncall dad"
+        viewModel.inputText.value = multiLine
+
+        val received1 = async {
+            withTimeoutOrNull(1_000) { viewModel.multiCreateIntents.first() }
+        }
+        val received2 = async {
+            withTimeoutOrNull(1_000) { viewModel.multiCreateIntents.first() }
+        }
+        // See sibling test — `runCurrent` instead of `advanceUntilIdle` so
+        // the withTimeoutOrNull delays don't auto-fire before the emit.
+        runCurrent()
+
+        viewModel.onSubmit()
+        advanceTimeBy(2_000)
+        advanceUntilIdle()
+
+        val r1 = received1.await()
+        val r2 = received2.await()
+
+        assertEquals(1, listOf(r1, r2).count { it != null })
     }
 
     private fun newViewModel(): QuickAddViewModel = QuickAddViewModel(

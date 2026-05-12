@@ -31,6 +31,8 @@ import com.averycorp.prismtask.domain.usecase.VoiceInputManager
 import com.averycorp.prismtask.domain.usecase.extractKeywords
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -41,6 +43,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -108,9 +111,20 @@ constructor(
      * screen navigates to BatchPreviewScreen with the command text.
      * Free-tier users emit a paywall message via [_voiceMessages] and
      * never see this flow.
+     *
+     * Backed by a [Channel] (vs. `MutableSharedFlow`) so each emission is
+     * delivered to **exactly one** collector. The screen-level fix is to
+     * give each `QuickAddBar` composition site a distinct `hiltViewModel`
+     * key so it gets its own VM, but a `Channel` defends in depth: if a
+     * future composition site under `MainTabs` accidentally shares this
+     * VM (or someone strips a key), two `LaunchedEffect` collectors on a
+     * `SharedFlow` would both fire `onBatchCommand`, navigating twice and
+     * stacking two `BatchPreview` screens — the user-reported "preview,
+     * accept, then it runs a second time" bug. `Channel.receiveAsFlow()`
+     * collapses fan-out at the VM layer.
      */
-    private val _batchIntents = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val batchIntents: SharedFlow<String> = _batchIntents.asSharedFlow()
+    private val _batchIntents = Channel<String>(capacity = Channel.BUFFERED)
+    val batchIntents: Flow<String> = _batchIntents.receiveAsFlow()
 
     /**
      * Emits when the user submits multi-task input (rule-(a) newlines or
@@ -120,9 +134,11 @@ constructor(
      * skip this flow — the detector still fires but the gate at
      * [onSubmit] drops them through to the single-task path because
      * extract-from-text is a paid Haiku call.
+     *
+     * Same `Channel` rationale as [_batchIntents] — see its KDoc.
      */
-    private val _multiCreateIntents = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val multiCreateIntents: SharedFlow<String> = _multiCreateIntents.asSharedFlow()
+    private val _multiCreateIntents = Channel<String>(capacity = Channel.BUFFERED)
+    val multiCreateIntents: Flow<String> = _multiCreateIntents.receiveAsFlow()
 
     val inputText = MutableStateFlow("")
 
@@ -401,7 +417,7 @@ constructor(
             }
             viewModelScope.launch {
                 try {
-                    _batchIntents.emit(batchIntent.commandText)
+                    _batchIntents.send(batchIntent.commandText)
                     inputText.value = ""
                 } finally {
                     _isSubmitting.value = false
@@ -423,7 +439,7 @@ constructor(
             if (proFeatureGate.hasAccess(ProFeatureGate.AI_NLP)) {
                 viewModelScope.launch {
                     try {
-                        _multiCreateIntents.emit(multiCreate.rawText)
+                        _multiCreateIntents.send(multiCreate.rawText)
                         inputText.value = ""
                     } finally {
                         _isSubmitting.value = false

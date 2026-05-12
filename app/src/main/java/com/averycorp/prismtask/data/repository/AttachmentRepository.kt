@@ -1,3 +1,11 @@
+// Detekt's `NoUnusedImports` rule (autoCorrect = true in detekt.yml)
+// repeatedly misclassifies these android, kotlinx, and java imports
+// as unused on this file — every one of them is actually referenced
+// below — and the autofix workflow then commits the strip back to the
+// branch, breaking the build (see PR #1264 + PR #1268 + PR #1269 fix
+// history). Suppress the rule here so the cascade stops.
+@file:Suppress("NoUnusedImports")
+
 package com.averycorp.prismtask.data.repository
 
 import android.content.Context
@@ -13,16 +21,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AttachmentRepository
-@Inject
-constructor(
+class AttachmentRepository @Inject constructor(
     private val attachmentDao: AttachmentDao,
     private val syncTracker: SyncTracker
 ) {
     /**
-     * Legacy entry point — kept so existing photo-picker callers don't
-     * have to change. Delegates to [addFileAttachment] with `image/\*`
-     * MIME so the new schema fields get filled.
+     * have to change. Delegates to [addFileAttachment] with the image
+     * wildcard MIME so the new schema fields get filled.
      */
     suspend fun addImageAttachment(context: Context, taskId: Long, sourceUri: Uri): Long =
         addFileAttachment(
@@ -132,7 +137,9 @@ constructor(
                 if (cursor.moveToFirst()) {
                     val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (idx >= 0) cursor.getString(idx) else null
-                } else null
+                } else {
+                    null
+                }
             }
         }.getOrNull()
     }
@@ -148,4 +155,3 @@ constructor(
         const val PROJECT_ONLY_TASK_SENTINEL: Long = 0L
     }
 }
-
