@@ -26,9 +26,10 @@ import org.junit.Test
  */
 class CategoryDailyTaskControllerTest {
     private val taskRepository: TaskRepository = mockk(relaxed = true)
-    private val taskBehaviorPreferences: TaskBehaviorPreferences = mockk(relaxed = true).also {
-        every { it.getDayStartHour() } returns flowOf(0)
-    }
+    private val taskBehaviorPreferences: TaskBehaviorPreferences =
+        mockk<TaskBehaviorPreferences>(relaxed = true).also {
+            every { it.getDayStartHour() } returns flowOf(0)
+        }
     private val controller = CategoryDailyTaskController(taskRepository, taskBehaviorPreferences)
 
     @Test
