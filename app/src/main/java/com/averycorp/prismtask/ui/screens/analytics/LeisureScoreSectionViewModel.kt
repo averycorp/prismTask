@@ -3,8 +3,8 @@ package com.averycorp.prismtask.ui.screens.analytics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
-import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.domain.model.LeisureCategory
 import com.averycorp.prismtask.domain.usecase.DailyForgivenessStreakCore
 import com.averycorp.prismtask.util.DayBoundary
@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import javax.inject.Inject
 
 /**

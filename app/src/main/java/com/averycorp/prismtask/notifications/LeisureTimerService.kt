@@ -198,21 +198,27 @@ class LeisureTimerService : Service() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val tapPending = PendingIntent.getActivity(
-            this, 0, tapIntent,
+            this,
+            0,
+            tapIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val stopIntent = Intent(this, LeisureTimerService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPending = PendingIntent.getService(
-            this, 1, stopIntent,
+            this,
+            1,
+            stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val pauseResumeIntent = Intent(this, LeisureTimerService::class.java).apply {
             action = if (isPaused) ACTION_RESUME else ACTION_PAUSE
         }
         val pauseResumePending = PendingIntent.getService(
-            this, 3, pauseResumeIntent,
+            this,
+            3,
+            pauseResumeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val content = if (isPaused) {

@@ -64,14 +64,18 @@ constructor() {
                 .toInt()
         }
 
-        val varietyPoints = (distinctCategories.toDouble() / TOTAL_CATEGORIES *
-            MAX_VARIETY)
+        val varietyPoints = (
+            distinctCategories.toDouble() / TOTAL_CATEGORIES *
+                MAX_VARIETY
+            )
             .coerceAtMost(MAX_VARIETY.toDouble())
             .toInt()
 
         val streakPoints =
-            (min(currentStreakDays, STREAK_CAP_DAYS).toDouble() / STREAK_CAP_DAYS *
-                MAX_STREAK)
+            (
+                min(currentStreakDays, STREAK_CAP_DAYS).toDouble() / STREAK_CAP_DAYS *
+                    MAX_STREAK
+                )
                 .coerceAtMost(MAX_STREAK.toDouble())
                 .toInt()
 
