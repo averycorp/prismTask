@@ -55,10 +55,11 @@ class LeisureSamplerTest {
     @Test
     fun pick_prefersRecentlyUncompletedOverFreshlyCompleted() {
         // Run many trials and verify the never-completed activity wins
-        // more often than the just-completed one.
+        // more often than the just-completed one. Activity 1 = 0 days
+        // since completion; activity 2 = never completed.
         val candidates = listOf(
-            activity(id = 1, category = "PHYSICAL", lastCompletedAt = now), // 0 days
-            activity(id = 2, category = "PHYSICAL", lastCompletedAt = null) // never
+            activity(id = 1, category = "PHYSICAL", lastCompletedAt = now),
+            activity(id = 2, category = "PHYSICAL", lastCompletedAt = null)
         )
         var picksFor2 = 0
         repeat(1000) { trial ->

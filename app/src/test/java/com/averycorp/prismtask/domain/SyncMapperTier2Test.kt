@@ -2,8 +2,6 @@ package com.averycorp.prismtask.domain
 
 import com.averycorp.prismtask.data.local.entity.CourseCompletionEntity
 import com.averycorp.prismtask.data.local.entity.CourseEntity
-// Leisure Budget v2.0: LeisureLogEntity import retired; v1.x sync
-// mapper tests below are deleted alongside the entity.
 import com.averycorp.prismtask.data.local.entity.SelfCareLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareStepEntity
 import com.averycorp.prismtask.data.remote.mapper.SyncMapper
