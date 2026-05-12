@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeoutOrNull
@@ -221,8 +222,12 @@ class QuickAddViewModelBatchSubmitGuardTest {
         val received2 = async {
             withTimeoutOrNull(1_000) { viewModel.batchIntents.first() }
         }
-        // Let both collectors subscribe before the emit.
-        advanceUntilIdle()
+        // Run pending tasks at t=0 so both collectors subscribe, but DON'T
+        // advance virtual time — `advanceUntilIdle` would auto-fire the
+        // pending `withTimeoutOrNull(1_000)` delays at t=1000 before the
+        // emit ever runs, leaving both async results null (CI attempt 3
+        // failure shape).
+        runCurrent()
 
         viewModel.onSubmit()
         // Past the 1s virtual-time bound so the loser's withTimeoutOrNull
@@ -258,7 +263,9 @@ class QuickAddViewModelBatchSubmitGuardTest {
         val received2 = async {
             withTimeoutOrNull(1_000) { viewModel.multiCreateIntents.first() }
         }
-        advanceUntilIdle()
+        // See sibling test — `runCurrent` instead of `advanceUntilIdle` so
+        // the withTimeoutOrNull delays don't auto-fire before the emit.
+        runCurrent()
 
         viewModel.onSubmit()
         advanceTimeBy(2_000)
