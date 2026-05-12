@@ -267,14 +267,12 @@ constructor(
             remainingSeconds = secondsRemaining,
             isRunning = secondsRemaining > 0
         )
-        // Widget refreshes are driven by PomodoroTimerService directly
-        // (TimerStateDataStore.writeLive + TimerWidget.updateAll on every
-        // tick) so the home-screen widget keeps ticking at 1Hz even when
-        // this ViewModel is gone (process backgrounded + reclaimed). The
-        // ViewModel still pushes full-state writes on lifecycle events
-        // (start/pause/resume/stop/complete/mode/pomodoro toggle) so the
-        // structural fields the service doesn't know about (mode,
-        // sessionsUntilLongBreak, currentTaskTitle, …) stay in sync.
+        // Widget refreshes are driven by PomodoroTimerService directly so
+        // the home-screen countdown keeps ticking even when this ViewModel
+        // is gone (process backgrounded + reclaimed). The widget composes
+        // its displayed time from `sessionEndElapsedRealtime - now()`, so
+        // each push is just a Glance recomposition — no per-tick DataStore
+        // write needed.
     }
 
     private fun onServicePaused() {
@@ -552,6 +550,15 @@ constructor(
         //     coroutine doesn't leak `Dispatchers.Main` references
         //     across `Dispatchers.setMain` / `resetMain` boundaries
         //     between tests.
+        // Stamp the Chronometer base when the timer is actively running.
+        // The launcher hosts the Chronometer view and counts down on its
+        // own — so the widget shows live seconds without any 1Hz widget
+        // pushes from this process.
+        val sessionEnd = if (s.isRunning && s.remainingSeconds > 0) {
+            android.os.SystemClock.elapsedRealtime() + s.remainingSeconds * 1000L
+        } else {
+            0L
+        }
         widgetUpdateManager.writeTimerState(
             TimerWidgetState(
                 isRunning = s.isRunning,
@@ -566,7 +573,8 @@ constructor(
                 currentSession = s.completedSessions + if (s.mode == TimerMode.WORK) 1 else 0,
                 totalSessions = s.sessionsUntilLongBreak,
                 isLongBreak = s.isLongBreak,
-                pomodoroEnabled = s.pomodoroEnabled
+                pomodoroEnabled = s.pomodoroEnabled,
+                sessionEndElapsedRealtime = sessionEnd
             )
         )
     }

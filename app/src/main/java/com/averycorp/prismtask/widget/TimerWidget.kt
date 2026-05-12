@@ -2,6 +2,7 @@ package com.averycorp.prismtask.widget
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -115,10 +116,24 @@ private fun TimerWidgetContent(
                 )
             }
         } else {
-            val minutes = state.remainingSeconds / 60
-            val seconds = state.remainingSeconds % 60
+            // While running, derive the remaining seconds from the stored
+            // session deadline (an absolute SystemClock.elapsedRealtime()
+            // value) rather than from the DataStore-cached remainingSeconds.
+            // This way the displayed time matches the wall clock on every
+            // composition — even if the next updateAll() arrives a few
+            // hundred ms late, the time isn't stuck at the previously
+            // written value.
+            val displayedSeconds = when {
+                state.isRunning && state.sessionEndElapsedRealtime > 0L ->
+                    ((state.sessionEndElapsedRealtime - SystemClock.elapsedRealtime()) / 1000L)
+                        .coerceAtLeast(0L)
+                        .toInt()
+                else -> state.remainingSeconds
+            }
+            val minutes = displayedSeconds / 60
+            val seconds = displayedSeconds % 60
             val timeText = "%d:%02d".format(minutes, seconds)
-            val progress = if (state.totalSeconds > 0) 1f - (state.remainingSeconds.toFloat() / state.totalSeconds) else 0f
+            val progress = if (state.totalSeconds > 0) 1f - (displayedSeconds.toFloat() / state.totalSeconds) else 0f
 
             // Mirror the in-app TimerScreen label split: Pomodoro mode shows
             // "Focus Session N of M" / "Long Break" / "Short Break"; plain

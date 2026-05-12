@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
@@ -33,7 +34,13 @@ data class TimerWidgetState(
     // True when the user has Pomodoro mode on. Drives the session-indicator
     // dot row in the widget — without this the dots would render even for
     // plain work/break/custom sessions where they're meaningless.
-    val pomodoroEnabled: Boolean = false
+    val pomodoroEnabled: Boolean = false,
+    // The absolute SystemClock.elapsedRealtime() millis at which the active
+    // session will hit zero. Set on start/resume so the widget can hand the
+    // value to RemoteViews' Chronometer and let the launcher self-tick the
+    // countdown — no per-second widget recomposition needed. Zero (or
+    // ignored) when paused / stopped / idle.
+    val sessionEndElapsedRealtime: Long = 0L
 )
 
 object TimerStateDataStore {
@@ -47,6 +54,8 @@ object TimerStateDataStore {
     private val TOTAL_SESSIONS = intPreferencesKey("timer_total_sessions")
     private val IS_LONG_BREAK = booleanPreferencesKey("timer_is_long_break")
     private val POMODORO_ENABLED = booleanPreferencesKey("timer_pomodoro_enabled")
+    private val SESSION_END_ELAPSED_REALTIME =
+        longPreferencesKey("timer_session_end_elapsed_realtime")
 
     suspend fun write(context: Context, state: TimerWidgetState) {
         context.timerStateDataStore.edit { prefs ->
@@ -64,27 +73,29 @@ object TimerStateDataStore {
             prefs[TOTAL_SESSIONS] = state.totalSessions
             prefs[IS_LONG_BREAK] = state.isLongBreak
             prefs[POMODORO_ENABLED] = state.pomodoroEnabled
+            prefs[SESSION_END_ELAPSED_REALTIME] = state.sessionEndElapsedRealtime
         }
     }
 
     /**
-     * Updates only the per-tick fields (remaining seconds + run/pause flags)
-     * so [PomodoroTimerService] can drive the widget at 1Hz without
-     * clobbering structural fields (mode, session counts, pomodoro flag) the
-     * ViewModel owns. Structural fields are written via [write] on lifecycle
-     * events; live fields are written here on every tick. DataStore edits are
-     * atomic so the two writers don't race.
+     * Lifecycle-event update from [PomodoroTimerService] when the timer
+     * pauses, resumes, stops, or completes. The Chronometer base is rewritten
+     * (or zeroed) so the launcher's self-ticking view picks up the new
+     * deadline; structural fields (mode, session counts, pomodoro flag)
+     * stay as the ViewModel last wrote them.
      */
-    suspend fun writeLive(
+    suspend fun writeRunState(
         context: Context,
         remainingSeconds: Int,
         isRunning: Boolean,
-        isPaused: Boolean
+        isPaused: Boolean,
+        sessionEndElapsedRealtime: Long
     ) {
         context.timerStateDataStore.edit { prefs ->
             prefs[REMAINING_SECONDS] = remainingSeconds
             prefs[IS_RUNNING] = isRunning
             prefs[IS_PAUSED] = isPaused
+            prefs[SESSION_END_ELAPSED_REALTIME] = sessionEndElapsedRealtime
         }
     }
 
@@ -100,7 +111,8 @@ object TimerStateDataStore {
             currentSession = prefs[CURRENT_SESSION] ?: 0,
             totalSessions = prefs[TOTAL_SESSIONS] ?: 4,
             isLongBreak = prefs[IS_LONG_BREAK] ?: false,
-            pomodoroEnabled = prefs[POMODORO_ENABLED] ?: false
+            pomodoroEnabled = prefs[POMODORO_ENABLED] ?: false,
+            sessionEndElapsedRealtime = prefs[SESSION_END_ELAPSED_REALTIME] ?: 0L
         )
     }
 
