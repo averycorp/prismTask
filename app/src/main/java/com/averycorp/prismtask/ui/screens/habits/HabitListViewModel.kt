@@ -9,10 +9,9 @@ import com.averycorp.prismtask.data.preferences.BuiltInSortOrders
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.SelfCareTierDefaults
 import com.averycorp.prismtask.data.repository.DailyCourseProgress
-import com.averycorp.prismtask.data.repository.DailyLeisureProgress
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.HabitWithStatus
-import com.averycorp.prismtask.data.repository.LeisureRepository
+import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.averycorp.prismtask.domain.model.SelfCareRoutines
@@ -73,7 +72,7 @@ constructor(
     private val habitRepository: HabitRepository,
     private val selfCareRepository: SelfCareRepository,
     private val schoolworkRepository: SchoolworkRepository,
-    private val leisureRepository: LeisureRepository,
+    private val leisureRepository: LeisureBudgetRepository,
     private val habitListPreferences: HabitListPreferences,
     private val advancedTuningPreferences: AdvancedTuningPreferences,
     private val gson: Gson
@@ -153,9 +152,12 @@ constructor(
         .getDailyCourseProgress()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DailyCourseProgress(0, 0))
 
-    private val leisureProgress: StateFlow<DailyLeisureProgress> = leisureRepository
-        .getDailyLeisureProgress()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DailyLeisureProgress(0, 0))
+    // Leisure Budget v2.0 — surface today's minutes as a single number;
+    // the v1.x "done/total" shape doesn't map cleanly. The habit list
+    // displays the minutes-logged value via BuiltInHabitProgress.
+    private val leisureMinutesToday: StateFlow<Int> = leisureRepository
+        .observeMinutesLoggedToday()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     private val tierDefaults: StateFlow<SelfCareTierDefaults> = advancedTuningPreferences
         .getSelfCareTierDefaults()
@@ -178,7 +180,7 @@ constructor(
         houseworkSteps,
         houseworkEnabled,
         schoolProgress,
-        leisureProgress,
+        leisureMinutesToday,
         tierDefaults
     ) { values ->
         @Suppress("UNCHECKED_CAST")
@@ -198,7 +200,7 @@ constructor(
         val hwSteps = values[13] as List<SelfCareStepEntity>
         val houseworkOn = values[14] as Boolean
         val schoolProg = values[15] as DailyCourseProgress
-        val leisureProg = values[16] as DailyLeisureProgress
+        val leisureMin = values[16] as Int
         val defaults = values[17] as SelfCareTierDefaults
 
         val morningHabit = habitList.find { it.habit.name == SelfCareRepository.MORNING_HABIT_NAME }
@@ -217,7 +219,7 @@ constructor(
         if (medicationOn) autoHabitNames.add(SelfCareRepository.MEDICATION_HABIT_NAME)
         if (houseworkOn) autoHabitNames.add(SelfCareRepository.HOUSEWORK_HABIT_NAME)
         if (schoolOn) autoHabitNames.add(SchoolworkRepository.SCHOOL_HABIT_NAME)
-        if (leisureOn) autoHabitNames.add(LeisureRepository.LEISURE_HABIT_NAME)
+        if (leisureOn) autoHabitNames.add(LeisureBudgetRepository.LEISURE_META_HABIT_NAME)
         // Always filter out built-in habit names from the regular habit list
         val allBuiltInNames = setOf(
             SelfCareRepository.MORNING_HABIT_NAME,
@@ -225,11 +227,11 @@ constructor(
             SelfCareRepository.MEDICATION_HABIT_NAME,
             SelfCareRepository.HOUSEWORK_HABIT_NAME,
             SchoolworkRepository.SCHOOL_HABIT_NAME,
-            LeisureRepository.LEISURE_HABIT_NAME
+            LeisureBudgetRepository.LEISURE_META_HABIT_NAME
         )
 
         val schoolHabit = habitList.find { it.habit.name == SchoolworkRepository.SCHOOL_HABIT_NAME }
-        val leisureHabit = habitList.find { it.habit.name == LeisureRepository.LEISURE_HABIT_NAME }
+        val leisureHabit = habitList.find { it.habit.name == LeisureBudgetRepository.LEISURE_META_HABIT_NAME }
 
         val allItems = mutableListOf<HabitListItem>()
         if (selfCareOn) {
@@ -262,7 +264,9 @@ constructor(
                     type = "leisure",
                     habitWithStatus = leisureHabit,
                     sortOrder = sortOrders.leisure,
-                    progress = BuiltInHabitProgress(leisureProg.done, leisureProg.total)
+                    // v2.0: surface minutes-logged-today as the
+                    // "done" portion against a single target.
+                    progress = BuiltInHabitProgress(leisureMin, 1)
                 )
             )
         }

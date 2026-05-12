@@ -3,7 +3,6 @@ package com.averycorp.prismtask.data.export
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.HabitLogDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
 import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.SchoolworkDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
@@ -17,7 +16,6 @@ import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
 import com.averycorp.prismtask.data.preferences.ArchivePreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
 import com.averycorp.prismtask.data.preferences.MedicationPreferences
 import com.averycorp.prismtask.data.preferences.TabPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
@@ -49,7 +47,6 @@ class DataImporterTest {
     private lateinit var habitDao: HabitDao
     private lateinit var habitCompletionDao: HabitCompletionDao
     private lateinit var habitLogDao: HabitLogDao
-    private lateinit var leisureDao: LeisureDao
     private lateinit var selfCareDao: SelfCareDao
     private lateinit var schoolworkDao: SchoolworkDao
 
@@ -67,7 +64,6 @@ class DataImporterTest {
     private lateinit var tabPreferences: TabPreferences
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var habitListPreferences: HabitListPreferences
-    private lateinit var leisurePreferences: LeisurePreferences
     private lateinit var medicationPreferences: MedicationPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
     private lateinit var taskCompletionDao: com.averycorp.prismtask.data.local.dao.TaskCompletionDao
@@ -90,7 +86,6 @@ class DataImporterTest {
         habitDao = mockk(relaxed = true)
         habitCompletionDao = mockk(relaxed = true)
         habitLogDao = mockk(relaxed = true)
-        leisureDao = mockk(relaxed = true)
         selfCareDao = mockk(relaxed = true)
         schoolworkDao = mockk(relaxed = true)
         taskCompletionDao = mockk(relaxed = true)
@@ -100,7 +95,6 @@ class DataImporterTest {
         tabPreferences = mockk(relaxed = true)
         taskBehaviorPreferences = mockk(relaxed = true)
         habitListPreferences = mockk(relaxed = true)
-        leisurePreferences = mockk(relaxed = true)
         medicationPreferences = mockk(relaxed = true)
         userPreferencesDataStore = mockk(relaxed = true)
         a11yPreferences = mockk(relaxed = true)
@@ -124,7 +118,6 @@ class DataImporterTest {
             habitCompletionDao,
             taskCompletionDao,
             habitLogDao,
-            leisureDao,
             selfCareDao,
             schoolworkDao,
             // medicationDao
@@ -142,7 +135,6 @@ class DataImporterTest {
             tabPreferences,
             taskBehaviorPreferences,
             habitListPreferences,
-            leisurePreferences,
             medicationPreferences,
             userPreferencesDataStore,
             a11yPreferences,
@@ -169,7 +161,6 @@ class DataImporterTest {
         coEvery { habitCompletionDao.getAllCompletionsOnce() } returns emptyList()
         coEvery { taskCompletionDao.getAllCompletionsOnce() } returns emptyList()
         coEvery { habitLogDao.getAllLogsOnce() } returns emptyList()
-        coEvery { leisureDao.getAllLogsOnce() } returns emptyList()
         coEvery { selfCareDao.getAllLogsOnce() } returns emptyList()
         coEvery { selfCareDao.getAllStepsOnce() } returns emptyList()
         coEvery { schoolworkDao.getAllCoursesOnce() } returns emptyList()

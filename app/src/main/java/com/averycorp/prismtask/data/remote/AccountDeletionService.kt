@@ -308,7 +308,7 @@ constructor(
             "dashboard_prefs",
             "tab_prefs",
             "task_behavior_prefs",
-            "leisure_prefs",
+            "leisure_budget_prefs",
             "habit_list_prefs",
             "template_prefs",
             "user_prefs",

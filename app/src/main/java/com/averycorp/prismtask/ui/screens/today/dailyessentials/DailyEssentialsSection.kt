@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUiState
 import com.averycorp.prismtask.ui.screens.today.components.CollapsibleSection
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.HabitCard
-import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.LeisureCard
+import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.LeisureBudgetCard
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.RoutineCard
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.SchoolworkCard
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
@@ -26,19 +26,20 @@ data class DailyEssentialsActions(
     val onToggleHousework: () -> Unit,
     val onToggleSchoolworkHabit: () -> Unit,
     val onOpenAssignment: (assignmentId: Long) -> Unit,
-    val onPickMusic: () -> Unit,
-    val onToggleMusicDone: () -> Unit,
-    val onPickFlex: () -> Unit,
-    val onToggleFlexDone: () -> Unit,
+    val onOpenLeisurePool: () -> Unit,
+    val onStartLeisureTimer: () -> Unit,
+    val onLogPastLeisure: () -> Unit,
+    val onRefreshLeisureSuggestion: () -> Unit,
     val onDismissHint: () -> Unit,
     val onOpenSettings: () -> Unit
 )
 
 /**
- * Collapsible section wrapper for the six virtual Daily Essentials cards.
- * Cards render in a fixed order: Morning → Housework → Schoolwork → Music
- * → Flex → Bedtime. Empty cards are omitted entirely; if the whole section
- * is empty, a one-time onboarding banner links to Settings → Daily Essentials.
+ * Collapsible section wrapper for the Daily Essentials cards.
+ *
+ * Leisure Budget v2.0 — the two slot-pick cards (music + flex) have
+ * been replaced by a single budget-progress card. The remaining card
+ * order is: Morning → Housework → Schoolwork → Leisure Budget → Bedtime.
  */
 @Composable
 fun DailyEssentialsSection(
@@ -49,20 +50,24 @@ fun DailyEssentialsSection(
     modifier: Modifier = Modifier
 ) {
     val prismColors = LocalPrismColors.current
+    // The leisure budget card always renders when the user has any
+    // configuration (pool entries OR minutes logged); otherwise it's
+    // counted as empty and the empty-state hint can decide to fire.
+    val leisureVisible = !state.leisureBudget.poolIsEmpty ||
+        state.leisureBudget.minutesLogged > 0
     val visibleCardCount = listOfNotNull(
         state.morning,
         state.housework,
         state.houseworkRoutine,
         state.schoolwork?.takeIf { it.hasContent },
-        state.musicLeisure.pickedForToday?.let { state.musicLeisure },
-        state.flexLeisure.pickedForToday?.let { state.flexLeisure },
+        state.leisureBudget.takeIf { leisureVisible },
         state.bedtime
     ).size
 
     if (state.isEmpty && state.hasSeenHint) return
 
     CollapsibleSection(
-        emoji = "\u2728",
+        emoji = "✨",
         title = "Daily Essentials",
         count = visibleCardCount,
         accentColor = prismColors.primary,
@@ -108,18 +113,13 @@ fun DailyEssentialsSection(
                     onOpenAssignment = actions.onOpenAssignment
                 )
             }
-            state.musicLeisure.takeIf { it.pickedForToday != null }?.let { music ->
-                LeisureCard(
-                    state = music,
-                    onTapBody = actions.onPickMusic,
-                    onToggleDone = actions.onToggleMusicDone
-                )
-            }
-            state.flexLeisure.takeIf { it.pickedForToday != null }?.let { flex ->
-                LeisureCard(
-                    state = flex,
-                    onTapBody = actions.onPickFlex,
-                    onToggleDone = actions.onToggleFlexDone
+            if (leisureVisible) {
+                LeisureBudgetCard(
+                    state = state.leisureBudget,
+                    onTapBody = actions.onOpenLeisurePool,
+                    onStartTimer = actions.onStartLeisureTimer,
+                    onLogPast = actions.onLogPastLeisure,
+                    onRefresh = actions.onRefreshLeisureSuggestion
                 )
             }
             state.bedtime?.let { bedtime ->

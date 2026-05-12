@@ -63,7 +63,8 @@ constructor(
     private val billingManager: BillingManager,
     private val authManager: AuthManager,
     private val logger: PrismSyncLogger,
-    private val syncStateRepository: SyncStateRepository
+    private val syncStateRepository: SyncStateRepository,
+    private val leisureSyncService: LeisureSyncService
 ) {
     /**
      * True when the user has backend JWTs stored (i.e. they've logged into or
@@ -87,6 +88,23 @@ constructor(
             ensureTemplatesPushedOnFirstConnect()
             pushed = pushChanges()
             pulled = pullChanges()
+            // Leisure-activity pool follows the user across devices via
+            // dedicated /api/v1/leisure REST endpoints (not the generic
+            // /sync/push pipeline). Run after the generic pull so any
+            // server-side updated_at clock skew is reconciled against
+            // the freshly-fetched lastSyncAt.
+            val leisureOps = try {
+                leisureSyncService.sync()
+            } catch (e: Exception) {
+                logger.warn(
+                    operation = "sync.leisure_activity",
+                    status = "failed",
+                    detail = "non-fatal — generic /sync already succeeded",
+                    throwable = e
+                )
+                0
+            }
+            pushed += leisureOps
             val summary = SyncSummary(
                 pushed = pushed,
                 pulled = pulled,

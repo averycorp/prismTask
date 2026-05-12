@@ -281,7 +281,6 @@ class CloudIdOrphanHealerEmulatorTest {
                     syncMetadataDao = db.syncMetadataDao(),
                     selfCareDao = db.selfCareDao(),
                     schoolworkDao = db.schoolworkDao(),
-                    leisureDao = db.leisureDao(),
                     taskDao = db.taskDao(),
                     projectDao = db.projectDao(),
                     tagDao = db.tagDao(),

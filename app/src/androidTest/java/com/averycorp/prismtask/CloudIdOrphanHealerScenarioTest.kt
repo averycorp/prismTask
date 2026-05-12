@@ -62,7 +62,6 @@ class CloudIdOrphanHealerScenarioTest {
             syncMetadataDao = database.syncMetadataDao(),
             selfCareDao = database.selfCareDao(),
             schoolworkDao = database.schoolworkDao(),
-            leisureDao = database.leisureDao(),
             taskDao = database.taskDao(),
             projectDao = database.projectDao(),
             tagDao = database.tagDao(),

@@ -18,7 +18,8 @@ import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.HabitLogDao
 import com.averycorp.prismtask.data.local.dao.HabitTemplateDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
+import com.averycorp.prismtask.data.local.dao.LeisureActivityDao
+import com.averycorp.prismtask.data.local.dao.LeisureSessionDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.dao.MedicationRefillDao
@@ -65,7 +66,8 @@ import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.HabitLogEntity
 import com.averycorp.prismtask.data.local.entity.HabitTemplateEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
+import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
+import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.local.entity.MedicationDoseEntity
 import com.averycorp.prismtask.data.local.entity.MedicationEntity
 import com.averycorp.prismtask.data.local.entity.MedicationRefillEntity
@@ -110,7 +112,8 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
         HabitEntity::class,
         HabitCompletionEntity::class,
         HabitLogEntity::class,
-        LeisureLogEntity::class,
+        LeisureActivityEntity::class,
+        LeisureSessionEntity::class,
         CourseEntity::class,
         AssignmentEntity::class,
         CourseCompletionEntity::class,
@@ -157,7 +160,7 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
     // Database" failure, which then breaks ktlint's no-unused-imports
     // resolution and triggers an autofix-strips-imports cascade. Keep this
     // in sync with `CURRENT_DB_VERSION` in Migrations.kt.
-    version = 81,
+    version = 82,
     exportSchema = false
 )
 abstract class PrismTaskDatabase : RoomDatabase() {
@@ -181,7 +184,9 @@ abstract class PrismTaskDatabase : RoomDatabase() {
 
     abstract fun habitLogDao(): HabitLogDao
 
-    abstract fun leisureDao(): LeisureDao
+    abstract fun leisureActivityDao(): LeisureActivityDao
+
+    abstract fun leisureSessionDao(): LeisureSessionDao
 
     abstract fun schoolworkDao(): SchoolworkDao
 

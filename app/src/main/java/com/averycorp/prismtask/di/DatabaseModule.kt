@@ -19,7 +19,8 @@ import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.HabitLogDao
 import com.averycorp.prismtask.data.local.dao.HabitTemplateDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
+import com.averycorp.prismtask.data.local.dao.LeisureActivityDao
+import com.averycorp.prismtask.data.local.dao.LeisureSessionDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.dao.MedicationRefillDao
@@ -113,7 +114,12 @@ object DatabaseModule {
     fun provideHabitLogDao(database: PrismTaskDatabase): HabitLogDao = database.habitLogDao()
 
     @Provides
-    fun provideLeisureDao(database: PrismTaskDatabase): LeisureDao = database.leisureDao()
+    fun provideLeisureActivityDao(database: PrismTaskDatabase): LeisureActivityDao =
+        database.leisureActivityDao()
+
+    @Provides
+    fun provideLeisureSessionDao(database: PrismTaskDatabase): LeisureSessionDao =
+        database.leisureSessionDao()
 
     @Provides
     fun provideSchoolworkDao(database: PrismTaskDatabase): SchoolworkDao = database.schoolworkDao()

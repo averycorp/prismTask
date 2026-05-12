@@ -62,6 +62,11 @@ class PomodoroTimerService : Service() {
     // can self-tick the countdown in the launcher process.
     private var sessionEndElapsedRealtime: Long = 0L
 
+    // Absolute SystemClock.elapsedRealtime() at which the current session
+    // hits zero. Recomputed on start/resume so RemoteViews' Chronometer
+    // can self-tick the countdown in the launcher process.
+    private var sessionEndElapsedRealtime: Long = 0L
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

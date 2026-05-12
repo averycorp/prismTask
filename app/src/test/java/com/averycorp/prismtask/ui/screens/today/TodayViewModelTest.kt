@@ -17,7 +17,7 @@ import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.CheckInLogRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
-import com.averycorp.prismtask.data.repository.LeisureRepository
+import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.MedicationRefillRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
@@ -78,7 +78,7 @@ class TodayViewModelTest {
     private lateinit var dailyEssentialsPreferences: DailyEssentialsPreferences
     private lateinit var selfCareRepository: SelfCareRepository
     private lateinit var schoolworkRepository: SchoolworkRepository
-    private lateinit var leisureRepository: LeisureRepository
+    private lateinit var leisureRepository: LeisureBudgetRepository
     private lateinit var localDateFlow: LocalDateFlow
     private lateinit var tourCardPreferences: TourCardPreferences
     private lateinit var coachmarkController: CoachmarkController

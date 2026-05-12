@@ -13,7 +13,8 @@ import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.HabitLogEntity
 import com.averycorp.prismtask.data.local.entity.HabitTemplateEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
+import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
+import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.local.entity.MedicationRefillEntity
 import com.averycorp.prismtask.data.local.entity.MoodEnergyLogEntity
 import com.averycorp.prismtask.data.local.entity.NlpShortcutEntity
@@ -63,7 +64,8 @@ class DatabaseEntityRegistrationTest {
         HabitEntity::class.java,
         HabitCompletionEntity::class.java,
         HabitLogEntity::class.java,
-        LeisureLogEntity::class.java,
+        LeisureActivityEntity::class.java,
+        LeisureSessionEntity::class.java,
         CourseEntity::class.java,
         AssignmentEntity::class.java,
         CourseCompletionEntity::class.java,
@@ -99,14 +101,16 @@ class DatabaseEntityRegistrationTest {
     }
 
     @Test
-    fun `exactly 31 entities are registered`() {
-        // PrismTaskDatabase @Database annotation lists 31 entities.
+    fun `exactly 32 entities are registered`() {
+        // PrismTaskDatabase @Database annotation lists 32 entities.
         // If someone adds or removes one, both this test and the annotation
-        // must be updated together.
+        // must be updated together. Leisure Budget v2.0 (migration 81→82):
+        // dropped LeisureLogEntity, added LeisureActivityEntity +
+        // LeisureSessionEntity (net +1).
         assertTrue(
-            "Expected 31 entity classes, found ${expectedEntityClasses.size}. " +
+            "Expected 32 entity classes, found ${expectedEntityClasses.size}. " +
                 "Update this test AND PrismTaskDatabase.kt if entities were added/removed.",
-            expectedEntityClasses.size == 31
+            expectedEntityClasses.size == 32
         )
     }
 

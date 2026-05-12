@@ -30,8 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.domain.model.SelfCareRoutines
-import com.averycorp.prismtask.ui.screens.leisure.LeisureViewModel
-import com.averycorp.prismtask.ui.screens.leisure.components.LeisureOption
 
 /**
  * Stateless template picker, rendered inside the onboarding flow and the
@@ -59,35 +57,12 @@ fun TemplatePickerContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (showLeisure) {
-            LeisureSectionCard(
-                emoji = "\uD83C\uDFB5",
-                title = "Music",
-                subtitle = "Instruments to practice",
-                options = LeisureViewModel.DEFAULT_INSTRUMENTS,
-                selected = state.musicIds,
-                onToggle = { id -> onChange(state.withMusicToggled(id)) },
-                initiallyExpanded = true
-            )
-            LeisureSectionCard(
-                emoji = "\uD83C\uDFB2",
-                title = "Flex Activities",
-                subtitle = "Leisure options to rotate",
-                options = LeisureViewModel.DEFAULT_FLEX_OPTIONS,
-                selected = state.flexIds,
-                onToggle = { id -> onChange(state.withFlexToggled(id)) },
-                initiallyExpanded = false
-            )
-            LeisureSectionCard(
-                emoji = "\uD83D\uDDE3\uFE0F",
-                title = "Language",
-                subtitle = "Languages to practice each day",
-                options = LeisureViewModel.DEFAULT_LANGUAGE_OPTIONS,
-                selected = state.languageIds,
-                onToggle = { id -> onChange(state.withLanguageToggled(id)) },
-                initiallyExpanded = false
-            )
-        }
+        // Leisure Budget v2.0 \u2014 Templates picker no longer seeds music
+        // / flex / language slots; the new pool is populated via
+        // LeisurePoolScreen. showLeisure stays in the signature for
+        // backwards-compat with callers that pass it explicitly, but is
+        // now a no-op so the templates browser doesn't accidentally
+        // surface a half-deleted UI surface.
         if (showSelfCare) {
             RoutineSectionCard(
                 emoji = "\uD83C\uDF05",
@@ -111,34 +86,8 @@ fun TemplatePickerContent(
     }
 }
 
-@Composable
-private fun LeisureSectionCard(
-    emoji: String,
-    title: String,
-    subtitle: String,
-    options: List<LeisureOption>,
-    selected: Set<String>,
-    onToggle: (String) -> Unit,
-    initiallyExpanded: Boolean
-) {
-    var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
-    SectionCard(
-        emoji = emoji,
-        title = title,
-        subtitle = subtitle,
-        selectionSummary = selectionCountLabel(selected.size, options.size),
-        expanded = expanded,
-        onToggleExpanded = { expanded = !expanded }
-    ) {
-        options.forEach { option ->
-            CheckboxRow(
-                label = "${option.icon} ${option.label}",
-                checked = option.id in selected,
-                onCheckedChange = { onToggle(option.id) }
-            )
-        }
-    }
-}
+// Leisure Budget v2.0: v1.x LeisureSectionCard removed alongside the
+// rest of the v1.x slot model.
 
 @Composable
 private fun RoutineSectionCard(
@@ -328,6 +277,3 @@ private fun RadioRow(
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
     }
 }
-
-private fun selectionCountLabel(selected: Int, total: Int): String =
-    if (selected == 0) "None" else "$selected / $total"

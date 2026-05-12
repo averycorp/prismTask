@@ -899,3 +899,199 @@ class InAppFeedback(Base):
     )
 
     user = relationship("User")
+
+
+class LeisureCategory(str, enum.Enum):
+    """Top-level Leisure Budget v2.0 categories.
+
+    Spec-locked to four buckets (Q5 lock — all enabled by default).
+    Stored as a plain VARCHAR in the database with a CHECK constraint
+    rather than a real Postgres ENUM so adding/renaming categories
+    later only requires a CHECK swap, not an ENUM type rebuild.
+    """
+
+    PHYSICAL = "PHYSICAL"
+    SOCIAL = "SOCIAL"
+    CREATIVE = "CREATIVE"
+    PASSIVE = "PASSIVE"
+
+
+class LeisureSessionSource(str, enum.Enum):
+    """Where a ``LeisureSession`` was logged from.
+
+    TIMER: ``LeisureTimerService`` posted on natural stop or user stop.
+    MANUAL: User logged via the "Log past activity" modal.
+    """
+
+    TIMER = "TIMER"
+    MANUAL = "MANUAL"
+
+
+class LeisureEnforcementMode(str, enum.Enum):
+    """How aggressively the app nudges the user to hit their leisure target.
+
+    SOFT: visual progress only, no notifications. Default; free for all
+    tiers (Q1 lock — refresh limit is the feature, enforcement is the
+    upsell).
+    MEDIUM: optional reminder notification when target is missed by SoD.
+    HARD: persistent notification + Today-screen modal when target missed.
+
+    MEDIUM and HARD require Pro tier (gated server-side via
+    ``require_leisure_enforcement_choice`` in
+    ``app/middleware/leisure_gate.py``).
+    """
+
+    SOFT = "SOFT"
+    MEDIUM = "MEDIUM"
+    HARD = "HARD"
+
+
+class LeisureActivity(Base):
+    """User-owned leisure-activity pool entry.
+
+    One row per activity-the-user-can-do (e.g. "Walk", "Call Mom",
+    "Play piano"). Categories partition the pool into the four buckets
+    above. ``default_duration_minutes`` is optional — when null, the
+    timer + manual-entry modal default to 30 minutes.
+
+    ``last_completed_at`` is denormalized off ``leisure_sessions`` so
+    the recency-weighted random pull algorithm can sample without a
+    join. Updated by the session-insert path in the leisure router.
+    """
+
+    __tablename__ = "leisure_activities"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('PHYSICAL','SOCIAL','CREATIVE','PASSIVE')",
+            name="ck_leisure_activity_category",
+        ),
+    )
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name = Column(String(120), nullable=False)
+    category = Column(String(16), nullable=False)
+    default_duration_minutes = Column(Integer, nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    last_completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User")
+
+
+class LeisureSession(Base):
+    """Completed leisure session row.
+
+    Inserted by either the foreground timer service (``source = TIMER``)
+    or the manual-entry modal (``source = MANUAL``). ``activity_id`` is
+    nullable to accommodate free-text entries that drop out of the pool
+    later — the historical row keeps its category snapshot so analytics
+    don't regress.
+    """
+
+    __tablename__ = "leisure_sessions"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('PHYSICAL','SOCIAL','CREATIVE','PASSIVE')",
+            name="ck_leisure_session_category",
+        ),
+        CheckConstraint(
+            "source IN ('TIMER','MANUAL')",
+            name="ck_leisure_session_source",
+        ),
+        CheckConstraint(
+            "duration_minutes > 0",
+            name="ck_leisure_session_duration_positive",
+        ),
+    )
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    activity_id = Column(
+        String(64),
+        ForeignKey("leisure_activities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    category = Column(String(16), nullable=False)
+    duration_minutes = Column(Integer, nullable=False)
+    logged_at = Column(DateTime(timezone=True), nullable=False)
+    source = Column(String(8), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user = relationship("User")
+    activity = relationship("LeisureActivity")
+
+
+class LeisureSettings(Base):
+    """Per-user Leisure Budget settings singleton.
+
+    ``pending_enforcement_mode`` + ``pending_enforcement_effective_date``
+    implement the deferred-setting-takes-effect-next-day pattern: when
+    the user toggles enforcement_mode, the router writes the new value
+    to the pending columns; the daily-reset worker on the client
+    promotes pending → active at the SoD boundary, then clears pending.
+
+    ``enabled_categories`` is JSON-encoded so the schema doesn't need to
+    grow a column per category. The default
+    ``["PHYSICAL","SOCIAL","CREATIVE","PASSIVE"]`` honors Q5 lock.
+    """
+
+    __tablename__ = "leisure_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "enforcement_mode IN ('SOFT','MEDIUM','HARD')",
+            name="ck_leisure_settings_enforcement",
+        ),
+        CheckConstraint(
+            "pending_enforcement_mode IS NULL OR "
+            "pending_enforcement_mode IN ('SOFT','MEDIUM','HARD')",
+            name="ck_leisure_settings_pending_enforcement",
+        ),
+        CheckConstraint(
+            "refresh_limit BETWEEN 0 AND 10",
+            name="ck_leisure_settings_refresh_limit_range",
+        ),
+        CheckConstraint(
+            "daily_target_minutes BETWEEN 0 AND 1440",
+            name="ck_leisure_settings_daily_target_range",
+        ),
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    daily_target_minutes = Column(Integer, nullable=False, default=60)
+    weekend_target_minutes = Column(Integer, nullable=True)
+    enforcement_mode = Column(String(8), nullable=False, default="SOFT")
+    refresh_limit = Column(Integer, nullable=False, default=3)
+    enabled_categories = Column(
+        Text,
+        nullable=False,
+        default='["PHYSICAL","SOCIAL","CREATIVE","PASSIVE"]',
+    )
+    pending_enforcement_mode = Column(String(8), nullable=True)
+    pending_enforcement_effective_date = Column(Date, nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user = relationship("User")
