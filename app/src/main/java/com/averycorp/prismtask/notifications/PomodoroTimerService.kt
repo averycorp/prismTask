@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.glance.appwidget.updateAll
@@ -56,6 +57,11 @@ class PomodoroTimerService : Service() {
     private var sessionType: String = SESSION_TYPE_WORK
     private var owner: String = OWNER_TIMER
     private var isPaused: Boolean = false
+
+    // Absolute SystemClock.elapsedRealtime() at which the current session
+    // hits zero. Recomputed on start/resume so RemoteViews' Chronometer
+    // can self-tick the countdown in the launcher process.
+    private var sessionEndElapsedRealtime: Long = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -119,19 +125,36 @@ class PomodoroTimerService : Service() {
 
     private fun runTickLoop() {
         tickJob?.cancel()
+        // Stamp the absolute deadline once. The widget reads this on each
+        // composition and renders `(deadline - now) / 1000` so the displayed
+        // time tracks the wall clock — no per-tick DataStore writes needed
+        // for the time itself.
+        sessionEndElapsedRealtime = SystemClock.elapsedRealtime() + secondsRemaining * 1000L
+        // Fire-and-forget: the lifecycle write goes onto serviceScope so the
+        // tick loop below isn't gated on Glance / DataStore work.
+        serviceScope.launch {
+            pushWidgetRunState(running = true, paused = false)
+        }
         tickJob = serviceScope.launch {
-            // Emit an initial tick so the UI picks up the starting value even
-            // if the user backgrounded the app before the first second
-            // elapsed.
+            // Emit an initial tick so the in-app UI picks up the starting
+            // value even if the user backgrounded the app before the first
+            // second elapsed.
             broadcastTick(secondsRemaining)
-            pushLiveWidgetState(running = true, paused = false)
             while (secondsRemaining > 0) {
                 delay(1000)
                 if (isPaused) break
                 secondsRemaining -= 1
                 updateOngoingNotification(secondsRemaining)
                 broadcastTick(secondsRemaining)
-                pushLiveWidgetState(running = true, paused = false)
+                // Fire-and-forget the widget refresh on every tick so the
+                // home-screen countdown stays in lockstep with the in-app
+                // timer. Launching on serviceScope (instead of awaiting
+                // inline) keeps this loop's cadence at a true 1Hz: a slow
+                // Glance recomposition or DataStore write no longer
+                // stretches the next `delay(1000)` out by hundreds of ms.
+                // Glance serializes per-widget updates internally so pushes
+                // can't pile up.
+                serviceScope.launch { pushWidgetTick() }
             }
             if (!isPaused && secondsRemaining <= 0) {
                 onCountdownComplete()
@@ -154,7 +177,9 @@ class PomodoroTimerService : Service() {
                 putExtra(EXTRA_OWNER, owner)
             }
         )
-        serviceScope.launch { pushLiveWidgetState(running = false, paused = true) }
+        // Zero the Chronometer base — the widget switches back to a static
+        // Glance Text frozen at the paused remaining time, no more ticking.
+        serviceScope.launch { pushWidgetRunState(running = false, paused = true) }
     }
 
     private fun resumeCountdown() {
@@ -181,7 +206,7 @@ class PomodoroTimerService : Service() {
         // pill immediately. The ViewModel's onServiceStopped will follow up
         // with a full write that resets remainingSeconds to totalSeconds, but
         // that path requires the ViewModel to be alive.
-        serviceScope.launch { pushLiveWidgetState(running = false, paused = false) }
+        serviceScope.launch { pushWidgetRunState(running = false, paused = false) }
     }
 
     private fun onCountdownComplete() {
@@ -208,35 +233,57 @@ class PomodoroTimerService : Service() {
                 putExtra(EXTRA_OWNER, owner)
             }
         )
-        serviceScope.launch { pushLiveWidgetState(running = false, paused = false) }
+        serviceScope.launch { pushWidgetRunState(running = false, paused = false) }
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     /**
-     * Mirrors [secondsRemaining] / running / paused into the timer widget's
-     * DataStore and triggers a widget refresh. Only fires for [OWNER_TIMER]
-     * sessions because the in-app TimerWidget reflects the regular Timer
-     * screen — a Smart Pomodoro session driving the widget would surface a
-     * different mode/session count than the user sees in the Timer screen.
+     * Lifecycle-event widget refresh. Called on start / pause / resume /
+     * stop / complete to push the run flags + Chronometer deadline.
+     * Structural fields (mode, session counts, pomodoro flag) stay as the
+     * ViewModel last wrote them — DataStore edits are atomic so the two
+     * writers don't race.
+     *
+     * Only fires for [OWNER_TIMER] sessions because the in-app TimerWidget
+     * reflects the regular Timer screen — a Smart Pomodoro session driving
+     * the widget would surface a different mode/session count than the user
+     * sees in the Timer screen.
      *
      * Errors are swallowed so a flaky DataStore disk or an unplaced widget
      * never crashes the foreground service.
      */
-    private suspend fun pushLiveWidgetState(running: Boolean, paused: Boolean) {
+    private suspend fun pushWidgetRunState(running: Boolean, paused: Boolean) {
         if (!BuildConfig.WIDGETS_ENABLED) return
         if (owner != OWNER_TIMER) return
         try {
-            TimerStateDataStore.writeLive(
+            TimerStateDataStore.writeRunState(
                 context = this,
                 remainingSeconds = secondsRemaining,
                 isRunning = running,
-                isPaused = paused
+                isPaused = paused,
+                sessionEndElapsedRealtime = if (running) sessionEndElapsedRealtime else 0L
             )
             TimerWidget().updateAll(this)
         } catch (e: Exception) {
-            Log.w("PomodoroService", "Live widget update failed: ${e.message}")
+            Log.w("PomodoroService", "Widget run-state update failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Per-tick widget refresh. Skips the DataStore write — the deadline
+     * stored at start is the only field that needs to be fresh, and the
+     * widget computes displayed seconds from it. Just calls `updateAll` so
+     * Glance re-composes against the cached state. Errors are swallowed.
+     */
+    private suspend fun pushWidgetTick() {
+        if (!BuildConfig.WIDGETS_ENABLED) return
+        if (owner != OWNER_TIMER) return
+        try {
+            TimerWidget().updateAll(this)
+        } catch (e: Exception) {
+            Log.w("PomodoroService", "Widget tick update failed: ${e.message}")
         }
     }
 
