@@ -65,8 +65,6 @@ constructor(
     private val _uiState = MutableStateFlow(TimerUiState())
     val uiState: StateFlow<TimerUiState> = _uiState.asStateFlow()
 
-    private var ticksSinceWidgetUpdate: Int = 0
-
     /**
      * Listens for tick / pause / resume / complete broadcasts from
      * [PomodoroTimerService]. Filters on
@@ -232,7 +230,6 @@ constructor(
     private fun start() {
         val state = _uiState.value
         if (state.remainingSeconds <= 0) return
-        ticksSinceWidgetUpdate = 0
         _uiState.value = state.copy(isRunning = true)
         syncWidgetState()
         viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
@@ -263,7 +260,6 @@ constructor(
 
     private fun onTick(secondsRemaining: Int) {
         val current = _uiState.value
-        ticksSinceWidgetUpdate++
         // The first tick after a resume / start may set isRunning to true if
         // the service caught up before our optimistic flip. Keep both in
         // sync.
@@ -271,13 +267,14 @@ constructor(
             remainingSeconds = secondsRemaining,
             isRunning = secondsRemaining > 0
         )
-        // Widget update cadence mirrors the legacy in-memory timer:
-        // every 30 ticks for sub-minute accuracy without a flood.
-        if (ticksSinceWidgetUpdate >= 30) {
-            ticksSinceWidgetUpdate = 0
-            syncWidgetState()
-            viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
-        }
+        // Widget refreshes are driven by PomodoroTimerService directly
+        // (TimerStateDataStore.writeLive + TimerWidget.updateAll on every
+        // tick) so the home-screen widget keeps ticking at 1Hz even when
+        // this ViewModel is gone (process backgrounded + reclaimed). The
+        // ViewModel still pushes full-state writes on lifecycle events
+        // (start/pause/resume/stop/complete/mode/pomodoro toggle) so the
+        // structural fields the service doesn't know about (mode,
+        // sessionsUntilLongBreak, currentTaskTitle, …) stay in sync.
     }
 
     private fun onServicePaused() {

@@ -12,8 +12,12 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.glance.appwidget.updateAll
+import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.data.preferences.TimerPreferences
+import com.averycorp.prismtask.widget.TimerStateDataStore
+import com.averycorp.prismtask.widget.TimerWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -120,12 +124,14 @@ class PomodoroTimerService : Service() {
             // if the user backgrounded the app before the first second
             // elapsed.
             broadcastTick(secondsRemaining)
+            pushLiveWidgetState(running = true, paused = false)
             while (secondsRemaining > 0) {
                 delay(1000)
                 if (isPaused) break
                 secondsRemaining -= 1
                 updateOngoingNotification(secondsRemaining)
                 broadcastTick(secondsRemaining)
+                pushLiveWidgetState(running = true, paused = false)
             }
             if (!isPaused && secondsRemaining <= 0) {
                 onCountdownComplete()
@@ -148,6 +154,7 @@ class PomodoroTimerService : Service() {
                 putExtra(EXTRA_OWNER, owner)
             }
         )
+        serviceScope.launch { pushLiveWidgetState(running = false, paused = true) }
     }
 
     private fun resumeCountdown() {
@@ -170,6 +177,11 @@ class PomodoroTimerService : Service() {
         tickJob?.cancel()
         tickJob = null
         isPaused = false
+        // Push a final live snapshot so the widget flips out of the running
+        // pill immediately. The ViewModel's onServiceStopped will follow up
+        // with a full write that resets remainingSeconds to totalSeconds, but
+        // that path requires the ViewModel to be alive.
+        serviceScope.launch { pushLiveWidgetState(running = false, paused = false) }
     }
 
     private fun onCountdownComplete() {
@@ -196,9 +208,36 @@ class PomodoroTimerService : Service() {
                 putExtra(EXTRA_OWNER, owner)
             }
         )
+        serviceScope.launch { pushLiveWidgetState(running = false, paused = false) }
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    /**
+     * Mirrors [secondsRemaining] / running / paused into the timer widget's
+     * DataStore and triggers a widget refresh. Only fires for [OWNER_TIMER]
+     * sessions because the in-app TimerWidget reflects the regular Timer
+     * screen — a Smart Pomodoro session driving the widget would surface a
+     * different mode/session count than the user sees in the Timer screen.
+     *
+     * Errors are swallowed so a flaky DataStore disk or an unplaced widget
+     * never crashes the foreground service.
+     */
+    private suspend fun pushLiveWidgetState(running: Boolean, paused: Boolean) {
+        if (!BuildConfig.WIDGETS_ENABLED) return
+        if (owner != OWNER_TIMER) return
+        try {
+            TimerStateDataStore.writeLive(
+                context = this,
+                remainingSeconds = secondsRemaining,
+                isRunning = running,
+                isPaused = paused
+            )
+            TimerWidget().updateAll(this)
+        } catch (e: Exception) {
+            Log.w("PomodoroService", "Live widget update failed: ${e.message}")
+        }
     }
 
     private fun updateOngoingNotification(seconds: Int) {
