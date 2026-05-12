@@ -20,14 +20,17 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -197,32 +200,43 @@ class QuickAddViewModelBatchSubmitGuardTest {
      * navigates once, not twice.
      *
      * Pre-Channel (when `_batchIntents` was `MutableSharedFlow`), the
-     * single emit fanned out to both collectors and the host navigated
-     * twice, stacking two `BatchPreview` screens (the user-visible
-     * "preview, accept, then it runs a second time" bug).
+     * single emit fanned out to both collectors and this assertion read
+     * 2, not 1 — the user-visible "preview, accept, then it runs a
+     * second time" bug.
+     *
+     * Each collector is bounded by a `withTimeoutOrNull` against the
+     * test scheduler's virtual clock so the "loser" returns null rather
+     * than hanging `runTest` forever (which is what the unbounded
+     * `launch { collect { … } }` shape did and was killed by the
+     * 12-minute CI step timeout — see PR #1273 attempt 2).
      */
     @Test
     fun onSubmit_batch_twoCollectors_emitDeliveredToExactlyOne() = runTest(dispatcher) {
         val viewModel = newViewModel()
         viewModel.inputText.value = "complete all tasks today"
 
-        val collectorA = mutableListOf<String>()
-        val collectorB = mutableListOf<String>()
-        val jobA = launch { viewModel.batchIntents.collect { collectorA += it } }
-        val jobB = launch { viewModel.batchIntents.collect { collectorB += it } }
-        // Let both collectors register before the emit.
+        val received1 = async {
+            withTimeoutOrNull(1_000) { viewModel.batchIntents.first() }
+        }
+        val received2 = async {
+            withTimeoutOrNull(1_000) { viewModel.batchIntents.first() }
+        }
+        // Let both collectors subscribe before the emit.
         advanceUntilIdle()
 
         viewModel.onSubmit()
+        // Past the 1s virtual-time bound so the loser's withTimeoutOrNull
+        // returns null instead of hanging on `first()`.
+        advanceTimeBy(2_000)
         advanceUntilIdle()
 
-        // Exactly one collector receives the emit. Which one is racy
-        // (whichever the dispatcher resumes first), but the **total** count
-        // must be 1, not 2.
-        assertEquals(1, collectorA.size + collectorB.size)
+        val r1 = received1.await()
+        val r2 = received2.await()
 
-        jobA.cancel()
-        jobB.cancel()
+        // Exactly one collector received the emit; the other timed out.
+        // Which one wins is racy (dispatcher order), but the count must
+        // be 1, not 2.
+        assertEquals(1, listOf(r1, r2).count { it != null })
     }
 
     /**
@@ -238,19 +252,22 @@ class QuickAddViewModelBatchSubmitGuardTest {
         val multiLine = "buy milk\nfeed cat\ncall dad"
         viewModel.inputText.value = multiLine
 
-        val collectorA = mutableListOf<String>()
-        val collectorB = mutableListOf<String>()
-        val jobA = launch { viewModel.multiCreateIntents.collect { collectorA += it } }
-        val jobB = launch { viewModel.multiCreateIntents.collect { collectorB += it } }
+        val received1 = async {
+            withTimeoutOrNull(1_000) { viewModel.multiCreateIntents.first() }
+        }
+        val received2 = async {
+            withTimeoutOrNull(1_000) { viewModel.multiCreateIntents.first() }
+        }
         advanceUntilIdle()
 
         viewModel.onSubmit()
+        advanceTimeBy(2_000)
         advanceUntilIdle()
 
-        assertEquals(1, collectorA.size + collectorB.size)
+        val r1 = received1.await()
+        val r2 = received2.await()
 
-        jobA.cancel()
-        jobB.cancel()
+        assertEquals(1, listOf(r1, r2).count { it != null })
     }
 
     private fun newViewModel(): QuickAddViewModel = QuickAddViewModel(
