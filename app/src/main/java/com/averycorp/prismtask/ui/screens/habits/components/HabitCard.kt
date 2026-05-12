@@ -98,20 +98,10 @@ internal fun HabitItem(
     val cardModifier = modifier
         .fillMaxWidth()
         .clickable { onClick() }
-        .then(
-            if (attrs.brackets) {
-                Modifier.border(
-                    width = 1.dp,
-                    color = if (isComplete) colors.primary.copy(alpha = 0.4f) else colors.border,
-                    shape = cardShape
-                )
-            } else {
-                Modifier.border(
-                    width = 1.dp,
-                    color = if (isComplete) colors.primary.copy(alpha = 0.4f) else colors.border,
-                    shape = cardShape
-                )
-            }
+        .border(
+            width = 1.dp,
+            color = colors.primary.copy(alpha = 0.4f),
+            shape = cardShape
         )
 
     Card(

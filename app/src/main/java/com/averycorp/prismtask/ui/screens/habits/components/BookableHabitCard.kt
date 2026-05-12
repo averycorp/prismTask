@@ -84,7 +84,7 @@ internal fun BookableHabitItem(
             .clickable { onClick() }
             .border(
                 width = 1.dp,
-                color = prismColors.border,
+                color = prismColors.primary.copy(alpha = 0.4f),
                 shape = cardShape
             ),
         shape = cardShape,

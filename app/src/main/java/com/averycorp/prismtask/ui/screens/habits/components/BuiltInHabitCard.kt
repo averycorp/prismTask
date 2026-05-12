@@ -71,11 +71,7 @@ internal fun BuiltInHabitCard(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = if (habitWithStatus.isCompletedToday) {
-                    prismColors.primary.copy(alpha = 0.4f)
-                } else {
-                    prismColors.border
-                },
+                color = prismColors.primary.copy(alpha = 0.4f),
                 shape = cardShape
             ),
         shape = cardShape,
