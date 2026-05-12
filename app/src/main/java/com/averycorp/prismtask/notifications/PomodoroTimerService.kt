@@ -57,6 +57,7 @@ class PomodoroTimerService : Service() {
     private var sessionType: String = SESSION_TYPE_WORK
     private var owner: String = OWNER_TIMER
     private var isPaused: Boolean = false
+
     // Absolute SystemClock.elapsedRealtime() at which the current session
     // hits zero. Recomputed on start/resume so RemoteViews' Chronometer
     // can self-tick the countdown in the launcher process.
