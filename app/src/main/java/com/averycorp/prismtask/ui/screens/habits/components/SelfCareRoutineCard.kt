@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.ui.components.StreakBadge
 import com.averycorp.prismtask.ui.screens.habits.SelfCareCardData
+import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 
 /**
@@ -64,6 +65,7 @@ internal fun SelfCareRoutineCard(
         else -> c.primary
     }
     val cardShape = MaterialTheme.shapes.medium
+    val attrs = LocalPrismAttrs.current
 
     Card(
         modifier = modifier
@@ -86,7 +88,16 @@ internal fun SelfCareRoutineCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .then(
+                    if (attrs.brackets) {
+                        Modifier.border(
+                            androidx.compose.foundation.BorderStroke(width = 3.dp, color = color),
+                            shape = cardShape
+                        ).padding(16.dp)
+                    } else {
+                        Modifier.padding(12.dp)
+                    }
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(

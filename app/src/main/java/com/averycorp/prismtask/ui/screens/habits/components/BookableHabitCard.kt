@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.repository.HabitWithStatus
+import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -77,6 +78,7 @@ internal fun BookableHabitItem(
     val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
     val prismColors = LocalPrismColors.current
     val cardShape = MaterialTheme.shapes.medium
+    val attrs = LocalPrismAttrs.current
 
     Card(
         modifier = modifier
@@ -95,7 +97,16 @@ internal fun BookableHabitItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+                .then(
+                    if (attrs.brackets) {
+                        Modifier.border(
+                            androidx.compose.foundation.BorderStroke(width = 3.dp, color = habitColor),
+                            shape = cardShape
+                        ).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)
+                    } else {
+                        Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)
+                    }
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon circle
