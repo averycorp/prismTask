@@ -3504,7 +3504,10 @@ constructor(
                     "task_template" -> taskTemplateDao.deleteTemplate(localId)
                     "course" -> schoolworkDao.deleteCourse(localId)
                     "course_completion" -> schoolworkDao.deleteCompletionById(localId)
-                    "leisure_log" -> leisureDao.deleteLogById(localId)
+                    // Leisure Budget v2.0: v1.x "leisure_log" delete dispatch
+                    // retired alongside the table (migration 81→82). New
+                    // "leisure_activity" / "leisure_session" deletes flow
+                    // through BackendSyncMappers instead.
                     "self_care_step" -> selfCareDao.deleteStepById(localId)
                     "self_care_log" -> selfCareDao.deleteLogById(localId)
                     "medication" -> medicationDao.deleteById(localId)

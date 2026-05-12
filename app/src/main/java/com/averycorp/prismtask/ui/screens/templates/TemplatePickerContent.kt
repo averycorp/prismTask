@@ -277,6 +277,3 @@ private fun RadioRow(
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
     }
 }
-
-private fun selectionCountLabel(selected: Int, total: Int): String =
-    if (selected == 0) "None" else "$selected / $total"
