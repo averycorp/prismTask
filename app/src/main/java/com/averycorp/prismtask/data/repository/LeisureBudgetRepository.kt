@@ -127,6 +127,38 @@ constructor(
         return id
     }
 
+    /** Reactive feed of recent sessions, newest first. */
+    fun observeRecentSessions(limit: Int = 100): Flow<List<LeisureSessionEntity>> =
+        sessionDao.getRecent(limit)
+
+    /**
+     * Delete a previously logged session. Re-evaluates the leisure
+     * meta-habit completion for the day the session belonged to so the
+     * streak/analytics stay consistent with the new minutes total.
+     */
+    suspend fun deleteSession(sessionId: Long) {
+        val existing = sessionDao.getById(sessionId) ?: return
+        sessionDao.deleteById(sessionId)
+        syncTracker.trackDelete(sessionId, "leisure_session")
+        syncMetaHabitForDate(existing.loggedAt)
+    }
+
+    /**
+     * Re-stamp a logged session's [loggedAt] timestamp. Re-evaluates the
+     * meta-habit for both the old and new dates so the streak responds
+     * when an entry crosses a day boundary. Calling twice when the move
+     * stays within the same SoD day is a no-op on the second pass since
+     * the worker is idempotent.
+     */
+    suspend fun updateSessionTime(sessionId: Long, newLoggedAt: Long) {
+        val existing = sessionDao.getById(sessionId) ?: return
+        if (existing.loggedAt == newLoggedAt) return
+        sessionDao.update(existing.copy(loggedAt = newLoggedAt))
+        syncTracker.trackUpdate(sessionId, "leisure_session")
+        syncMetaHabitForDate(existing.loggedAt)
+        syncMetaHabitForDate(newLoggedAt)
+    }
+
     private suspend fun syncMetaHabitForDate(loggedAt: Long) {
         val hour = taskBehaviorPreferences.getDayStartHour().first()
         val startOfDay = DayBoundary.startOfCurrentDay(hour, loggedAt)
