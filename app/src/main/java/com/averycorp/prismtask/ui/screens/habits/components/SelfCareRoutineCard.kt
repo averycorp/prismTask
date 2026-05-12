@@ -71,11 +71,7 @@ internal fun SelfCareRoutineCard(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = if (cardData.isComplete) {
-                    c.primary.copy(alpha = 0.4f)
-                } else {
-                    c.border
-                },
+                color = c.primary.copy(alpha = 0.4f),
                 shape = cardShape
             ),
         shape = cardShape,
