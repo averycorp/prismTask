@@ -240,22 +240,23 @@ class PomodoroTimerService : Service() {
 
     /**
      * Lifecycle-event widget refresh. Called on start / pause / resume /
-     * stop / complete to push the run flags + Chronometer deadline.
+     * stop / complete to push the run flags + countdown deadline.
      * Structural fields (mode, session counts, pomodoro flag) stay as the
-     * ViewModel last wrote them — DataStore edits are atomic so the two
-     * writers don't race.
+     * in-app ViewModel last wrote them — DataStore edits are atomic so the
+     * two writers don't race.
      *
-     * Only fires for [OWNER_TIMER] sessions because the in-app TimerWidget
-     * reflects the regular Timer screen — a Smart Pomodoro session driving
-     * the widget would surface a different mode/session count than the user
-     * sees in the Timer screen.
+     * Fires for both [OWNER_TIMER] and [OWNER_SMART_POMODORO] so the widget
+     * reflects whichever Pomodoro flow the user is actually running. The
+     * displayed mode/session count may be stale during a Smart Pomodoro
+     * session (those fields come from the regular Timer ViewModel) — that's
+     * an acceptable trade for the widget showing a live countdown instead
+     * of staying frozen on "Ready to Focus".
      *
      * Errors are swallowed so a flaky DataStore disk or an unplaced widget
      * never crashes the foreground service.
      */
     private suspend fun pushWidgetRunState(running: Boolean, paused: Boolean) {
         if (!BuildConfig.WIDGETS_ENABLED) return
-        if (owner != OWNER_TIMER) return
         try {
             TimerStateDataStore.writeRunState(
                 context = this,
@@ -278,7 +279,6 @@ class PomodoroTimerService : Service() {
      */
     private suspend fun pushWidgetTick() {
         if (!BuildConfig.WIDGETS_ENABLED) return
-        if (owner != OWNER_TIMER) return
         try {
             TimerWidget().updateAll(this)
         } catch (e: Exception) {
