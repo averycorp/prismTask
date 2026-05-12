@@ -53,8 +53,9 @@ constructor(
      * total number of rows pushed + applied.
      */
     suspend fun sync(): Int {
-        val pushed = pushPending()
-        val pulled = pullAndReconcile()
+        val justPushed = mutableSetOf<Long>()
+        val pushed = pushPending(justPushed)
+        val pulled = pullAndReconcile(justPushed)
         return pushed + pulled
     }
 
@@ -62,18 +63,31 @@ constructor(
      * Walk every pending sync-metadata row for `leisure_activity` and
      * apply it to the backend. Mints a cloud_id on first push so the
      * server-side primary key is stable across re-runs.
+     *
+     * Records the [localId] of every successfully-pushed *non-delete*
+     * row in [justPushed] so the subsequent pull's orphan reconciler
+     * doesn't nuke a row we just sent up but that the backend hasn't
+     * yet round-tripped into the canonical list (eventual consistency
+     * inside one sync cycle).
      */
-    private suspend fun pushPending(): Int {
+    private suspend fun pushPending(justPushed: MutableSet<Long>): Int {
         val pending = syncMetadataDao.getPendingActions()
             .filter { it.entityType == ENTITY_TYPE }
         if (pending.isEmpty()) return 0
         var ops = 0
         for (meta in pending) {
             try {
-                when (meta.pendingAction) {
-                    "create" -> ops += pushCreate(meta)
-                    "update" -> ops += pushUpdate(meta)
-                    "delete" -> ops += pushDelete(meta)
+                val applied = when (meta.pendingAction) {
+                    "create" -> pushCreate(meta)
+                    "update" -> pushUpdate(meta)
+                    "delete" -> pushDelete(meta)
+                    else -> 0
+                }
+                if (applied > 0) {
+                    ops += applied
+                    if (meta.pendingAction != "delete") {
+                        justPushed += meta.localId
+                    }
                 }
             } catch (e: Exception) {
                 logger.error(
@@ -193,9 +207,11 @@ constructor(
      * Pull the canonical activity list from the backend and merge into
      * Room. Last-write-wins by `updated_at`. Local rows whose cloud_id
      * isn't in the remote list are treated as remote-side deletes —
-     * unless they have a pending local action that hasn't pushed yet.
+     * unless they have a pending local action that hasn't pushed yet,
+     * or were just pushed in this sync cycle (their [localId] is in
+     * [justPushed]) and the backend hasn't yet round-tripped them.
      */
-    private suspend fun pullAndReconcile(): Int {
+    private suspend fun pullAndReconcile(justPushed: Set<Long>): Int {
         val remote = api.listLeisureActivities(enabledOnly = false)
         var applied = 0
         val remoteCloudIds = HashSet<String>(remote.size)
@@ -203,7 +219,7 @@ constructor(
             remoteCloudIds += row.id
             applied += applyRemote(row)
         }
-        applied += reconcileLocalOrphans(remoteCloudIds)
+        applied += reconcileLocalOrphans(remoteCloudIds, justPushed)
         logger.debug(
             operation = "pull.leisure_activity",
             entity = ENTITY_TYPE,
@@ -271,15 +287,22 @@ constructor(
     /**
      * Delete any local row that was previously synced (has a cloud_id)
      * but no longer appears in the remote list — another device deleted
-     * it. Rows with a pending local action are preserved so we don't
-     * clobber an in-flight create/update.
+     * it. Rows are preserved when:
+     *   • there's a pending local action (an in-flight create/update),
+     *   • the row was just pushed in this sync cycle (its localId is
+     *     in [justPushed]) — the backend has it; the pull simply
+     *     hasn't seen it yet.
      */
-    private suspend fun reconcileLocalOrphans(remoteCloudIds: Set<String>): Int {
+    private suspend fun reconcileLocalOrphans(
+        remoteCloudIds: Set<String>,
+        justPushed: Set<Long>
+    ): Int {
         val locals = activityDao.getAllOnce()
         var deleted = 0
         for (activity in locals) {
             val cloudId = activity.cloudId?.takeIf { it.isNotBlank() } ?: continue
             if (cloudId in remoteCloudIds) continue
+            if (activity.id in justPushed) continue
             val meta = syncMetadataDao.get(activity.id, ENTITY_TYPE)
             if (meta?.pendingAction != null) continue
             activityDao.deleteById(activity.id)
