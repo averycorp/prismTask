@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -182,6 +183,74 @@ class QuickAddViewModelBatchSubmitGuardTest {
 
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    /**
+     * Defense-in-depth regression test. The screen-level fix gives each
+     * `QuickAddBar` composition site under the `MainTabs` pager a distinct
+     * `hiltViewModel(key = …)` so two bars never share one VM. But the VM
+     * itself also defends: `_batchIntents` is backed by a [Channel]
+     * (`receiveAsFlow()`), not a `MutableSharedFlow`, so a single emission
+     * is delivered to **exactly one** collector. Even if a future
+     * composition site regresses and two `LaunchedEffect` collectors
+     * share this VM, only one will fire `onBatchCommand` — the host
+     * navigates once, not twice.
+     *
+     * Pre-Channel (when `_batchIntents` was `MutableSharedFlow`), the
+     * single emit fanned out to both collectors and the host navigated
+     * twice, stacking two `BatchPreview` screens (the user-visible
+     * "preview, accept, then it runs a second time" bug).
+     */
+    @Test
+    fun onSubmit_batch_twoCollectors_emitDeliveredToExactlyOne() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        viewModel.inputText.value = "complete all tasks today"
+
+        val collectorA = mutableListOf<String>()
+        val collectorB = mutableListOf<String>()
+        val jobA = launch { viewModel.batchIntents.collect { collectorA += it } }
+        val jobB = launch { viewModel.batchIntents.collect { collectorB += it } }
+        // Let both collectors register before the emit.
+        advanceUntilIdle()
+
+        viewModel.onSubmit()
+        advanceUntilIdle()
+
+        // Exactly one collector receives the emit. Which one is racy
+        // (whichever the dispatcher resumes first), but the **total** count
+        // must be 1, not 2.
+        assertEquals(1, collectorA.size + collectorB.size)
+
+        jobA.cancel()
+        jobB.cancel()
+    }
+
+    /**
+     * Same defense for the multi-create path. The bug class is identical
+     * (single emit fanning out to two `LaunchedEffect` collectors that
+     * share a `QuickAddViewModel`), so the `Channel` defense applies the
+     * same way.
+     */
+    @Test
+    fun onSubmit_multiCreate_twoCollectors_emitDeliveredToExactlyOne() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+        // Newline-separated input is rule-(a) of MultiCreateDetector.
+        val multiLine = "buy milk\nfeed cat\ncall dad"
+        viewModel.inputText.value = multiLine
+
+        val collectorA = mutableListOf<String>()
+        val collectorB = mutableListOf<String>()
+        val jobA = launch { viewModel.multiCreateIntents.collect { collectorA += it } }
+        val jobB = launch { viewModel.multiCreateIntents.collect { collectorB += it } }
+        advanceUntilIdle()
+
+        viewModel.onSubmit()
+        advanceUntilIdle()
+
+        assertEquals(1, collectorA.size + collectorB.size)
+
+        jobA.cancel()
+        jobB.cancel()
     }
 
     private fun newViewModel(): QuickAddViewModel = QuickAddViewModel(

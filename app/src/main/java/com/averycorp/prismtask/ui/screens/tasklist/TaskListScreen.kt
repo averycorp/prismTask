@@ -739,8 +739,20 @@ fun TaskListScreen(
                 onManageProjects = { navController.navigate(PrismTaskRoute.ProjectList.route) }
             )
 
-            // Quick add bar
+            // Quick add bar.
+            //
+            // The `hiltViewModel(key = ...)` is load-bearing: TaskList (idx 1)
+            // and Today (idx 0) live under the same `MainTabs` NavBackStackEntry
+            // inside a `HorizontalPager(beyondViewportPageCount = 1)`. Both
+            // pages stay composed simultaneously, and `FloatingQuickAddBar` on
+            // Today also resolves `hiltViewModel<QuickAddViewModel>()`. Without
+            // distinct keys both bars would share one VM, every
+            // `_batchIntents` / `_multiCreateIntents` emit would fan out to
+            // both `LaunchedEffect` collectors, and the host would navigate
+            // twice — the user sees BatchPreview run, accept, then run again
+            // off the second navigation.
             QuickAddBar(
+                viewModel = hiltViewModel(key = "tasklist_quickadd"),
                 onMultiCreate = { rawText ->
                     navController.navigate(
                         PrismTaskRoute.MultiCreate.createRoute(rawText)
