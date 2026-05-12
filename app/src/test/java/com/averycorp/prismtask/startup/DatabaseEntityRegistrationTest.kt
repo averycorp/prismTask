@@ -101,14 +101,16 @@ class DatabaseEntityRegistrationTest {
     }
 
     @Test
-    fun `exactly 31 entities are registered`() {
-        // PrismTaskDatabase @Database annotation lists 31 entities.
+    fun `exactly 32 entities are registered`() {
+        // PrismTaskDatabase @Database annotation lists 32 entities.
         // If someone adds or removes one, both this test and the annotation
-        // must be updated together.
+        // must be updated together. Leisure Budget v2.0 (migration 81→82):
+        // dropped LeisureLogEntity, added LeisureActivityEntity +
+        // LeisureSessionEntity (net +1).
         assertTrue(
-            "Expected 31 entity classes, found ${expectedEntityClasses.size}. " +
+            "Expected 32 entity classes, found ${expectedEntityClasses.size}. " +
                 "Update this test AND PrismTaskDatabase.kt if entities were added/removed.",
-            expectedEntityClasses.size == 31
+            expectedEntityClasses.size == 32
         )
     }
 

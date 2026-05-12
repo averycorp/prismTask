@@ -48,7 +48,7 @@ class DataStoreCollisionTest {
         "archive_prefs",
         "dashboard_prefs",
         "habit_list_prefs",
-        "leisure_prefs",
+        "leisure_budget_prefs",
         "auth_token_prefs",
         "morning_checkin_prefs",
         "notification_prefs",
