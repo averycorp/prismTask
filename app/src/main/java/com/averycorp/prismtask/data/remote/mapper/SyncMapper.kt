@@ -15,7 +15,8 @@ import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.HabitLogEntity
 import com.averycorp.prismtask.data.local.entity.HabitTemplateEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
+import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
+import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.local.entity.MedicationRefillEntity
 import com.averycorp.prismtask.data.local.entity.MilestoneEntity
 import com.averycorp.prismtask.data.local.entity.MoodEnergyLogEntity
@@ -728,41 +729,58 @@ object SyncMapper {
         updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
     )
 
-    // ── Leisure logs ──────────────────────────────────────────────────────────
+    // ── Leisure Budget v2.0 (Items 7 + 8) ─────────────────────────────────────
 
-    fun leisureLogToMap(log: LeisureLogEntity): Map<String, Any?> = mapOf(
-        "localId" to log.id,
-        "date" to log.date,
-        "musicPick" to log.musicPick,
-        "musicDone" to log.musicDone,
-        "flexPick" to log.flexPick,
-        "flexDone" to log.flexDone,
-        "languagePick" to log.languagePick,
-        "languageDone" to log.languageDone,
-        "customSectionsState" to log.customSectionsState,
-        "startedAt" to log.startedAt,
-        "createdAt" to log.createdAt,
-        "updatedAt" to log.updatedAt
+    fun leisureActivityToMap(activity: LeisureActivityEntity): Map<String, Any?> = mapOf(
+        "localId" to activity.id,
+        "name" to activity.name,
+        "category" to activity.category,
+        "defaultDurationMinutes" to activity.defaultDurationMinutes,
+        "enabled" to activity.enabled,
+        "createdAt" to activity.createdAt,
+        "updatedAt" to activity.updatedAt,
+        "lastCompletedAt" to activity.lastCompletedAt
     )
 
-    fun mapToLeisureLog(
+    fun mapToLeisureActivity(
         data: Map<String, Any?>,
         localId: Long = 0,
         cloudId: String? = null
-    ): LeisureLogEntity = LeisureLogEntity(
+    ): LeisureActivityEntity = LeisureActivityEntity(
         id = localId,
         cloudId = cloudId,
-        date = (data["date"] as? Number)?.toLong() ?: 0L,
-        musicPick = data["musicPick"] as? String,
-        musicDone = data["musicDone"] as? Boolean ?: false,
-        flexPick = data["flexPick"] as? String,
-        flexDone = data["flexDone"] as? Boolean ?: false,
-        languagePick = data["languagePick"] as? String,
-        languageDone = data["languageDone"] as? Boolean ?: false,
-        customSectionsState = data["customSectionsState"] as? String,
-        startedAt = (data["startedAt"] as? Number)?.toLong(),
+        name = data["name"] as? String ?: "",
+        category = data["category"] as? String ?: "PASSIVE",
+        defaultDurationMinutes = (data["defaultDurationMinutes"] as? Number)?.toInt(),
+        enabled = data["enabled"] as? Boolean ?: true,
         createdAt = (data["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-        updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
+        updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
+        lastCompletedAt = (data["lastCompletedAt"] as? Number)?.toLong()
+    )
+
+    fun leisureSessionToMap(session: LeisureSessionEntity): Map<String, Any?> = mapOf(
+        "localId" to session.id,
+        "activityId" to session.activityId,
+        "category" to session.category,
+        "durationMinutes" to session.durationMinutes,
+        "loggedAt" to session.loggedAt,
+        "source" to session.source,
+        "createdAt" to session.createdAt
+    )
+
+    fun mapToLeisureSession(
+        data: Map<String, Any?>,
+        localId: Long = 0,
+        cloudId: String? = null
+    ): LeisureSessionEntity = LeisureSessionEntity(
+        id = localId,
+        cloudId = cloudId,
+        activityId = (data["activityId"] as? Number)?.toLong(),
+        category = data["category"] as? String ?: "PASSIVE",
+        durationMinutes = (data["durationMinutes"] as? Number)?.toInt() ?: 0,
+        loggedAt = (data["loggedAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+        source = data["source"] as? String ?: "MANUAL",
+        createdAt = (data["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
     )
 
     // ── Self-care steps ───────────────────────────────────────────────────────

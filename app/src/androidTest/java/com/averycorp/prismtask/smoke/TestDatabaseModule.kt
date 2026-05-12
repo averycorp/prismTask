@@ -55,7 +55,10 @@ object TestDatabaseModule {
     fun provideHabitCompletionDao(database: PrismTaskDatabase) = database.habitCompletionDao()
 
     @Provides
-    fun provideLeisureDao(database: PrismTaskDatabase) = database.leisureDao()
+    fun provideLeisureActivityDao(database: PrismTaskDatabase) = database.leisureActivityDao()
+
+    @Provides
+    fun provideLeisureSessionDao(database: PrismTaskDatabase) = database.leisureSessionDao()
 
     @Provides
     fun provideSchoolworkDao(database: PrismTaskDatabase) = database.schoolworkDao()

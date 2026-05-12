@@ -4,7 +4,6 @@ import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.data.calendar.CalendarSyncPreferences
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
 import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.SchoolworkDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
@@ -19,7 +18,6 @@ import com.averycorp.prismtask.data.preferences.CoachingPreferences
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
 import com.averycorp.prismtask.data.preferences.MedicationPreferences
 import com.averycorp.prismtask.data.preferences.MorningCheckInPreferences
 import com.averycorp.prismtask.data.preferences.NdPreferencesDataStore
@@ -104,7 +102,6 @@ constructor(
     private val habitCompletionDao: HabitCompletionDao,
     private val taskCompletionDao: TaskCompletionDao,
     private val habitLogDao: com.averycorp.prismtask.data.local.dao.HabitLogDao,
-    private val leisureDao: LeisureDao,
     private val selfCareDao: SelfCareDao,
     private val schoolworkDao: SchoolworkDao,
     private val themePreferences: ThemePreferences,
@@ -113,7 +110,6 @@ constructor(
     private val tabPreferences: TabPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val habitListPreferences: HabitListPreferences,
-    private val leisurePreferences: LeisurePreferences,
     private val medicationPreferences: MedicationPreferences,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     // v5 additions — see audit doc
@@ -188,8 +184,14 @@ constructor(
         root.add("habits", gson.toJsonTree(habits))
         val habitNameById = habits.associate { it.id to it.name }
 
-        // === Leisure Logs ===
-        root.add("leisureLogs", gson.toJsonTree(leisureDao.getAllLogsOnce()))
+        // === Leisure Budget v2.0 (Items 7+8) ===
+        // v1.x leisure_logs table retired in migration 81→82. New v2.0
+        // leisure_activities + leisure_sessions are surfaced under
+        // dedicated keys instead. The legacy "leisureLogs" key is
+        // omitted so importers don't try to re-hydrate the slot-pick
+        // shape. TODO(post-v2.0): wire DAO-level export here once the
+        // v2.0 leisure_activity/_session DAO injections are tidied
+        // into this module.
 
         // === Self-Care Logs & Steps ===
         root.add("selfCareLogs", gson.toJsonTree(selfCareDao.getAllLogsOnce()))
@@ -376,11 +378,8 @@ constructor(
         )
         config.add("habitList", habitList)
 
-        // Leisure
-        val leisure = JsonObject()
-        leisure.add("customMusicActivities", gson.toJsonTree(leisurePreferences.getCustomMusicActivities().first()))
-        leisure.add("customFlexActivities", gson.toJsonTree(leisurePreferences.getCustomFlexActivities().first()))
-        config.add("leisure", leisure)
+        // Leisure Budget v2.0: pool/settings export moved to dedicated
+        // top-level keys (leisure_activities table → see TODO above).
 
         // Medication
         val medication = JsonObject()

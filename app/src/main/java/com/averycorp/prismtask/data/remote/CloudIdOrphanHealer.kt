@@ -11,7 +11,6 @@ import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.HabitLogDao
 import com.averycorp.prismtask.data.local.dao.HabitTemplateDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.dao.MedicationRefillDao
@@ -136,7 +135,6 @@ constructor(
     private val syncMetadataDao: SyncMetadataDao,
     private val selfCareDao: SelfCareDao,
     private val schoolworkDao: SchoolworkDao,
-    private val leisureDao: LeisureDao,
     private val taskDao: TaskDao,
     private val projectDao: ProjectDao,
     private val tagDao: TagDao,
@@ -229,11 +227,8 @@ constructor(
                 entity.cloudId?.takeIf { it.isNotBlank() }?.let { CloudIdRow(entity.id, it) }
             }
         }
-        healFamily("leisure_logs", "leisure_log", fetcher) {
-            leisureDao.getAllLogsOnce().mapNotNull { entity ->
-                entity.cloudId?.takeIf { it.isNotBlank() }?.let { CloudIdRow(entity.id, it) }
-            }
-        }
+        // Leisure Budget v2.0: v1.x leisure_logs Firestore healing retired
+        // in migration 81→82.
 
         // ── Tier-1 families (via doInitialUpload) ──
         healFamily("projects", "project", fetcher) {

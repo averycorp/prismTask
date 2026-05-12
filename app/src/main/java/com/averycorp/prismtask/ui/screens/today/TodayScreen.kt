@@ -701,14 +701,18 @@ fun TodayScreen(
                                     onOpenAssignment = {
                                         navController.navigate(PrismTaskRoute.Schoolwork.route)
                                     },
-                                    onPickMusic = {
+                                    onOpenLeisurePool = {
                                         navController.navigate(PrismTaskRoute.Leisure.route)
                                     },
-                                    onToggleMusicDone = { viewModel.onToggleMusicDone() },
-                                    onPickFlex = {
+                                    onStartLeisureTimer = {
                                         navController.navigate(PrismTaskRoute.Leisure.route)
                                     },
-                                    onToggleFlexDone = { viewModel.onToggleFlexDone() },
+                                    onLogPastLeisure = {
+                                        navController.navigate(PrismTaskRoute.Leisure.route)
+                                    },
+                                    onRefreshLeisureSuggestion = {
+                                        viewModel.onRefreshLeisureSuggestion()
+                                    },
                                     onDismissHint = { viewModel.onDismissDailyEssentialsHint() },
                                     onOpenSettings = {
                                         navController.navigate("settings/layout")

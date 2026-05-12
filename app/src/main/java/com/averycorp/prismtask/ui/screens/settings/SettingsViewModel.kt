@@ -24,7 +24,6 @@ import com.averycorp.prismtask.data.preferences.AuthTokenPreferences
 import com.averycorp.prismtask.data.preferences.BackendSyncPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.OnboardingPreferences
 import com.averycorp.prismtask.data.preferences.TabPreferences
@@ -75,7 +74,6 @@ constructor(
     private val tabPreferences: TabPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val timerPreferences: TimerPreferences,
-    private val leisurePreferences: LeisurePreferences,
     private val habitListPreferences: HabitListPreferences,
     private val database: PrismTaskDatabase,
     internal val dataExporter: DataExporter,
@@ -1521,7 +1519,10 @@ constructor(
                     dashboardPreferences.resetToDefaults()
                     tabPreferences.resetToDefaults()
                     taskBehaviorPreferences.resetToDefaults()
-                    leisurePreferences.clearAll()
+                    // Leisure Budget v2.0: v1.x leisure prefs file
+                    // retired; no-op here. The new LeisureBudgetPreferences
+                    // is wiped via Room table clear if Settings → Wipe
+                    // Data eventually adds DAO-level clears.
                     habitListPreferences.clearAll()
                     backendSyncPreferences.clear()
                     templatePreferences.clear()

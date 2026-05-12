@@ -25,7 +25,7 @@ import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.WorkLifeBalancePrefs
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.data.repository.HabitWithStatus
-import com.averycorp.prismtask.data.repository.LeisureRepository
+import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.MedicationRefillRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
@@ -95,7 +95,7 @@ constructor(
     private val dailyEssentialsPreferences: DailyEssentialsPreferences,
     private val selfCareRepository: SelfCareRepository,
     private val schoolworkRepository: SchoolworkRepository,
-    private val leisureRepository: LeisureRepository,
+    private val leisureRepository: LeisureBudgetRepository,
     private val localDateFlow: LocalDateFlow,
     private val tourCardPreferences: TourCardPreferences,
     private val coachmarkController: CoachmarkController,
@@ -729,7 +729,7 @@ constructor(
         if (!medicationOn) disabledNames.add(SelfCareRepository.MEDICATION_HABIT_NAME)
         if (!houseworkOn) disabledNames.add(SelfCareRepository.HOUSEWORK_HABIT_NAME)
         if (!schoolOn) disabledNames.add(SchoolworkRepository.SCHOOL_HABIT_NAME)
-        if (!leisureOn) disabledNames.add(LeisureRepository.LEISURE_HABIT_NAME)
+        if (!leisureOn) disabledNames.add(LeisureBudgetRepository.LEISURE_META_HABIT_NAME)
         habits
             .filter { it.habit.name !in disabledNames }
             .filter { hws ->
@@ -1260,24 +1260,16 @@ constructor(
         onToggleHabitCompletion(habit.habitId, habit.completedToday)
     }
 
-    fun onToggleMusicDone() {
-        val state = dailyEssentials.value.musicLeisure
+    /**
+     * Leisure Budget v2.0 — Today card actions.
+     * Refresh a leisure suggestion (consumes one of the daily refreshes).
+     */
+    fun onRefreshLeisureSuggestion() {
         viewModelScope.launch {
             try {
-                leisureRepository.toggleMusicDone(!state.doneForToday)
+                leisureRepository.refreshSuggestion()
             } catch (e: Exception) {
-                Log.e("TodayVM", "Failed to toggle music done", e)
-            }
-        }
-    }
-
-    fun onToggleFlexDone() {
-        val state = dailyEssentials.value.flexLeisure
-        viewModelScope.launch {
-            try {
-                leisureRepository.toggleFlexDone(!state.doneForToday)
-            } catch (e: Exception) {
-                Log.e("TodayVM", "Failed to toggle flex done", e)
+                Log.e("TodayVM", "Failed to refresh leisure suggestion", e)
             }
         }
     }

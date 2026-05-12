@@ -2,8 +2,6 @@ package com.averycorp.prismtask.ui.screens.templates
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
-import com.averycorp.prismtask.data.preferences.LeisureSlotId
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,13 +18,17 @@ import javax.inject.Inject
  * content as onboarding but commits selections immediately on demand (rather
  * than on onboarding completion). Pre-populates nothing so returning users
  * can additively pick more templates without fighting existing state.
+ *
+ * Leisure Budget v2.0: leisure-slot template seeding (music/flex/language)
+ * is retired with the v1.x slot model. The new leisure pool is seeded
+ * directly via [com.averycorp.prismtask.ui.screens.leisure.LeisurePoolScreen]
+ * → "Add activity" rather than through template selection.
  */
 @HiltViewModel
 class TemplateBrowserViewModel
 @Inject
 constructor(
-    private val selfCareRepository: SelfCareRepository,
-    private val leisurePreferences: LeisurePreferences
+    private val selfCareRepository: SelfCareRepository
 ) : ViewModel() {
     private val _selections = MutableStateFlow(TemplateSelections())
     val selections: StateFlow<TemplateSelections> = _selections.asStateFlow()
@@ -41,15 +43,6 @@ constructor(
     fun commit() {
         val snapshot = _selections.value
         viewModelScope.launch {
-            applyLeisureSelection(LeisureSlotId.MUSIC, snapshot.musicIds)
-            applyLeisureSelection(LeisureSlotId.FLEX, snapshot.flexIds)
-            applyLeisureSelection(LeisureSlotId.LANGUAGE, snapshot.languageIds)
-            // LANGUAGE defaults to disabled, so picking a language here also
-            // has to flip the slot on for the activity rotation to surface
-            // on the leisure screen — same reasoning as onboarding.
-            if (snapshot.languageIds.isNotEmpty()) {
-                leisurePreferences.updateSlotConfig(LeisureSlotId.LANGUAGE, enabled = true)
-            }
             listOf("morning", "bedtime", "housework").forEach { routineType ->
                 val stepIds = snapshot.effectiveStepIds(routineType)
                 if (stepIds.isNotEmpty()) {
@@ -58,17 +51,6 @@ constructor(
             }
             _selections.value = TemplateSelections()
             _messages.tryEmit("Templates added")
-        }
-    }
-
-    /**
-     * In the Settings browser we only un-hide leisure options the user
-     * picks; we do NOT re-hide ones they didn't pick, since that would
-     * undo choices they made previously. This keeps the screen additive.
-     */
-    private suspend fun applyLeisureSelection(slot: LeisureSlotId, selectedIds: Set<String>) {
-        selectedIds.forEach { id ->
-            leisurePreferences.setBuiltInHidden(slot, id, hidden = false)
         }
     }
 }

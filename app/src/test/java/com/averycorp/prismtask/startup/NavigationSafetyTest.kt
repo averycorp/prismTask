@@ -43,7 +43,7 @@ class NavigationSafetyTest {
         "ui/screens/selfcare/SelfCareScreen.kt",
         "ui/screens/medication/MedicationScreen.kt",
         "ui/screens/medication/MedicationLogScreen.kt",
-        "ui/screens/leisure/LeisureScreen.kt",
+        "ui/screens/leisure/LeisurePoolScreen.kt",
         "ui/screens/schoolwork/SchoolworkScreen.kt",
         "ui/screens/schoolwork/AddEditCourseScreen.kt",
         "ui/screens/eisenhower/EisenhowerScreen.kt",

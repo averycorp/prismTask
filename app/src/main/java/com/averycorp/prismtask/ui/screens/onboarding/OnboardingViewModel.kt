@@ -5,8 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.preferences.A11yPreferences
 import com.averycorp.prismtask.data.preferences.ForgivenessPrefs
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
-import com.averycorp.prismtask.data.preferences.LeisureSlotId
 import com.averycorp.prismtask.data.preferences.NdPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.OnboardingPreferences
@@ -21,7 +19,6 @@ import com.averycorp.prismtask.data.remote.SyncService
 import com.averycorp.prismtask.data.remote.sync.PrismSyncLogger
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
-import com.averycorp.prismtask.ui.screens.leisure.LeisureViewModel
 import com.averycorp.prismtask.ui.screens.templates.TemplateSelections
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,7 +43,6 @@ constructor(
     private val syncService: SyncService,
     private val taskRepository: TaskRepository,
     private val selfCareRepository: SelfCareRepository,
-    private val leisurePreferences: LeisurePreferences,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val canonicalOnboardingSync: CanonicalOnboardingSync,
@@ -498,42 +494,14 @@ constructor(
      * (idempotent, safe to run on an already-populated DB).
      */
     internal suspend fun applyTemplateSelections(selections: TemplateSelections) {
-        applyLeisureSelection(
-            LeisureSlotId.MUSIC,
-            LeisureViewModel.DEFAULT_INSTRUMENTS.map { it.id },
-            selections.musicIds
-        )
-        applyLeisureSelection(
-            LeisureSlotId.FLEX,
-            LeisureViewModel.DEFAULT_FLEX_OPTIONS.map { it.id },
-            selections.flexIds
-        )
-        applyLeisureSelection(
-            LeisureSlotId.LANGUAGE,
-            LeisureViewModel.DEFAULT_LANGUAGE_OPTIONS.map { it.id },
-            selections.languageIds
-        )
-        // LANGUAGE defaults to disabled (see LeisureSlotConfig.defaultFor) so
-        // existing installs keep their meta-habit completion definition
-        // unchanged. Enable the slot only when the user actually picked a
-        // language in onboarding — otherwise leave it off and let the user
-        // opt in later via the leisure-settings screen.
-        if (selections.languageIds.isNotEmpty()) {
-            leisurePreferences.updateSlotConfig(LeisureSlotId.LANGUAGE, enabled = true)
-        }
+        // Leisure Budget v2.0: per-slot music/flex/language template
+        // application retired — onboarding no longer seeds the
+        // (deprecated) slot pool. Users add activities via
+        // LeisurePoolScreen instead. (Item 11 / onboarding addition is
+        // YELLOW-DEFER in the v2.0 bundle.)
         applyRoutineSelection("morning", selections)
         applyRoutineSelection("bedtime", selections)
         applyRoutineSelection("housework", selections)
-    }
-
-    private suspend fun applyLeisureSelection(
-        slot: LeisureSlotId,
-        defaultIds: List<String>,
-        selectedIds: Set<String>
-    ) {
-        defaultIds.forEach { id ->
-            leisurePreferences.setBuiltInHidden(slot, id, hidden = id !in selectedIds)
-        }
     }
 
     private suspend fun applyRoutineSelection(routineType: String, selections: TemplateSelections) {

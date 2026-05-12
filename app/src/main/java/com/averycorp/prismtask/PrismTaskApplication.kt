@@ -14,7 +14,7 @@ import com.averycorp.prismtask.data.remote.AutomationDuplicateBackfiller
 import com.averycorp.prismtask.data.remote.BuiltInHabitReconciler
 import com.averycorp.prismtask.data.remote.LifeCategoryBackfiller
 import com.averycorp.prismtask.data.remote.MedicationMigrationRunner
-import com.averycorp.prismtask.data.repository.LeisureRepository
+import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
 import com.averycorp.prismtask.data.seed.AutomationSampleRulesSeeder
 import com.averycorp.prismtask.data.seed.TemplateSeeder
@@ -56,7 +56,7 @@ class PrismTaskApplication :
     lateinit var schoolworkRepository: SchoolworkRepository
 
     @Inject
-    lateinit var leisureRepository: LeisureRepository
+    lateinit var leisureRepository: LeisureBudgetRepository
 
     @Inject
     lateinit var taskBehaviorPreferences: TaskBehaviorPreferences

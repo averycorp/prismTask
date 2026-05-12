@@ -122,7 +122,7 @@ class HiltDependencyGraphTest {
         val injectedTypes = listOf(
             "HiltWorkerFactory",
             "SchoolworkRepository",
-            "LeisureRepository",
+            "LeisureBudgetRepository",
             "SelfCareRepository",
             "TaskBehaviorPreferences",
             "TemplateSeeder"

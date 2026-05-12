@@ -13,7 +13,8 @@ import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.HabitLogEntity
 import com.averycorp.prismtask.data.local.entity.HabitTemplateEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
+import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
+import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.local.entity.MedicationRefillEntity
 import com.averycorp.prismtask.data.local.entity.MoodEnergyLogEntity
 import com.averycorp.prismtask.data.local.entity.NlpShortcutEntity
@@ -63,7 +64,8 @@ class DatabaseEntityRegistrationTest {
         HabitEntity::class.java,
         HabitCompletionEntity::class.java,
         HabitLogEntity::class.java,
-        LeisureLogEntity::class.java,
+        LeisureActivityEntity::class.java,
+        LeisureSessionEntity::class.java,
         CourseEntity::class.java,
         AssignmentEntity::class.java,
         CourseCompletionEntity::class.java,

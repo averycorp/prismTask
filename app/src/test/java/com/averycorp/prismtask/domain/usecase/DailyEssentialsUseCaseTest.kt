@@ -69,9 +69,9 @@ class DailyEssentialsUseCaseTest {
     }
 
     @Test
-    fun `state with only leisure picks is not empty`() {
+    fun `state with only leisure budget minutes is not empty`() {
         val state = DailyEssentialsUiState.empty().copy(
-            musicLeisure = LeisureCardState(LeisureKind.MUSIC, "classical", doneForToday = false)
+            leisureBudget = LeisureBudgetCardState.empty().copy(minutesLogged = 30)
         )
         assertFalse(state.isEmpty)
     }

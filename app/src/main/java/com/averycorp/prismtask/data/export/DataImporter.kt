@@ -3,7 +3,6 @@ package com.averycorp.prismtask.data.export
 import com.averycorp.prismtask.data.calendar.CalendarSyncPreferences
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
 import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.SchoolworkDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
@@ -14,7 +13,6 @@ import com.averycorp.prismtask.data.local.entity.CourseCompletionEntity
 import com.averycorp.prismtask.data.local.entity.CourseEntity
 import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareStepEntity
@@ -31,7 +29,6 @@ import com.averycorp.prismtask.data.preferences.BuiltInSortOrders
 import com.averycorp.prismtask.data.preferences.BurnoutWeights
 import com.averycorp.prismtask.data.preferences.CoachingPreferences
 import com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords
-import com.averycorp.prismtask.data.preferences.CustomLeisureActivity
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.EditorFieldRows
@@ -41,7 +38,6 @@ import com.averycorp.prismtask.data.preferences.ForgivenessPrefs
 import com.averycorp.prismtask.data.preferences.GoodEnoughTimerConfig
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.HabitReminderFallback
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
 import com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords
 import com.averycorp.prismtask.data.preferences.MedicationPreferences
 import com.averycorp.prismtask.data.preferences.MedicationScheduleMode
@@ -177,7 +173,6 @@ constructor(
     private val habitCompletionDao: HabitCompletionDao,
     private val taskCompletionDao: com.averycorp.prismtask.data.local.dao.TaskCompletionDao,
     private val habitLogDao: com.averycorp.prismtask.data.local.dao.HabitLogDao,
-    private val leisureDao: LeisureDao,
     private val selfCareDao: SelfCareDao,
     private val schoolworkDao: SchoolworkDao,
     private val medicationDao: com.averycorp.prismtask.data.local.dao.MedicationDao,
@@ -197,7 +192,6 @@ constructor(
     private val tabPreferences: TabPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val habitListPreferences: HabitListPreferences,
-    private val leisurePreferences: LeisurePreferences,
     private val medicationPreferences: MedicationPreferences,
     private val userPreferencesDataStore: com.averycorp.prismtask.data.preferences.UserPreferencesDataStore,
     // v5 additions — see audit doc
@@ -660,23 +654,19 @@ constructor(
     }
 
     private suspend fun importLeisureLogs(ctx: ImportContext, root: JsonObject) {
-        val existingLeisureDates = leisureDao.getAllLogsOnce().map { it.date }.toMutableSet()
-        root.getAsJsonArray("leisureLogs")?.forEach { elem ->
-            try {
-                val obj = elem.asJsonObject
-                val date = obj.get("date")?.takeIf { !it.isJsonNull }?.asLong ?: return@forEach
-                if (date in existingLeisureDates) {
-                    ctx.duplicatesSkipped++
-                    return@forEach
-                }
-                val default = LeisureLogEntity(date = date)
-                val merged = mergeEntityWithDefaults(default, obj)
-                leisureDao.insertLog(merged.copy(id = 0))
-                existingLeisureDates.add(date)
-                ctx.leisureLogsImported++
-            } catch (e: Exception) {
-                ctx.errors.add("Failed to import leisure log: ${e.message}")
-            }
+        // Leisure Budget v2.0: v1.x leisure_logs format is no longer
+        // imported — the table was dropped in migration 81→82. v2.0
+        // exports use the new leisure_activities / leisure_sessions
+        // shape; round-tripping a pre-v82 export is intentionally a
+        // no-op (the rows wouldn't translate into the v2.0 model
+        // without duration data anyway).
+        if (root.getAsJsonArray("leisureLogs") != null) {
+            // Surface the skip so the import summary doesn't silently
+            // drop a chunk of the user's old export.
+            ctx.errors.add(
+                "Skipped legacy leisure_logs payload — v1.x slot picks " +
+                    "don't translate into the v2.0 session-log model."
+            )
         }
     }
 
@@ -1277,42 +1267,14 @@ constructor(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun importLeisureConfig(ctx: ImportContext, config: JsonObject) {
-        config.getAsJsonObject("leisure")?.let { lp ->
-            val listType = object : TypeToken<List<CustomLeisureActivity>>() {}.type
-            lp.getAsJsonArray("customMusicActivities")?.let { arr ->
-                val activities: List<CustomLeisureActivity> = gson.fromJson(arr, listType)
-                val existingLabels = leisurePreferences
-                    .getCustomMusicActivities()
-                    .first()
-                    .map { it.label.lowercase() }
-                    .toMutableSet()
-                activities.forEach {
-                    if (it.label.lowercase() !in existingLabels) {
-                        leisurePreferences.addMusicActivity(it.label, it.icon)
-                        existingLabels.add(it.label.lowercase())
-                    } else {
-                        ctx.duplicatesSkipped++
-                    }
-                }
-            }
-            lp.getAsJsonArray("customFlexActivities")?.let { arr ->
-                val activities: List<CustomLeisureActivity> = gson.fromJson(arr, listType)
-                val existingLabels = leisurePreferences
-                    .getCustomFlexActivities()
-                    .first()
-                    .map { it.label.lowercase() }
-                    .toMutableSet()
-                activities.forEach {
-                    if (it.label.lowercase() !in existingLabels) {
-                        leisurePreferences.addFlexActivity(it.label, it.icon)
-                        existingLabels.add(it.label.lowercase())
-                    } else {
-                        ctx.duplicatesSkipped++
-                    }
-                }
-            }
-        }
+        // Leisure Budget v2.0: v1.x leisure config (per-slot custom
+        // music/flex activities) is retired. The new pool is imported
+        // via the leisure_activities entity payload instead. Pre-v82
+        // backups carrying the legacy `leisure.customMusicActivities`
+        // payload are silently skipped — no error surfaced because the
+        // v1.x payload was never a hard guarantee.
     }
 
     private suspend fun importMedicationConfig(config: JsonObject) {
