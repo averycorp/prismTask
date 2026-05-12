@@ -16,8 +16,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +38,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +61,7 @@ import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
 import com.averycorp.prismtask.domain.model.LeisureCategory
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +70,18 @@ fun LeisurePoolScreen(
     viewModel: LeisurePoolViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var showAddSheet by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<LeisureActivityEntity?>(null) }
+    var checkingOff by remember { mutableStateOf<LeisureActivityEntity?>(null) }
+
+    fun logCheckOff(activity: LeisureActivityEntity, minutes: Int) {
+        viewModel.checkOffActivity(activity, minutes)
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar("Logged $minutes min of ${activity.name}")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -75,6 +94,7 @@ fun LeisurePoolScreen(
                 }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddSheet = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add activity")
@@ -104,7 +124,22 @@ fun LeisurePoolScreen(
                     CategorySectionHeader(category, activitiesForCategory.size)
                 }
                 items(activitiesForCategory, key = { it.id }) { activity ->
-                    ActivityRow(activity = activity, viewModel = viewModel)
+                    ActivityRow(
+                        activity = activity,
+                        onCheckOff = {
+                            val defaultDuration = activity.defaultDurationMinutes
+                            if (defaultDuration != null && defaultDuration > 0) {
+                                logCheckOff(activity, defaultDuration)
+                            } else {
+                                checkingOff = activity
+                            }
+                        },
+                        onEdit = { editing = activity },
+                        onToggleEnabled = { enabled ->
+                            viewModel.setActivityEnabled(activity, enabled)
+                        },
+                        onDelete = { viewModel.deleteActivity(activity) }
+                    )
                 }
             }
             if (state.activities.isEmpty()) {
@@ -122,6 +157,28 @@ fun LeisurePoolScreen(
             onConfirm = { name, category, duration ->
                 viewModel.addActivity(name, category, duration)
                 showAddSheet = false
+            }
+        )
+    }
+
+    editing?.let { activity ->
+        EditActivityDialog(
+            activity = activity,
+            onDismiss = { editing = null },
+            onConfirm = { name, category, duration ->
+                viewModel.updateActivity(activity, name, category, duration)
+                editing = null
+            }
+        )
+    }
+
+    checkingOff?.let { activity ->
+        CheckOffDurationDialog(
+            activity = activity,
+            onDismiss = { checkingOff = null },
+            onConfirm = { minutes ->
+                logCheckOff(activity, minutes)
+                checkingOff = null
             }
         )
     }
@@ -272,7 +329,10 @@ private fun CategorySectionHeader(category: LeisureCategory, count: Int) {
 @Composable
 private fun ActivityRow(
     activity: LeisureActivityEntity,
-    viewModel: LeisurePoolViewModel
+    onCheckOff: () -> Unit,
+    onEdit: () -> Unit,
+    onToggleEnabled: (Boolean) -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -281,19 +341,49 @@ private fun ActivityRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(activity.name, style = MaterialTheme.typography.bodyLarge)
-                activity.defaultDurationMinutes?.let { duration ->
-                    Text(
-                        "$duration min default",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                val parsedCategory = LeisureCategory.fromStringOrNull(activity.category)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (parsedCategory != null) {
+                        AssistChip(
+                            onClick = onEdit,
+                            label = {
+                                Text("${parsedCategory.emoji} ${parsedCategory.label}")
+                            },
+                            colors = AssistChipDefaults.assistChipColors()
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    activity.defaultDurationMinutes?.let { duration ->
+                        Text(
+                            "$duration min default",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+            }
+            IconButton(
+                onClick = onCheckOff,
+                enabled = activity.enabled
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Check off as done",
+                    tint = if (activity.enabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit activity")
             }
             Switch(
                 checked = activity.enabled,
-                onCheckedChange = { viewModel.setActivityEnabled(activity, it) }
+                onCheckedChange = onToggleEnabled
             )
-            IconButton(onClick = { viewModel.deleteActivity(activity) }) {
+            IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete activity")
             }
         }
@@ -379,6 +469,122 @@ private fun AddActivityDialog(
                     onConfirm(name, category, durationStr.toIntOrNull())
                 }
             ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun EditActivityDialog(
+    activity: LeisureActivityEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (String, LeisureCategory, Int?) -> Unit
+) {
+    var name by remember(activity.id) { mutableStateOf(activity.name) }
+    var category by remember(activity.id) {
+        mutableStateOf(
+            LeisureCategory.fromStringOrNull(activity.category) ?: LeisureCategory.PHYSICAL
+        )
+    }
+    var durationStr by remember(activity.id) {
+        mutableStateOf(activity.defaultDurationMinutes?.toString().orEmpty())
+    }
+    var categoryMenuOpen by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Activity") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box {
+                    OutlinedButton(
+                        onClick = { categoryMenuOpen = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("${category.emoji} ${category.label}")
+                    }
+                    DropdownMenu(
+                        expanded = categoryMenuOpen,
+                        onDismissRequest = { categoryMenuOpen = false }
+                    ) {
+                        LeisureCategory.values().forEach { c ->
+                            DropdownMenuItem(
+                                text = { Text("${c.emoji} ${c.label}") },
+                                onClick = {
+                                    category = c
+                                    categoryMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = durationStr,
+                    onValueChange = { durationStr = it.filter(Char::isDigit) },
+                    label = { Text("Default Duration (min, optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(name, category, durationStr.toIntOrNull())
+                },
+                enabled = name.isNotBlank()
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun CheckOffDurationDialog(
+    activity: LeisureActivityEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var durationStr by remember(activity.id) {
+        mutableStateOf(activity.defaultDurationMinutes?.toString() ?: "30")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Log ${activity.name}") },
+        text = {
+            Column {
+                Text(
+                    "How long did you spend on this?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = durationStr,
+                    onValueChange = { durationStr = it.filter(Char::isDigit) },
+                    label = { Text("Duration (min)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val minutes = durationStr.toIntOrNull() ?: 0
+                    if (minutes >= 1) onConfirm(minutes)
+                },
+                enabled = (durationStr.toIntOrNull() ?: 0) >= 1
+            ) { Text("Log") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

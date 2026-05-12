@@ -10,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -59,13 +60,17 @@ fun LogPastLeisureSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             Box {
+                val selectedCategory = selectedActivity
+                    ?.let { LeisureCategory.fromStringOrNull(it.category) }
                 OutlinedButton(
                     onClick = { pickerOpen = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         when {
-                            selectedActivity != null -> "${selectedActivity.name} (${selectedActivity.category})"
+                            selectedActivity != null && selectedCategory != null ->
+                                "${selectedCategory.emoji} ${selectedActivity.name}"
+                            selectedActivity != null -> selectedActivity.name
                             freeText.isNotBlank() -> "Free text: $freeText"
                             else -> "Pick an activity…"
                         }
@@ -76,22 +81,49 @@ fun LogPastLeisureSheet(
                     onDismissRequest = { pickerOpen = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Free text…") },
+                        text = { Text("✍️ Free text…") },
                         onClick = {
                             selectedActivityId = null
                             pickerOpen = false
                         }
                     )
-                    state.activities.filter { it.enabled }.forEach { activity ->
+                    val grouped = state.activities
+                        .filter { it.enabled }
+                        .groupBy { LeisureCategory.fromStringOrNull(it.category) }
+                    LeisureCategory.values().forEach { cat ->
+                        val items = grouped[cat].orEmpty()
+                        if (items.isEmpty()) return@forEach
+                        HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text("${activity.name} — ${activity.category}") },
-                            onClick = {
-                                selectedActivityId = activity.id
-                                LeisureCategory.fromStringOrNull(activity.category)?.let { category = it }
-                                activity.defaultDurationMinutes?.let { durationStr = it.toString() }
-                                pickerOpen = false
-                            }
+                            text = {
+                                Text(
+                                    "${cat.emoji} ${cat.label}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            enabled = false,
+                            onClick = {}
                         )
+                        items.forEach { activity ->
+                            DropdownMenuItem(
+                                text = {
+                                    val durationSuffix = activity
+                                        .defaultDurationMinutes
+                                        ?.let { " • $it min" }.orEmpty()
+                                    Text("${activity.name}$durationSuffix")
+                                },
+                                onClick = {
+                                    selectedActivityId = activity.id
+                                    category = cat
+                                    activity.defaultDurationMinutes?.let {
+                                        durationStr = it.toString()
+                                    }
+                                    pickerOpen = false
+                                }
+                            )
+                        }
                     }
                 }
             }

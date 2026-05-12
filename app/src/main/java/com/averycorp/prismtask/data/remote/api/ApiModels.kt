@@ -1081,4 +1081,39 @@ data class InAppFeedbackResponse(
 )
 // endregion
 
+// region Leisure Budget v2.0 — Activity Pool
+// Mirrors backend/app/schemas/leisure.py. Activity ids are
+// client-generated UUID strings (backend primary key is String(64)).
+// Categories: "PHYSICAL" | "SOCIAL" | "CREATIVE" | "PASSIVE".
+
+data class LeisureActivityCreateRequest(
+    val id: String,
+    val name: String,
+    val category: String,
+    @SerializedName("default_duration_minutes")
+    val defaultDurationMinutes: Int? = null,
+    val enabled: Boolean = true
+)
+
+data class LeisureActivityUpdateRequest(
+    val name: String? = null,
+    val category: String? = null,
+    @SerializedName("default_duration_minutes")
+    val defaultDurationMinutes: Int? = null,
+    val enabled: Boolean? = null
+)
+
+data class LeisureActivityRemoteResponse(
+    val id: String,
+    val name: String,
+    val category: String,
+    @SerializedName("default_duration_minutes")
+    val defaultDurationMinutes: Int? = null,
+    val enabled: Boolean,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("updated_at") val updatedAt: String,
+    @SerializedName("last_completed_at") val lastCompletedAt: String? = null
+)
+// endregion
+
 // endregion

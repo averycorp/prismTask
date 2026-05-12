@@ -103,6 +103,47 @@ constructor(
         }
     }
 
+    fun updateActivity(
+        activity: LeisureActivityEntity,
+        name: String,
+        category: LeisureCategory,
+        defaultDurationMinutes: Int?
+    ) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            repository.upsertActivity(
+                activity.copy(
+                    name = name.trim(),
+                    category = category.name,
+                    defaultDurationMinutes = defaultDurationMinutes
+                )
+            )
+        }
+    }
+
+    /**
+     * Mark an activity done as part of today's leisure budget. Logs a
+     * session with [durationMinutes] (or the activity's default when
+     * null, falling back to 30 minutes), counted toward today's target.
+     */
+    fun checkOffActivity(
+        activity: LeisureActivityEntity,
+        durationMinutes: Int? = null
+    ) {
+        val resolvedCategory = LeisureCategory.fromStringOrNull(activity.category)
+            ?: LeisureCategory.PASSIVE
+        val resolvedDuration = (durationMinutes ?: activity.defaultDurationMinutes ?: 30)
+            .coerceAtLeast(1)
+        viewModelScope.launch {
+            repository.logSession(
+                activityId = activity.id,
+                category = resolvedCategory,
+                durationMinutes = resolvedDuration,
+                source = LeisureSessionSource.MANUAL
+            )
+        }
+    }
+
     fun setActivityEnabled(activity: LeisureActivityEntity, enabled: Boolean) {
         viewModelScope.launch {
             repository.setActivityEnabled(activity.id, enabled)
