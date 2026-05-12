@@ -2,7 +2,6 @@ package com.averycorp.prismtask.domain
 
 import com.averycorp.prismtask.data.local.entity.CourseCompletionEntity
 import com.averycorp.prismtask.data.local.entity.CourseEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareStepEntity
 import com.averycorp.prismtask.data.remote.mapper.SyncMapper
@@ -118,74 +117,9 @@ class SyncMapperTier2Test {
         assertEquals(0L, entity.updatedAt)
     }
 
-    // ── LeisureLog ────────────────────────────────────────────────────────────
-
-    @Test
-    fun leisureLog_outputMapper_usesEntityUpdatedAt() {
-        val entity = LeisureLogEntity(
-            id = 1,
-            date = 3000L,
-            musicPick = "jazz",
-            updatedAt = 88_000L
-        )
-        val map = SyncMapper.leisureLogToMap(entity)
-        assertEquals(88_000L, map["updatedAt"])
-    }
-
-    @Test
-    fun leisureLog_inputMapper_readsUpdatedAt() {
-        val map = mapOf<String, Any?>(
-            "date" to 3000L,
-            "musicPick" to "jazz",
-            "musicDone" to true,
-            "flexPick" to null,
-            "flexDone" to false,
-            "createdAt" to 1000L,
-            "updatedAt" to 66_000L
-        )
-        val entity = SyncMapper.mapToLeisureLog(map, localId = 7)
-        assertEquals(66_000L, entity.updatedAt)
-    }
-
-    @Test
-    fun leisureLog_inputMapper_missingUpdatedAt_defaultsZero() {
-        val map = mapOf<String, Any?>("date" to 3000L)
-        val entity = SyncMapper.mapToLeisureLog(map)
-        assertEquals(0L, entity.updatedAt)
-    }
-
-    @Test
-    fun leisureLog_languageFields_roundTrip() {
-        val entity = LeisureLogEntity(
-            id = 9,
-            date = 4000L,
-            languagePick = "italian",
-            languageDone = true,
-            updatedAt = 42_000L
-        )
-        val map = SyncMapper.leisureLogToMap(entity)
-        assertEquals("italian", map["languagePick"])
-        assertEquals(true, map["languageDone"])
-        val restored = SyncMapper.mapToLeisureLog(map, localId = 9)
-        assertEquals("italian", restored.languagePick)
-        assertEquals(true, restored.languageDone)
-    }
-
-    @Test
-    fun leisureLog_inputMapper_missingLanguageFields_defaultToNullAndFalse() {
-        // A doc written by an older client (or pre-language web) will have
-        // no languagePick / languageDone keys — the mapper has to absorb the
-        // omission without throwing and fall back to safe defaults.
-        val map = mapOf<String, Any?>(
-            "date" to 3000L,
-            "musicPick" to "piano",
-            "createdAt" to 1000L,
-            "updatedAt" to 5000L
-        )
-        val entity = SyncMapper.mapToLeisureLog(map)
-        assertEquals(null, entity.languagePick)
-        assertEquals(false, entity.languageDone)
-    }
+    // ── LeisureLog tests retired in Leisure Budget v2.0 (migration 81→82)
+    // — v1.x slot-pick rows are gone. v2.0 leisure_activities /
+    // leisure_sessions get fresh mapper tests in a follow-on.
 
     // ── Course ────────────────────────────────────────────────────────────────
 

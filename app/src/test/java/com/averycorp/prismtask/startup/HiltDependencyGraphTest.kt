@@ -35,7 +35,8 @@ class HiltDependencyGraphTest {
         "habitDao",
         "habitCompletionDao",
         "habitLogDao",
-        "leisureDao",
+        "leisureActivityDao",
+        "leisureSessionDao",
         "schoolworkDao",
         "selfCareDao",
         "taskTemplateDao",
@@ -122,7 +123,7 @@ class HiltDependencyGraphTest {
         val injectedTypes = listOf(
             "HiltWorkerFactory",
             "SchoolworkRepository",
-            "LeisureRepository",
+            "LeisureBudgetRepository",
             "SelfCareRepository",
             "TaskBehaviorPreferences",
             "TemplateSeeder"

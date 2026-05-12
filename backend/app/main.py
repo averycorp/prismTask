@@ -4,7 +4,7 @@ from prometheus_client import generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
-from app.routers import ai, analytics, app_update, auth, beta_codes, calendar, daily_essentials, dashboard, export, feedback, goals, habits, integrations, medications, nd_preferences, projects, search, syllabus, sync, tags, tasks, templates
+from app.routers import ai, analytics, app_update, auth, beta_codes, calendar, daily_essentials, dashboard, export, feedback, goals, habits, integrations, leisure, medications, nd_preferences, projects, search, syllabus, sync, tags, tasks, templates
 from app.routers.admin import activity_logs as admin_activity_logs
 from app.routers.admin import debug_logs as admin_debug_logs
 
@@ -51,6 +51,7 @@ app.include_router(integrations.router, prefix="/api/v1")
 app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(nd_preferences.router, prefix="/api/v1")
 app.include_router(daily_essentials.router, prefix="/api/v1")
+app.include_router(leisure.router, prefix="/api/v1")
 app.include_router(medications.router, prefix="/api/v1")
 app.include_router(admin_activity_logs.router, prefix="/api/v1")
 app.include_router(admin_debug_logs.router, prefix="/api/v1")

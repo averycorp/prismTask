@@ -173,6 +173,9 @@ fun TaskAnalyticsScreen(
                 // Habit correlations \u2014 Pro-gated, on-demand (server
                 // rate-limits to 1 call/day so don't auto-fetch).
                 HabitCorrelationsSection(accent = accentColor)
+                // Leisure score section (Leisure Budget v2.0 \u2014 Item 6).
+                // Standalone score; does not interact with productivity score.
+                LeisureScoreSection(accent = accentColor)
             } else {
                 // Free-tier replacements so the screen doesn't have a
                 // silent gap where the Pro charts would render. Each

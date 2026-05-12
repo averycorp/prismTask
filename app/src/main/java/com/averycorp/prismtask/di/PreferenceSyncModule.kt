@@ -8,7 +8,7 @@ import com.averycorp.prismtask.data.preferences.coachingDataStore
 import com.averycorp.prismtask.data.preferences.dailyEssentialsDataStore
 import com.averycorp.prismtask.data.preferences.dashboardDataStore
 import com.averycorp.prismtask.data.preferences.habitListDataStore
-import com.averycorp.prismtask.data.preferences.leisureDataStore
+import com.averycorp.prismtask.data.preferences.leisureBudgetDataStore
 import com.averycorp.prismtask.data.preferences.medicationDataStore
 import com.averycorp.prismtask.data.preferences.morningCheckInDataStore
 import com.averycorp.prismtask.data.preferences.notificationDataStore
@@ -59,7 +59,7 @@ object PreferenceSyncModule {
         PreferenceSyncSpec("daily_essentials_prefs", context.dailyEssentialsDataStore),
         PreferenceSyncSpec("dashboard_prefs", context.dashboardDataStore),
         PreferenceSyncSpec("habit_list_prefs", context.habitListDataStore),
-        PreferenceSyncSpec("leisure_prefs", context.leisureDataStore),
+        PreferenceSyncSpec("leisure_budget_prefs", context.leisureBudgetDataStore),
         PreferenceSyncSpec("medication_prefs", context.medicationDataStore),
         PreferenceSyncSpec("morning_checkin_prefs", context.morningCheckInDataStore),
         PreferenceSyncSpec("nd_prefs", context.ndPrefsDataStore),

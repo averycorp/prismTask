@@ -13,7 +13,6 @@ import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.HabitLogDao
 import com.averycorp.prismtask.data.local.dao.HabitTemplateDao
-import com.averycorp.prismtask.data.local.dao.LeisureDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.dao.MedicationRefillDao
@@ -101,7 +100,6 @@ constructor(
     private val medicationMigrationPreferences: com.averycorp.prismtask.data.preferences.MedicationMigrationPreferences,
     private val sortPreferencesSyncService: SortPreferencesSyncService,
     private val schoolworkDao: SchoolworkDao,
-    private val leisureDao: LeisureDao,
     private val selfCareDao: SelfCareDao,
     private val notificationProfileDao: NotificationProfileDao,
     private val customSoundDao: CustomSoundDao,
@@ -882,7 +880,12 @@ constructor(
     private suspend fun maybeRunEntityBackfill() {
         val coursesOk = runCoursesBackfillIfNeeded()
         val courseCompletionsOk = runCourseCompletionsBackfillIfNeeded()
-        val leisureLogsOk = runLeisureLogsBackfillIfNeeded()
+        // Leisure Budget v2.0: v1.x leisure_logs backfill retired in v82
+        // migration. Mark the flag done so we never come back here looking
+        // for v1.x data.
+        if (!builtInSyncPreferences.isLeisureLogsBackfillDone()) {
+            builtInSyncPreferences.setLeisureLogsBackfillDone(true)
+        }
         val selfCareStepsOk = runSelfCareStepsBackfillIfNeeded()
         val selfCareLogsOk = runSelfCareLogsBackfillIfNeeded()
         // medications BEFORE medication_doses so the dose helper can
@@ -891,7 +894,7 @@ constructor(
         val medicationsOk = runMedicationsBackfillIfNeeded()
         val medicationDosesOk = runMedicationDosesBackfillIfNeeded()
 
-        val allSucceeded = coursesOk && courseCompletionsOk && leisureLogsOk &&
+        val allSucceeded = coursesOk && courseCompletionsOk &&
             selfCareStepsOk && selfCareLogsOk &&
             medicationsOk && medicationDosesOk
         if (allSucceeded) {
@@ -979,35 +982,11 @@ constructor(
         }
     }
 
-    private suspend fun runLeisureLogsBackfillIfNeeded(): Boolean {
-        if (builtInSyncPreferences.isLeisureLogsBackfillDone()) return true
-        return try {
-            val leisureLogs = leisureDao.getAllLogsOnce()
-            logger.debug("upload.leisure_logs", status = "begin", detail = "count=${leisureLogs.size}")
-            for (log in leisureLogs) {
-                try {
-                    if (syncMetadataDao.getCloudId(log.id, "leisure_log") != null) continue
-                    val docRef = userCollection("leisure_logs")?.document() ?: continue
-                    docRef.set(SyncMapper.leisureLogToMap(log)).await()
-                    syncMetadataDao.upsert(
-                        SyncMetadataEntity(
-                            localId = log.id,
-                            entityType = "leisure_log",
-                            cloudId = docRef.id,
-                            lastSyncedAt = System.currentTimeMillis()
-                        )
-                    )
-                } catch (e: Exception) {
-                    logger.error(operation = "upload.leisure_log", entity = "leisure_log", id = log.id.toString(), throwable = e)
-                }
-            }
-            builtInSyncPreferences.setLeisureLogsBackfillDone(true)
-            true
-        } catch (e: Exception) {
-            logger.error(operation = "upload.leisure_logs", throwable = e)
-            false
-        }
-    }
+    // Leisure Budget v2.0: v1.x runLeisureLogsBackfillIfNeeded was
+    // retired when migration 81→82 dropped the leisure_logs table.
+    // The new v2.0 leisure_activities / leisure_sessions tables sync
+    // via the BackendSyncMappers path (extensions added in the v2.0
+    // bundle PR) rather than this Firestore-specific path.
 
     private suspend fun runSelfCareStepsBackfillIfNeeded(): Boolean {
         if (builtInSyncPreferences.isSelfCareStepsBackfillDone()) return true
@@ -1276,10 +1255,6 @@ constructor(
                 val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: return
                 SyncMapper.courseCompletionToMap(completion, courseCloudId)
             }
-            "leisure_log" -> {
-                val log = leisureDao.getAllLogsOnce().find { it.id == meta.localId } ?: return
-                SyncMapper.leisureLogToMap(log)
-            }
             "self_care_step" -> {
                 val step = selfCareDao.getAllStepsOnce().find { it.id == meta.localId } ?: return
                 SyncMapper.selfCareStepToMap(step)
@@ -1475,10 +1450,6 @@ constructor(
                 val completion = schoolworkDao.getAllCompletionsOnce().find { it.id == meta.localId } ?: return
                 val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: return
                 SyncMapper.courseCompletionToMap(completion, courseCloudId)
-            }
-            "leisure_log" -> {
-                val log = leisureDao.getAllLogsOnce().find { it.id == meta.localId } ?: return
-                SyncMapper.leisureLogToMap(log)
             }
             "self_care_step" -> {
                 val step = selfCareDao.getAllStepsOnce().find { it.id == meta.localId } ?: return
@@ -2260,32 +2231,9 @@ constructor(
         skipped += courseCompletionsResult.skipped
         skippedPermanent += courseCompletionsResult.skippedPermanent
 
-        val leisureLogsResult = pullCollection("leisure_logs") { data, cloudId ->
-            val localId = syncMetadataDao.getLocalId(cloudId, "leisure_log")
-            if (localId == null) {
-                val log = SyncMapper.mapToLeisureLog(data, cloudId = cloudId)
-                val newId = leisureDao.insertLog(log)
-                syncMetadataDao.upsert(
-                    SyncMetadataEntity(
-                        localId = newId,
-                        entityType = "leisure_log",
-                        cloudId = cloudId,
-                        lastSyncedAt = System.currentTimeMillis()
-                    )
-                )
-            } else {
-                val localLog = leisureDao.getLogById(localId)
-                val remoteUpdatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
-                if (localLog == null || remoteUpdatedAt > localLog.updatedAt) {
-                    leisureDao.updateLog(SyncMapper.mapToLeisureLog(data, localId, cloudId = cloudId))
-                    syncMetadataDao.clearPendingAction(localId, "leisure_log")
-                }
-            }
-            true
-        }
-        applied += leisureLogsResult.applied
-        skipped += leisureLogsResult.skipped
-        skippedPermanent += leisureLogsResult.skippedPermanent
+        // Leisure Budget v2.0: v1.x leisure_logs Firestore pull retired in
+        // migration 81→82. New v2.0 leisure_activities / leisure_sessions
+        // sync via BackendSyncMappers (see SyncDispatchTables wiring).
 
         // self_care_steps before self_care_logs (logical dependency).
         // Dedup by stepId+routineType to avoid duplicating built-in default steps
@@ -3556,7 +3504,10 @@ constructor(
                     "task_template" -> taskTemplateDao.deleteTemplate(localId)
                     "course" -> schoolworkDao.deleteCourse(localId)
                     "course_completion" -> schoolworkDao.deleteCompletionById(localId)
-                    "leisure_log" -> leisureDao.deleteLogById(localId)
+                    // Leisure Budget v2.0: v1.x "leisure_log" delete dispatch
+                    // retired alongside the table (migration 81→82). New
+                    // "leisure_activity" / "leisure_session" deletes flow
+                    // through BackendSyncMappers instead.
                     "self_care_step" -> selfCareDao.deleteStepById(localId)
                     "self_care_log" -> selfCareDao.deleteLogById(localId)
                     "medication" -> medicationDao.deleteById(localId)

@@ -44,9 +44,7 @@ fun TemplateBrowserScreen(
         viewModel.messages.collect { msg -> snackbarHostState.showSnackbar(msg) }
     }
 
-    val totalSelected = selections.musicIds.size +
-        selections.flexIds.size +
-        selections.effectiveStepIds("morning").size +
+    val totalSelected = selections.effectiveStepIds("morning").size +
         selections.effectiveStepIds("bedtime").size +
         selections.effectiveStepIds("housework").size
 

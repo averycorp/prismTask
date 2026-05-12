@@ -8,14 +8,12 @@ import com.averycorp.prismtask.data.local.dao.SelfCareDao
 import com.averycorp.prismtask.data.local.entity.AssignmentEntity
 import com.averycorp.prismtask.data.local.entity.CourseEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
-import com.averycorp.prismtask.data.local.entity.LeisureLogEntity
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
-import com.averycorp.prismtask.data.preferences.LeisurePreferences
-import com.averycorp.prismtask.data.preferences.LeisureSlotConfig
-import com.averycorp.prismtask.data.preferences.LeisureSlotId
+import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
+import com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
-import com.averycorp.prismtask.data.repository.LeisureRepository
+import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.domain.model.SelfCareRoutines
 import com.google.gson.JsonArray
 import com.google.gson.JsonParser
@@ -27,8 +25,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
-
-enum class LeisureKind { MUSIC, FLEX }
 
 data class StepState(
     val stepId: String,
@@ -68,16 +64,38 @@ data class SchoolworkCardState(
     val hasContent: Boolean get() = habit != null || assignmentsDueToday.isNotEmpty()
 }
 
-data class LeisureCardState(
-    val kind: LeisureKind,
-    val pickedForToday: String?,
-    val doneForToday: Boolean,
-    val label: String = when (kind) {
-        LeisureKind.MUSIC -> "Music"
-        LeisureKind.FLEX -> "Flex Leisure"
-    },
-    val enabled: Boolean = true
-)
+/**
+ * Today screen leisure-budget card state. Replaces the v1.x
+ * music/flex-slot model with a single minutes-vs-target budget display.
+ */
+data class LeisureBudgetCardState(
+    val minutesLogged: Int,
+    val targetMinutes: Int,
+    val poolIsEmpty: Boolean,
+    val suggestionName: String?,
+    val suggestionCategory: String?,
+    val refreshLimit: Int,
+    val refreshesConsumed: Int
+) {
+    val progressFraction: Float
+        get() = if (targetMinutes <= 0) 0f else (minutesLogged.toFloat() / targetMinutes).coerceIn(0f, 1f)
+
+    val canRefresh: Boolean get() = refreshesConsumed < refreshLimit
+
+    val targetHit: Boolean get() = targetMinutes > 0 && minutesLogged >= targetMinutes
+
+    companion object {
+        fun empty(): LeisureBudgetCardState = LeisureBudgetCardState(
+            minutesLogged = 0,
+            targetMinutes = LeisureBudgetPreferences.DEFAULT_TARGET,
+            poolIsEmpty = true,
+            suggestionName = null,
+            suggestionCategory = null,
+            refreshLimit = LeisureBudgetPreferences.DEFAULT_REFRESH_LIMIT,
+            refreshesConsumed = 0
+        )
+    }
+}
 
 /**
  * Aggregated state for the Daily Essentials section. Any field may be null
@@ -91,8 +109,7 @@ data class DailyEssentialsUiState(
     val housework: HabitCardState?,
     val houseworkRoutine: RoutineCardState?,
     val schoolwork: SchoolworkCardState?,
-    val musicLeisure: LeisureCardState,
-    val flexLeisure: LeisureCardState,
+    val leisureBudget: LeisureBudgetCardState,
     val hasSeenHint: Boolean
 ) {
     val isEmpty: Boolean
@@ -101,8 +118,8 @@ data class DailyEssentialsUiState(
             housework == null &&
             houseworkRoutine == null &&
             (schoolwork == null || !schoolwork.hasContent) &&
-            musicLeisure.pickedForToday == null &&
-            flexLeisure.pickedForToday == null
+            leisureBudget.minutesLogged == 0 &&
+            leisureBudget.poolIsEmpty
 
     companion object {
         fun empty(): DailyEssentialsUiState = DailyEssentialsUiState(
@@ -111,8 +128,7 @@ data class DailyEssentialsUiState(
             housework = null,
             houseworkRoutine = null,
             schoolwork = null,
-            musicLeisure = LeisureCardState(LeisureKind.MUSIC, null, false),
-            flexLeisure = LeisureCardState(LeisureKind.FLEX, null, false),
+            leisureBudget = LeisureBudgetCardState.empty(),
             hasSeenHint = false
         )
     }
@@ -127,18 +143,13 @@ constructor(
     private val schoolworkDao: SchoolworkDao,
     private val habitDao: HabitDao,
     private val habitCompletionDao: HabitCompletionDao,
-    private val leisureRepository: LeisureRepository,
+    private val leisureBudgetRepository: LeisureBudgetRepository,
+    private val leisureBudgetPreferences: LeisureBudgetPreferences,
     private val dailyEssentialsPreferences: DailyEssentialsPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
-    private val leisurePreferences: LeisurePreferences,
     private val advancedTuningPreferences: AdvancedTuningPreferences,
     private val localDateFlow: LocalDateFlow
 ) {
-    /**
-     * Composite feed for the Daily Essentials section. All time windows use
-     * [TaskBehaviorPreferences.getDayStartHour] so the section respects the
-     * user's configured rollover hour.
-     */
     fun observeToday(): Flow<DailyEssentialsUiState> =
         combine(
             localDateFlow.observe(taskBehaviorPreferences.getStartOfDay()),
@@ -146,11 +157,6 @@ constructor(
         ) { date, sod -> date to sod }
             .flatMapLatest { (date, sod) ->
                 val zone = java.time.ZoneId.systemDefault()
-                // Derive the four window epochs from the canonical reactive
-                // logical date — re-emits at every SoD boundary crossing,
-                // not just on preference change. Replaces the four
-                // `DayBoundary.*` snapshot calls that were locked at upstream
-                // emission time. Per UTIL_DAYBOUNDARY_SWEEP_AUDIT.md § 5.
                 val todayStart = date.atTime(sod.hour, sod.minute)
                     .atZone(zone).toInstant().toEpochMilli()
                 val todayLocal = date.toString()
@@ -163,10 +169,8 @@ constructor(
                     observeHouseworkCard(todayLocal),
                     observeRoutineCard("housework", "Housework", todayStart),
                     observeSchoolworkCard(todayLocal, windowStart, windowEnd),
-                    leisureRepository.getTodayLog(),
-                    dailyEssentialsPreferences.hasSeenHint,
-                    leisurePreferences.getSlotConfig(LeisureSlotId.MUSIC),
-                    leisurePreferences.getSlotConfig(LeisureSlotId.FLEX)
+                    observeLeisureBudgetCard(date),
+                    dailyEssentialsPreferences.hasSeenHint
                 ) { args -> combineDailyEssentials(args) }
             }
 
@@ -177,10 +181,8 @@ constructor(
         val housework = args[2] as HabitCardState?
         val houseworkRoutine = args[3] as RoutineCardState?
         val schoolwork = args[4] as SchoolworkCardState?
-        val leisureLog = args[5] as LeisureLogEntity?
+        val leisureBudget = args[5] as LeisureBudgetCardState
         val seenHint = args[6] as Boolean
-        val musicConfig = args[7] as LeisureSlotConfig
-        val flexConfig = args[8] as LeisureSlotConfig
 
         return DailyEssentialsUiState(
             morning = morning,
@@ -188,21 +190,32 @@ constructor(
             housework = housework,
             houseworkRoutine = houseworkRoutine,
             schoolwork = schoolwork,
-            musicLeisure = LeisureCardState(
-                kind = LeisureKind.MUSIC,
-                pickedForToday = if (musicConfig.enabled) leisureLog?.musicPick else null,
-                doneForToday = musicConfig.enabled && leisureLog?.musicDone == true,
-                label = musicConfig.label,
-                enabled = musicConfig.enabled
-            ),
-            flexLeisure = LeisureCardState(
-                kind = LeisureKind.FLEX,
-                pickedForToday = if (flexConfig.enabled) leisureLog?.flexPick else null,
-                doneForToday = flexConfig.enabled && leisureLog?.flexDone == true,
-                label = flexConfig.label,
-                enabled = flexConfig.enabled
-            ),
+            leisureBudget = leisureBudget,
             hasSeenHint = seenHint
+        )
+    }
+
+    private fun observeLeisureBudgetCard(
+        date: java.time.LocalDate
+    ): Flow<LeisureBudgetCardState> = combine(
+        leisureBudgetRepository.observeMinutesLoggedToday(),
+        leisureBudgetPreferences.observeSnapshot(),
+        leisureBudgetRepository.getActivities()
+    ) { minutes, snap: LeisureBudgetSnapshot, activities ->
+        val enabledPool = activities.filter { activity ->
+            activity.enabled &&
+                com.averycorp.prismtask.domain.model.LeisureCategory.fromStringOrNull(activity.category)
+                    ?.let { it in snap.enabledCategories } == true
+        }
+        val suggestion = enabledPool.firstOrNull() // ViewModel resamples lazily via repository
+        LeisureBudgetCardState(
+            minutesLogged = minutes,
+            targetMinutes = snap.targetForDate(date),
+            poolIsEmpty = enabledPool.isEmpty(),
+            suggestionName = suggestion?.name,
+            suggestionCategory = suggestion?.category,
+            refreshLimit = snap.refreshLimit,
+            refreshesConsumed = leisureBudgetPreferences.readRefreshesConsumed(date.toString())
         )
     }
 
@@ -316,13 +329,6 @@ constructor(
     }
 
     companion object {
-        /**
-         * Resolves the tier used to filter a routine's steps. Order of
-         * precedence: today's persisted log → user-configured default from
-         * [SelfCareTierDefaults] → penultimate-of-order. Mirrors
-         * `SelfCareViewModel.getSelectedTier` so the Today / Daily Essentials
-         * cards agree with the dedicated Self-Care screen on a fresh day.
-         */
         @JvmStatic
         internal fun resolveSelectedTier(
             logTier: String?,
@@ -335,12 +341,6 @@ constructor(
             return tierOrder.getOrNull(tierOrder.size - 2) ?: tierOrder.last()
         }
 
-        /**
-         * Mirrors the medication log parser but only needs step IDs — handles
-         * both the legacy string-array format and the richer object format
-         * with `{id, note, at, timeOfDay}` entries. Exposed on the companion
-         * so unit tests don't need to instantiate the use case.
-         */
         @JvmStatic
         internal fun parseStepIds(json: String?): Set<String> {
             if (json.isNullOrBlank() || json == "[]") return emptySet()

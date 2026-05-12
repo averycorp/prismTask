@@ -2520,7 +2520,101 @@ val MIGRATION_80_81 = object : Migration(80, 81) {
     }
 }
 
-const val CURRENT_DB_VERSION = 81
+/**
+ * v81 → v82 — Leisure Budget v2.0 schema rebuild.
+ *
+ * Drops the v1.x `leisure_logs` table (per-day slot picks: music/flex/language
+ * pick + done bools) and replaces it with two normalized tables that match
+ * the v2.0 session-log + budget-tracking model:
+ *
+ * * `leisure_activities` — user-owned activity pool. One row per activity
+ *   (e.g. "Walk", "Call Mom"), partitioned by category
+ *   (PHYSICAL/SOCIAL/CREATIVE/PASSIVE). `last_completed_at` is
+ *   denormalized off `leisure_sessions` so the recency-weighted random
+ *   pull algorithm samples without a join.
+ *
+ * * `leisure_sessions` — completed leisure sessions with duration +
+ *   category + source (TIMER / MANUAL). `activity_id` FK is SET_NULL on
+ *   delete so deleting a pool entry preserves history. `category` is
+ *   snapshotted at insert so orphan rows survive a category rename.
+ *
+ * Settings live in DataStore (`LeisureBudgetPreferences`), not Room —
+ * settings change rarely and DataStore avoids Room migration noise on
+ * every toggle. The server still has a `leisure_settings` table mirrored
+ * by the sync layer.
+ *
+ * Backfill: any rows that existed in v1.x `leisure_logs` are dropped —
+ * they were daily slot picks (music_pick / flex_pick / language_pick)
+ * with no duration data, so they don't translate into the v2.0 session
+ * model. User-configured custom activities live in the
+ * `leisure_prefs` DataStore (CustomLeisureActivity entries inside slot
+ * configs); a one-shot reconciler in `LeisureBudgetRepository` reads
+ * them on first launch and seeds `leisure_activities` so the user's
+ * pool isn't wiped on upgrade.
+ */
+val MIGRATION_81_82 = object : Migration(81, 82) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS leisure_logs")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `leisure_activities` (
+                `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                `cloud_id` TEXT,
+                `name` TEXT NOT NULL,
+                `category` TEXT NOT NULL,
+                `default_duration_minutes` INTEGER,
+                `enabled` INTEGER NOT NULL DEFAULT 1,
+                `created_at` INTEGER NOT NULL,
+                `updated_at` INTEGER NOT NULL DEFAULT 0,
+                `last_completed_at` INTEGER
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_leisure_activities_category` " +
+                "ON `leisure_activities` (`category`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_leisure_activities_enabled` " +
+                "ON `leisure_activities` (`enabled`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_leisure_activities_cloud_id` " +
+                "ON `leisure_activities` (`cloud_id`)"
+        )
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `leisure_sessions` (
+                `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                `cloud_id` TEXT,
+                `activity_id` INTEGER,
+                `category` TEXT NOT NULL,
+                `duration_minutes` INTEGER NOT NULL,
+                `logged_at` INTEGER NOT NULL,
+                `source` TEXT NOT NULL,
+                `created_at` INTEGER NOT NULL,
+                FOREIGN KEY(`activity_id`) REFERENCES `leisure_activities`(`id`)
+                    ON UPDATE NO ACTION ON DELETE SET NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_leisure_sessions_activity_id` " +
+                "ON `leisure_sessions` (`activity_id`)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_leisure_sessions_logged_at` " +
+                "ON `leisure_sessions` (`logged_at`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_leisure_sessions_cloud_id` " +
+                "ON `leisure_sessions` (`cloud_id`)"
+        )
+    }
+}
+
+const val CURRENT_DB_VERSION = 82
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2602,5 +2696,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_77_78,
     MIGRATION_78_79,
     MIGRATION_79_80,
-    MIGRATION_80_81
+    MIGRATION_80_81,
+    MIGRATION_81_82
 )
