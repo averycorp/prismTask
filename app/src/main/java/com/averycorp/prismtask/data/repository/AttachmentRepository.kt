@@ -26,7 +26,6 @@ class AttachmentRepository @Inject constructor(
     private val syncTracker: SyncTracker
 ) {
     /**
-     * Legacy entry point — kept so existing photo-picker callers don't
      * have to change. Delegates to [addFileAttachment] with the image
      * wildcard MIME so the new schema fields get filled.
      */
