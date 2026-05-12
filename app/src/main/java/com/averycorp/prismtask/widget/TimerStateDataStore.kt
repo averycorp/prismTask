@@ -67,6 +67,27 @@ object TimerStateDataStore {
         }
     }
 
+    /**
+     * Updates only the per-tick fields (remaining seconds + run/pause flags)
+     * so [PomodoroTimerService] can drive the widget at 1Hz without
+     * clobbering structural fields (mode, session counts, pomodoro flag) the
+     * ViewModel owns. Structural fields are written via [write] on lifecycle
+     * events; live fields are written here on every tick. DataStore edits are
+     * atomic so the two writers don't race.
+     */
+    suspend fun writeLive(
+        context: Context,
+        remainingSeconds: Int,
+        isRunning: Boolean,
+        isPaused: Boolean
+    ) {
+        context.timerStateDataStore.edit { prefs ->
+            prefs[REMAINING_SECONDS] = remainingSeconds
+            prefs[IS_RUNNING] = isRunning
+            prefs[IS_PAUSED] = isPaused
+        }
+    }
+
     suspend fun read(context: Context): TimerWidgetState {
         val prefs = context.timerStateDataStore.data.first()
         return TimerWidgetState(
