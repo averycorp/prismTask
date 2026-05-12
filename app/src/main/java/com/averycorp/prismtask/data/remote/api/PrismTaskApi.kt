@@ -298,4 +298,29 @@ interface PrismTaskApi {
     suspend fun submitInAppFeedback(
         @Body body: InAppFeedbackRequest
     ): InAppFeedbackResponse
+
+    // region Leisure Budget v2.0 — activity pool (saved to user profile)
+
+    @GET("api/v1/leisure/activities")
+    suspend fun listLeisureActivities(
+        @Query("enabled_only") enabledOnly: Boolean = false
+    ): List<LeisureActivityRemoteResponse>
+
+    @POST("api/v1/leisure/activities")
+    suspend fun createLeisureActivity(
+        @Body body: LeisureActivityCreateRequest
+    ): LeisureActivityRemoteResponse
+
+    @PATCH("api/v1/leisure/activities/{activityId}")
+    suspend fun updateLeisureActivity(
+        @Path("activityId") activityId: String,
+        @Body body: LeisureActivityUpdateRequest
+    ): LeisureActivityRemoteResponse
+
+    @DELETE("api/v1/leisure/activities/{activityId}")
+    suspend fun deleteLeisureActivity(
+        @Path("activityId") activityId: String
+    ): retrofit2.Response<Unit>
+
+    // endregion
 }

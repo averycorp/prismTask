@@ -58,4 +58,18 @@ interface LeisureActivityDao {
 
     @Query("SELECT COUNT(*) FROM leisure_activities WHERE enabled = 1")
     suspend fun countEnabled(): Int
+
+    @Query("SELECT * FROM leisure_activities WHERE cloud_id = :cloudId LIMIT 1")
+    suspend fun getByCloudIdOnce(cloudId: String): LeisureActivityEntity?
+
+    @Query(
+        "UPDATE leisure_activities " +
+            "SET cloud_id = :cloudId, updated_at = :timestamp " +
+            "WHERE id = :id"
+    )
+    suspend fun setCloudId(
+        id: Long,
+        cloudId: String,
+        timestamp: Long = System.currentTimeMillis()
+    )
 }
