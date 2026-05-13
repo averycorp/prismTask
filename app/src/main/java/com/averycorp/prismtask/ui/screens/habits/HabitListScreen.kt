@@ -215,106 +215,106 @@ fun HabitListScreen(
                 ) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                items(filteredItems, key = { it.key }) { listItem ->
-                    ReorderableItem(reorderableLazyListState, key = listItem.key) { isDragging ->
-                        val elevation = if (isDragging) 8.dp else 0.dp
-                        when (listItem) {
-                            is HabitListItem.HabitItem -> {
-                                if (listItem.habitWithStatus.habit.isBookable) {
-                                    BookableHabitItem(
-                                        habitWithStatus = listItem.habitWithStatus,
+                    items(filteredItems, key = { it.key }) { listItem ->
+                        ReorderableItem(reorderableLazyListState, key = listItem.key) { isDragging ->
+                            val elevation = if (isDragging) 8.dp else 0.dp
+                            when (listItem) {
+                                is HabitListItem.HabitItem -> {
+                                    if (listItem.habitWithStatus.habit.isBookable) {
+                                        BookableHabitItem(
+                                            habitWithStatus = listItem.habitWithStatus,
+                                            onClick = {
+                                                navController.navigate(
+                                                    PrismTaskRoute.HabitDetail.createRoute(listItem.habitWithStatus.habit.id)
+                                                )
+                                            },
+                                            onBook = { bookingHabit = listItem.habitWithStatus },
+                                            onLog = { activityLogHabit = listItem.habitWithStatus },
+                                            onEdit = {
+                                                navController.navigate(
+                                                    PrismTaskRoute.AddEditHabit.createRoute(listItem.habitWithStatus.habit.id)
+                                                )
+                                            },
+                                            onDelete = { habitToDelete = listItem.habitWithStatus },
+                                            modifier = Modifier
+                                                .shadow(elevation, MaterialTheme.shapes.medium)
+                                                .longPressDraggableHandle()
+                                        )
+                                    } else {
+                                        HabitItem(
+                                            habitWithStatus = listItem.habitWithStatus,
+                                            onToggle = {
+                                                val hws = listItem.habitWithStatus
+                                                if (hws.habit.hasLogging && !hws.isCompletedToday) {
+                                                    loggingHabit = hws
+                                                } else {
+                                                    viewModel.onToggleCompletion(hws.habit.id, hws.isCompletedToday)
+                                                }
+                                            },
+                                            onDecrement = {
+                                                val hws = listItem.habitWithStatus
+                                                if (hws.completionsToday > 0 && hws.dailyTarget > 1) {
+                                                    viewModel.onDecrementCompletion(hws.habit.id)
+                                                }
+                                            },
+                                            onClick = {
+                                                if (listItem.habitWithStatus.habit.hasLogging) {
+                                                    loggingHabit = listItem.habitWithStatus
+                                                } else {
+                                                    navController.navigate(
+                                                        PrismTaskRoute.HabitAnalytics.createRoute(listItem.habitWithStatus.habit.id)
+                                                    )
+                                                }
+                                            },
+                                            onEdit = {
+                                                navController.navigate(
+                                                    PrismTaskRoute.AddEditHabit.createRoute(listItem.habitWithStatus.habit.id)
+                                                )
+                                            },
+                                            onDelete = { habitToDelete = listItem.habitWithStatus },
+                                            modifier = Modifier
+                                                .shadow(elevation, MaterialTheme.shapes.medium)
+                                                .longPressDraggableHandle()
+                                        )
+                                    }
+                                }
+                                is HabitListItem.SelfCareItem -> {
+                                    SelfCareRoutineCard(
+                                        routineType = listItem.routineType,
+                                        cardData = listItem.cardData,
                                         onClick = {
-                                            navController.navigate(
-                                                PrismTaskRoute.HabitDetail.createRoute(listItem.habitWithStatus.habit.id)
-                                            )
+                                            when (listItem.routineType) {
+                                                "medication" -> navController.navigate(PrismTaskRoute.Medication.route)
+                                                else -> navController.navigate(
+                                                    PrismTaskRoute.SelfCare.createRoute(listItem.routineType)
+                                                )
+                                            }
                                         },
-                                        onBook = { bookingHabit = listItem.habitWithStatus },
-                                        onLog = { activityLogHabit = listItem.habitWithStatus },
-                                        onEdit = {
-                                            navController.navigate(
-                                                PrismTaskRoute.AddEditHabit.createRoute(listItem.habitWithStatus.habit.id)
-                                            )
-                                        },
-                                        onDelete = { habitToDelete = listItem.habitWithStatus },
                                         modifier = Modifier
                                             .shadow(elevation, MaterialTheme.shapes.medium)
                                             .longPressDraggableHandle()
                                     )
-                                } else {
-                                    HabitItem(
+                                }
+                                is HabitListItem.BuiltInHabitItem -> {
+                                    BuiltInHabitCard(
+                                        type = listItem.type,
                                         habitWithStatus = listItem.habitWithStatus,
-                                        onToggle = {
-                                            val hws = listItem.habitWithStatus
-                                            if (hws.habit.hasLogging && !hws.isCompletedToday) {
-                                                loggingHabit = hws
-                                            } else {
-                                                viewModel.onToggleCompletion(hws.habit.id, hws.isCompletedToday)
-                                            }
-                                        },
-                                        onDecrement = {
-                                            val hws = listItem.habitWithStatus
-                                            if (hws.completionsToday > 0 && hws.dailyTarget > 1) {
-                                                viewModel.onDecrementCompletion(hws.habit.id)
-                                            }
-                                        },
                                         onClick = {
-                                            if (listItem.habitWithStatus.habit.hasLogging) {
-                                                loggingHabit = listItem.habitWithStatus
-                                            } else {
-                                                navController.navigate(
-                                                    PrismTaskRoute.HabitAnalytics.createRoute(listItem.habitWithStatus.habit.id)
-                                                )
+                                            when (listItem.type) {
+                                                "school" -> navController.navigate(PrismTaskRoute.Schoolwork.route)
                                             }
                                         },
-                                        onEdit = {
-                                            navController.navigate(
-                                                PrismTaskRoute.AddEditHabit.createRoute(listItem.habitWithStatus.habit.id)
-                                            )
-                                        },
-                                        onDelete = { habitToDelete = listItem.habitWithStatus },
+                                        progress = listItem.progress,
                                         modifier = Modifier
                                             .shadow(elevation, MaterialTheme.shapes.medium)
                                             .longPressDraggableHandle()
                                     )
                                 }
                             }
-                            is HabitListItem.SelfCareItem -> {
-                                SelfCareRoutineCard(
-                                    routineType = listItem.routineType,
-                                    cardData = listItem.cardData,
-                                    onClick = {
-                                        when (listItem.routineType) {
-                                            "medication" -> navController.navigate(PrismTaskRoute.Medication.route)
-                                            else -> navController.navigate(
-                                                PrismTaskRoute.SelfCare.createRoute(listItem.routineType)
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .shadow(elevation, MaterialTheme.shapes.medium)
-                                        .longPressDraggableHandle()
-                                )
-                            }
-                            is HabitListItem.BuiltInHabitItem -> {
-                                BuiltInHabitCard(
-                                    type = listItem.type,
-                                    habitWithStatus = listItem.habitWithStatus,
-                                    onClick = {
-                                        when (listItem.type) {
-                                            "school" -> navController.navigate(PrismTaskRoute.Schoolwork.route)
-                                        }
-                                    },
-                                    progress = listItem.progress,
-                                    modifier = Modifier
-                                        .shadow(elevation, MaterialTheme.shapes.medium)
-                                        .longPressDraggableHandle()
-                                )
-                            }
                         }
                     }
-                }
 
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
         }
