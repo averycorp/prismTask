@@ -1,12 +1,15 @@
 package com.averycorp.prismtask.widget
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.updateAll
+import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.notifications.PomodoroTimerService
+import kotlinx.coroutines.flow.first
 
 /**
  * Action callbacks invoked by the Glance widgets. Each callback mutates
@@ -114,6 +117,71 @@ class TimerControlFromWidgetAction : ActionCallback {
             // can't dispatch start/startService (test harness, locked
             // device early in boot, etc.). The next user-driven action
             // will retry.
+        }
+    }
+}
+
+/**
+ * Starts a fresh focus session from the [TimerWidget] without first opening
+ * the app. Mirrors what `TimerViewModel.start()` does for an idle WORK
+ * session: read the user's Pomodoro toggle + work duration + sessions-per-
+ * cycle from [TimerPreferences], pre-write a running [TimerWidgetState] so
+ * the widget flips out of "Ready to Focus" immediately, then hand off to
+ * [PomodoroTimerService] as [PomodoroTimerService.OWNER_TIMER].
+ *
+ * Pre-writing the structural fields (mode, session counts, pomodoro flag)
+ * matters because the service's per-tick `pushWidgetRunState` only touches
+ * the run flags + deadline; without this seed write the widget would render
+ * an "isRunning" pill against stale structural fields from the last in-app
+ * session.
+ *
+ * When the user later opens the app, `TimerViewModel`'s broadcast receiver
+ * picks up the service's ACTION_TICK / ACTION_PAUSED / ACTION_COMPLETE
+ * stream and resyncs in-app UI to the widget-started session.
+ */
+class TimerStartFromWidgetAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        try {
+            val prefs = TimerPreferences(context.applicationContext)
+            val workSeconds = prefs.getWorkDurationSeconds().first()
+            val pomodoroEnabled = prefs.getPomodoroEnabled().first()
+            val sessionsUntilLongBreak = prefs.getSessionsUntilLongBreak().first()
+            val sessionEnd = SystemClock.elapsedRealtime() + workSeconds * 1000L
+
+            TimerStateDataStore.write(
+                context = context,
+                state = TimerWidgetState(
+                    isRunning = true,
+                    isPaused = false,
+                    currentTaskTitle = null,
+                    remainingSeconds = workSeconds,
+                    totalSeconds = workSeconds,
+                    sessionType = "work",
+                    currentSession = 1,
+                    totalSessions = sessionsUntilLongBreak,
+                    isLongBreak = false,
+                    pomodoroEnabled = pomodoroEnabled,
+                    sessionEndElapsedRealtime = sessionEnd
+                )
+            )
+            TimerWidget().updateAll(context)
+
+            PomodoroTimerService.start(
+                context = context,
+                durationSeconds = workSeconds,
+                sessionIndex = 0,
+                sessionType = PomodoroTimerService.SESSION_TYPE_WORK,
+                owner = PomodoroTimerService.OWNER_TIMER
+            )
+        } catch (_: Exception) {
+            // Test contexts (mocked Context, no DataStore disk) and edge
+            // cases (locked device early in boot) may reject either the
+            // prefs read or the foreground service start. The widget will
+            // redraw on the next refresh; the user can retry.
         }
     }
 }

@@ -99,16 +99,16 @@ private fun TimerWidgetContent(
                 style = WidgetTextStyles.caption(palette.onSurfaceVariant)
             )
             Spacer(modifier = GlanceModifier.height(10.dp))
-            val timerIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenTimer.wireId)
-            }
+            // Independent start: dispatch the foreground service directly so
+            // the countdown begins from the home screen without the app
+            // having to be in the foreground. TimerViewModel re-syncs from
+            // the service's broadcasts when the user later opens the app.
             Box(
                 modifier = GlanceModifier
                     .cornerRadius(20.dp)
                     .background(palette.primary)
                     .padding(horizontal = 14.dp, vertical = 8.dp)
-                    .clickable(actionStartActivity(timerIntent))
+                    .clickable(actionRunCallback<TimerStartFromWidgetAction>())
             ) {
                 Text(
                     text = "▶ Start",
