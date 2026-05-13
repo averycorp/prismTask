@@ -295,12 +295,13 @@ class FileExtractionMappingTest {
 
     @Test
     fun `technical metadata rejects out-of-range gps`() {
+        // gpsLat 100 is above the valid 90° upper bound; gpsLon -200 below the -180° lower bound.
         val mapped = FileExtractionSuggestion.fromResponse(
             FileExtractionResponse(
                 title = "X",
                 technicalMetadata = FileTechnicalMetadataResponse(
-                    gpsLat = 100.0, // > 90
-                    gpsLon = -200.0 // < -180
+                    gpsLat = 100.0,
+                    gpsLon = -200.0
                 )
             )
         )
