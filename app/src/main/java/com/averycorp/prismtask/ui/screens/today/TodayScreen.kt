@@ -700,7 +700,7 @@ fun TodayScreen(
                                         viewModel.onToggleRoutineStep(routineType, stepId)
                                     },
                                     onToggleHousework = { viewModel.onToggleHouseworkHabit() },
-                                    onToggleSchoolworkHabit = { viewModel.onToggleSchoolworkHabit() },
+                                    onToggleCourse = { courseId -> viewModel.onToggleCourse(courseId) },
                                     onOpenAssignment = {
                                         navController.navigate(PrismTaskRoute.Schoolwork.route)
                                     },

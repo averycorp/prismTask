@@ -79,7 +79,7 @@ class DailyEssentialsUseCaseTest {
     @Test
     fun `schoolwork card with only assignments still shows`() {
         val schoolwork = SchoolworkCardState(
-            habit = null,
+            courses = emptyList(),
             assignmentsDueToday = listOf(
                 AssignmentSummary(
                     id = 1L,

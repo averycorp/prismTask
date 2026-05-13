@@ -28,20 +28,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.domain.usecase.AssignmentSummary
+import com.averycorp.prismtask.domain.usecase.CourseCompletionStatus
 import com.averycorp.prismtask.domain.usecase.SchoolworkCardState
 
 @Composable
 fun SchoolworkCard(
     state: SchoolworkCardState,
-    onToggleHabit: () -> Unit,
+    onToggleCourse: (courseId: Long) -> Unit,
     onOpenAssignment: (assignmentId: Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = Color(0xFFCFB87C)
     val description = buildString {
         append("Schoolwork")
-        state.habit?.let {
-            append(", habit ${if (it.completedToday) "done" else "not done"}")
+        if (state.courses.isNotEmpty()) {
+            val done = state.courses.count { it.completedToday }
+            append(", $done of ${state.courses.size} classes done")
         }
         if (state.assignmentsDueToday.isNotEmpty()) {
             append(", ${state.assignmentsDueToday.size} assignments due today")
@@ -63,102 +65,46 @@ fun SchoolworkCard(
                 )
             }
 
-            state.habit?.let { habit ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 48.dp)
-                        .clickable(onClick = onToggleHabit)
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (habit.completedToday) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = accent,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Outlined.RadioButtonUnchecked,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = habit.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textDecoration = if (habit.completedToday) TextDecoration.LineThrough else null
+            val assignmentsByCourse: Map<Long, List<AssignmentSummary>> =
+                state.assignmentsDueToday.groupBy { it.courseId }
+            val coveredCourseIds = state.courses.map { it.courseId }.toSet()
+
+            state.courses.forEach { course ->
+                CourseGroup(
+                    course = course,
+                    assignments = assignmentsByCourse[course.courseId].orEmpty(),
+                    accent = accent,
+                    onToggle = { onToggleCourse(course.courseId) },
+                    onOpenAssignment = onOpenAssignment
+                )
+            }
+
+            // Assignments whose course isn't in the active-course list (e.g.
+            // archived or deleted course). Render them flat at the bottom so
+            // they're still actionable.
+            state.assignmentsDueToday
+                .filter { it.courseId !in coveredCourseIds }
+                .forEach { assignment ->
+                    AssignmentRow(
+                        summary = assignment,
+                        onClick = { onOpenAssignment(assignment.id) }
                     )
                 }
-            }
-
-            groupByClass(state.assignmentsDueToday).forEach { group ->
-                ClassGroup(group = group, onOpenAssignment = onOpenAssignment)
-            }
         }
-    }
-}
-
-private data class ClassAssignmentGroup(
-    val courseId: Long,
-    val courseName: String,
-    val courseColor: Int,
-    val assignments: List<AssignmentSummary>
-)
-
-private fun groupByClass(
-    assignments: List<AssignmentSummary>
-): List<ClassAssignmentGroup> {
-    if (assignments.isEmpty()) return emptyList()
-    // Preserve assignment order within each class; order classes by first
-    // appearance so the visual order matches the underlying due-date sort.
-    val byCourse = linkedMapOf<Long, MutableList<AssignmentSummary>>()
-    for (a in assignments) {
-        byCourse.getOrPut(a.courseId) { mutableListOf() }.add(a)
-    }
-    return byCourse.map { (courseId, items) ->
-        ClassAssignmentGroup(
-            courseId = courseId,
-            courseName = items.first().courseName,
-            courseColor = items.first().courseColor,
-            assignments = items
-        )
     }
 }
 
 @Composable
-private fun ClassGroup(
-    group: ClassAssignmentGroup,
+private fun CourseGroup(
+    course: CourseCompletionStatus,
+    assignments: List<AssignmentSummary>,
+    accent: Color,
+    onToggle: () -> Unit,
     onOpenAssignment: (assignmentId: Long) -> Unit
 ) {
-    val dot = if (group.courseColor != 0) Color(group.courseColor) else Color.Gray
-    val headerLabel = group.courseName.ifBlank { "Unassigned" }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(dot)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = headerLabel,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-        group.assignments.forEach { assignment ->
+        CourseRow(course = course, accent = accent, onToggle = onToggle)
+        assignments.forEach { assignment ->
             AssignmentRow(
                 summary = assignment,
                 onClick = { onOpenAssignment(assignment.id) }
@@ -168,18 +114,65 @@ private fun ClassGroup(
 }
 
 @Composable
+private fun CourseRow(
+    course: CourseCompletionStatus,
+    accent: Color,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .clickable(onClick = onToggle)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (course.completedToday) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(22.dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = course.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textDecoration = if (course.completedToday) TextDecoration.LineThrough else null
+        )
+    }
+}
+
+@Composable
 private fun AssignmentRow(
     summary: AssignmentSummary,
     onClick: () -> Unit
 ) {
+    val dot = if (summary.courseColor != 0) Color(summary.courseColor) else Color.Gray
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 44.dp)
             .clickable(onClick = onClick)
-            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = 32.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(dot)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = summary.title,
             style = MaterialTheme.typography.bodyMedium,
