@@ -5,9 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.converter.RecurrenceConverter
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.ProjectDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
@@ -17,6 +14,7 @@ import com.averycorp.prismtask.data.remote.api.ChatTaskContext
 import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.toCalendarDayOfWeek
@@ -50,10 +48,8 @@ constructor(
     private val chatRepository: ChatRepository,
     private val taskRepository: TaskRepository,
     private val tagRepository: TagRepository,
-    private val taskDao: TaskDao,
-    private val projectDao: ProjectDao,
+    private val projectRepository: ProjectRepository,
     private val habitRepository: HabitRepository,
-    private val habitCompletionDao: HabitCompletionDao,
     private val proFeatureGate: ProFeatureGate,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val userPreferencesDataStore: UserPreferencesDataStore,
@@ -181,7 +177,7 @@ constructor(
     init {
         if (taskContextId != null) {
             viewModelScope.launch {
-                _contextTask.value = taskDao.getTaskByIdOnce(taskContextId)
+                _contextTask.value = taskRepository.getTaskByIdOnce(taskContextId)
             }
         }
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1).
@@ -483,7 +479,7 @@ constructor(
 
     private suspend fun handleReschedule(action: ChatActionResponse): ChatActionResult? {
         val taskId = action.taskId?.toLongOrNull() ?: return null
-        val originalDueDate = taskDao.getTaskByIdOnce(taskId)?.dueDate
+        val originalDueDate = taskRepository.getTaskByIdOnce(taskId)?.dueDate
         val newDate = resolveDate(action.to)
         taskRepository.rescheduleTask(taskId, newDate)
         return ChatActionResult(
@@ -501,7 +497,7 @@ constructor(
         // Snapshot original due dates BEFORE mutation so undo can restore
         // each task's prior schedule even if some succeed and some fail.
         val originalDueDates = ids.associateWith { id ->
-            taskDao.getTaskByIdOnce(id)?.dueDate
+            taskRepository.getTaskByIdOnce(id)?.dueDate
         }
 
         var succeeded = 0
@@ -609,7 +605,7 @@ constructor(
         val description = action.description?.takeIf { it.isNotBlank() }
         val projectId = action.project
             ?.takeIf { it.isNotBlank() }
-            ?.let { projectDao.getProjectByNameOnce(it.trim())?.id }
+            ?.let { projectRepository.getProjectByNameOnce(it.trim())?.id }
 
         // B.3 (D13): the chat backend doesn't carry a recurrence field on
         // `ChatActionResponse`, so re-run the offline NLP parser over the
@@ -680,7 +676,7 @@ constructor(
             SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
         }
         val projectName = task.projectId?.let { pid ->
-            projectDao.getProjectByIdOnce(pid)?.name
+            projectRepository.getProjectByIdOnce(pid)?.name
         }
         return ChatTaskContext(
             title = task.title,

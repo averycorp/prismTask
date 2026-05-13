@@ -2,8 +2,6 @@ package com.averycorp.prismtask.ui.screens.today
 
 import app.cash.turbine.test
 import com.averycorp.prismtask.core.time.LocalDateFlow
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
@@ -59,8 +57,6 @@ class TodayViewModelTest {
 
     private lateinit var taskRepository: TaskRepository
     private lateinit var tagRepository: TagRepository
-    private lateinit var taskDao: TaskDao
-    private lateinit var habitCompletionDao: HabitCompletionDao
     private lateinit var habitRepository: HabitRepository
     private lateinit var projectRepository: ProjectRepository
     private lateinit var templateRepository: TaskTemplateRepository
@@ -89,8 +85,6 @@ class TodayViewModelTest {
         Dispatchers.setMain(dispatcher)
         taskRepository = mockk(relaxed = true)
         tagRepository = mockk(relaxed = true)
-        taskDao = mockk(relaxed = true)
-        habitCompletionDao = mockk(relaxed = true)
         habitRepository = mockk(relaxed = true)
         projectRepository = mockk(relaxed = true)
         templateRepository = mockk(relaxed = true)
@@ -145,15 +139,15 @@ class TodayViewModelTest {
         coEvery { habitListPreferences.isHouseworkEnabled() } returns flowOf(true)
         coEvery { habitListPreferences.getTodaySkipAfterCompleteDays() } returns flowOf(0)
         coEvery { habitListPreferences.getTodaySkipBeforeScheduleDays() } returns flowOf(0)
-        coEvery { habitCompletionDao.getLastCompletionDatesPerHabit() } returns flowOf(emptyList())
+        coEvery { habitRepository.getLastCompletionDatesPerHabit() } returns flowOf(emptyList())
         coEvery { projectRepository.getAllProjects() } returns flowOf(emptyList())
         coEvery { habitRepository.getHabitsWithTodayStatus() } returns flowOf(emptyList())
         coEvery { habitRepository.getHabitsWithFullStatus() } returns flowOf(emptyList())
-        coEvery { taskDao.getOverdueRootTasks(any()) } returns flowOf(emptyList())
-        coEvery { taskDao.getTodayTasks(any(), any()) } returns flowOf(emptyList())
-        coEvery { taskDao.getPlannedForToday(any(), any()) } returns flowOf(emptyList())
-        coEvery { taskDao.getCompletedToday(any()) } returns flowOf(emptyList())
-        coEvery { taskDao.getTasksNotInToday(any(), any()) } returns flowOf(emptyList())
+        coEvery { taskRepository.getOverdueRootTasks(any()) } returns flowOf(emptyList())
+        coEvery { taskRepository.getTodayTasks(any(), any()) } returns flowOf(emptyList())
+        coEvery { taskRepository.getPlannedForToday(any(), any()) } returns flowOf(emptyList())
+        coEvery { taskRepository.getCompletedToday(any()) } returns flowOf(emptyList())
+        coEvery { taskRepository.getTasksNotInToday(any(), any()) } returns flowOf(emptyList())
         coEvery { checkInLogRepository.getMostRecentDate() } returns null
         coEvery { checkInLogRepository.observeAll() } returns flowOf(emptyList())
         coEvery { medicationRefillRepository.observeAll() } returns flowOf(emptyList())
@@ -171,8 +165,6 @@ class TodayViewModelTest {
     private fun newViewModel() = TodayViewModel(
         taskRepository,
         tagRepository,
-        taskDao,
-        habitCompletionDao,
         habitRepository,
         projectRepository,
         templateRepository,
@@ -338,8 +330,8 @@ class TodayViewModelTest {
         vm.onPlanForToday(listOf(1L, 2L, 3L))
         advanceUntilIdle()
 
-        coVerify { taskDao.setPlanDate(1L, any(), any()) }
-        coVerify { taskDao.setPlanDate(2L, any(), any()) }
-        coVerify { taskDao.setPlanDate(3L, any(), any()) }
+        coVerify { taskRepository.setPlanDate(1L, any()) }
+        coVerify { taskRepository.setPlanDate(2L, any()) }
+        coVerify { taskRepository.setPlanDate(3L, any()) }
     }
 }

@@ -2,9 +2,6 @@ package com.averycorp.prismtask.ui.screens.chat
 
 import androidx.lifecycle.SavedStateHandle
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.ProjectDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
@@ -12,6 +9,7 @@ import com.averycorp.prismtask.data.remote.api.ChatStreamEvent
 import com.averycorp.prismtask.data.remote.api.ChatTokensUsed
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
@@ -54,10 +52,8 @@ class ChatViewModelStreamingTest {
     private lateinit var chatRepository: ChatRepository
     private lateinit var taskRepository: TaskRepository
     private lateinit var tagRepository: TagRepository
-    private lateinit var taskDao: TaskDao
-    private lateinit var projectDao: ProjectDao
+    private lateinit var projectRepository: ProjectRepository
     private lateinit var habitRepository: HabitRepository
-    private lateinit var habitCompletionDao: HabitCompletionDao
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
@@ -70,14 +66,12 @@ class ChatViewModelStreamingTest {
         chatRepository = mockk(relaxed = true) {
             every { messages } returns MutableStateFlow(emptyList())
         }
-        taskRepository = mockk(relaxed = true)
-        tagRepository = mockk(relaxed = true)
-        taskDao = mockk(relaxed = true) {
+        taskRepository = mockk(relaxed = true) {
             coEvery { getTaskByIdOnce(any()) } returns null
         }
-        projectDao = mockk(relaxed = true)
+        tagRepository = mockk(relaxed = true)
+        projectRepository = mockk(relaxed = true)
         habitRepository = mockk(relaxed = true)
-        habitCompletionDao = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true) {
             every { userTier } returns MutableStateFlow(UserTier.PRO)
             every { hasAccess(any()) } returns true
@@ -120,10 +114,8 @@ class ChatViewModelStreamingTest {
         chatRepository = chatRepository,
         taskRepository = taskRepository,
         tagRepository = tagRepository,
-        taskDao = taskDao,
-        projectDao = projectDao,
+        projectRepository = projectRepository,
         habitRepository = habitRepository,
-        habitCompletionDao = habitCompletionDao,
         proFeatureGate = proFeatureGate,
         taskBehaviorPreferences = taskBehaviorPreferences,
         userPreferencesDataStore = userPreferencesDataStore,
