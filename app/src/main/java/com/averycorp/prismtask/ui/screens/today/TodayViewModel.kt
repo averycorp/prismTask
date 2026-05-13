@@ -694,7 +694,7 @@ constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     private val allTodayHabits: StateFlow<List<HabitWithStatus>> = combine(
-        habitRepository.getHabitsWithTodayStatus(),
+        habitRepository.getHabitsWithFullStatus(),
         selfCareEnabled,
         medicationEnabled,
         schoolEnabled,
