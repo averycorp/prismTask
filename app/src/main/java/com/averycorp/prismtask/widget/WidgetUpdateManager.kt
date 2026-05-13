@@ -144,6 +144,36 @@ constructor(
         }
     }
 
+    /**
+     * Writes the [state] and refreshes [TimerWidget] in the same coroutine
+     * — guarantees the recomposition reads the just-written state.
+     *
+     * The previous shape ([writeTimerState] + [updateTimerWidget] called
+     * back-to-back) raced: the write went onto one coroutine and the
+     * 500ms-debounced update onto another, both on the same scope. If the
+     * recomposition fired before the write committed, the widget rendered
+     * the previous DataStore snapshot — and since there was no follow-up
+     * push, it stuck on that stale state (e.g. "Ready to Focus" after the
+     * user tapped Start). Sequencing the two calls inside one
+     * `scope.launch { … }` eliminates the race.
+     *
+     * Cancels any pending debounced update so a stale earlier-state push
+     * can't fire after this fresh one. Errors are swallowed so the caller
+     * can't be taken down by a DataStore disk failure.
+     */
+    fun writeTimerStateAndRefresh(state: TimerWidgetState) {
+        if (!BuildConfig.WIDGETS_ENABLED) return
+        timerWidgetJob?.cancel()
+        timerWidgetJob = scope.launch {
+            try {
+                TimerStateDataStore.write(context, state)
+                TimerWidget().updateAll(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "writeTimerStateAndRefresh failed: ${e.message}")
+            }
+        }
+    }
+
     suspend fun updateTimerWidget() {
         if (!BuildConfig.WIDGETS_ENABLED) return
         timerWidgetJob?.cancel()
