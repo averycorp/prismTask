@@ -2,6 +2,7 @@ package com.averycorp.prismtask.ui.screens.habits
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,9 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,7 +61,6 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun HabitListScreen(
     navController: NavController,
-    filter: String = "daily",
     viewModel: HabitListViewModel = hiltViewModel()
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
@@ -65,6 +68,7 @@ fun HabitListScreen(
     var loggingHabit by remember { mutableStateOf<HabitWithStatus?>(null) }
     var bookingHabit by remember { mutableStateOf<HabitWithStatus?>(null) }
     var activityLogHabit by remember { mutableStateOf<HabitWithStatus?>(null) }
+    var filter by remember { mutableStateOf("daily") }
     val recurringPeriods = setOf("weekly", "fortnightly", "monthly", "bimonthly", "quarterly")
     val filteredItems = remember(items, filter) {
         if (filter == "daily") {
@@ -82,7 +86,7 @@ fun HabitListScreen(
         }
     }
 
-    val baseTitle = if (filter == "daily") "Daily Habits" else "Recurring Habits"
+    val baseTitle = "Habits"
     val prismColors = LocalPrismColors.current
     val displayFont = LocalPrismFonts.current.display
     val prismAttrs = com.averycorp.prismtask.ui.theme.LocalPrismAttrs.current
@@ -101,7 +105,7 @@ fun HabitListScreen(
             TopAppBar(
                 title = {
                     if (prismAttrs.editorial) {
-                        // Void: "Daily Habits." — trailing dot in primary color
+                        // Void: "Habits." — trailing dot in primary color
                         androidx.compose.foundation.text.BasicText(
                             text = androidx.compose.ui.text.buildAnnotatedString {
                                 append(screenTitle)
@@ -158,36 +162,58 @@ fun HabitListScreen(
             }
         }
 
-        if (filteredItems.isEmpty()) {
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .gridFloor()
+                .padding(padding)
+        ) {
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .gridFloor()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                RichEmptyState(
-                    icon = "\u2728",
-                    title = "Start Building Habits",
-                    description = "Track daily routines at your own pace.",
-                    actionLabel = "Create Habit",
-                    onAction = { navController.navigate(PrismTaskRoute.AddEditHabit.createRoute()) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp)
-                )
+                SegmentedButton(
+                    selected = filter == "daily",
+                    onClick = { filter = "daily" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) { Text("Daily") }
+                SegmentedButton(
+                    selected = filter == "recurring",
+                    onClick = { filter = "recurring" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) { Text("Recurring") }
             }
-        } else {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .gridFloor()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
+
+            if (filteredItems.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    RichEmptyState(
+                        icon = "\u2728",
+                        title = if (filter == "daily") "Start Building Habits" else "No Recurring Habits",
+                        description = if (filter == "daily") {
+                            "Track daily routines at your own pace."
+                        } else {
+                            "Add a weekly, monthly, or other recurring habit."
+                        },
+                        actionLabel = "Create Habit",
+                        onAction = { navController.navigate(PrismTaskRoute.AddEditHabit.createRoute()) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp)
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
 
                 items(filteredItems, key = { it.key }) { listItem ->
                     ReorderableItem(reorderableLazyListState, key = listItem.key) { isDragging ->
@@ -276,7 +302,6 @@ fun HabitListScreen(
                                     onClick = {
                                         when (listItem.type) {
                                             "school" -> navController.navigate(PrismTaskRoute.Schoolwork.route)
-                                            "leisure" -> navController.navigate(PrismTaskRoute.Leisure.route)
                                         }
                                     },
                                     progress = listItem.progress,
@@ -290,6 +315,7 @@ fun HabitListScreen(
                 }
 
                 item { Spacer(modifier = Modifier.height(80.dp)) }
+                }
             }
         }
     }

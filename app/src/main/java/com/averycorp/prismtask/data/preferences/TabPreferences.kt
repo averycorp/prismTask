@@ -25,7 +25,7 @@ constructor(
         private val TAB_ORDER = stringPreferencesKey("tab_order")
         private val HIDDEN_TABS = stringSetPreferencesKey("hidden_tabs")
 
-        val DEFAULT_ORDER = listOf("today", "task_list", "habit_list", "habits_recurring", "timer")
+        val DEFAULT_ORDER = listOf("today", "task_list", "habit_list", "leisure", "timer")
     }
 
     fun getTabOrder(): Flow<List<String>> = context.tabDataStore.data.map { prefs ->
