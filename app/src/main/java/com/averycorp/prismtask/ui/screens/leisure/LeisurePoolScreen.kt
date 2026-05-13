@@ -202,14 +202,7 @@ fun LeisurePoolScreen(
                     categoryDisplays = state.categoryDisplays,
                     activities = state.activities,
                     onEditActivity = { editing = it },
-                    onCheckOffActivity = { activity ->
-                        val defaultDuration = activity.defaultDurationMinutes
-                        if (defaultDuration != null && defaultDuration > 0) {
-                            logCheckOff(activity, defaultDuration)
-                        } else {
-                            checkingOff = activity
-                        }
-                    }
+                    onCheckOffActivity = { activity -> checkingOff = activity }
                 )
             }
 
@@ -270,12 +263,7 @@ fun LeisurePoolScreen(
             onDismiss = { pickingCategory = null },
             onPickActivity = { activity ->
                 pickingCategory = null
-                val defaultDuration = activity.defaultDurationMinutes
-                if (defaultDuration != null && defaultDuration > 0) {
-                    logCheckOff(activity, defaultDuration)
-                } else {
-                    checkingOff = activity
-                }
+                checkingOff = activity
             },
             onLogCategoryOnly = {
                 pickingCategory = null
