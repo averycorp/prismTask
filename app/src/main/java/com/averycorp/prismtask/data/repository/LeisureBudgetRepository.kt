@@ -215,6 +215,14 @@ constructor(
             sessionDao.getMinutesInRange(start, start + DayBoundary.DAY_MILLIS)
         }
 
+    /** Observe today's leisure-budget target (weekend-aware, SoD-respecting). */
+    fun observeTargetMinutesToday(): Flow<Int> = combine(
+        preferences.observeSnapshot(),
+        taskBehaviorPreferences.getDayStartHour()
+    ) { snap, hour ->
+        snap.targetForDate(DayBoundary.currentLocalDate(hour))
+    }
+
     /**
      * Today progress with current suggestion. Calling this re-rolls the
      * suggestion only when [forceResample] is true — UI consumers should

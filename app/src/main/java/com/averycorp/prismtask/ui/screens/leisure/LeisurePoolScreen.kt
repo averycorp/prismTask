@@ -74,6 +74,7 @@ import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
 import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
+import com.averycorp.prismtask.data.preferences.LeisureCategoryDisplay
 import com.averycorp.prismtask.domain.model.LeisureCategory
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -94,9 +95,12 @@ fun LeisurePoolScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     var showAddSheet by remember { mutableStateOf(false) }
+    var addInitialCategory by remember { mutableStateOf<LeisureCategory?>(null) }
     var editing by remember { mutableStateOf<LeisureActivityEntity?>(null) }
     var checkingOff by remember { mutableStateOf<LeisureActivityEntity?>(null) }
-    var loggingCategory by remember { mutableStateOf<LeisureCategory?>(null) }
+    var pickingCategory by remember { mutableStateOf<LeisureCategory?>(null) }
+    var quickLoggingCategory by remember { mutableStateOf<LeisureCategory?>(null) }
+    var editingCategory by remember { mutableStateOf<LeisureCategory?>(null) }
     var editingSession by remember { mutableStateOf<LeisureSessionEntity?>(null) }
     var deletingSession by remember { mutableStateOf<LeisureSessionEntity?>(null) }
 
@@ -109,8 +113,9 @@ fun LeisurePoolScreen(
 
     fun logCategory(category: LeisureCategory, minutes: Int) {
         viewModel.logCategorySession(category, minutes)
+        val label = state.displayFor(category).label
         coroutineScope.launch {
-            snackbarHostState.showSnackbar("Logged $minutes min of ${category.label}")
+            snackbarHostState.showSnackbar("Logged $minutes min of $label")
         }
     }
 
@@ -119,8 +124,10 @@ fun LeisurePoolScreen(
             TopAppBar(
                 title = { Text("Leisure Budget", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (navController.previousBackStackEntry != null) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 }
             )
@@ -157,9 +164,10 @@ fun LeisurePoolScreen(
             }
             items(LeisureCategory.values().toList()) { category ->
                 CategoryLogCard(
-                    category = category,
+                    display = state.displayFor(category),
                     activityCount = state.activitiesByCategory[category]?.size ?: 0,
-                    onClick = { loggingCategory = category }
+                    onClick = { pickingCategory = category },
+                    onEdit = { editingCategory = category }
                 )
             }
             item {
@@ -177,6 +185,7 @@ fun LeisurePoolScreen(
                     SessionDayCard(
                         day = day,
                         activitiesById = state.activitiesById,
+                        categoryDisplays = state.categoryDisplays,
                         onEditTime = { editingSession = it },
                         onDelete = { deletingSession = it }
                     )
@@ -196,6 +205,7 @@ fun LeisurePoolScreen(
                 items(state.activities, key = { it.id }) { activity ->
                     ActivityRow(
                         activity = activity,
+                        categoryDisplays = state.categoryDisplays,
                         onCheckOff = {
                             val defaultDuration = activity.defaultDurationMinutes
                             if (defaultDuration != null && defaultDuration > 0) {
@@ -218,10 +228,16 @@ fun LeisurePoolScreen(
 
     if (showAddSheet) {
         AddActivityDialog(
-            onDismiss = { showAddSheet = false },
+            initialCategory = addInitialCategory ?: LeisureCategory.PHYSICAL,
+            categoryDisplays = state.categoryDisplays,
+            onDismiss = {
+                showAddSheet = false
+                addInitialCategory = null
+            },
             onConfirm = { name, category, duration ->
                 viewModel.addActivity(name, category, duration)
                 showAddSheet = false
+                addInitialCategory = null
             }
         )
     }
@@ -229,6 +245,7 @@ fun LeisurePoolScreen(
     editing?.let { activity ->
         EditActivityDialog(
             activity = activity,
+            categoryDisplays = state.categoryDisplays,
             onDismiss = { editing = null },
             onConfirm = { name, category, duration ->
                 viewModel.updateActivity(activity, name, category, duration)
@@ -248,13 +265,61 @@ fun LeisurePoolScreen(
         )
     }
 
-    loggingCategory?.let { category ->
+    pickingCategory?.let { category ->
+        PickActivityForCategoryDialog(
+            display = state.displayFor(category),
+            activities = state.activitiesByCategory[category]
+                .orEmpty()
+                .filter { it.enabled },
+            onDismiss = { pickingCategory = null },
+            onPickActivity = { activity ->
+                pickingCategory = null
+                val defaultDuration = activity.defaultDurationMinutes
+                if (defaultDuration != null && defaultDuration > 0) {
+                    logCheckOff(activity, defaultDuration)
+                } else {
+                    checkingOff = activity
+                }
+            },
+            onLogCategoryOnly = {
+                pickingCategory = null
+                quickLoggingCategory = category
+            },
+            onAddActivity = {
+                pickingCategory = null
+                addInitialCategory = category
+                showAddSheet = true
+            },
+            onEditCategory = {
+                pickingCategory = null
+                editingCategory = category
+            }
+        )
+    }
+
+    quickLoggingCategory?.let { category ->
         LogCategoryDialog(
-            category = category,
-            onDismiss = { loggingCategory = null },
+            display = state.displayFor(category),
+            onDismiss = { quickLoggingCategory = null },
             onConfirm = { minutes ->
                 logCategory(category, minutes)
-                loggingCategory = null
+                quickLoggingCategory = null
+            }
+        )
+    }
+
+    editingCategory?.let { category ->
+        EditCategoryDialog(
+            category = category,
+            current = state.displayFor(category),
+            onDismiss = { editingCategory = null },
+            onSave = { label, emoji ->
+                viewModel.setCategoryDisplay(category, label, emoji)
+                editingCategory = null
+            },
+            onReset = {
+                viewModel.resetCategoryDisplay(category)
+                editingCategory = null
             }
         )
     }
@@ -338,9 +403,10 @@ private fun TodayProgressCard(minutesLogged: Int, targetMinutes: Int) {
 
 @Composable
 private fun CategoryLogCard(
-    category: LeisureCategory,
+    display: LeisureCategoryDisplay,
     activityCount: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -353,29 +419,36 @@ private fun CategoryLogCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = category.emoji,
+                text = display.emoji,
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = category.label,
+                    text = display.label,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = when (activityCount) {
-                        0 -> "Tap to log"
-                        1 -> "1 activity • tap to log"
-                        else -> "$activityCount activities • tap to log"
+                        0 -> "Tap to pick an activity"
+                        1 -> "1 activity • tap to pick"
+                        else -> "$activityCount activities • tap to pick"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit ${display.label} Category",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Log ${category.label}",
+                contentDescription = "Log ${display.label}",
                 tint = MaterialTheme.colorScheme.primary
             )
         }
@@ -401,6 +474,7 @@ private fun groupSessionsByDay(sessions: List<LeisureSessionEntity>): List<Sessi
 private fun SessionDayCard(
     day: SessionDay,
     activitiesById: Map<Long, LeisureActivityEntity>,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onEditTime: (LeisureSessionEntity) -> Unit,
     onDelete: (LeisureSessionEntity) -> Unit
 ) {
@@ -442,6 +516,7 @@ private fun SessionDayCard(
             SessionRow(
                 session = session,
                 activity = session.activityId?.let { activitiesById[it] },
+                categoryDisplays = categoryDisplays,
                 onEditTime = { onEditTime(session) },
                 onDelete = { onDelete(session) }
             )
@@ -453,14 +528,16 @@ private fun SessionDayCard(
 private fun SessionRow(
     session: LeisureSessionEntity,
     activity: LeisureActivityEntity?,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onEditTime: () -> Unit,
     onDelete: () -> Unit
 ) {
     val accent = Color(0xFF8B5CF6)
     val category = LeisureCategory.fromStringOrNull(session.category)
+    val display = category?.let { categoryDisplays[it] }
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     val timeLabel = timeFormat.format(Date(session.loggedAt))
-    val label = activity?.name ?: category?.label ?: "Leisure"
+    val label = activity?.name ?: display?.label ?: category?.label ?: "Leisure"
 
     Row(
         modifier = Modifier
@@ -477,7 +554,7 @@ private fun SessionRow(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = category?.emoji ?: "•",
+                text = display?.emoji ?: category?.emoji ?: "•",
                 style = MaterialTheme.typography.labelSmall
             )
         }
@@ -619,6 +696,7 @@ private fun RefreshLimitCard(
 @Composable
 private fun ActivityRow(
     activity: LeisureActivityEntity,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onCheckOff: () -> Unit,
     onEdit: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
@@ -634,10 +712,12 @@ private fun ActivityRow(
                 val parsedCategory = LeisureCategory.fromStringOrNull(activity.category)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (parsedCategory != null) {
+                        val parsedDisplay = categoryDisplays[parsedCategory]
+                            ?: LeisureCategoryDisplay(parsedCategory.emoji, parsedCategory.label)
                         AssistChip(
                             onClick = onEdit,
                             label = {
-                                Text("${parsedCategory.emoji} ${parsedCategory.label}")
+                                Text("${parsedDisplay.emoji} ${parsedDisplay.label}")
                             },
                             colors = AssistChipDefaults.assistChipColors()
                         )
@@ -682,13 +762,18 @@ private fun ActivityRow(
 
 @Composable
 private fun AddActivityDialog(
+    initialCategory: LeisureCategory,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onDismiss: () -> Unit,
     onConfirm: (String, LeisureCategory, Int?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(LeisureCategory.PHYSICAL) }
+    var category by remember(initialCategory) { mutableStateOf(initialCategory) }
     var durationStr by remember { mutableStateOf("") }
     var categoryMenuOpen by remember { mutableStateOf(false) }
+
+    fun displayOf(c: LeisureCategory): LeisureCategoryDisplay =
+        categoryDisplays[c] ?: LeisureCategoryDisplay(c.emoji, c.label)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -707,15 +792,17 @@ private fun AddActivityDialog(
                         onClick = { categoryMenuOpen = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("${category.emoji} ${category.label}")
+                        val d = displayOf(category)
+                        Text("${d.emoji} ${d.label}")
                     }
                     DropdownMenu(
                         expanded = categoryMenuOpen,
                         onDismissRequest = { categoryMenuOpen = false }
                     ) {
                         LeisureCategory.values().forEach { c ->
+                            val d = displayOf(c)
                             DropdownMenuItem(
-                                text = { Text("${c.emoji} ${c.label}") },
+                                text = { Text("${d.emoji} ${d.label}") },
                                 onClick = {
                                     category = c
                                     categoryMenuOpen = false
@@ -749,6 +836,7 @@ private fun AddActivityDialog(
 @Composable
 private fun EditActivityDialog(
     activity: LeisureActivityEntity,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onDismiss: () -> Unit,
     onConfirm: (String, LeisureCategory, Int?) -> Unit
 ) {
@@ -762,6 +850,9 @@ private fun EditActivityDialog(
         mutableStateOf(activity.defaultDurationMinutes?.toString().orEmpty())
     }
     var categoryMenuOpen by remember { mutableStateOf(false) }
+
+    fun displayOf(c: LeisureCategory): LeisureCategoryDisplay =
+        categoryDisplays[c] ?: LeisureCategoryDisplay(c.emoji, c.label)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -780,15 +871,17 @@ private fun EditActivityDialog(
                         onClick = { categoryMenuOpen = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("${category.emoji} ${category.label}")
+                        val d = displayOf(category)
+                        Text("${d.emoji} ${d.label}")
                     }
                     DropdownMenu(
                         expanded = categoryMenuOpen,
                         onDismissRequest = { categoryMenuOpen = false }
                     ) {
                         LeisureCategory.values().forEach { c ->
+                            val d = displayOf(c)
                             DropdownMenuItem(
-                                text = { Text("${c.emoji} ${c.label}") },
+                                text = { Text("${d.emoji} ${d.label}") },
                                 onClick = {
                                     category = c
                                     categoryMenuOpen = false
@@ -864,14 +957,14 @@ private fun CheckOffDurationDialog(
 
 @Composable
 private fun LogCategoryDialog(
-    category: LeisureCategory,
+    display: LeisureCategoryDisplay,
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit
 ) {
-    var durationStr by remember(category) { mutableStateOf("30") }
+    var durationStr by remember(display) { mutableStateOf("30") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Log ${category.emoji} ${category.label}") },
+        title = { Text("Log ${display.emoji} ${display.label}") },
         text = {
             Column {
                 Text(
@@ -898,6 +991,142 @@ private fun LogCategoryDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun PickActivityForCategoryDialog(
+    display: LeisureCategoryDisplay,
+    activities: List<LeisureActivityEntity>,
+    onDismiss: () -> Unit,
+    onPickActivity: (LeisureActivityEntity) -> Unit,
+    onLogCategoryOnly: () -> Unit,
+    onAddActivity: () -> Unit,
+    onEditCategory: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${display.emoji} ${display.label}") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (activities.isEmpty()) {
+                    Text(
+                        text = "No activities in this category yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        text = "Pick An Activity",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    activities.forEach { activity ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPickActivity(activity) }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = activity.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                activity.defaultDurationMinutes?.let { d ->
+                                    Text(
+                                        text = "$d min default",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Log ${activity.name}",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        HorizontalDivider()
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = onLogCategoryOnly,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Log Without A Specific Activity") }
+                TextButton(
+                    onClick = onAddActivity,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Add Activity To ${display.label}") }
+                TextButton(
+                    onClick = onEditCategory,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Edit Category…") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+private fun EditCategoryDialog(
+    category: LeisureCategory,
+    current: LeisureCategoryDisplay,
+    onDismiss: () -> Unit,
+    onSave: (label: String, emoji: String) -> Unit,
+    onReset: () -> Unit
+) {
+    var label by remember(category) { mutableStateOf(current.label) }
+    var emoji by remember(category) { mutableStateOf(current.emoji) }
+    val isCustomized = current.label != category.label || current.emoji != category.emoji
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Category") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = emoji,
+                    onValueChange = { emoji = it },
+                    label = { Text("Emoji") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text("Label") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Defaults: ${category.emoji} ${category.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(label, emoji) },
+                enabled = label.isNotBlank() && emoji.isNotBlank()
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            Row {
+                if (isCustomized) {
+                    TextButton(onClick = onReset) { Text("Reset") }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
     )
 }
