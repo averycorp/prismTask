@@ -3,10 +3,6 @@ package com.averycorp.prismtask.ui.screens.analytics
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.TaskCompletionDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
-import com.averycorp.prismtask.data.local.dao.TaskTimingDao
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.preferences.ProductiveStreakPreferences
 import com.averycorp.prismtask.data.preferences.ProductiveStreakSnapshot
@@ -16,6 +12,7 @@ import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TaskCompletionRepository
 import com.averycorp.prismtask.data.repository.TaskCompletionStats
 import com.averycorp.prismtask.data.repository.TaskRepository
+import com.averycorp.prismtask.data.repository.TaskTimingRepository
 import com.averycorp.prismtask.domain.model.AnalyticsSummary
 import com.averycorp.prismtask.domain.model.ProductivityRange
 import com.averycorp.prismtask.domain.model.ProductivityScoreResponse
@@ -76,10 +73,7 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val taskRepository: TaskRepository,
     private val habitRepository: HabitRepository,
-    private val taskDao: TaskDao,
-    private val taskCompletionDao: TaskCompletionDao,
-    private val habitCompletionDao: HabitCompletionDao,
-    private val taskTimingDao: TaskTimingDao,
+    private val taskTimingRepository: TaskTimingRepository,
     private val analyticsSummaryAggregator: AnalyticsSummaryAggregator,
     private val productivityScoreCalculator: ProductivityScoreCalculator,
     private val timeTrackingAggregator: TimeTrackingAggregator,
@@ -115,9 +109,9 @@ constructor(
         val thirtyDaysAgo = todayStart - TimeUnit.DAYS.toMillis(29)
         combine(
             taskRepository.getTasksDueOnDate(todayStart, todayEnd),
-            taskCompletionDao.getCompletionsInRange(thirtyDaysAgo, todayEnd),
+            taskCompletionRepository.getCompletionsInRange(thirtyDaysAgo, todayEnd),
             habitRepository.getActiveHabits(),
-            habitCompletionDao.getAllCompletionsInRange(thirtyDaysAgo, todayEnd)
+            habitRepository.getAllCompletionsInRange(thirtyDaysAgo, todayEnd)
         ) { tasks, taskCompletions, habits, habitCompletions ->
             analyticsSummaryAggregator.compute(
                 today = today,
@@ -136,7 +130,7 @@ constructor(
         val startDate = today.minusDays((range.days - 1).toLong())
         val startMillis = startDate.atStartOfDay(zone).toInstant().toEpochMilli()
         val endMillisExclusive = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        taskTimingDao.getTimingsInRange(startMillis, endMillisExclusive).map { timings ->
+        taskTimingRepository.getTimingsInRange(startMillis, endMillisExclusive).map { timings ->
             timeTrackingAggregator.compute(
                 endDate = today,
                 zone = zone,
@@ -153,9 +147,9 @@ constructor(
         val startMillis = startDate.atStartOfDay(zone).toInstant().toEpochMilli()
         val endMillisExclusive = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         combine(
-            taskDao.getTasksForAnalyticsRange(startMillis, endMillisExclusive),
+            taskRepository.getTasksForAnalyticsRange(startMillis, endMillisExclusive),
             habitRepository.getActiveHabits(),
-            habitCompletionDao.getAllCompletionsInRange(startMillis, endMillisExclusive - 1)
+            habitRepository.getAllCompletionsInRange(startMillis, endMillisExclusive - 1)
         ) { tasks, habits, habitCompletions ->
             productivityScoreCalculator.compute(
                 startDate = startDate,

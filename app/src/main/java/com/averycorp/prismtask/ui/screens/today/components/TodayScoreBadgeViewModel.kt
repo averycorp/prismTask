@@ -2,9 +2,8 @@ package com.averycorp.prismtask.ui.screens.today.components
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProductivityScoreCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,9 +32,8 @@ data class TodayScoreBadgeState(
 class TodayScoreBadgeViewModel
 @Inject
 constructor(
-    private val taskDao: TaskDao,
+    private val taskRepository: TaskRepository,
     private val habitRepository: HabitRepository,
-    private val habitCompletionDao: HabitCompletionDao,
     private val productivityScoreCalculator: ProductivityScoreCalculator
 ) : ViewModel() {
 
@@ -49,9 +47,9 @@ constructor(
         val endMillisExclusive = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
         combine(
-            taskDao.getTasksForAnalyticsRange(startMillis, endMillisExclusive),
+            taskRepository.getTasksForAnalyticsRange(startMillis, endMillisExclusive),
             habitRepository.getActiveHabits(),
-            habitCompletionDao.getAllCompletionsInRange(startMillis, endMillisExclusive - 1)
+            habitRepository.getAllCompletionsInRange(startMillis, endMillisExclusive - 1)
         ) { tasks, habits, habitCompletions ->
             val response = productivityScoreCalculator.compute(
                 startDate = windowStart,
