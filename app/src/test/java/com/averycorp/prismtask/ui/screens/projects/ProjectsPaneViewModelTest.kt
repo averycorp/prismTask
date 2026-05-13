@@ -89,6 +89,54 @@ class ProjectsPaneViewModelTest {
     }
 
     @Test
+    fun `archiveProject delegates to the repository and removes from active stream`() = runTest {
+        val projectDao = FakeProjectDao().apply {
+            projects.add(ProjectEntity(id = 1, name = "Keep", status = "ACTIVE"))
+            projects.add(ProjectEntity(id = 2, name = "Retire", status = "ACTIVE"))
+        }
+        val vm = buildViewModel(projectDao, FakeMilestoneDao(), SavedStateHandle())
+        advanceUntilIdle()
+        assertEquals(setOf("Keep", "Retire"), vm.projects.first().map { it.project.name }.toSet())
+
+        vm.archiveProject(projectId = 2)
+        advanceUntilIdle()
+
+        assertEquals(listOf("Keep"), vm.projects.first().map { it.project.name })
+        assertEquals("ARCHIVED", projectDao.projects.first { it.id == 2L }.status)
+    }
+
+    @Test
+    fun `reopenProject moves an archived project back into the active stream`() = runTest {
+        val projectDao = FakeProjectDao().apply {
+            projects.add(ProjectEntity(id = 1, name = "Gone", status = "ARCHIVED"))
+        }
+        val vm = buildViewModel(projectDao, FakeMilestoneDao(), SavedStateHandle())
+        advanceUntilIdle()
+        assertEquals(emptyList<String>(), vm.projects.first().map { it.project.name })
+
+        vm.reopenProject(projectId = 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf("Gone"), vm.projects.first().map { it.project.name })
+        assertEquals("ACTIVE", projectDao.projects.first { it.id == 1L }.status)
+    }
+
+    @Test
+    fun `completeProject stamps COMPLETED status and removes from active stream`() = runTest {
+        val projectDao = FakeProjectDao().apply {
+            projects.add(ProjectEntity(id = 1, name = "Ship", status = "ACTIVE"))
+        }
+        val vm = buildViewModel(projectDao, FakeMilestoneDao(), SavedStateHandle())
+        advanceUntilIdle()
+
+        vm.completeProject(projectId = 1)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), vm.projects.first().map { it.project.name })
+        assertEquals("COMPLETED", projectDao.projects.first { it.id == 1L }.status)
+    }
+
+    @Test
     fun `projects flow reflects the selected status filter`() = runTest {
         val projectDao = FakeProjectDao().apply {
             projects.add(ProjectEntity(id = 1, name = "Act", status = "ACTIVE"))

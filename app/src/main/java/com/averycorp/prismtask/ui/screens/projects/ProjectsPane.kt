@@ -95,7 +95,10 @@ fun ProjectsPane(
                                     PrismTaskRoute.ProjectDetail.createRoute(data.project.id)
                                 )
                             },
-                            nowMillis = nowMillis
+                            nowMillis = nowMillis,
+                            onArchive = { viewModel.archiveProject(data.project.id) },
+                            onComplete = { viewModel.completeProject(data.project.id) },
+                            onReopen = { viewModel.reopenProject(data.project.id) }
                         )
                     }
                 }

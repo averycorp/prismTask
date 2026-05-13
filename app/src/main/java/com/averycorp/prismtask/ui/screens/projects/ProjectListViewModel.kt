@@ -60,6 +60,28 @@ constructor(
         }
     }
 
+    fun onArchiveProject(projectId: Long) {
+        viewModelScope.launch {
+            try {
+                projectRepository.archiveProject(projectId)
+            } catch (e: Exception) {
+                Log.e("ProjectListVM", "Failed to archive project", e)
+                snackbarHostState.showSnackbar("Couldn't archive project")
+            }
+        }
+    }
+
+    fun onReopenProject(projectId: Long) {
+        viewModelScope.launch {
+            try {
+                projectRepository.reopenProject(projectId)
+            } catch (e: Exception) {
+                Log.e("ProjectListVM", "Failed to reopen project", e)
+                snackbarHostState.showSnackbar("Couldn't reopen project")
+            }
+        }
+    }
+
     /**
      * Stage pasted content for the import preview screen to consume.
      * The preview ViewModel reads it via [PendingImportContent.consume]
