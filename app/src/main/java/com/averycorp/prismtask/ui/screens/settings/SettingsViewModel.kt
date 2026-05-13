@@ -9,22 +9,17 @@ import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.BillingPeriod
 import com.averycorp.prismtask.data.billing.SubscriptionState
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.calendar.CalendarConnectionResult
 import com.averycorp.prismtask.data.calendar.CalendarInfo
 import com.averycorp.prismtask.data.calendar.CalendarManager
 import com.averycorp.prismtask.data.calendar.CalendarSyncPreferences
-import com.averycorp.prismtask.data.calendar.DIRECTION_BOTH
-import com.averycorp.prismtask.data.calendar.FREQUENCY_15MIN
 import com.averycorp.prismtask.data.export.DataExporter
 import com.averycorp.prismtask.data.export.DataImporter
 import com.averycorp.prismtask.data.local.database.PrismTaskDatabase
-import com.averycorp.prismtask.data.preferences.A11yPreferences
 import com.averycorp.prismtask.data.preferences.ArchivePreferences
 import com.averycorp.prismtask.data.preferences.AuthTokenPreferences
 import com.averycorp.prismtask.data.preferences.BackendSyncPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
-import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.OnboardingPreferences
 import com.averycorp.prismtask.data.preferences.TabPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
@@ -33,14 +28,13 @@ import com.averycorp.prismtask.data.preferences.ThemePreferences
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UrgencyWeights
-import com.averycorp.prismtask.data.preferences.VoicePreferences
-import com.averycorp.prismtask.data.remote.AccountDeletionService
-import com.averycorp.prismtask.data.remote.AuthManager
-import com.averycorp.prismtask.data.remote.SyncService
-import com.averycorp.prismtask.data.repository.CalendarSyncRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.ui.navigation.ALL_BOTTOM_NAV_ITEMS
-import com.averycorp.prismtask.workers.CalendarSyncScheduler
+import com.averycorp.prismtask.ui.screens.settings.sections.AccessibilitySettingsViewModel
+import com.averycorp.prismtask.ui.screens.settings.sections.NotificationSettingsViewModel
+import com.averycorp.prismtask.ui.screens.settings.sections.SyncSettingsViewModel
+import com.averycorp.prismtask.ui.screens.settings.sections.ThemeSettingsViewModel
+import com.averycorp.prismtask.ui.screens.settings.sections.VoiceSettingsViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -78,8 +72,6 @@ constructor(
     private val database: PrismTaskDatabase,
     internal val dataExporter: DataExporter,
     internal val dataImporter: DataImporter,
-    private val authManager: AuthManager,
-    private val syncService: SyncService,
     private val taskRepository: TaskRepository,
     private val habitRepository: com.averycorp.prismtask.data.repository.HabitRepository,
     internal val backendSyncPreferences: BackendSyncPreferences,
@@ -87,11 +79,7 @@ constructor(
     internal val authTokenPreferences: AuthTokenPreferences,
     private val calendarManager: CalendarManager,
     private val calendarSyncPreferences: CalendarSyncPreferences,
-    private val calendarSyncRepository: CalendarSyncRepository,
-    private val calendarSyncScheduler: CalendarSyncScheduler,
     private val billingManager: BillingManager,
-    private val voicePreferences: VoicePreferences,
-    private val a11yPreferences: A11yPreferences,
     private val userPreferencesDataStore: com.averycorp.prismtask.data.preferences.UserPreferencesDataStore,
     private val boundaryRuleRepository: com.averycorp.prismtask.data.repository.BoundaryRuleRepository,
     private val moodEnergyRepository: com.averycorp.prismtask.data.repository.MoodEnergyRepository,
@@ -101,17 +89,36 @@ constructor(
     private val onboardingPreferences: OnboardingPreferences,
     private val widgetUpdateManager: com.averycorp.prismtask.widget.WidgetUpdateManager,
     private val ndPreferencesDataStore: com.averycorp.prismtask.data.preferences.NdPreferencesDataStore,
-    private val notificationPreferences: NotificationPreferences,
-    private val notificationWorkerScheduler: com.averycorp.prismtask.notifications.NotificationWorkerScheduler,
     private val templateSeeder: com.averycorp.prismtask.data.seed.TemplateSeeder,
     private val selfCareRepository: com.averycorp.prismtask.data.repository.SelfCareRepository,
-    private val accountDeletionService: AccountDeletionService,
-    private val tourCardPreferences: TourCardPreferences
+    private val tourCardPreferences: TourCardPreferences,
+    // --- Sub-VMs extracted as part of T1.2 refactor ---
+    private val themeSettings: ThemeSettingsViewModel,
+    private val notificationSettings: NotificationSettingsViewModel,
+    private val syncSettings: SyncSettingsViewModel,
+    private val accessibilitySettings: AccessibilitySettingsViewModel,
+    private val voiceSettings: VoiceSettingsViewModel
 ) : ViewModel() {
+    // Shared snackbar message channel. Sub-VMs receive a reference to
+    // [_messages] in their `attach` call so their operations can surface
+    // user-facing strings through this coordinator without each owning a
+    // separate SharedFlow.
+    internal val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
     private val _checkInStreak = kotlinx.coroutines.flow.MutableStateFlow(0)
     val checkInStreak: StateFlow<Int> = _checkInStreak
 
     init {
+        // Wire sub-VMs to viewModelScope so they own their StateFlow lifetimes.
+        // Sync receives the shared messages channel so its operations can
+        // surface snackbar messages through this coordinator's `messages` flow.
+        themeSettings.attach(viewModelScope)
+        notificationSettings.attach(viewModelScope)
+        syncSettings.attach(viewModelScope, _messages)
+        accessibilitySettings.attach(viewModelScope)
+        voiceSettings.attach(viewModelScope)
+
         try {
             com.google.firebase.crashlytics.FirebaseCrashlytics
                 .getInstance()
@@ -431,51 +438,23 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setQuickAdd(prefs) }
     }
 
-    // --- Voice Input ---
-    val voiceInputEnabled: StateFlow<Boolean> = voicePreferences
-        .getVoiceInputEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val voiceFeedbackEnabled: StateFlow<Boolean> = voicePreferences
-        .getVoiceFeedbackEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val continuousModeEnabled: StateFlow<Boolean> = voicePreferences
-        .getContinuousModeEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    // --- Voice Input (delegated to VoiceSettingsViewModel) ---
+    val voiceInputEnabled: StateFlow<Boolean> get() = voiceSettings.voiceInputEnabled
+    val voiceFeedbackEnabled: StateFlow<Boolean> get() = voiceSettings.voiceFeedbackEnabled
+    val continuousModeEnabled: StateFlow<Boolean> get() = voiceSettings.continuousModeEnabled
 
-    fun setVoiceInputEnabled(enabled: Boolean) {
-        viewModelScope.launch { voicePreferences.setVoiceInputEnabled(enabled) }
-    }
+    fun setVoiceInputEnabled(enabled: Boolean) = voiceSettings.setVoiceInputEnabled(enabled)
+    fun setVoiceFeedbackEnabled(enabled: Boolean) = voiceSettings.setVoiceFeedbackEnabled(enabled)
+    fun setContinuousModeEnabled(enabled: Boolean) = voiceSettings.setContinuousModeEnabled(enabled)
 
-    fun setVoiceFeedbackEnabled(enabled: Boolean) {
-        viewModelScope.launch { voicePreferences.setVoiceFeedbackEnabled(enabled) }
-    }
+    // --- Accessibility (delegated to AccessibilitySettingsViewModel) ---
+    val reduceMotionEnabled: StateFlow<Boolean> get() = accessibilitySettings.reduceMotionEnabled
+    val highContrastEnabled: StateFlow<Boolean> get() = accessibilitySettings.highContrastEnabled
+    val largeTouchTargetsEnabled: StateFlow<Boolean> get() = accessibilitySettings.largeTouchTargetsEnabled
 
-    fun setContinuousModeEnabled(enabled: Boolean) {
-        viewModelScope.launch { voicePreferences.setContinuousModeEnabled(enabled) }
-    }
-
-    // --- Accessibility ---
-    val reduceMotionEnabled: StateFlow<Boolean> = a11yPreferences
-        .getReduceMotion()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val highContrastEnabled: StateFlow<Boolean> = a11yPreferences
-        .getHighContrast()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val largeTouchTargetsEnabled: StateFlow<Boolean> = a11yPreferences
-        .getLargeTouchTargets()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    fun setReduceMotion(enabled: Boolean) {
-        viewModelScope.launch { a11yPreferences.setReduceMotion(enabled) }
-    }
-
-    fun setHighContrast(enabled: Boolean) {
-        viewModelScope.launch { a11yPreferences.setHighContrast(enabled) }
-    }
-
-    fun setLargeTouchTargets(enabled: Boolean) {
-        viewModelScope.launch { a11yPreferences.setLargeTouchTargets(enabled) }
-    }
+    fun setReduceMotion(enabled: Boolean) = accessibilitySettings.setReduceMotion(enabled)
+    fun setHighContrast(enabled: Boolean) = accessibilitySettings.setHighContrast(enabled)
+    fun setLargeTouchTargets(enabled: Boolean) = accessibilitySettings.setLargeTouchTargets(enabled)
 
     // --- Widgets ---
     fun refreshWidgets() {
@@ -511,211 +490,52 @@ constructor(
     val debugTierOverride: StateFlow<UserTier?> = billingManager.debugTierOverride
     val isAdmin: StateFlow<Boolean> = billingManager.isAdmin
 
-    // --- Notification Settings ---
-    // Per-type enable flags backed by NotificationPreferences.
-    val taskRemindersEnabled: StateFlow<Boolean> = notificationPreferences.taskRemindersEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val timerAlertsEnabled: StateFlow<Boolean> = notificationPreferences.timerAlertsEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val medicationRemindersEnabled: StateFlow<Boolean> = notificationPreferences.medicationRemindersEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val habitNagSuppressionDays: StateFlow<Int> = notificationPreferences.habitNagSuppressionDays
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NotificationPreferences.DEFAULT_HABIT_NAG_SUPPRESSION_DAYS)
-    val dailyBriefingEnabled: StateFlow<Boolean> = notificationPreferences.dailyBriefingEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val eveningSummaryEnabled: StateFlow<Boolean> = notificationPreferences.eveningSummaryEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val weeklySummaryEnabled: StateFlow<Boolean> = notificationPreferences.weeklySummaryEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val weeklyTaskSummaryEnabled: StateFlow<Boolean> =
-        notificationPreferences.weeklyTaskSummaryEnabled
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val overloadAlertsEnabled: StateFlow<Boolean> = notificationPreferences.overloadAlertsEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val reengagementEnabled: StateFlow<Boolean> = notificationPreferences.reengagementEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    // --- Notification Settings (delegated to NotificationSettingsViewModel) ---
+    val taskRemindersEnabled: StateFlow<Boolean> get() = notificationSettings.taskRemindersEnabled
+    val timerAlertsEnabled: StateFlow<Boolean> get() = notificationSettings.timerAlertsEnabled
+    val medicationRemindersEnabled: StateFlow<Boolean> get() = notificationSettings.medicationRemindersEnabled
+    val habitNagSuppressionDays: StateFlow<Int> get() = notificationSettings.habitNagSuppressionDays
+    val dailyBriefingEnabled: StateFlow<Boolean> get() = notificationSettings.dailyBriefingEnabled
+    val eveningSummaryEnabled: StateFlow<Boolean> get() = notificationSettings.eveningSummaryEnabled
+    val weeklySummaryEnabled: StateFlow<Boolean> get() = notificationSettings.weeklySummaryEnabled
+    val weeklyTaskSummaryEnabled: StateFlow<Boolean> get() = notificationSettings.weeklyTaskSummaryEnabled
+    val overloadAlertsEnabled: StateFlow<Boolean> get() = notificationSettings.overloadAlertsEnabled
+    val reengagementEnabled: StateFlow<Boolean> get() = notificationSettings.reengagementEnabled
+    val fullScreenNotificationsEnabled: StateFlow<Boolean> get() = notificationSettings.fullScreenNotificationsEnabled
+    val overrideVolumeEnabled: StateFlow<Boolean> get() = notificationSettings.overrideVolumeEnabled
+    val repeatingVibrationEnabled: StateFlow<Boolean> get() = notificationSettings.repeatingVibrationEnabled
+    val notificationImportance: StateFlow<String> get() = notificationSettings.notificationImportance
+    val defaultReminderOffset: StateFlow<Long> get() = notificationSettings.defaultReminderOffset
 
-    val fullScreenNotificationsEnabled: StateFlow<Boolean> =
-        notificationPreferences.fullScreenNotificationsEnabled
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val overrideVolumeEnabled: StateFlow<Boolean> =
-        notificationPreferences.overrideVolumeEnabled
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val repeatingVibrationEnabled: StateFlow<Boolean> =
-        notificationPreferences.repeatingVibrationEnabled
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun setTaskRemindersEnabled(enabled: Boolean) = notificationSettings.setTaskRemindersEnabled(enabled)
+    fun setTimerAlertsEnabled(enabled: Boolean) = notificationSettings.setTimerAlertsEnabled(enabled)
+    fun setMedicationRemindersEnabled(enabled: Boolean) = notificationSettings.setMedicationRemindersEnabled(enabled)
+    fun setHabitNagSuppressionDays(days: Int) = notificationSettings.setHabitNagSuppressionDays(days)
+    fun setDailyBriefingEnabled(enabled: Boolean) = notificationSettings.setDailyBriefingEnabled(enabled)
+    fun setEveningSummaryEnabled(enabled: Boolean) = notificationSettings.setEveningSummaryEnabled(enabled)
+    fun setWeeklyHabitSummaryEnabled(enabled: Boolean) = notificationSettings.setWeeklyHabitSummaryEnabled(enabled)
+    fun setWeeklyTaskSummaryEnabled(enabled: Boolean) = notificationSettings.setWeeklyTaskSummaryEnabled(enabled)
+    fun setOverloadAlertsEnabled(enabled: Boolean) = notificationSettings.setOverloadAlertsEnabled(enabled)
+    fun setReengagementEnabled(enabled: Boolean) = notificationSettings.setReengagementEnabled(enabled)
+    fun setFullScreenNotificationsEnabled(enabled: Boolean) = notificationSettings.setFullScreenNotificationsEnabled(enabled)
+    fun setOverrideVolumeEnabled(enabled: Boolean) = notificationSettings.setOverrideVolumeEnabled(enabled)
+    fun setRepeatingVibrationEnabled(enabled: Boolean) = notificationSettings.setRepeatingVibrationEnabled(enabled)
+    fun setNotificationImportance(level: String) = notificationSettings.setNotificationImportance(level)
+    fun setDefaultReminderOffset(offsetMs: Long) = notificationSettings.setDefaultReminderOffset(offsetMs)
 
-    val notificationImportance: StateFlow<String> = notificationPreferences.importance
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            NotificationPreferences.DEFAULT_IMPORTANCE
-        )
-
-    val defaultReminderOffset: StateFlow<Long> = notificationPreferences.defaultReminderOffset
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            NotificationPreferences.DEFAULT_REMINDER_OFFSET_MS
-        )
-
-    fun setTaskRemindersEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setTaskRemindersEnabled(enabled) }
-    }
-
-    fun setTimerAlertsEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setTimerAlertsEnabled(enabled) }
-    }
-
-    fun setMedicationRemindersEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setMedicationRemindersEnabled(enabled) }
-    }
-
-    fun setHabitNagSuppressionDays(days: Int) {
-        viewModelScope.launch { notificationPreferences.setHabitNagSuppressionDays(days) }
-    }
-
-    fun setDailyBriefingEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setDailyBriefingEnabled(enabled)
-            notificationWorkerScheduler.applyBriefing(enabled)
-        }
-    }
-
-    fun setEveningSummaryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setEveningSummaryEnabled(enabled)
-            notificationWorkerScheduler.applyEveningSummary(enabled)
-        }
-    }
-
-    fun setWeeklyHabitSummaryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setWeeklySummaryEnabled(enabled)
-            notificationWorkerScheduler.applyWeeklyHabitSummary(enabled)
-        }
-    }
-
-    fun setWeeklyTaskSummaryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setWeeklyTaskSummaryEnabled(enabled)
-            notificationWorkerScheduler.applyWeeklyTaskSummary(enabled)
-        }
-    }
-
-    fun setOverloadAlertsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setOverloadAlertsEnabled(enabled)
-            notificationWorkerScheduler.applyOverloadCheck(enabled)
-        }
-    }
-
-    fun setReengagementEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setReengagementEnabled(enabled)
-            notificationWorkerScheduler.applyReengagement(enabled)
-        }
-    }
-
-    fun setFullScreenNotificationsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setFullScreenNotificationsEnabled(enabled)
-        }
-    }
-
-    fun setOverrideVolumeEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setOverrideVolumeEnabled(enabled)
-            // Channel sound is immutable; recreate so the new alarm-stream
-            // audio attributes take effect next reminder.
-            try {
-                com.averycorp.prismtask.notifications.NotificationHelper
-                    .createNotificationChannel(appContext)
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    fun setRepeatingVibrationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setRepeatingVibrationEnabled(enabled)
-            // Channel vibration pattern is immutable; recreate so the new
-            // pattern takes effect next reminder.
-            try {
-                com.averycorp.prismtask.notifications.NotificationHelper
-                    .createNotificationChannel(appContext)
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    fun setNotificationImportance(level: String) {
-        viewModelScope.launch {
-            notificationPreferences.setImportance(level)
-            // Re-create the channel for the current importance — the helper
-            // tears down the stale channel (whose importance is immutable)
-            // and creates a fresh one tagged with the new importance suffix.
-            try {
-                com.averycorp.prismtask.notifications.NotificationHelper
-                    .createNotificationChannel(appContext)
-            } catch (e: Exception) {
-                Log.w("SettingsVM", "Failed to recreate notification channel after importance change", e)
-            }
-        }
-    }
-
-    fun setDefaultReminderOffset(offsetMs: Long) {
-        viewModelScope.launch { notificationPreferences.setDefaultReminderOffset(offsetMs) }
-    }
-
-    // --- Theme ---
-    val themeMode: StateFlow<String> = themePreferences
-        .getThemeMode()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
-
-    val accentColor: StateFlow<String> = themePreferences
-        .getAccentColor()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "#2563EB")
-
-    val recentCustomColors: StateFlow<List<String>> = themePreferences
-        .getRecentCustomColors()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val backgroundColor: StateFlow<String> = themePreferences
-        .getBackgroundColor()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val surfaceColor: StateFlow<String> = themePreferences
-        .getSurfaceColor()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val errorColor: StateFlow<String> = themePreferences
-        .getErrorColor()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val fontScale: StateFlow<Float> = themePreferences
-        .getFontScale()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
-
-    val priorityColorNone: StateFlow<String> = themePreferences
-        .getPriorityColorNone()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val priorityColorLow: StateFlow<String> = themePreferences
-        .getPriorityColorLow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val priorityColorMedium: StateFlow<String> = themePreferences
-        .getPriorityColorMedium()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val priorityColorHigh: StateFlow<String> = themePreferences
-        .getPriorityColorHigh()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
-    val priorityColorUrgent: StateFlow<String> = themePreferences
-        .getPriorityColorUrgent()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    // --- Theme (delegated to ThemeSettingsViewModel) ---
+    val themeMode: StateFlow<String> get() = themeSettings.themeMode
+    val accentColor: StateFlow<String> get() = themeSettings.accentColor
+    val recentCustomColors: StateFlow<List<String>> get() = themeSettings.recentCustomColors
+    val backgroundColor: StateFlow<String> get() = themeSettings.backgroundColor
+    val surfaceColor: StateFlow<String> get() = themeSettings.surfaceColor
+    val errorColor: StateFlow<String> get() = themeSettings.errorColor
+    val fontScale: StateFlow<Float> get() = themeSettings.fontScale
+    val priorityColorNone: StateFlow<String> get() = themeSettings.priorityColorNone
+    val priorityColorLow: StateFlow<String> get() = themeSettings.priorityColorLow
+    val priorityColorMedium: StateFlow<String> get() = themeSettings.priorityColorMedium
+    val priorityColorHigh: StateFlow<String> get() = themeSettings.priorityColorHigh
+    val priorityColorUrgent: StateFlow<String> get() = themeSettings.priorityColorUrgent
 
     // --- Dashboard ---
     val sectionOrder: StateFlow<List<String>> = dashboardPreferences
@@ -935,172 +755,35 @@ constructor(
         .getArchivedCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    // --- Google Calendar API Sync ---
-    val isGCalConnected: StateFlow<Boolean> = calendarManager.isCalendarConnected
-    val gCalAccountEmail: StateFlow<String?> = calendarManager.connectedAccountEmail
+    // --- Google Calendar API Sync (delegated to SyncSettingsViewModel) ---
+    val isGCalConnected: StateFlow<Boolean> get() = syncSettings.isGCalConnected
+    val gCalAccountEmail: StateFlow<String?> get() = syncSettings.gCalAccountEmail
+    val gCalSyncEnabled: StateFlow<Boolean> get() = syncSettings.gCalSyncEnabled
+    val gCalSyncCalendarId: StateFlow<String> get() = syncSettings.gCalSyncCalendarId
+    val gCalSyncDirection: StateFlow<String> get() = syncSettings.gCalSyncDirection
+    val gCalShowEvents: StateFlow<Boolean> get() = syncSettings.gCalShowEvents
+    val gCalSyncCompletedTasks: StateFlow<Boolean> get() = syncSettings.gCalSyncCompletedTasks
+    val gCalSyncFrequency: StateFlow<String> get() = syncSettings.gCalSyncFrequency
+    val gCalLastSyncTimestamp: StateFlow<Long> get() = syncSettings.gCalLastSyncTimestamp
+    val gCalAvailableCalendars: StateFlow<List<CalendarInfo>> get() = syncSettings.gCalAvailableCalendars
+    val isGCalSyncing: StateFlow<Boolean> get() = syncSettings.isGCalSyncing
+    val calendarConsentIntent: SharedFlow<Intent> get() = syncSettings.calendarConsentIntent
 
-    val gCalSyncEnabled: StateFlow<Boolean> = calendarSyncPreferences
-        .isCalendarSyncEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun connectGoogleCalendar() = syncSettings.connectGoogleCalendar()
+    fun handleCalendarConsentResult(data: Intent?) = syncSettings.handleCalendarConsentResult(data)
+    fun disconnectGoogleCalendar() = syncSettings.disconnectGoogleCalendar()
+    fun loadGCalCalendars() = syncSettings.loadGCalCalendars()
+    fun setGCalSyncEnabled(enabled: Boolean) = syncSettings.setGCalSyncEnabled(enabled)
+    fun setGCalSyncCalendarId(calendarId: String) = syncSettings.setGCalSyncCalendarId(calendarId)
+    fun setGCalSyncDirection(direction: String) = syncSettings.setGCalSyncDirection(direction)
+    fun setGCalShowEvents(show: Boolean) = syncSettings.setGCalShowEvents(show)
+    fun setGCalSyncCompletedTasks(sync: Boolean) = syncSettings.setGCalSyncCompletedTasks(sync)
+    fun setGCalSyncFrequency(frequency: String) = syncSettings.setGCalSyncFrequency(frequency)
+    fun syncGCalNow() = syncSettings.syncGCalNow()
 
-    val gCalSyncCalendarId: StateFlow<String> = calendarSyncPreferences
-        .getSyncCalendarId()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "primary")
-
-    val gCalSyncDirection: StateFlow<String> = calendarSyncPreferences
-        .getSyncDirection()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DIRECTION_BOTH)
-
-    val gCalShowEvents: StateFlow<Boolean> = calendarSyncPreferences
-        .getShowCalendarEvents()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
-    val gCalSyncCompletedTasks: StateFlow<Boolean> = calendarSyncPreferences
-        .getSyncCompletedTasks()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    val gCalSyncFrequency: StateFlow<String> = calendarSyncPreferences
-        .getSyncFrequency()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FREQUENCY_15MIN)
-
-    val gCalLastSyncTimestamp: StateFlow<Long> = calendarSyncPreferences
-        .getLastSyncTimestamp()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
-
-    private val _gCalAvailableCalendars = MutableStateFlow<List<CalendarInfo>>(emptyList())
-    val gCalAvailableCalendars: StateFlow<List<CalendarInfo>> = _gCalAvailableCalendars
-
-    private val _isGCalSyncing = MutableStateFlow(false)
-    val isGCalSyncing: StateFlow<Boolean> = _isGCalSyncing
-
-    private val _calendarConsentIntent = MutableSharedFlow<Intent>()
-    val calendarConsentIntent: SharedFlow<Intent> = _calendarConsentIntent.asSharedFlow()
-
-    fun connectGoogleCalendar() {
-        viewModelScope.launch {
-            when (val result = calendarManager.connectCalendar()) {
-                is CalendarConnectionResult.Connected -> {
-                    loadGCalCalendars()
-                    _messages.emit("Google Calendar connected")
-                }
-                is CalendarConnectionResult.NeedsConsent -> {
-                    _calendarConsentIntent.emit(result.signInIntent)
-                }
-                is CalendarConnectionResult.Failed -> {
-                    _messages.emit(result.message)
-                }
-            }
-        }
-    }
-
-    fun handleCalendarConsentResult(data: Intent?) {
-        viewModelScope.launch {
-            calendarManager.handleSignInResult(data)
-                .onSuccess {
-                    loadGCalCalendars()
-                    _messages.emit("Google Calendar connected")
-                }
-                .onFailure { e ->
-                    _messages.emit("Couldn't connect Google Calendar")
-                }
-        }
-    }
-
-    fun disconnectGoogleCalendar() {
-        viewModelScope.launch {
-            calendarManager.disconnectCalendar()
-            calendarSyncPreferences.clearAll()
-            _gCalAvailableCalendars.value = emptyList()
-            _messages.emit("Google Calendar disconnected")
-        }
-    }
-
-    fun loadGCalCalendars() {
-        viewModelScope.launch {
-            // Prefer the backend-mediated list so the Android client
-            // doesn't need the Calendar scope long-term. Fall back to the
-            // legacy direct fetch only when the backend call fails so the
-            // calendar picker still works during the transition period.
-            val backendCalendars = calendarSyncRepository.listCalendars().getOrNull()
-            _gCalAvailableCalendars.value = backendCalendars
-                ?: calendarManager.getUserCalendars()
-        }
-    }
-
-    fun setGCalSyncEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            calendarSyncPreferences.setCalendarSyncEnabled(enabled)
-            calendarSyncRepository.syncSettingsToBackend()
-            calendarSyncScheduler.applyPreferences()
-            if (enabled) {
-                _messages.emit("Google Calendar sync enabled")
-            } else {
-                _messages.emit("Google Calendar sync disabled")
-            }
-        }
-    }
-
-    fun setGCalSyncCalendarId(calendarId: String) {
-        viewModelScope.launch {
-            calendarSyncPreferences.setSyncCalendarId(calendarId)
-            calendarSyncRepository.syncSettingsToBackend()
-        }
-    }
-
-    fun setGCalSyncDirection(direction: String) {
-        viewModelScope.launch {
-            calendarSyncPreferences.setSyncDirection(direction)
-            calendarSyncRepository.syncSettingsToBackend()
-        }
-    }
-
-    fun setGCalShowEvents(show: Boolean) {
-        viewModelScope.launch {
-            calendarSyncPreferences.setShowCalendarEvents(show)
-            calendarSyncRepository.syncSettingsToBackend()
-        }
-    }
-
-    fun setGCalSyncCompletedTasks(sync: Boolean) {
-        viewModelScope.launch {
-            calendarSyncPreferences.setSyncCompletedTasks(sync)
-            calendarSyncRepository.syncSettingsToBackend()
-        }
-    }
-
-    fun setGCalSyncFrequency(frequency: String) {
-        viewModelScope.launch {
-            calendarSyncPreferences.setSyncFrequency(frequency)
-            calendarSyncRepository.syncSettingsToBackend()
-            calendarSyncScheduler.applyPreferences()
-        }
-    }
-
-    fun syncGCalNow() {
-        viewModelScope.launch {
-            _isGCalSyncing.value = true
-            try {
-                val result = calendarSyncRepository.syncNow()
-                if (result.isSuccess) {
-                    _messages.emit("Google Calendar sync complete")
-                } else {
-                    _messages.emit("Calendar sync failed")
-                }
-            } catch (e: Exception) {
-                _messages.emit("Calendar sync failed")
-            } finally {
-                _isGCalSyncing.value = false
-            }
-        }
-    }
-
-    // --- Auth + Shared State ---
-    val isSignedIn: StateFlow<Boolean> = authManager.isSignedIn
-
-    val userEmail: String? get() = authManager.currentUser.value?.email
-
-    internal val _messages = MutableSharedFlow<String>()
-    val messages: SharedFlow<String> = _messages.asSharedFlow()
+    // --- Auth + Shared State (delegated to SyncSettingsViewModel where applicable) ---
+    val isSignedIn: StateFlow<Boolean> get() = syncSettings.isSignedIn
+    val userEmail: String? get() = syncSettings.userEmail
 
     internal val _pendingJsonExport = MutableStateFlow<String?>(null)
     val pendingJsonExport: StateFlow<String?> = _pendingJsonExport
@@ -1108,8 +791,7 @@ constructor(
     internal val _pendingCsvExport = MutableStateFlow<String?>(null)
     val pendingCsvExport: StateFlow<String?> = _pendingCsvExport
 
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing: StateFlow<Boolean> = _isSyncing
+    val isSyncing: StateFlow<Boolean> get() = syncSettings.isSyncing
 
     internal val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting
@@ -1117,47 +799,16 @@ constructor(
     internal val _isExporting = MutableStateFlow(false)
     val isExporting: StateFlow<Boolean> = _isExporting
 
-    // --- Theme setters ---
-    fun setThemeMode(mode: String) {
-        viewModelScope.launch { themePreferences.setThemeMode(mode) }
-    }
-
-    fun setAccentColor(hex: String) {
-        viewModelScope.launch { themePreferences.setAccentColor(hex) }
-    }
-
-    fun setCustomAccentColor(hex: String) {
-        viewModelScope.launch {
-            if (ThemePreferences.isValidHex(hex)) {
-                themePreferences.setAccentColor(hex)
-                themePreferences.addRecentCustomColor(hex)
-            }
-        }
-    }
-
-    fun setBackgroundColor(hex: String) {
-        viewModelScope.launch { themePreferences.setBackgroundColor(hex) }
-    }
-
-    fun setSurfaceColor(hex: String) {
-        viewModelScope.launch { themePreferences.setSurfaceColor(hex) }
-    }
-
-    fun setErrorColor(hex: String) {
-        viewModelScope.launch { themePreferences.setErrorColor(hex) }
-    }
-
-    fun setFontScale(scale: Float) {
-        viewModelScope.launch { themePreferences.setFontScale(scale) }
-    }
-
-    fun setPriorityColor(level: Int, hex: String) {
-        viewModelScope.launch { themePreferences.setPriorityColor(level, hex) }
-    }
-
-    fun resetColorOverrides() {
-        viewModelScope.launch { themePreferences.resetColorOverrides() }
-    }
+    // --- Theme setters (delegated to ThemeSettingsViewModel) ---
+    fun setThemeMode(mode: String) = themeSettings.setThemeMode(mode)
+    fun setAccentColor(hex: String) = themeSettings.setAccentColor(hex)
+    fun setCustomAccentColor(hex: String) = themeSettings.setCustomAccentColor(hex)
+    fun setBackgroundColor(hex: String) = themeSettings.setBackgroundColor(hex)
+    fun setSurfaceColor(hex: String) = themeSettings.setSurfaceColor(hex)
+    fun setErrorColor(hex: String) = themeSettings.setErrorColor(hex)
+    fun setFontScale(scale: Float) = themeSettings.setFontScale(scale)
+    fun setPriorityColor(level: Int, hex: String) = themeSettings.setPriorityColor(level, hex)
+    fun resetColorOverrides() = themeSettings.resetColorOverrides()
 
     // --- Dashboard setters ---
     fun setSectionOrder(order: List<String>) {
@@ -1235,65 +886,16 @@ constructor(
         viewModelScope.launch { archivePreferences.setAutoArchiveDays(days) }
     }
 
-    // Firebase sync
-    fun onSync() {
-        viewModelScope.launch {
-            _isSyncing.value = true
-            try {
-                syncService.fullSync()
-                _messages.emit("Sync complete")
-            } catch (e: Exception) {
-                Log.e("SettingsVM", "Sync failed", e)
-                _messages.emit("Sync failed")
-            } finally {
-                _isSyncing.value = false
-            }
-        }
-    }
+    // Firebase sync / sign-out / account deletion — all delegated to
+    // SyncSettingsViewModel.
+    fun onSync() = syncSettings.onSync()
+    fun onSignOut() = syncSettings.onSignOut()
 
-    fun onSignOut() {
-        viewModelScope.launch {
-            authManager.signOut()
-            _messages.emit("Signed out")
-        }
-    }
+    val isDeletingAccount: StateFlow<Boolean> get() = syncSettings.isDeletingAccount
+    val accountDeletionCompleted: SharedFlow<Unit> get() = syncSettings.accountDeletionCompleted
 
-    private val _isDeletingAccount = MutableStateFlow(false)
-    val isDeletingAccount: StateFlow<Boolean> = _isDeletingAccount
-
-    private val _accountDeletionCompleted = MutableSharedFlow<Unit>()
-    val accountDeletionCompleted: SharedFlow<Unit> = _accountDeletionCompleted.asSharedFlow()
-
-    /**
-     * Triggered from the Settings → Account & Sync → Delete Account flow
-     * after the user types DELETE and confirms.
-     *
-     * Returns through [accountDeletionCompleted] on success — the UI then
-     * navigates back to Today (which detects the signed-out state and
-     * routes to AuthScreen). Errors emit on [messages] so the user sees
-     * a snackbar; they remain on the Account & Sync screen and can retry.
-     *
-     * The Firestore mark is the single load-bearing step: failure aborts
-     * before any local data changes. See [AccountDeletionService.requestAccountDeletion].
-     */
-    fun onRequestAccountDeletion() {
-        if (_isDeletingAccount.value) return
-        _isDeletingAccount.value = true
-        viewModelScope.launch {
-            try {
-                val result = accountDeletionService.requestAccountDeletion(initiatedFrom = "android")
-                if (result.isSuccess) {
-                    _accountDeletionCompleted.emit(Unit)
-                } else {
-                    _messages.emit(
-                        "Couldn't delete account — check your connection and try again"
-                    )
-                }
-            } finally {
-                _isDeletingAccount.value = false
-            }
-        }
-    }
+    /** See [SyncSettingsViewModel.onRequestAccountDeletion]. */
+    fun onRequestAccountDeletion() = syncSettings.onRequestAccountDeletion()
 
     private val _isResetting = MutableStateFlow(false)
     val isResetting: StateFlow<Boolean> = _isResetting
