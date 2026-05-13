@@ -152,12 +152,18 @@ constructor(
         .getDailyCourseProgress()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DailyCourseProgress(0, 0))
 
-    // Leisure Budget v2.0 — surface today's minutes as a single number;
-    // the v1.x "done/total" shape doesn't map cleanly. The habit list
-    // displays the minutes-logged value via BuiltInHabitProgress.
-    private val leisureMinutesToday: StateFlow<Int> = leisureRepository
-        .observeMinutesLoggedToday()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    // Leisure Budget v2.0 — surface today's minutes against the daily
+    // target so the habit-list circle can render a budget percentage.
+    private val leisureProgress: StateFlow<BuiltInHabitProgress> = combine(
+        leisureRepository.observeMinutesLoggedToday(),
+        leisureRepository.observeTargetMinutesToday()
+    ) { minutes, target ->
+        BuiltInHabitProgress(minutes, target)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        BuiltInHabitProgress(0, 0)
+    )
 
     private val tierDefaults: StateFlow<SelfCareTierDefaults> = advancedTuningPreferences
         .getSelfCareTierDefaults()
@@ -180,7 +186,7 @@ constructor(
         houseworkSteps,
         houseworkEnabled,
         schoolProgress,
-        leisureMinutesToday,
+        leisureProgress,
         tierDefaults
     ) { values ->
         @Suppress("UNCHECKED_CAST")
@@ -200,7 +206,7 @@ constructor(
         val hwSteps = values[13] as List<SelfCareStepEntity>
         val houseworkOn = values[14] as Boolean
         val schoolProg = values[15] as DailyCourseProgress
-        val leisureMin = values[16] as Int
+        val leisureProg = values[16] as BuiltInHabitProgress
         val defaults = values[17] as SelfCareTierDefaults
 
         val morningHabit = habitList.find { it.habit.name == SelfCareRepository.MORNING_HABIT_NAME }
@@ -264,9 +270,7 @@ constructor(
                     type = "leisure",
                     habitWithStatus = leisureHabit,
                     sortOrder = sortOrders.leisure,
-                    // v2.0: surface minutes-logged-today as the
-                    // "done" portion against a single target.
-                    progress = BuiltInHabitProgress(leisureMin, 1)
+                    progress = leisureProg
                 )
             )
         }
