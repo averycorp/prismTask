@@ -1,11 +1,11 @@
 package com.averycorp.prismtask.ui.screens.briefing
 
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.remote.api.BriefingPriorityResponse
 import com.averycorp.prismtask.data.remote.api.DailyBriefingResponse
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.api.SuggestedTaskResponse
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import io.mockk.coEvery
 import io.mockk.every
@@ -41,21 +41,21 @@ class DailyBriefingViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
     private lateinit var api: PrismTaskApi
-    private lateinit var taskDao: TaskDao
+    private lateinit var taskRepository: TaskRepository
     private lateinit var proFeatureGate: ProFeatureGate
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         api = mockk()
-        taskDao = mockk(relaxed = true)
+        taskRepository = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
         every { proFeatureGate.userTier } returns MutableStateFlow(UserTier.PRO)
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_BRIEFING) } returns true
         // Default resolutions for the canonical fixture cloud ids.
-        coEvery { taskDao.getIdByCloudId("cloud-1") } returns 1L
-        coEvery { taskDao.getIdByCloudId("cloud-2") } returns 2L
-        coEvery { taskDao.getIdByCloudId("cloud-3") } returns 3L
+        coEvery { taskRepository.getIdByCloudId("cloud-1") } returns 1L
+        coEvery { taskRepository.getIdByCloudId("cloud-2") } returns 2L
+        coEvery { taskRepository.getIdByCloudId("cloud-3") } returns 3L
     }
 
     @After
@@ -63,7 +63,7 @@ class DailyBriefingViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = DailyBriefingViewModel(api, taskDao, proFeatureGate)
+    private fun newViewModel() = DailyBriefingViewModel(api, taskRepository, proFeatureGate)
 
     @Test
     fun generateBriefing_resolvesCloudIdsToLocalLongs() = runTest(dispatcher) {
@@ -101,7 +101,7 @@ class DailyBriefingViewModelTest {
     @Test
     fun generateBriefing_demotesUnresolvedCloudIdsIntoPendingSync() = runTest(dispatcher) {
         // "cloud-99" is not in the dao mocks → returns null → demote.
-        coEvery { taskDao.getIdByCloudId("cloud-99") } returns null
+        coEvery { taskRepository.getIdByCloudId("cloud-99") } returns null
         coEvery { api.getDailyBriefing(any()) } returns DailyBriefingResponse(
             greeting = "Good morning!",
             topPriorities = listOf(

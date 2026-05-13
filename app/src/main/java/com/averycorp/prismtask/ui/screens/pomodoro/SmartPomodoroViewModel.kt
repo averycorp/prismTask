@@ -10,7 +10,6 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.data.remote.api.PomodoroRequest
@@ -148,7 +147,6 @@ class SmartPomodoroViewModel
 @Inject
 constructor(
     @ApplicationContext private val appContext: Context,
-    private val taskDao: TaskDao,
     private val taskRepository: TaskRepository,
     private val api: PrismTaskApi,
     private val proFeatureGate: ProFeatureGate,
@@ -282,7 +280,7 @@ constructor(
 
     init {
         viewModelScope.launch {
-            taskDao.getIncompleteRootTasks().collect { tasks ->
+            taskRepository.getIncompleteRootTasks().collect { tasks ->
                 _incompleteTaskCount.value = tasks.size
             }
         }
@@ -524,7 +522,7 @@ constructor(
                 val unresolved = mutableListOf<SkippedTask>()
                 val sessions = response.sessions.map { s ->
                     val resolved = s.tasks.mapNotNull { t ->
-                        val localId = taskDao.getIdByCloudId(t.taskId)
+                        val localId = taskRepository.getIdByCloudId(t.taskId)
                         if (localId == null) {
                             unresolved += SkippedTask(0L, "${t.title}: not synced to this device")
                             null
@@ -539,7 +537,7 @@ constructor(
                     )
                 }
                 val skipped = response.skippedTasks.mapNotNull {
-                    val localId = taskDao.getIdByCloudId(it.taskId) ?: return@mapNotNull null
+                    val localId = taskRepository.getIdByCloudId(it.taskId) ?: return@mapNotNull null
                     SkippedTask(localId, it.reason)
                 } + unresolved
                 val built = PomodoroPlan(

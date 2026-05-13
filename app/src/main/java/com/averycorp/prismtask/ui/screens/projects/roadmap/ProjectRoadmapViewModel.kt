@@ -3,7 +3,6 @@ package com.averycorp.prismtask.ui.screens.projects.roadmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.ExternalAnchorEntity
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.ProjectPhaseEntity
@@ -13,6 +12,7 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.repository.ExternalAnchorRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TaskDependencyRepository
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.ExternalAnchor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -69,7 +69,7 @@ class ProjectRoadmapViewModel
 @Inject
 constructor(
     savedStateHandle: SavedStateHandle,
-    private val taskDao: TaskDao,
+    private val taskRepository: TaskRepository,
     private val projectRepository: ProjectRepository,
     private val externalAnchorRepository: ExternalAnchorRepository,
     private val taskDependencyRepository: TaskDependencyRepository
@@ -94,12 +94,12 @@ constructor(
                         projectRepository.observePhases(projectId),
                         projectRepository.observeRisks(projectId),
                         externalAnchorRepository.observeAnchors(projectId),
-                        taskDao.getTasksByProject(projectId)
+                        taskRepository.getTasksByProject(projectId)
                     ) { phases, risks, anchors, projectTasks ->
                         val phaseWithTasks = phases.map { phase ->
-                            PhaseWithTasks(phase, taskDao.getTasksForPhaseOnce(phase.id))
+                            PhaseWithTasks(phase, taskRepository.getTasksForPhaseOnce(phase.id))
                         }
-                        val unphased = taskDao.getUnphasedTasksForProjectOnce(projectId)
+                        val unphased = taskRepository.getUnphasedTasksForProjectOnce(projectId)
                         val taskIds = projectTasks.map { it.id }.toSet()
                         // Filter the global edge set down to ones whose
                         // endpoints are both inside this project. The

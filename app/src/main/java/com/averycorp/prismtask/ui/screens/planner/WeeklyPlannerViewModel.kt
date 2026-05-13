@@ -3,11 +3,11 @@ package com.averycorp.prismtask.ui.screens.planner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.api.WeeklyPlanPreferencesRequest
 import com.averycorp.prismtask.data.remote.api.WeeklyPlanRequest
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,7 +64,7 @@ class WeeklyPlannerViewModel
 @Inject
 constructor(
     private val api: PrismTaskApi,
-    private val taskDao: TaskDao,
+    private val taskRepository: TaskRepository,
     private val proFeatureGate: ProFeatureGate,
     private val taskBehaviorPreferences: TaskBehaviorPreferences
 ) : ViewModel() {
@@ -168,7 +168,7 @@ constructor(
                 val days = dayOrder.mapNotNull { dayName ->
                     response.plan[dayName]?.let { dayPlan ->
                         val resolvedTasks = dayPlan.tasks.mapNotNull { t ->
-                            val localId = taskDao.getIdByCloudId(t.taskId)
+                            val localId = taskRepository.getIdByCloudId(t.taskId)
                             if (localId == null) {
                                 demoted += UnscheduledTask(null, t.title, "Not synced to this device")
                                 null
@@ -188,7 +188,7 @@ constructor(
                 }
 
                 val resolvedUnscheduled = response.unscheduled.map {
-                    UnscheduledTask(taskDao.getIdByCloudId(it.taskId), it.title, it.reason)
+                    UnscheduledTask(taskRepository.getIdByCloudId(it.taskId), it.title, it.reason)
                 } + demoted
 
                 _plan.value = WeeklyPlan(
@@ -250,7 +250,7 @@ constructor(
                     val dayDate = LocalDate.parse(day.date, DateTimeFormatter.ISO_LOCAL_DATE)
                     val dayMillis = dayDate.toEpochDay() * 86400000L
                     for ((index, task) in day.tasks.withIndex()) {
-                        taskDao.updatePlannedDateAndSortOrder(task.taskId, dayMillis, index)
+                        taskRepository.updatePlannedDateAndSortOrder(task.taskId, dayMillis, index)
                     }
                 }
                 _planApplied.value = true

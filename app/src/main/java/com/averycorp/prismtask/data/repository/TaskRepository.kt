@@ -160,6 +160,66 @@ constructor(
 
     fun getOverdueTasks(now: Long): Flow<List<TaskEntity>> = taskDao.getOverdueTasks(now)
 
+    fun getTodayTasks(startOfToday: Long, endOfToday: Long): Flow<List<TaskEntity>> =
+        taskDao.getTodayTasks(startOfToday, endOfToday)
+
+    fun getOverdueRootTasks(startOfToday: Long): Flow<List<TaskEntity>> =
+        taskDao.getOverdueRootTasks(startOfToday)
+
+    fun getPlannedForToday(startOfToday: Long, endOfToday: Long): Flow<List<TaskEntity>> =
+        taskDao.getPlannedForToday(startOfToday, endOfToday)
+
+    fun getCompletedToday(startOfToday: Long): Flow<List<TaskEntity>> =
+        taskDao.getCompletedToday(startOfToday)
+
+    fun getTasksNotInToday(startOfToday: Long, endOfToday: Long): Flow<List<TaskEntity>> =
+        taskDao.getTasksNotInToday(startOfToday, endOfToday)
+
+    fun getTasksForAnalyticsRange(startMillis: Long, endMillis: Long): Flow<List<TaskEntity>> =
+        taskDao.getTasksForAnalyticsRange(startMillis, endMillis)
+
+    suspend fun getIdByCloudId(cloudId: String): Long? = taskDao.getIdByCloudId(cloudId)
+
+    suspend fun setPlanDate(id: Long, plannedDate: Long?) {
+        taskDao.setPlanDate(id, plannedDate)
+        syncTracker.trackUpdate(id, "task")
+        widgetUpdateManager.updateTaskWidgets()
+    }
+
+    suspend fun clearExpiredPlans(startOfToday: Long) {
+        taskDao.clearExpiredPlans(startOfToday)
+    }
+
+    suspend fun updateDueDate(id: Long, newDate: Long?) {
+        taskDao.updateDueDate(id, newDate)
+        syncTracker.trackUpdate(id, "task")
+        widgetUpdateManager.updateTaskWidgets()
+    }
+
+    suspend fun updatePlannedDateAndSortOrder(id: Long, plannedDate: Long, sortOrder: Int) {
+        taskDao.updatePlannedDateAndSortOrder(id, plannedDate, sortOrder)
+        syncTracker.trackUpdate(id, "task")
+        widgetUpdateManager.updateTaskWidgets()
+    }
+
+    suspend fun getTasksForPhaseOnce(phaseId: Long): List<TaskEntity> =
+        taskDao.getTasksForPhaseOnce(phaseId)
+
+    suspend fun getUnphasedTasksForProjectOnce(projectId: Long): List<TaskEntity> =
+        taskDao.getUnphasedTasksForProjectOnce(projectId)
+
+    /**
+     * Persists a manual Eisenhower quadrant move from a screen that already
+     * manages `userOverrodeQuadrant` itself (e.g. the AI categorize
+     * response, which writes the model's classification verbatim).
+     * For user-initiated moves use [setQuadrantManual] which also flips the
+     * override flag.
+     */
+    suspend fun updateEisenhowerQuadrant(id: Long, quadrant: String?, reason: String?) {
+        taskDao.updateEisenhowerQuadrant(id, quadrant, reason)
+        syncTracker.trackUpdate(id, "task")
+    }
+
     suspend fun addSubtask(title: String, parentTaskId: Long, priority: Int = 0): Long {
         val now = System.currentTimeMillis()
         val parent = taskDao.getTaskById(parentTaskId).firstOrNull()

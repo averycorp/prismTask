@@ -4,10 +4,10 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.MilestoneEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.repository.ProjectRepository
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.ProjectDetail
 import com.averycorp.prismtask.domain.usecase.ProjectBurndown
 import com.averycorp.prismtask.domain.usecase.ProjectBurndownComputer
@@ -41,7 +41,7 @@ class ProjectDetailViewModel
 @Inject
 constructor(
     private val projectRepository: ProjectRepository,
-    private val taskDao: TaskDao,
+    private val taskRepository: TaskRepository,
     private val projectBurndownComputer: ProjectBurndownComputer,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -60,7 +60,7 @@ constructor(
             if (d == null) {
                 flowOf(emptyList())
             } else {
-                taskDao.getTasksByProject(d.project.id)
+                taskRepository.getTasksByProject(d.project.id)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

@@ -7,7 +7,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
@@ -103,7 +102,6 @@ sealed interface AiScheduleUiState {
 class TimelineViewModel
 @Inject
 constructor(
-    private val taskDao: TaskDao,
     private val taskRepository: TaskRepository,
     private val projectRepository: ProjectRepository,
     private val sortPreferences: SortPreferences,
@@ -155,7 +153,7 @@ constructor(
         .getAllProjects()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val taskCountByProject: StateFlow<Map<Long, Int>> = taskDao
+    val taskCountByProject: StateFlow<Map<Long, Int>> = taskRepository
         .getIncompleteRootTasks()
         .map { tasks ->
             tasks
@@ -188,7 +186,7 @@ constructor(
             .atStartOfDay(zone)
             .toInstant()
             .toEpochMilli()
-        taskDao.getTasksDueOnDate(start, end).map { tasks ->
+        taskRepository.getTasksDueOnDate(start, end).map { tasks ->
             tasks.filter { it.parentTaskId == null && it.archivedAt == null && !it.isCompleted }
         }
     }
@@ -243,15 +241,15 @@ constructor(
 
     fun onScheduleTask(taskId: Long, startTimeMillis: Long) {
         viewModelScope.launch {
-            val task = taskDao.getTaskByIdOnce(taskId) ?: return@launch
-            taskDao.update(task.copy(scheduledStartTime = startTimeMillis, updatedAt = System.currentTimeMillis()))
+            val task = taskRepository.getTaskByIdOnce(taskId) ?: return@launch
+            taskRepository.updateTask(task.copy(scheduledStartTime = startTimeMillis))
         }
     }
 
     fun onUnscheduleTask(taskId: Long) {
         viewModelScope.launch {
-            val task = taskDao.getTaskByIdOnce(taskId) ?: return@launch
-            taskDao.update(task.copy(scheduledStartTime = null, updatedAt = System.currentTimeMillis()))
+            val task = taskRepository.getTaskByIdOnce(taskId) ?: return@launch
+            taskRepository.updateTask(task.copy(scheduledStartTime = null))
         }
     }
 
@@ -263,7 +261,7 @@ constructor(
      */
     fun loadTaskForPopup(taskId: Long, onLoaded: (TaskEntity?) -> Unit) {
         viewModelScope.launch {
-            onLoaded(taskDao.getTaskByIdOnce(taskId))
+            onLoaded(taskRepository.getTaskByIdOnce(taskId))
         }
     }
 
@@ -478,7 +476,7 @@ constructor(
                 val resolvedUnscheduled = mutableListOf<Pair<Long?, String>>()
                 for (block in response.schedule) {
                     val cloudId = block.taskId
-                    val localId = cloudId?.let { taskDao.getIdByCloudId(it) }
+                    val localId = cloudId?.let { taskRepository.getIdByCloudId(it) }
                     if (cloudId != null && localId == null) {
                         resolvedUnscheduled += null to block.title
                         continue
@@ -494,7 +492,7 @@ constructor(
                     )
                 }
                 for (u in response.unscheduledTasks) {
-                    resolvedUnscheduled += taskDao.getIdByCloudId(u.taskId) to u.title
+                    resolvedUnscheduled += taskRepository.getIdByCloudId(u.taskId) to u.title
                 }
                 val schedule = AiSchedule(
                     blocks = resolvedBlocks,
@@ -559,12 +557,11 @@ constructor(
                     val startMillis = dayStartMillis + startMinutes * 60 * 1000L
                     val durationMin = (endMinutes - startMinutes).coerceAtLeast(1)
 
-                    val task = taskDao.getTaskByIdOnce(block.taskId) ?: continue
-                    taskDao.update(
+                    val task = taskRepository.getTaskByIdOnce(block.taskId) ?: continue
+                    taskRepository.updateTask(
                         task.copy(
                             scheduledStartTime = startMillis,
-                            estimatedDuration = durationMin,
-                            updatedAt = System.currentTimeMillis()
+                            estimatedDuration = durationMin
                         )
                     )
                 }

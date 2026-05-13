@@ -1,7 +1,6 @@
 package com.averycorp.prismtask.ui.screens.projects.roadmap
 
 import androidx.lifecycle.SavedStateHandle
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.ExternalAnchorEntity
 import com.averycorp.prismtask.data.local.entity.ProjectPhaseEntity
 import com.averycorp.prismtask.data.local.entity.ProjectRiskEntity
@@ -9,6 +8,7 @@ import com.averycorp.prismtask.data.local.entity.TaskDependencyEntity
 import com.averycorp.prismtask.data.repository.ExternalAnchorRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TaskDependencyRepository
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.ExternalAnchor
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -38,7 +38,7 @@ import org.junit.Test
 class ProjectRoadmapViewModelTest {
     private val dispatcher = UnconfinedTestDispatcher()
 
-    private lateinit var taskDao: TaskDao
+    private lateinit var taskRepository: TaskRepository
     private lateinit var projectRepository: ProjectRepository
     private lateinit var externalAnchorRepository: ExternalAnchorRepository
     private lateinit var taskDependencyRepository: TaskDependencyRepository
@@ -46,7 +46,7 @@ class ProjectRoadmapViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        taskDao = mockk(relaxed = true)
+        taskRepository = mockk(relaxed = true)
         projectRepository = mockk(relaxed = true)
         externalAnchorRepository = mockk(relaxed = true)
         taskDependencyRepository = mockk(relaxed = true)
@@ -60,7 +60,7 @@ class ProjectRoadmapViewModelTest {
     private fun newViewModel(projectId: Long = 1L): ProjectRoadmapViewModel =
         ProjectRoadmapViewModel(
             savedStateHandle = SavedStateHandle(mapOf("projectId" to projectId)),
-            taskDao = taskDao,
+            taskRepository = taskRepository,
             projectRepository = projectRepository,
             externalAnchorRepository = externalAnchorRepository,
             taskDependencyRepository = taskDependencyRepository

@@ -3,7 +3,7 @@ package com.averycorp.prismtask.ui.screens.builtinupdates
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.HabitDao
+import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.domain.model.AcceptedChanges
 import com.averycorp.prismtask.domain.model.TemplateDiff
 import com.averycorp.prismtask.domain.usecase.BuiltInUpdateDetector
@@ -31,7 +31,7 @@ data class TemplateDiffUiState(
 @HiltViewModel
 class TemplateDiffViewModel @Inject constructor(
     private val detector: BuiltInUpdateDetector,
-    private val habitDao: HabitDao,
+    private val habitRepository: HabitRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -77,7 +77,7 @@ class TemplateDiffViewModel @Inject constructor(
         val state = _uiState.value
         val diff = state.diff ?: return
         viewModelScope.launch {
-            val habit = habitDao.getByTemplateKeyOnce(diff.templateKey) ?: return@launch
+            val habit = habitRepository.getByTemplateKeyOnce(diff.templateKey) ?: return@launch
             val accepted = AcceptedChanges(
                 habit = habit,
                 acceptedFieldNames = state.selections.acceptedFieldNames,

@@ -3,9 +3,6 @@ package com.averycorp.prismtask.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.ProjectDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
@@ -13,6 +10,7 @@ import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.repository.ChatRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
@@ -57,10 +55,8 @@ class ChatViewModelActionTest {
     private lateinit var chatRepository: ChatRepository
     private lateinit var taskRepository: TaskRepository
     private lateinit var tagRepository: TagRepository
-    private lateinit var taskDao: TaskDao
-    private lateinit var projectDao: ProjectDao
+    private lateinit var projectRepository: ProjectRepository
     private lateinit var habitRepository: HabitRepository
-    private lateinit var habitCompletionDao: HabitCompletionDao
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
@@ -73,14 +69,12 @@ class ChatViewModelActionTest {
         chatRepository = mockk(relaxed = true) {
             every { messages } returns MutableStateFlow(emptyList())
         }
-        taskRepository = mockk(relaxed = true)
-        tagRepository = mockk(relaxed = true)
-        taskDao = mockk(relaxed = true) {
+        taskRepository = mockk(relaxed = true) {
             coEvery { getTaskByIdOnce(any()) } returns null
         }
-        projectDao = mockk(relaxed = true)
+        tagRepository = mockk(relaxed = true)
+        projectRepository = mockk(relaxed = true)
         habitRepository = mockk(relaxed = true)
-        habitCompletionDao = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true) {
             every { userTier } returns MutableStateFlow(UserTier.PRO)
             every { hasAccess(any()) } returns true
@@ -126,10 +120,8 @@ class ChatViewModelActionTest {
         chatRepository = chatRepository,
         taskRepository = taskRepository,
         tagRepository = tagRepository,
-        taskDao = taskDao,
-        projectDao = projectDao,
+        projectRepository = projectRepository,
         habitRepository = habitRepository,
-        habitCompletionDao = habitCompletionDao,
         proFeatureGate = proFeatureGate,
         taskBehaviorPreferences = taskBehaviorPreferences,
         userPreferencesDataStore = userPreferencesDataStore,
@@ -200,11 +192,11 @@ class ChatViewModelActionTest {
         coEvery { taskRepository.rescheduleTask(1L, any()) } returns Unit
         coEvery { taskRepository.rescheduleTask(2L, any()) } throws IllegalStateException("boom")
         coEvery { taskRepository.rescheduleTask(3L, any()) } returns Unit
-        coEvery { taskDao.getTaskByIdOnce(1L) } returns
+        coEvery { taskRepository.getTaskByIdOnce(1L) } returns
             TaskEntity(id = 1L, title = "a", dueDate = 100L, createdAt = 0L, updatedAt = 0L)
-        coEvery { taskDao.getTaskByIdOnce(2L) } returns
+        coEvery { taskRepository.getTaskByIdOnce(2L) } returns
             TaskEntity(id = 2L, title = "b", dueDate = 200L, createdAt = 0L, updatedAt = 0L)
-        coEvery { taskDao.getTaskByIdOnce(3L) } returns
+        coEvery { taskRepository.getTaskByIdOnce(3L) } returns
             TaskEntity(id = 3L, title = "c", dueDate = 300L, createdAt = 0L, updatedAt = 0L)
 
         val viewModel = newViewModel()
@@ -230,9 +222,9 @@ class ChatViewModelActionTest {
 
     @Test
     fun reschedule_batch_undo_restores_each_task_to_original_due_date() = runTest(dispatcher) {
-        coEvery { taskDao.getTaskByIdOnce(1L) } returns
+        coEvery { taskRepository.getTaskByIdOnce(1L) } returns
             TaskEntity(id = 1L, title = "a", dueDate = 100L, createdAt = 0L, updatedAt = 0L)
-        coEvery { taskDao.getTaskByIdOnce(2L) } returns
+        coEvery { taskRepository.getTaskByIdOnce(2L) } returns
             TaskEntity(id = 2L, title = "b", dueDate = 200L, createdAt = 0L, updatedAt = 0L)
 
         val viewModel = newViewModel()
@@ -255,8 +247,8 @@ class ChatViewModelActionTest {
             // Both reschedules were issued (forward + undo for each id). The
             // undo path must pass each task's ORIGINAL dueDate, not the new one.
             coVerifySequence {
-                taskDao.getTaskByIdOnce(1L)
-                taskDao.getTaskByIdOnce(2L)
+                taskRepository.getTaskByIdOnce(1L)
+                taskRepository.getTaskByIdOnce(2L)
                 taskRepository.rescheduleTask(1L, any())
                 taskRepository.rescheduleTask(2L, any())
                 taskRepository.rescheduleTask(1L, 100L)
@@ -353,7 +345,7 @@ class ChatViewModelActionTest {
     @Test
     fun create_task_plumbs_description_project_and_tags_through_addtask() = runTest(dispatcher) {
         // Project name resolves to id; one existing tag, one new tag.
-        coEvery { projectDao.getProjectByNameOnce("Q2 Planning") } returns
+        coEvery { projectRepository.getProjectByNameOnce("Q2 Planning") } returns
             com.averycorp.prismtask.data.local.entity.ProjectEntity(
                 id = 77L,
                 name = "Q2 Planning"
@@ -408,7 +400,7 @@ class ChatViewModelActionTest {
 
     @Test
     fun create_task_silently_drops_unknown_project_name() = runTest(dispatcher) {
-        coEvery { projectDao.getProjectByNameOnce(any()) } returns null
+        coEvery { projectRepository.getProjectByNameOnce(any()) } returns null
         coEvery {
             taskRepository.addTask(
                 any(), any(), any(), any(), any(), any(), any(),

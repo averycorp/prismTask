@@ -7,8 +7,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.core.time.LocalDateFlow
-import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
@@ -76,8 +74,6 @@ class TodayViewModel
 constructor(
     private val taskRepository: TaskRepository,
     private val tagRepository: TagRepository,
-    private val taskDao: TaskDao,
-    private val habitCompletionDao: HabitCompletionDao,
     private val habitRepository: HabitRepository,
     private val projectRepository: ProjectRepository,
     private val templateRepository: TaskTemplateRepository,
@@ -578,7 +574,7 @@ constructor(
     init {
         viewModelScope.launch {
             try {
-                taskDao.clearExpiredPlans(currentStartOfToday())
+                taskRepository.clearExpiredPlans(currentStartOfToday())
             } catch (
                 e: Exception
             ) {
@@ -589,7 +585,7 @@ constructor(
             try {
                 // Wait for first emission from a key data flow, then mark loading done
                 combine(dayStart, dayEnd) { start, end -> start to end }
-                    .flatMapLatest { (start, end) -> taskDao.getTodayTasks(start, end) }
+                    .flatMapLatest { (start, end) -> taskRepository.getTodayTasks(start, end) }
                     .first()
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed initial data load", e)
@@ -601,22 +597,22 @@ constructor(
 
     val overdueTasks: StateFlow<List<TaskEntity>> = dayStart
         .flatMapLatest { start ->
-            taskDao.getOverdueRootTasks(start)
+            taskRepository.getOverdueRootTasks(start)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val todayTasks: StateFlow<List<TaskEntity>> =
         combine(dayStart, dayEnd) { start, end -> start to end }
-            .flatMapLatest { (start, end) -> taskDao.getTodayTasks(start, end) }
+            .flatMapLatest { (start, end) -> taskRepository.getTodayTasks(start, end) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val plannedTasks: StateFlow<List<TaskEntity>> =
         combine(dayStart, dayEnd) { start, end -> start to end }
-            .flatMapLatest { (start, end) -> taskDao.getPlannedForToday(start, end) }
+            .flatMapLatest { (start, end) -> taskRepository.getPlannedForToday(start, end) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val completedToday: StateFlow<List<TaskEntity>> = dayStart
         .flatMapLatest { start ->
-            taskDao.getCompletedToday(start)
+            taskRepository.getCompletedToday(start)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allTodayItems: StateFlow<List<TaskEntity>> =
@@ -692,7 +688,7 @@ constructor(
             com.averycorp.prismtask.data.preferences.HabitListPreferences.DEFAULT_TODAY_SKIP_BEFORE_SCHEDULE_DAYS
         )
 
-    private val lastCompletionByHabit: StateFlow<Map<Long, Long>> = habitCompletionDao
+    private val lastCompletionByHabit: StateFlow<Map<Long, Long>> = habitRepository
         .getLastCompletionDatesPerHabit()
         .map { rows -> rows.associate { it.habitId to it.lastCompletedDate } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
@@ -860,7 +856,7 @@ constructor(
     // Plan for Today
     val tasksNotInToday: StateFlow<List<TaskEntity>> =
         combine(dayStart, dayEnd) { start, end -> start to end }
-            .flatMapLatest { (start, end) -> taskDao.getTasksNotInToday(start, end) }
+            .flatMapLatest { (start, end) -> taskRepository.getTasksNotInToday(start, end) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val projects: StateFlow<List<ProjectEntity>> = projectRepository
@@ -903,7 +899,7 @@ constructor(
     fun onPlanForToday(taskId: Long) {
         viewModelScope.launch {
             try {
-                taskDao.setPlanDate(taskId, currentStartOfToday())
+                taskRepository.setPlanDate(taskId, currentStartOfToday())
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to plan task", e)
             }
@@ -914,7 +910,7 @@ constructor(
         viewModelScope.launch {
             try {
                 val start = currentStartOfToday()
-                taskIds.forEach { id -> taskDao.setPlanDate(id, start) }
+                taskIds.forEach { id -> taskRepository.setPlanDate(id, start) }
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to plan tasks", e)
             }
@@ -925,7 +921,7 @@ constructor(
         viewModelScope.launch {
             try {
                 val start = currentStartOfToday()
-                overdueTasks.value.forEach { task -> taskDao.setPlanDate(task.id, start) }
+                overdueTasks.value.forEach { task -> taskRepository.setPlanDate(task.id, start) }
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to plan overdue tasks", e)
             }
@@ -935,7 +931,7 @@ constructor(
     fun onRemoveFromToday(taskId: Long) {
         viewModelScope.launch {
             try {
-                taskDao.setPlanDate(taskId, null)
+                taskRepository.setPlanDate(taskId, null)
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to remove task from today", e)
             }
@@ -1162,7 +1158,7 @@ constructor(
             try {
                 val tomorrow = currentEndOfToday()
                 taskIds.forEach { id ->
-                    taskDao.updateDueDate(id, tomorrow)
+                    taskRepository.updateDueDate(id, tomorrow)
                 }
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to rollover tasks", e)
@@ -1174,7 +1170,7 @@ constructor(
         viewModelScope.launch {
             try {
                 taskIds.forEach { id ->
-                    taskDao.updateDueDate(id, null)
+                    taskRepository.updateDueDate(id, null)
                 }
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to clear due dates", e)
@@ -1210,7 +1206,7 @@ constructor(
                 // has no due date, dueDateOverride still sets it, so this is
                 // a safety net for templates that already carry their own
                 // recurrence / schedule.
-                taskDao.setPlanDate(newTaskId, today)
+                taskRepository.setPlanDate(newTaskId, today)
                 val title = taskRepository.getTaskByIdOnce(newTaskId)?.title.orEmpty()
                 snackbarHostState.showSnackbar(
                     message = "Added '${title.ifBlank { "task" }}' for today",
