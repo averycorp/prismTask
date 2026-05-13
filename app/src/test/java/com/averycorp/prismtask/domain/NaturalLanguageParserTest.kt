@@ -541,6 +541,72 @@ class NaturalLanguageParserTest {
         assertEquals(4, result.priority)
     }
 
+    // ---------------------------------------------------------------------
+    // Urgency-keyword priority inference. These activate only when no
+    // explicit `!` priority was set, so the bare-keyword title gets the
+    // inferred priority but a title that *also* carries `!low` keeps the
+    // explicit choice. See `NaturalLanguageParser` § 3b.
+    // ---------------------------------------------------------------------
+    @Test
+    fun test_urgencyKeyword_asap_setsPriority4() {
+        val result = parser.parse("Reply to client asap")
+        assertEquals(4, result.priority)
+        // Keyword stays in the title — it's natural language the user wants.
+        assertEquals("Reply to client asap", result.title)
+    }
+
+    @Test
+    fun test_urgencyKeyword_urgent_caseInsensitive() {
+        val result = parser.parse("URGENT client meeting")
+        assertEquals(4, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_important_setsPriority3() {
+        val result = parser.parse("Important review for Q4")
+        assertEquals(3, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_highPriority_setsPriority3() {
+        val result = parser.parse("Make this a high priority decision")
+        assertEquals(3, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_soon_setsPriority2() {
+        val result = parser.parse("Call dentist soon")
+        assertEquals(2, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_explicitBangWins() {
+        // Explicit `!low` must beat the keyword inference — user intent.
+        val result = parser.parse("Urgent task !low")
+        assertEquals(1, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_higherTierWinsAcrossKeywords() {
+        // Title mentions both "important" (3) and "urgent" (4) — urgent wins
+        // because the priority-4 regex is evaluated first.
+        val result = parser.parse("Important and urgent fix")
+        assertEquals(4, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_noMatch_leavesZero() {
+        val result = parser.parse("Buy milk")
+        assertEquals(0, result.priority)
+    }
+
+    @Test
+    fun test_urgencyKeyword_wordBoundary_doesNotMatchSubstring() {
+        // "soonish" must not trigger the `\bsoon\b` keyword.
+        val result = parser.parse("Plan something soonish")
+        assertEquals(0, result.priority)
+    }
+
     @Test
     fun test_urgentPriority() {
         val result = parser.parse("Fix now !urgent")

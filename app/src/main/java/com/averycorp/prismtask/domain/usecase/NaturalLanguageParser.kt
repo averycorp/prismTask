@@ -399,6 +399,26 @@ constructor(
             }
         }
 
+        // 3b. Urgency-keyword inference — only when no explicit `!` priority
+        // was set above. Keywords are left in the title (they are natural
+        // language the user probably wants to keep, e.g. "urgent client call")
+        // and the highest-tier match wins. Order matters: priority-4 keywords
+        // are checked before priority-3 before priority-2 so a title that
+        // mentions both "urgent" and "important" lands on 4.
+        if (priority == 0) {
+            val urgencyPatterns = listOf(
+                Regex("""(?i)\b(asap|urgent|urgently|immediately|critical)\b""") to 4,
+                Regex("""(?i)\b(important|high\s+priority|high-priority)\b""") to 3,
+                Regex("""(?i)\bsoon\b""") to 2
+            )
+            for ((regex, level) in urgencyPatterns) {
+                if (regex.containsMatchIn(text)) {
+                    priority = level
+                    break
+                }
+            }
+        }
+
         // 4. Recurrence hints (before date parsing to avoid conflicts)
         var recurrenceHint: String? = null
         val recurrencePatterns = listOf(

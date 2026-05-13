@@ -9,7 +9,9 @@ import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
 import com.averycorp.prismtask.data.local.entity.TaskWithTags
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+import com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords
 import com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords
+import com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords
 import com.google.gson.Gson
 import io.mockk.every
 import io.mockk.mockk
@@ -41,6 +43,8 @@ import org.junit.Test
  */
 private fun fakeAdvancedTuningPreferences(): AdvancedTuningPreferences = mockk {
     every { getLifeCategoryCustomKeywords() } returns flowOf(LifeCategoryCustomKeywords())
+    every { getTaskModeCustomKeywords() } returns flowOf(TaskModeCustomKeywords())
+    every { getCognitiveLoadCustomKeywords() } returns flowOf(CognitiveLoadCustomKeywords())
 }
 
 class TaskTemplateRepositoryTest {

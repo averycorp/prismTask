@@ -7,8 +7,10 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
 import com.averycorp.prismtask.domain.model.LifeCategory
+import com.averycorp.prismtask.domain.usecase.CognitiveLoadClassifier
 import com.averycorp.prismtask.domain.usecase.DateShortcuts
 import com.averycorp.prismtask.domain.usecase.LifeCategoryClassifier
+import com.averycorp.prismtask.domain.usecase.TaskModeClassifier
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -29,6 +31,14 @@ constructor(
     private var latestLifeCategoryCustomKeywords: com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords =
         com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords()
 
+    @Volatile
+    private var latestTaskModeCustomKeywords: com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords =
+        com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords()
+
+    @Volatile
+    private var latestCognitiveLoadCustomKeywords: com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords =
+        com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords()
+
     private val keywordScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob()
     )
@@ -37,6 +47,16 @@ constructor(
         keywordScope.launch {
             advancedTuningPreferences.getLifeCategoryCustomKeywords().collect {
                 latestLifeCategoryCustomKeywords = it
+            }
+        }
+        keywordScope.launch {
+            advancedTuningPreferences.getTaskModeCustomKeywords().collect {
+                latestTaskModeCustomKeywords = it
+            }
+        }
+        keywordScope.launch {
+            advancedTuningPreferences.getCognitiveLoadCustomKeywords().collect {
+                latestCognitiveLoadCustomKeywords = it
             }
         }
     }
@@ -51,6 +71,16 @@ constructor(
         )
         return guess.name
     }
+
+    private fun resolveTemplateTaskMode(title: String, description: String?): String =
+        TaskModeClassifier.withCustomKeywords(latestTaskModeCustomKeywords)
+            .classify(title, description)
+            .name
+
+    private fun resolveTemplateCognitiveLoad(title: String, description: String?): String =
+        CognitiveLoadClassifier.withCustomKeywords(latestCognitiveLoadCustomKeywords)
+            .classify(title, description)
+            .name
 
     fun getAllTemplates(): Flow<List<TaskTemplateEntity>> = templateDao.getAllTemplates()
 
@@ -129,7 +159,11 @@ constructor(
         val effectiveDueDate = dueDateOverride ?: if (quickUse) DateShortcuts.today(now) else null
         val rawTask = buildTaskFromTemplate(template, effectiveDueDate, projectIdOverride, now)
         val task = rawTask.copy(
-            lifeCategory = resolveTemplateLifeCategory(rawTask.title, rawTask.description, taskId = 0)
+            lifeCategory = resolveTemplateLifeCategory(rawTask.title, rawTask.description, taskId = 0),
+            taskMode = rawTask.taskMode
+                ?: resolveTemplateTaskMode(rawTask.title, rawTask.description),
+            cognitiveLoad = rawTask.cognitiveLoad
+                ?: resolveTemplateCognitiveLoad(rawTask.title, rawTask.description)
         )
         val taskId = taskDao.insert(task)
 
@@ -141,6 +175,8 @@ constructor(
                 parentTaskId = taskId,
                 sortOrder = index,
                 lifeCategory = resolveTemplateLifeCategory(title, description = null, taskId = 0),
+                taskMode = resolveTemplateTaskMode(title, description = null),
+                cognitiveLoad = resolveTemplateCognitiveLoad(title, description = null),
                 createdAt = now,
                 updatedAt = now
             )

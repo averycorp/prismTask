@@ -12,10 +12,14 @@ import com.averycorp.prismtask.data.remote.EisenhowerClassifier
 import com.averycorp.prismtask.data.remote.SyncTracker
 import com.averycorp.prismtask.domain.automation.AutomationEvent
 import com.averycorp.prismtask.domain.automation.AutomationEventBus
+import com.averycorp.prismtask.domain.model.CognitiveLoad
 import com.averycorp.prismtask.domain.model.EisenhowerQuadrant
 import com.averycorp.prismtask.domain.model.LifeCategory
+import com.averycorp.prismtask.domain.model.TaskMode
+import com.averycorp.prismtask.domain.usecase.CognitiveLoadClassifier
 import com.averycorp.prismtask.domain.usecase.LifeCategoryClassifier
 import com.averycorp.prismtask.domain.usecase.RecurrenceEngine
+import com.averycorp.prismtask.domain.usecase.TaskModeClassifier
 import com.averycorp.prismtask.notifications.ReminderScheduler
 import com.averycorp.prismtask.util.DayBoundary
 import com.averycorp.prismtask.widget.WidgetUpdateManager
@@ -61,8 +65,22 @@ constructor(
     private var latestLifeCategoryCustomKeywords: com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords =
         com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords()
 
+    @Volatile
+    private var latestTaskModeCustomKeywords: com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords =
+        com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords()
+
+    @Volatile
+    private var latestCognitiveLoadCustomKeywords: com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords =
+        com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords()
+
     private fun lifeCategoryClassifier(): LifeCategoryClassifier =
         LifeCategoryClassifier.withCustomKeywords(latestLifeCategoryCustomKeywords)
+
+    private fun taskModeClassifier(): TaskModeClassifier =
+        TaskModeClassifier.withCustomKeywords(latestTaskModeCustomKeywords)
+
+    private fun cognitiveLoadClassifier(): CognitiveLoadClassifier =
+        CognitiveLoadClassifier.withCustomKeywords(latestCognitiveLoadCustomKeywords)
 
     /**
      * Background scope for fire-and-forget Eisenhower classification. A
@@ -75,11 +93,23 @@ constructor(
     private val classifyScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
-        // Keep [latestLifeCategoryCustomKeywords] warm so the synchronous
-        // insert path picks up Settings changes without blocking on disk.
+        // Keep the custom-keyword snapshots warm so the synchronous insert
+        // path picks up Settings changes without blocking on disk. Each
+        // dimension (life category / task mode / cognitive load) is kept in
+        // its own collector so Settings updates land independently.
         classifyScope.launch {
             advancedTuningPreferences.getLifeCategoryCustomKeywords().collect {
                 latestLifeCategoryCustomKeywords = it
+            }
+        }
+        classifyScope.launch {
+            advancedTuningPreferences.getTaskModeCustomKeywords().collect {
+                latestTaskModeCustomKeywords = it
+            }
+        }
+        classifyScope.launch {
+            advancedTuningPreferences.getCognitiveLoadCustomKeywords().collect {
+                latestCognitiveLoadCustomKeywords = it
             }
         }
     }
@@ -135,6 +165,34 @@ constructor(
             "PrismSync",
             "lifeCategory.resolved | taskId=${task.id} | source=$source | result=${guess.name}"
         )
+        return guess.name
+    }
+
+    /**
+     * Same shape as [resolveLifeCategoryForInsert] for the orthogonal
+     * Work/Play/Relax mode dimension. A non-null/non-blank incoming value
+     * is preserved (user manually picked or NLP `#work-mode` tag fired);
+     * otherwise [TaskModeClassifier] runs and a miss resolves to
+     * [TaskMode.UNCATEGORIZED] so downstream readers can distinguish
+     * "tried and didn't match" from "never looked at this row."
+     */
+    fun resolveTaskModeForInsert(task: TaskEntity): String {
+        val existing = task.taskMode
+        if (!existing.isNullOrBlank()) return existing
+        val guess = taskModeClassifier().classify(task.title, task.description)
+        return guess.name
+    }
+
+    /**
+     * Same shape as [resolveLifeCategoryForInsert] for the orthogonal
+     * start-friction dimension (Easy/Medium/Hard). Preserves an explicit
+     * incoming value; otherwise [CognitiveLoadClassifier] runs and a miss
+     * resolves to [CognitiveLoad.UNCATEGORIZED].
+     */
+    fun resolveCognitiveLoadForInsert(task: TaskEntity): String {
+        val existing = task.cognitiveLoad
+        if (!existing.isNullOrBlank()) return existing
+        val guess = cognitiveLoadClassifier().classify(task.title, task.description)
         return guess.name
     }
 
@@ -236,7 +294,11 @@ constructor(
                 createdAt = now,
                 updatedAt = now
             )
-        val task = draft.copy(lifeCategory = resolveLifeCategoryForInsert(draft))
+        val task = draft.copy(
+            lifeCategory = resolveLifeCategoryForInsert(draft),
+            taskMode = resolveTaskModeForInsert(draft),
+            cognitiveLoad = resolveCognitiveLoadForInsert(draft)
+        )
         val id = taskDao.insert(task)
         syncTracker.trackCreate(id, "task")
         automationEventBus.emit(AutomationEvent.TaskCreated(id))
@@ -269,7 +331,11 @@ constructor(
     suspend fun getTaskByIdOnce(id: Long): TaskEntity? = taskDao.getTaskByIdOnce(id)
 
     suspend fun insertTask(task: TaskEntity): Long {
-        val resolved = task.copy(lifeCategory = resolveLifeCategoryForInsert(task))
+        val resolved = task.copy(
+            lifeCategory = resolveLifeCategoryForInsert(task),
+            taskMode = resolveTaskModeForInsert(task),
+            cognitiveLoad = resolveCognitiveLoadForInsert(task)
+        )
         val id = taskDao.insert(resolved)
         syncTracker.trackCreate(id, "task")
         automationEventBus.emit(AutomationEvent.TaskCreated(id))
@@ -324,7 +390,11 @@ constructor(
                 createdAt = now,
                 updatedAt = now
             )
-        val task = draft.copy(lifeCategory = resolveLifeCategoryForInsert(draft))
+        val task = draft.copy(
+            lifeCategory = resolveLifeCategoryForInsert(draft),
+            taskMode = resolveTaskModeForInsert(draft),
+            cognitiveLoad = resolveCognitiveLoadForInsert(draft)
+        )
         val id = taskDao.insert(task)
         syncTracker.trackCreate(id, "task")
         // Mirror insertTask() — every primary-creation surface routes through
@@ -454,7 +524,11 @@ constructor(
                         createdAt = now,
                         updatedAt = now
                     )
-                    val nextTask = nextDraft.copy(lifeCategory = resolveLifeCategoryForInsert(nextDraft))
+                    val nextTask = nextDraft.copy(
+                        lifeCategory = resolveLifeCategoryForInsert(nextDraft),
+                        taskMode = resolveTaskModeForInsert(nextDraft),
+                        cognitiveLoad = resolveCognitiveLoadForInsert(nextDraft)
+                    )
                     taskDao.insert(nextTask)
                 } else {
                     null
