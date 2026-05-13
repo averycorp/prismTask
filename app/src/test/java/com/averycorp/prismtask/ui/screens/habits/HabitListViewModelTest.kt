@@ -6,7 +6,6 @@ import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.SelfCareTierDefaults
 import com.averycorp.prismtask.data.repository.DailyCourseProgress
 import com.averycorp.prismtask.data.repository.HabitRepository
-import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.google.gson.Gson
@@ -38,7 +37,6 @@ class HabitListViewModelTest {
     private lateinit var habitRepository: HabitRepository
     private lateinit var selfCareRepository: SelfCareRepository
     private lateinit var schoolworkRepository: SchoolworkRepository
-    private lateinit var leisureRepository: LeisureBudgetRepository
     private lateinit var habitListPreferences: HabitListPreferences
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
     private lateinit var gson: Gson
@@ -49,7 +47,6 @@ class HabitListViewModelTest {
         habitRepository = mockk(relaxed = true)
         selfCareRepository = mockk(relaxed = true)
         schoolworkRepository = mockk(relaxed = true)
-        leisureRepository = mockk(relaxed = true)
         habitListPreferences = mockk(relaxed = true)
         advancedTuningPreferences = mockk(relaxed = true)
         gson = Gson()
@@ -60,7 +57,6 @@ class HabitListViewModelTest {
         coEvery { selfCareRepository.getTodayLog(any()) } returns flowOf(null)
         coEvery { selfCareRepository.getSteps(any()) } returns flowOf(emptyList())
         coEvery { schoolworkRepository.getDailyCourseProgress() } returns flowOf(DailyCourseProgress(0, 0))
-        coEvery { leisureRepository.observeMinutesLoggedToday() } returns flowOf(0)
         coEvery { habitListPreferences.getBuiltInSortOrders() } returns flowOf(
             BuiltInSortOrders(
                 HabitListPreferences.DEFAULT_MORNING_ORDER,
@@ -88,7 +84,6 @@ class HabitListViewModelTest {
             habitRepository,
             selfCareRepository,
             schoolworkRepository,
-            leisureRepository,
             habitListPreferences,
             advancedTuningPreferences,
             gson
