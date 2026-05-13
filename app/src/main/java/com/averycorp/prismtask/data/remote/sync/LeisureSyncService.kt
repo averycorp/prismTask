@@ -175,9 +175,7 @@ constructor(
             // 204 success or 404 (already gone) both leave us in the
             // intended state. Anything else throws via Retrofit.
             if (!response.isSuccessful && response.code() != 404) {
-                throw IllegalStateException(
-                    "deleteLeisureActivity returned ${response.code()}"
-                )
+                error("deleteLeisureActivity returned ${response.code()}")
             }
         }
         syncMetadataDao.delete(meta.localId, ENTITY_TYPE)
