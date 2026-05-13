@@ -9,4 +9,5 @@
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen"
     android:widgetFeatures="reconfigurable"
-    android:previewLayout="@layout/widget_preview_quick_add" />
+    android:previewLayout="@layout/widget_preview_quick_add"
+    android:previewImage="@drawable/widget_thumb_quick_add" />

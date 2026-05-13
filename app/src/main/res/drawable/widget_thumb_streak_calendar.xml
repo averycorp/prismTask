@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path android:fillColor="#161618"
+        android:pathData="M12,0 L84,0 A12,12 0 0 1 96,12 L96,84 A12,12 0 0 1 84,96 L12,96 A12,12 0 0 1 0,84 L0,12 A12,12 0 0 1 12,0 Z" />
+    <path android:fillColor="#E8E8EA"
+        android:pathData="M14,14 L52,14 L52,20 L14,20 Z" />
+    <path android:fillColor="#FF7A45"
+        android:pathData="M66,14 L82,14 L82,20 L66,20 Z" />
+    <path android:fillColor="#1F1F23"
+        android:pathData="M14,28 L22,28 L22,36 L14,36 Z M26,28 L34,28 L34,36 L26,36 Z M38,28 L46,28 L46,36 L38,36 Z M50,28 L58,28 L58,36 L50,36 Z M62,28 L70,28 L70,36 L62,36 Z M74,28 L82,28 L82,36 L74,36 Z" />
+    <path android:fillColor="#2D5A3F"
+        android:pathData="M14,40 L22,40 L22,48 L14,48 Z" />
+    <path android:fillColor="#4ADE80"
+        android:pathData="M26,40 L34,40 L34,48 L26,48 Z M38,40 L46,40 L46,48 L38,48 Z" />
+    <path android:fillColor="#2D5A3F"
+        android:pathData="M50,40 L58,40 L58,48 L50,48 Z" />
+    <path android:fillColor="#1F1F23"
+        android:pathData="M62,40 L70,40 L70,48 L62,48 Z" />
+    <path android:fillColor="#4ADE80"
+        android:pathData="M74,40 L82,40 L82,48 L74,48 Z" />
+    <path android:fillColor="#4ADE80"
+        android:pathData="M14,52 L22,52 L22,60 L14,60 Z M26,52 L34,52 L34,60 L26,60 Z M38,52 L46,52 L46,60 L38,60 Z M50,52 L58,52 L58,60 L50,60 Z" />
+    <path android:fillColor="#2D5A3F"
+        android:pathData="M62,52 L70,52 L70,60 L62,60 Z" />
+    <path android:fillColor="#4ADE80"
+        android:pathData="M74,52 L82,52 L82,60 L74,60 Z" />
+    <path android:fillColor="#1F1F23"
+        android:pathData="M14,64 L22,64 L22,72 L14,72 Z" />
+    <path android:fillColor="#4ADE80"
+        android:pathData="M26,64 L34,64 L34,72 L26,72 Z M38,64 L46,64 L46,72 L38,72 Z M50,64 L58,64 L58,72 L50,72 Z M62,64 L70,64 L70,72 L62,72 Z M74,64 L82,64 L82,72 L74,72 Z" />
+</vector>
