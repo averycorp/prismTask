@@ -566,18 +566,6 @@ fun TaskListScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { navController.navigate(PrismTaskRoute.TagManagement.route) }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Label,
-                                contentDescription = "Tags"
-                            )
-                        }
-                        IconButton(onClick = { navController.navigate(PrismTaskRoute.Archive.route) }) {
-                            Icon(
-                                imageVector = Icons.Default.Inventory2,
-                                contentDescription = "Archive"
-                            )
-                        }
                         Box {
                             IconButton(onClick = { showSortMenu = true }) {
                                 Icon(
@@ -623,6 +611,26 @@ fun TaskListScreen(
                                 expanded = showMoreMenu,
                                 onDismissRequest = { showMoreMenu = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("Tags") },
+                                    leadingIcon = {
+                                        Icon(Icons.AutoMirrored.Filled.Label, null)
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        navController.navigate(PrismTaskRoute.TagManagement.route)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Archive") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Inventory2, null)
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        navController.navigate(PrismTaskRoute.Archive.route)
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text("Automation Rules") },
                                     leadingIcon = {
