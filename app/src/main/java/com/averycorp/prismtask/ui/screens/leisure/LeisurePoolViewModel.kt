@@ -50,6 +50,7 @@ constructor(
         val activitiesById: Map<Long, LeisureActivityEntity>,
         val minutesLoggedToday: Int,
         val targetMinutesToday: Int,
+        val minutesByCategoryToday: Map<LeisureCategory, Int>,
         val categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>
     ) {
         fun displayFor(category: LeisureCategory): LeisureCategoryDisplay =
@@ -65,6 +66,7 @@ constructor(
                 activitiesById = emptyMap(),
                 minutesLoggedToday = 0,
                 targetMinutesToday = LeisureBudgetPreferences.DEFAULT_TARGET,
+                minutesByCategoryToday = LeisureCategory.values().associateWith { 0 },
                 categoryDisplays = LeisureCategory.values().associateWith {
                     LeisureCategoryDisplay(emoji = it.emoji, label = it.label)
                 }
@@ -91,6 +93,14 @@ constructor(
                 }
             }
         val today = DayBoundary.currentLocalDate(dayStartHour)
+        val startOfDay = DayBoundary.startOfCurrentDay(dayStartHour)
+        val endOfDay = startOfDay + DayBoundary.DAY_MILLIS
+        val breakdown: Map<LeisureCategory, Int> = LeisureCategory.values().associateWith { cat ->
+            sessions
+                .filter { it.loggedAt in startOfDay until endOfDay }
+                .filter { LeisureCategory.fromStringOrNull(it.category) == cat }
+                .sumOf { it.durationMinutes }
+        }
         UiState(
             activities = activities,
             settings = snap,
@@ -99,6 +109,7 @@ constructor(
             activitiesById = activities.associateBy { it.id },
             minutesLoggedToday = minutes,
             targetMinutesToday = snap.targetForDate(today),
+            minutesByCategoryToday = breakdown,
             categoryDisplays = displays
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.empty())
