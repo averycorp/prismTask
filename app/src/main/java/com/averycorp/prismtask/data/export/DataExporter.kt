@@ -649,6 +649,7 @@ constructor(
         add("quickAddRows", gson.toJsonTree(p.getQuickAddRows().first()))
         add("searchPreview", gson.toJsonTree(p.getSearchPreview().first()))
         add("selfCareTierDefaults", gson.toJsonTree(p.getSelfCareTierDefaults().first()))
+        add("habitBorderBrightness", gson.toJsonTree(p.getHabitBorderBrightness().first()))
     }
 
     private suspend fun exportAttachments(): JsonArray {

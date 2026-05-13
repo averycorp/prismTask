@@ -36,6 +36,7 @@ fun PrismTaskTheme(
     compactMode: Boolean = false,
     cardCornerRadius: Int = 12,
     showCardBorders: Boolean = true,
+    habitBorderBrightness: Float = 0.4f,
     content: @Composable () -> Unit
 ) {
     // PrismThemes are always dark-surface palettes, so we always start from
@@ -140,7 +141,8 @@ fun PrismTaskTheme(
         com.averycorp.prismtask.ui.a11y.LocalLargeTouchTargets provides largeTouchTargets,
         LocalCompactMode provides compactMode,
         LocalCardCornerRadius provides cardCornerRadius.coerceIn(0, 24).dp,
-        LocalShowCardBorders provides showCardBorders
+        LocalShowCardBorders provides showCardBorders,
+        LocalHabitBorderBrightness provides habitBorderBrightness.coerceIn(0f, 1f)
     ) {
         val scanSpacing = when (prismTheme) {
             PrismTheme.CYBERPUNK -> 3.dp

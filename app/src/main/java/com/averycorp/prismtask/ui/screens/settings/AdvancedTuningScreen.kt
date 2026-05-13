@@ -110,6 +110,9 @@ fun AdvancedTuningScreen(
             QuickAddRowsGroup(viewModel)
             SearchPreviewGroup(viewModel)
 
+            // ---------- Appearance ----------
+            HabitBorderBrightnessGroup(viewModel)
+
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
@@ -813,6 +816,24 @@ private fun SearchPreviewGroup(vm: AdvancedTuningViewModel) {
     ) {
         IntSliderRow("Preview lines", state.previewLines, 1..10) {
             vm.setSearchPreview(state.copy(previewLines = it))
+        }
+    }
+}
+
+@Composable
+private fun HabitBorderBrightnessGroup(vm: AdvancedTuningViewModel) {
+    val state by vm.habitBorderBrightness.collectAsStateWithLifecycle()
+    ExpandableGroup(
+        title = "Habit Border Brightness",
+        subtitle = "Opacity of the outer border on habit cards"
+    ) {
+        FloatSliderRow(
+            label = "Brightness",
+            value = state.brightness,
+            range = 0f..1f,
+            valueFormatter = { String.format("%.0f%%", it * 100f) }
+        ) {
+            vm.setHabitBorderBrightness(state.copy(brightness = it))
         }
     }
 }

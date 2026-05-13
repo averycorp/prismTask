@@ -225,6 +225,15 @@ data class SearchPreview(
 )
 
 /**
+ * Alpha applied to habit-card outer borders. 0.0 hides the border entirely,
+ * 1.0 paints it fully opaque. Default 0.4 matches the value shipped before
+ * the setting was introduced.
+ */
+data class HabitBorderBrightness(
+    val brightness: Float = 0.4f
+)
+
+/**
  * First-display tier per Self-Care routine, applied when no log exists for
  * today. Stored values are validated against the routine's tier order at
  * read time by [SelfCareViewModel.getSelectedTier]; an unknown tier id
@@ -390,6 +399,9 @@ constructor(
 
         // E5 — search preview lines
         private val SEARCH_PREVIEW_LINES = intPreferencesKey("search_preview_lines")
+
+        // Habit-card outer border brightness (0..1 alpha, default 0.4)
+        private val HABIT_BORDER_BRIGHTNESS = floatPreferencesKey("habit_border_brightness")
 
         // Self-care default tiers (one per routine)
         private val SC_DEFAULT_MORNING = stringPreferencesKey("selfcare_default_tier_morning")
@@ -816,6 +828,19 @@ constructor(
     suspend fun setSearchPreview(c: SearchPreview) {
         context.advancedTuningDataStore.edit {
             it[SEARCH_PREVIEW_LINES] = c.previewLines.coerceIn(1, 10)
+        }
+    }
+
+    fun getHabitBorderBrightness(): Flow<HabitBorderBrightness> =
+        context.advancedTuningDataStore.data.map {
+            HabitBorderBrightness(
+                brightness = (it[HABIT_BORDER_BRIGHTNESS] ?: 0.4f).coerceIn(0f, 1f)
+            )
+        }
+
+    suspend fun setHabitBorderBrightness(c: HabitBorderBrightness) {
+        context.advancedTuningDataStore.edit {
+            it[HABIT_BORDER_BRIGHTNESS] = c.brightness.coerceIn(0f, 1f)
         }
     }
 

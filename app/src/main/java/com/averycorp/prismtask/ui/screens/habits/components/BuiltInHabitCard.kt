@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.repository.HabitWithStatus
 import com.averycorp.prismtask.ui.components.StreakBadge
 import com.averycorp.prismtask.ui.screens.habits.BuiltInHabitProgress
+import com.averycorp.prismtask.ui.theme.LocalHabitBorderBrightness
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 
@@ -66,6 +67,7 @@ internal fun BuiltInHabitCard(
     }
     val cardShape = MaterialTheme.shapes.medium
     val attrs = LocalPrismAttrs.current
+    val borderAlpha = LocalHabitBorderBrightness.current
 
     Card(
         modifier = modifier
@@ -73,7 +75,7 @@ internal fun BuiltInHabitCard(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = prismColors.primary.copy(alpha = 0.4f),
+                color = prismColors.primary.copy(alpha = borderAlpha),
                 shape = cardShape
             ),
         shape = cardShape,

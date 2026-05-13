@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.ui.components.StreakBadge
 import com.averycorp.prismtask.ui.screens.habits.SelfCareCardData
+import com.averycorp.prismtask.ui.theme.LocalHabitBorderBrightness
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 
@@ -66,6 +67,7 @@ internal fun SelfCareRoutineCard(
     }
     val cardShape = MaterialTheme.shapes.medium
     val attrs = LocalPrismAttrs.current
+    val borderAlpha = LocalHabitBorderBrightness.current
 
     Card(
         modifier = modifier
@@ -73,7 +75,7 @@ internal fun SelfCareRoutineCard(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = c.primary.copy(alpha = 0.4f),
+                color = c.primary.copy(alpha = borderAlpha),
                 shape = cardShape
             ),
         shape = cardShape,

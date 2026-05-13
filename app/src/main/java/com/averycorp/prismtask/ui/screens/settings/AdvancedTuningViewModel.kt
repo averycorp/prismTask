@@ -10,6 +10,7 @@ import com.averycorp.prismtask.data.preferences.EditorFieldRows
 import com.averycorp.prismtask.data.preferences.EnergyPomodoroConfig
 import com.averycorp.prismtask.data.preferences.ExtractorConfig
 import com.averycorp.prismtask.data.preferences.GoodEnoughTimerConfig
+import com.averycorp.prismtask.data.preferences.HabitBorderBrightness
 import com.averycorp.prismtask.data.preferences.HabitReminderFallback
 import com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords
 import com.averycorp.prismtask.data.preferences.MoodCorrelationConfig
@@ -164,6 +165,10 @@ constructor(
         prefs.getSelfCareTierDefaults()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SelfCareTierDefaults())
 
+    val habitBorderBrightness: StateFlow<HabitBorderBrightness> =
+        prefs.getHabitBorderBrightness()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HabitBorderBrightness())
+
     fun setUrgencyBands(value: UrgencyBands) = launchSet { prefs.setUrgencyBands(value) }
     fun setUrgencyWindows(value: UrgencyWindows) = launchSet { prefs.setUrgencyWindows(value) }
     fun setBurnoutWeights(value: BurnoutWeights) = launchSet { prefs.setBurnoutWeights(value) }
@@ -199,6 +204,9 @@ constructor(
     fun setQuickAddRows(value: QuickAddRows) = launchSet { prefs.setQuickAddRows(value) }
     fun setSearchPreview(value: SearchPreview) = launchSet { prefs.setSearchPreview(value) }
     fun setSelfCareTierDefaults(value: SelfCareTierDefaults) = launchSet { prefs.setSelfCareTierDefaults(value) }
+    fun setHabitBorderBrightness(value: HabitBorderBrightness) = launchSet {
+        prefs.setHabitBorderBrightness(value)
+    }
 
     private inline fun launchSet(crossinline block: suspend () -> Unit) {
         viewModelScope.launch { block() }
