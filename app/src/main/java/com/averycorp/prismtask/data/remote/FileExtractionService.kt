@@ -6,10 +6,13 @@ import android.provider.OpenableColumns
 import android.util.Log
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.data.preferences.AuthTokenPreferences
+import com.averycorp.prismtask.data.remote.api.FileContactResponse
 import com.averycorp.prismtask.data.remote.api.FileExtractedSubtaskResponse
 import com.averycorp.prismtask.data.remote.api.FileExtractionResponse
+import com.averycorp.prismtask.data.remote.api.FileTechnicalMetadataResponse
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.domain.model.FileExtractionSuggestion
+import com.averycorp.prismtask.domain.model.LifeCategory
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -169,7 +172,38 @@ fun FileExtractionSuggestion.Companion.fromResponse(
     confidence = response.confidence.coerceIn(0f, 1f),
     notes = response.notes?.takeIf { it.isNotBlank() },
     sourceFileName = response.sourceFileName,
-    sourceMimeType = response.sourceMimeType
+    sourceMimeType = response.sourceMimeType,
+    lifeCategory = response.lifeCategory
+        ?.takeIf { it.isNotBlank() }
+        ?.let { raw ->
+            val parsed = LifeCategory.fromStorage(raw)
+            // fromStorage returns UNCATEGORIZED for unknown inputs — drop
+            // that signal unless the LLM explicitly returned UNCATEGORIZED,
+            // so the UI doesn't surface a misleading apply toggle.
+            if (parsed == LifeCategory.UNCATEGORIZED && raw != "UNCATEGORIZED") {
+                null
+            } else {
+                parsed
+            }
+        },
+    estimatedDurationMinutes = response.estimatedDurationMinutes?.takeIf { it in 0..(24 * 60) },
+    recurrenceHint = response.recurrenceHint?.trim()?.takeIf { it.isNotBlank() },
+    location = response.location?.trim()?.takeIf { it.isNotBlank() },
+    reminderOffsetMinutes = response.reminderOffsetMinutes?.takeIf { it in 0..(30 * 24 * 60) },
+    urls = response.urls
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct(),
+    contacts = response.contacts.mapNotNull { it.toDomainOrNull() },
+    keyEntities = response.keyEntities
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .take(10),
+    documentType = response.documentType?.takeIf { it.isNotBlank() },
+    actionOrInfo = response.actionOrInfo?.takeIf { it == "action" || it == "info" },
+    language = response.language?.trim()?.takeIf { it.isNotBlank() },
+    technicalMetadata = response.technicalMetadata?.toDomain()
 )
 
 private fun FileExtractedSubtaskResponse.toDomainOrNull(): FileExtractionSuggestion.Subtask? {
@@ -180,6 +214,49 @@ private fun FileExtractedSubtaskResponse.toDomainOrNull(): FileExtractionSuggest
         suggestedDueDateMillis = suggestedDueDate?.let { parseIsoDateToEndOfDay(it) }
     )
 }
+
+private fun FileContactResponse.toDomainOrNull(): FileExtractionSuggestion.Contact? {
+    val cleanName = name?.trim()?.takeIf { it.isNotBlank() }
+    val cleanEmail = email?.trim()?.takeIf { it.isNotBlank() && '@' in it }
+    val cleanPhone = phone?.trim()?.takeIf { it.isNotBlank() }
+    // Skip entries with no actual contact details — the LLM is asked to
+    // omit these but we belt-and-brace here to match the prompt's contract.
+    if (cleanEmail == null && cleanPhone == null) return null
+    return FileExtractionSuggestion.Contact(
+        name = cleanName,
+        email = cleanEmail,
+        phone = cleanPhone
+    )
+}
+
+private fun FileTechnicalMetadataResponse.toDomain(): FileExtractionSuggestion.TechnicalMetadata =
+    FileExtractionSuggestion.TechnicalMetadata(
+        fileSizeBytes = fileSizeBytes?.takeIf { it >= 0 },
+        pageCount = pageCount?.takeIf { it >= 0 },
+        docTitle = docTitle?.takeIf { it.isNotBlank() },
+        docAuthor = docAuthor?.takeIf { it.isNotBlank() },
+        docSubject = docSubject?.takeIf { it.isNotBlank() },
+        docKeywords = docKeywords?.takeIf { it.isNotBlank() },
+        docCreationDate = docCreationDate?.takeIf { it.isNotBlank() },
+        docModificationDate = docModificationDate?.takeIf { it.isNotBlank() },
+        docLastModifiedBy = docLastModifiedBy?.takeIf { it.isNotBlank() },
+        docRevision = docRevision?.takeIf { it >= 0 },
+        paragraphCount = paragraphCount?.takeIf { it >= 0 },
+        tableCount = tableCount?.takeIf { it >= 0 },
+        sheetNames = sheetNames.filter { it.isNotBlank() },
+        sheetCount = sheetCount?.takeIf { it >= 0 },
+        rowCountTotal = rowCountTotal?.takeIf { it >= 0 },
+        widthPx = widthPx?.takeIf { it >= 0 },
+        heightPx = heightPx?.takeIf { it >= 0 },
+        imageTakenAt = imageTakenAt?.takeIf { it.isNotBlank() },
+        cameraMake = cameraMake?.takeIf { it.isNotBlank() },
+        cameraModel = cameraModel?.takeIf { it.isNotBlank() },
+        gpsLat = gpsLat?.takeIf { it in -90.0..90.0 },
+        gpsLon = gpsLon?.takeIf { it in -180.0..180.0 },
+        lineCount = lineCount?.takeIf { it >= 0 },
+        wordCount = wordCount?.takeIf { it >= 0 },
+        charCount = charCount?.takeIf { it >= 0 }
+    )
 
 /**
  * Parse a leading `YYYY-MM-DD` from an arbitrary string and resolve it to

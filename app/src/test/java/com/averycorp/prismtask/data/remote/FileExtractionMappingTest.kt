@@ -1,8 +1,11 @@
 package com.averycorp.prismtask.data.remote
 
+import com.averycorp.prismtask.data.remote.api.FileContactResponse
 import com.averycorp.prismtask.data.remote.api.FileExtractedSubtaskResponse
 import com.averycorp.prismtask.data.remote.api.FileExtractionResponse
+import com.averycorp.prismtask.data.remote.api.FileTechnicalMetadataResponse
 import com.averycorp.prismtask.domain.model.FileExtractionSuggestion
+import com.averycorp.prismtask.domain.model.LifeCategory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -158,5 +161,172 @@ class FileExtractionMappingTest {
         assertNull(parseIsoDateToEndOfDay("2026-00-15"))
         assertNull(parseIsoDateToEndOfDay("2026-05-32"))
         assertNull(parseIsoDateToEndOfDay("2026-05-00"))
+    }
+
+    // --- Enrichment-field mapping ---
+
+    @Test
+    fun `life category string maps to enum`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", lifeCategory = "WORK")
+        )
+        assertEquals(LifeCategory.WORK, mapped.lifeCategory)
+    }
+
+    @Test
+    fun `unknown life category falls back to null`() {
+        // LifeCategory.fromString returns UNCATEGORIZED on unknown inputs;
+        // the mapper drops the UNCATEGORIZED-from-unknown signal so the UI
+        // doesn't surface a misleading apply toggle.
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", lifeCategory = "garbage")
+        )
+        assertNull(mapped.lifeCategory)
+    }
+
+    @Test
+    fun `explicit UNCATEGORIZED is preserved`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", lifeCategory = "UNCATEGORIZED")
+        )
+        assertEquals(LifeCategory.UNCATEGORIZED, mapped.lifeCategory)
+    }
+
+    @Test
+    fun `estimated duration out of range becomes null`() {
+        val negative = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", estimatedDurationMinutes = -5)
+        )
+        val tooBig = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", estimatedDurationMinutes = 60 * 25)
+        )
+        val ok = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", estimatedDurationMinutes = 45)
+        )
+        assertNull(negative.estimatedDurationMinutes)
+        assertNull(tooBig.estimatedDurationMinutes)
+        assertEquals(45, ok.estimatedDurationMinutes)
+    }
+
+    @Test
+    fun `urls are trimmed and de-duplicated`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(
+                title = "X",
+                urls = listOf(" https://a.example ", "https://a.example", "https://b.example", "   ")
+            )
+        )
+        assertEquals(listOf("https://a.example", "https://b.example"), mapped.urls)
+    }
+
+    @Test
+    fun `contacts without email or phone are dropped`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(
+                title = "X",
+                contacts = listOf(
+                    FileContactResponse(name = "Jane", email = "jane@example.com"),
+                    FileContactResponse(name = "Skip me", email = null, phone = null),
+                    FileContactResponse(name = "Alex", phone = "+1-555-0100"),
+                    FileContactResponse(name = "Bad email", email = "not-an-address")
+                )
+            )
+        )
+        assertEquals(2, mapped.contacts.size)
+        assertEquals("Jane", mapped.contacts[0].name)
+        assertEquals("Alex", mapped.contacts[1].name)
+        assertEquals("+1-555-0100", mapped.contacts[1].phone)
+    }
+
+    @Test
+    fun `key entities are de-duplicated and capped at 10`() {
+        val many = (1..15).map { "Entity-$it" }
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(
+                title = "X",
+                keyEntities = many + listOf(" Entity-1 ", "Entity-2", "   ")
+            )
+        )
+        assertEquals(10, mapped.keyEntities.size)
+        assertEquals("Entity-1", mapped.keyEntities[0])
+    }
+
+    @Test
+    fun `action or info accepts only known values`() {
+        val good = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", actionOrInfo = "action")
+        )
+        val bad = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X", actionOrInfo = "yolo")
+        )
+        assertEquals("action", good.actionOrInfo)
+        assertNull(bad.actionOrInfo)
+    }
+
+    @Test
+    fun `technical metadata round-trips with valid values`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(
+                title = "X",
+                technicalMetadata = FileTechnicalMetadataResponse(
+                    fileSizeBytes = 4096,
+                    pageCount = 3,
+                    docTitle = "Quarterly Plan",
+                    docAuthor = "Avery",
+                    widthPx = 800,
+                    heightPx = 600,
+                    sheetNames = listOf("Summary", "Detail"),
+                    sheetCount = 2,
+                    wordCount = 12_345,
+                    gpsLat = 37.7749,
+                    gpsLon = -122.4194
+                )
+            )
+        )
+        val tech = mapped.technicalMetadata
+        assertNotNull(tech)
+        assertEquals(4096L, tech!!.fileSizeBytes)
+        assertEquals(3, tech.pageCount)
+        assertEquals(800, tech.widthPx)
+        assertEquals(listOf("Summary", "Detail"), tech.sheetNames)
+        assertEquals(12_345, tech.wordCount)
+        assertTrue(tech.hasRichDetails)
+    }
+
+    @Test
+    fun `technical metadata rejects out-of-range gps`() {
+        // gpsLat 100 is above the valid 90° upper bound; gpsLon -200 below the -180° lower bound.
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(
+                title = "X",
+                technicalMetadata = FileTechnicalMetadataResponse(
+                    gpsLat = 100.0,
+                    gpsLon = -200.0
+                )
+            )
+        )
+        assertNotNull(mapped.technicalMetadata)
+        assertNull(mapped.technicalMetadata!!.gpsLat)
+        assertNull(mapped.technicalMetadata!!.gpsLon)
+    }
+
+    @Test
+    fun `hasAnyContent is true when only enrichment is present`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(
+                title = "",
+                lifeCategory = "WORK",
+                estimatedDurationMinutes = 30
+            )
+        )
+        assertTrue(mapped.hasAnyContent)
+    }
+
+    @Test
+    fun `null technical metadata stays null`() {
+        val mapped = FileExtractionSuggestion.fromResponse(
+            FileExtractionResponse(title = "X")
+        )
+        assertNull(mapped.technicalMetadata)
     }
 }

@@ -359,12 +359,82 @@ class FileExtractedSubtask(BaseModel):
     suggested_due_date: Optional[str] = None
 
 
+class FileContact(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class FileTechnicalMetadata(BaseModel):
+    """Deterministic file-side metadata extracted without invoking the LLM.
+
+    Populated by the backend from the raw bytes / parser output before the
+    Haiku call. Surfaced to the client as a read-only "File details" panel
+    in ``FileImportSuggestionSheet`` — the user does not get an apply
+    toggle for these. All fields optional because the answers depend on
+    the file type (e.g. ``page_count`` is PDF-only, ``sheet_names`` XLSX-only).
+    """
+
+    file_size_bytes: Optional[int] = Field(default=None, ge=0)
+    # PDF
+    page_count: Optional[int] = Field(default=None, ge=0)
+    doc_title: Optional[str] = None
+    doc_author: Optional[str] = None
+    doc_subject: Optional[str] = None
+    doc_keywords: Optional[str] = None
+    doc_creation_date: Optional[str] = None
+    doc_modification_date: Optional[str] = None
+    # DOCX
+    doc_last_modified_by: Optional[str] = None
+    doc_revision: Optional[int] = Field(default=None, ge=0)
+    paragraph_count: Optional[int] = Field(default=None, ge=0)
+    table_count: Optional[int] = Field(default=None, ge=0)
+    # XLSX
+    sheet_names: list[str] = Field(default_factory=list)
+    sheet_count: Optional[int] = Field(default=None, ge=0)
+    row_count_total: Optional[int] = Field(default=None, ge=0)
+    # Images
+    width_px: Optional[int] = Field(default=None, ge=0)
+    height_px: Optional[int] = Field(default=None, ge=0)
+    image_taken_at: Optional[str] = None
+    camera_make: Optional[str] = None
+    camera_model: Optional[str] = None
+    gps_lat: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    gps_lon: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    # Text-like
+    line_count: Optional[int] = Field(default=None, ge=0)
+    word_count: Optional[int] = Field(default=None, ge=0)
+    char_count: Optional[int] = Field(default=None, ge=0)
+
+
+_FILE_LIFE_CATEGORY_PATTERN = "^(WORK|PERSONAL|SELF_CARE|HEALTH|UNCATEGORIZED)$"
+_FILE_DOCUMENT_TYPE_PATTERN = (
+    "^(syllabus|meeting_notes|invoice|shopping_list|code_todos|report|"
+    "event_invite|personal_note|recipe|article|other)$"
+)
+_FILE_ACTION_OR_INFO_PATTERN = "^(action|info)$"
+
+
 class FileExtractionResponse(BaseModel):
     """Single-task suggestion derived from an uploaded file.
 
     Sent back to the Android client which renders it in
     ``FileImportSuggestionSheet`` for the user to confirm before any task
     state is mutated. The user may accept/reject individual fields.
+
+    Three groups of fields:
+      1. Task-shape fields (title / description / due_date / priority /
+         project / tags / subtasks) — directly applied to the editor draft
+         when the user accepts.
+      2. Enrichment fields (life_category / estimated_duration_minutes /
+         recurrence_hint / location / reminder_offset_minutes / urls /
+         contacts / key_entities / document_type / action_or_info /
+         language) — extracted by the LLM, surfaced with their own apply
+         toggles when the field maps onto a task property, otherwise
+         shown as read-only context.
+      3. ``technical_metadata`` — deterministic file-side metadata
+         (page count, EXIF, doc-info, etc.) collected without invoking
+         the LLM. Always informational, never applied.
     """
 
     title: str = ""
@@ -379,6 +449,30 @@ class FileExtractionResponse(BaseModel):
     notes: Optional[str] = None
     source_file_name: Optional[str] = None
     source_mime_type: Optional[str] = None
+    # Enrichment fields (LLM-extracted).
+    life_category: Optional[str] = Field(
+        default=None, pattern=_FILE_LIFE_CATEGORY_PATTERN
+    )
+    estimated_duration_minutes: Optional[int] = Field(
+        default=None, ge=0, le=24 * 60
+    )
+    recurrence_hint: Optional[str] = None
+    location: Optional[str] = None
+    reminder_offset_minutes: Optional[int] = Field(
+        default=None, ge=0, le=30 * 24 * 60
+    )
+    urls: list[str] = Field(default_factory=list)
+    contacts: list[FileContact] = Field(default_factory=list)
+    key_entities: list[str] = Field(default_factory=list)
+    document_type: Optional[str] = Field(
+        default=None, pattern=_FILE_DOCUMENT_TYPE_PATTERN
+    )
+    action_or_info: Optional[str] = Field(
+        default=None, pattern=_FILE_ACTION_OR_INFO_PATTERN
+    )
+    language: Optional[str] = Field(default=None, max_length=8)
+    # Deterministic file-side metadata.
+    technical_metadata: Optional[FileTechnicalMetadata] = None
 
 
 # --- Vision: extract tasks from a screenshot (G1) ---

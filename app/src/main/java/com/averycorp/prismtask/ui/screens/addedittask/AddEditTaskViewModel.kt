@@ -1119,7 +1119,12 @@ constructor(
         applyPriority: Boolean,
         applyProject: Boolean,
         applyTags: Boolean,
-        applySubtasks: Boolean
+        applySubtasks: Boolean,
+        applyLifeCategory: Boolean = false,
+        applyEstimatedDuration: Boolean = false,
+        applyLocation: Boolean = false,
+        applyRecurrenceHint: Boolean = false,
+        applyReminderOffset: Boolean = false
     ) {
         if (applyTitle && suggestion.title.isNotBlank()) {
             title = suggestion.title
@@ -1161,6 +1166,35 @@ constructor(
         }
         if (applySubtasks) {
             suggestion.subtasks.forEach { addPendingSubtask(it.title) }
+        }
+        if (applyLifeCategory && suggestion.lifeCategory != null) {
+            lifeCategory = suggestion.lifeCategory
+            lifeCategoryManuallySet = true
+        }
+        if (applyEstimatedDuration && suggestion.estimatedDurationMinutes != null &&
+            suggestion.estimatedDurationMinutes > 0
+        ) {
+            estimatedDuration = suggestion.estimatedDurationMinutes
+        }
+        if (applyReminderOffset && suggestion.reminderOffsetMinutes != null &&
+            suggestion.reminderOffsetMinutes > 0
+        ) {
+            reminderOffset = suggestion.reminderOffsetMinutes.toLong() * 60L * 1000L
+        }
+        // Location + recurrence hint don't have dedicated task slots — append
+        // them to the description so the user has a single confirmation
+        // surface before saving.
+        val descriptionAddenda = buildList {
+            if (applyLocation && !suggestion.location.isNullOrBlank()) {
+                add("Location: ${suggestion.location}")
+            }
+            if (applyRecurrenceHint && !suggestion.recurrenceHint.isNullOrBlank()) {
+                add("Recurrence: ${suggestion.recurrenceHint}")
+            }
+        }
+        if (descriptionAddenda.isNotEmpty()) {
+            val prefix = description.takeIf { it.isNotBlank() }?.plus("\n\n").orEmpty()
+            description = prefix + descriptionAddenda.joinToString("\n")
         }
         dismissFileExtractionSheet()
     }
