@@ -232,7 +232,6 @@ constructor(
         if (state.remainingSeconds <= 0) return
         _uiState.value = state.copy(isRunning = true)
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
         PomodoroTimerService.start(
             context = appContext,
             durationSeconds = state.remainingSeconds,
@@ -247,14 +246,12 @@ constructor(
         if (state.remainingSeconds <= 0) return
         _uiState.value = state.copy(isRunning = true)
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
         PomodoroTimerService.resume(appContext)
     }
 
     private fun pause() {
         _uiState.value = _uiState.value.copy(isRunning = false)
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
         PomodoroTimerService.pause(appContext)
     }
 
@@ -278,13 +275,11 @@ constructor(
     private fun onServicePaused() {
         _uiState.value = _uiState.value.copy(isRunning = false)
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }
 
     private fun onServiceResumed() {
         _uiState.value = _uiState.value.copy(isRunning = true)
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }
 
     // The user tapped "Stop" on the ongoing notification (or another caller
@@ -304,14 +299,12 @@ constructor(
             isRunning = false
         )
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }
 
     private fun onServiceComplete() {
         val state = _uiState.value
         _uiState.value = state.copy(remainingSeconds = 0, isRunning = false)
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
         // Mirror the in-app completion notification the previous
         // in-memory tick loop fired. The service already shows its own
         // ongoing notification; this surfaces the alert sound/vibration the
@@ -325,7 +318,6 @@ constructor(
         // the post-completion state even when both auto-start
         // flags are off.
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }
 
     @androidx.annotation.VisibleForTesting
@@ -447,7 +439,6 @@ constructor(
             isRunning = false
         )
         syncWidgetState()
-        viewModelScope.launch { widgetUpdateManager.updateTimerWidget() }
     }
 
     fun resetPomodoro() {
@@ -538,28 +529,25 @@ constructor(
         else -> PomodoroTimerService.SESSION_TYPE_WORK
     }
 
-    /** Syncs the current timer UI state to the widget DataStore. */
+    /**
+     * Syncs the current timer UI state to the widget DataStore and refreshes
+     * the widget in the same coroutine, so the recomposition is guaranteed
+     * to see the just-written state. The previous shape (separate write +
+     * debounced update) raced and could leave the widget stuck on a stale
+     * snapshot (e.g. "Ready to Focus" after the user tapped Start), since
+     * no follow-up push fired after the missed transition.
+     */
     private fun syncWidgetState() {
         val s = _uiState.value
-        // Routed through WidgetUpdateManager (which wraps the write in
-        // try/catch on its own app-scoped SupervisorJob) so that:
-        //   - Real-world DataStore failures (disk pressure, FS errors)
-        //     don't take the timer ViewModel down.
-        //   - Unit tests with a mocked Context don't NPE on
-        //     `Context.filesDir = null`, and the underlying actor
-        //     coroutine doesn't leak `Dispatchers.Main` references
-        //     across `Dispatchers.setMain` / `resetMain` boundaries
-        //     between tests.
-        // Stamp the Chronometer base when the timer is actively running.
-        // The launcher hosts the Chronometer view and counts down on its
-        // own — so the widget shows live seconds without any 1Hz widget
-        // pushes from this process.
+        // Stamp the absolute deadline when the timer is actively running so
+        // the widget can render `(deadline - now()) / 1000` and track the
+        // wall clock between widget pushes.
         val sessionEnd = if (s.isRunning && s.remainingSeconds > 0) {
             android.os.SystemClock.elapsedRealtime() + s.remainingSeconds * 1000L
         } else {
             0L
         }
-        widgetUpdateManager.writeTimerState(
+        widgetUpdateManager.writeTimerStateAndRefresh(
             TimerWidgetState(
                 isRunning = s.isRunning,
                 isPaused = !s.isRunning && s.remainingSeconds < s.totalSeconds && s.remainingSeconds > 0,
