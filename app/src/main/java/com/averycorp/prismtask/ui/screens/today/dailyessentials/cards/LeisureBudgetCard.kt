@@ -21,7 +21,7 @@ import com.averycorp.prismtask.domain.usecase.LeisureBudgetCardState
 /**
  * Leisure Budget v2.0 — Item 3.
  *
- * Replaces the v1.x slot-pick LeisureCard with a budget-progress card:
+ * Replaces the v1.x slot-pick LeisureCard with a minimum-progress card:
  *   • progress bar of minutesLogged / targetMinutes
  *   • suggested activity (recency-weighted random pull)
  *   • Start Timer / Log Past / Refresh actions
@@ -39,14 +39,14 @@ fun LeisureBudgetCard(
     val accent = Color(0xFF8B5CF6)
     DailyEssentialCard(
         accent = accent,
-        contentDescription = "Leisure budget: ${state.minutesLogged} of ${state.targetMinutes} minutes",
+        contentDescription = "Leisure minimum: ${state.minutesLogged} of ${state.targetMinutes} minutes",
         onClick = onTapBody,
         modifier = modifier
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Leisure Budget",
+                    text = "Leisure Minimum",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -95,7 +95,7 @@ fun LeisureBudgetCard(
                 )
             } else {
                 Text(
-                    text = if (state.targetHit) "Target hit. Take a victory lap." else "Nothing suggested.",
+                    text = if (state.targetHit) "Minimum Hit. Take A Victory Lap." else "Nothing Suggested.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -104,20 +104,9 @@ fun LeisureBudgetCard(
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (!state.poolIsEmpty && state.suggestionName != null) {
                     TextButton(onClick = onStartTimer) { Text("Start") }
-                    TextButton(
-                        onClick = onRefresh,
-                        enabled = state.canRefresh
-                    ) {
-                        Text(
-                            if (state.canRefresh) {
-                                "Refresh (${state.refreshLimit - state.refreshesConsumed})"
-                            } else {
-                                "No refreshes"
-                            }
-                        )
-                    }
+                    TextButton(onClick = onRefresh) { Text("Refresh") }
                 }
-                TextButton(onClick = onLogPast) { Text("Log past") }
+                TextButton(onClick = onLogPast) { Text("Log Past") }
             }
         }
     }

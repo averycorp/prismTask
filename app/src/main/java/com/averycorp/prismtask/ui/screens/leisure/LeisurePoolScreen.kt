@@ -122,7 +122,7 @@ fun LeisurePoolScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Leisure Budget", fontWeight = FontWeight.Bold) },
+                title = { Text("Leisure Minimum", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     if (navController.previousBackStackEntry != null) {
                         IconButton(onClick = { navController.popBackStack() }) {
@@ -162,12 +162,23 @@ fun LeisurePoolScreen(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            items(LeisureCategory.values().toList()) { category ->
+            items(
+                LeisureCategory.values().filter { it in state.settings.enabledCategories }
+            ) { category ->
                 CategoryLogCard(
                     display = state.displayFor(category),
                     activityCount = state.activitiesByCategory[category]?.size ?: 0,
                     onClick = { pickingCategory = category },
                     onEdit = { editingCategory = category }
+                )
+            }
+            item {
+                CategoryManagerCard(
+                    enabledCategories = state.settings.enabledCategories,
+                    categoryDisplays = state.categoryDisplays,
+                    onToggle = { category, enabled ->
+                        viewModel.setCategoryEnabled(category, enabled)
+                    }
                 )
             }
             item {
@@ -192,7 +203,6 @@ fun LeisurePoolScreen(
                 }
             }
             item { BudgetTargetCard(viewModel = viewModel, snapshot = state.settings) }
-            item { RefreshLimitCard(viewModel = viewModel, snapshot = state.settings) }
             if (state.activities.isNotEmpty()) {
                 item {
                     Text(
@@ -227,8 +237,12 @@ fun LeisurePoolScreen(
     }
 
     if (showAddSheet) {
+        val initial = addInitialCategory
+            ?: state.settings.enabledCategories.firstOrNull()
+            ?: LeisureCategory.PHYSICAL
         AddActivityDialog(
-            initialCategory = addInitialCategory ?: LeisureCategory.PHYSICAL,
+            initialCategory = initial,
+            enabledCategories = state.settings.enabledCategories,
             categoryDisplays = state.categoryDisplays,
             onDismiss = {
                 showAddSheet = false
@@ -245,6 +259,7 @@ fun LeisurePoolScreen(
     editing?.let { activity ->
         EditActivityDialog(
             activity = activity,
+            enabledCategories = state.settings.enabledCategories,
             categoryDisplays = state.categoryDisplays,
             onDismiss = { editing = null },
             onConfirm = { name, category, duration ->
@@ -392,7 +407,7 @@ private fun TodayProgressCard(minutesLogged: Int, targetMinutes: Int) {
                 )
             } else {
                 Text(
-                    text = "Set a daily target below to track progress.",
+                    text = "Set a daily minimum below to track progress.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -621,7 +636,7 @@ private fun BudgetTargetCard(
     }
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Daily Target", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Daily Minimum", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "$dailyTarget minutes",
@@ -637,7 +652,7 @@ private fun BudgetTargetCard(
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Different Target On Weekends", modifier = Modifier.weight(1f))
+                Text("Different Minimum On Weekends", modifier = Modifier.weight(1f))
                 Switch(
                     checked = weekendOverrideEnabled,
                     onCheckedChange = { enabled ->
@@ -666,29 +681,61 @@ private fun BudgetTargetCard(
 }
 
 @Composable
-private fun RefreshLimitCard(
-    viewModel: LeisurePoolViewModel,
-    snapshot: com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot
+private fun CategoryManagerCard(
+    enabledCategories: Set<LeisureCategory>,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
+    onToggle: (LeisureCategory, Boolean) -> Unit
 ) {
-    var refresh by remember(snapshot) { mutableIntStateOf(snapshot.refreshLimit) }
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Refresh Limit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Categories",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "Refreshes per day to surface a new suggestion. The limit is the feature; it isn't a paywall.",
+                "Add or remove categories from your leisure pool. Disabled categories are hidden from the log and from suggestions.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text("$refresh refreshes per day", style = MaterialTheme.typography.bodyMedium)
-            Slider(
-                value = refresh.toFloat(),
-                onValueChange = { refresh = it.toInt() },
-                onValueChangeFinished = { viewModel.setRefreshLimit(refresh) },
-                valueRange = 0f..LeisureBudgetPreferences.MAX_REFRESH.toFloat(),
-                steps = LeisureBudgetPreferences.MAX_REFRESH - 1
-            )
+            LeisureCategory.values().forEach { category ->
+                val isEnabled = category in enabledCategories
+                val display = categoryDisplays[category]
+                    ?: LeisureCategoryDisplay(category.emoji, category.label)
+                val canDisable = !isEnabled || enabledCategories.size > 1
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = display.emoji,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = display.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = isEnabled,
+                        enabled = canDisable,
+                        onCheckedChange = { onToggle(category, it) }
+                    )
+                }
+            }
+            if (enabledCategories.size <= 1) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Keep at least one category enabled.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -763,6 +810,7 @@ private fun ActivityRow(
 @Composable
 private fun AddActivityDialog(
     initialCategory: LeisureCategory,
+    enabledCategories: Set<LeisureCategory>,
     categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onDismiss: () -> Unit,
     onConfirm: (String, LeisureCategory, Int?) -> Unit
@@ -774,6 +822,9 @@ private fun AddActivityDialog(
 
     fun displayOf(c: LeisureCategory): LeisureCategoryDisplay =
         categoryDisplays[c] ?: LeisureCategoryDisplay(c.emoji, c.label)
+
+    val selectableCategories = LeisureCategory.values().filter { it in enabledCategories }
+        .ifEmpty { LeisureCategory.values().toList() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -799,7 +850,7 @@ private fun AddActivityDialog(
                         expanded = categoryMenuOpen,
                         onDismissRequest = { categoryMenuOpen = false }
                     ) {
-                        LeisureCategory.values().forEach { c ->
+                        selectableCategories.forEach { c ->
                             val d = displayOf(c)
                             DropdownMenuItem(
                                 text = { Text("${d.emoji} ${d.label}") },
@@ -836,6 +887,7 @@ private fun AddActivityDialog(
 @Composable
 private fun EditActivityDialog(
     activity: LeisureActivityEntity,
+    enabledCategories: Set<LeisureCategory>,
     categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onDismiss: () -> Unit,
     onConfirm: (String, LeisureCategory, Int?) -> Unit
@@ -853,6 +905,12 @@ private fun EditActivityDialog(
 
     fun displayOf(c: LeisureCategory): LeisureCategoryDisplay =
         categoryDisplays[c] ?: LeisureCategoryDisplay(c.emoji, c.label)
+
+    // Always include the activity's current category so the user can keep it
+    // even after that category has been disabled in their settings.
+    val selectableCategories = LeisureCategory.values()
+        .filter { it in enabledCategories || it == category }
+        .ifEmpty { LeisureCategory.values().toList() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -878,7 +936,7 @@ private fun EditActivityDialog(
                         expanded = categoryMenuOpen,
                         onDismissRequest = { categoryMenuOpen = false }
                     ) {
-                        LeisureCategory.values().forEach { c ->
+                        selectableCategories.forEach { c ->
                             val d = displayOf(c)
                             DropdownMenuItem(
                                 text = { Text("${d.emoji} ${d.label}") },
