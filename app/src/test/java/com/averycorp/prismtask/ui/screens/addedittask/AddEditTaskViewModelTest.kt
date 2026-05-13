@@ -838,6 +838,137 @@ class AddEditTaskViewModelTest {
         assertFalse(vm.cognitiveLoadManuallySet)
     }
 
+    // ---------------------------------------------------------------------
+    // Auto-pick force=true preserves existing chip when classifier returns
+    // UNCATEGORIZED — was the user-reported "Auto button clears my chip"
+    // regression for OrganizeTab buttons.
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun `autoPickLifeCategory force preserves existing chip when classifier finds nothing`() = runTest {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onLifeCategoryChange(LifeCategory.PERSONAL)
+        vm.onTitleChange("watch a movie") // no keyword in any default category
+
+        vm.autoPickLifeCategory(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Classifier returns UNCATEGORIZED — chip MUST NOT be cleared.
+        assertEquals(LifeCategory.PERSONAL, vm.lifeCategory)
+        assertFalse(vm.lifeCategoryManuallySet)
+    }
+
+    @Test
+    fun `autoPickTaskMode force preserves existing chip when classifier finds nothing`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTaskModeChange(TaskMode.WORK)
+        vm.onTitleChange("xyzzy")
+
+        vm.autoPickTaskMode(force = true)
+
+        assertEquals(TaskMode.WORK, vm.taskMode)
+        assertFalse(vm.taskModeManuallySet)
+    }
+
+    @Test
+    fun `autoPickCognitiveLoad force preserves existing chip when classifier finds nothing`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onCognitiveLoadChange(CognitiveLoad.MEDIUM)
+        vm.onTitleChange("xyzzy")
+
+        vm.autoPickCognitiveLoad(force = true)
+
+        assertEquals(CognitiveLoad.MEDIUM, vm.cognitiveLoad)
+        assertFalse(vm.cognitiveLoadManuallySet)
+    }
+
+    @Test
+    fun `autoPickTaskMode force emits failure message when classifier finds nothing`() = runTest {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("xyzzy")
+        val messages = mutableListOf<String>()
+        val collectJob = launch { vm.errorMessages.collect { messages += it } }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.autoPickTaskMode(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, messages.size)
+        assertTrue(messages.single().contains("Task Mode"))
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `autoPickCognitiveLoad force emits failure message when classifier finds nothing`() = runTest {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("xyzzy")
+        val messages = mutableListOf<String>()
+        val collectJob = launch { vm.errorMessages.collect { messages += it } }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.autoPickCognitiveLoad(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, messages.size)
+        assertTrue(messages.single().contains("Cognitive Load"))
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `autoPickLifeCategory force emits failure message when AI disabled and classifier finds nothing`() = runTest {
+        // setUp defaults aiFeaturePrefsFlow to disabled.
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("xyzzy")
+        val messages = mutableListOf<String>()
+        val collectJob = launch { vm.errorMessages.collect { messages += it } }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.autoPickLifeCategory(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, messages.size)
+        assertTrue(messages.single().contains("Life Category"))
+        coVerify(exactly = 0) { lifeCategoryRemoteClassifier.classify(any(), any()) }
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `autoPickLifeCategory force does NOT emit when local picks a category`() = runTest {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Email project status update to manager")
+        val messages = mutableListOf<String>()
+        val collectJob = launch { vm.errorMessages.collect { messages += it } }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.autoPickLifeCategory(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LifeCategory.WORK, vm.lifeCategory)
+        assertTrue(messages.isEmpty())
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `autoPickLifeCategory non-force still clears chip when classifier finds nothing`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Email project status update")
+        vm.autoPickLifeCategory()
+        assertEquals(LifeCategory.WORK, vm.lifeCategory)
+
+        // Editing to a no-keyword title should clear via the implicit auto-press.
+        vm.onTitleChange("xyzzy")
+        vm.autoPickLifeCategory()
+        assertNull(vm.lifeCategory)
+    }
+
     @Test
     fun `resolveLifeCategoryForSave persists displayed auto-pick`() = runTest {
         val vm = newViewModel()

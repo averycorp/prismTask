@@ -39,7 +39,6 @@ import com.averycorp.prismtask.data.local.dao.TaskTemplateDao
 import com.averycorp.prismtask.data.local.dao.TaskTimingDao
 import com.averycorp.prismtask.data.local.dao.WeeklyReviewDao
 import com.averycorp.prismtask.data.local.entity.SyncMetadataEntity
-import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
 import com.averycorp.prismtask.data.preferences.BuiltInSyncPreferences
 import com.averycorp.prismtask.data.remote.mapper.MedicationSyncMapper
 import com.averycorp.prismtask.data.remote.mapper.SyncMapper

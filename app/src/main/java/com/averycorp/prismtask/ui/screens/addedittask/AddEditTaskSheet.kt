@@ -149,6 +149,9 @@ fun AddEditTaskSheet(
     var showTemplatePicker by remember { mutableStateOf(false) }
     var showSaveAsTemplateDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.errorMessages.collect { snackbarHostState.showSnackbar(it) }
+    }
     val subtaskCount by viewModel.subtaskCount.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(
         initialPage = initialTab.coerceIn(0, 2),
