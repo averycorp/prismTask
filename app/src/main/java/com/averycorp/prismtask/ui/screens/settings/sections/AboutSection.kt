@@ -20,7 +20,6 @@ import com.averycorp.prismtask.ui.components.settings.SectionHeader
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AboutSection(
-    latestReleaseTag: String?,
     onRefreshWidgets: (() -> Unit)? = null,
     onDebugReseed: (() -> Unit)? = null
 ) {
@@ -53,12 +52,6 @@ fun AboutSection(
     )
     Text(
         text = "In Memory of Morris and Tobi Isaac",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 4.dp)
-    )
-    Text(
-        text = "Latest GitHub Release: ${latestReleaseTag ?: "Loading..."}",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 4.dp)
