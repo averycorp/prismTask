@@ -310,6 +310,98 @@ class ProjectImporterTest {
         assertEquals(201L, inserted[2].parentTaskId)
     }
 
+    @Test
+    fun `Rich plan exposes task metadata via taskPreviews`() {
+        val sub = ChecklistParsedTask(
+            title = "sub",
+            description = "sub-desc",
+            dueDate = 5_000L,
+            priority = 2,
+            completed = true,
+            tags = listOf("sub-tag"),
+            subtasks = emptyList(),
+            estimatedMinutes = 15,
+            phaseName = "Phase 1"
+        )
+        val task = ChecklistParsedTask(
+            title = "Ship MVP",
+            description = "Initial release.",
+            dueDate = 1_700_000_000_000L,
+            priority = 3,
+            completed = false,
+            tags = listOf("launch", "p0"),
+            subtasks = listOf(sub),
+            estimatedMinutes = 90,
+            phaseName = "Phase 1"
+        )
+
+        val plan = ImportPlan.Rich(
+            richResult(
+                tasks = listOf(task),
+                risks = listOf(
+                    ParsedProjectRiskDomain(
+                        title = "Vendor delay",
+                        description = "Hardware ETA slipping.",
+                        level = "high"
+                    )
+                )
+            )
+        )
+
+        val previews = plan.taskPreviews
+        assertEquals(1, previews.size)
+        val row = previews[0]
+        assertEquals("Ship MVP", row.title)
+        assertEquals("Initial release.", row.description)
+        assertEquals(1_700_000_000_000L, row.dueDate)
+        assertEquals(3, row.priority)
+        assertEquals(false, row.completed)
+        assertEquals(listOf("launch", "p0"), row.tags)
+        assertEquals(90, row.estimatedMinutes)
+        assertEquals("Phase 1", row.phaseName)
+        assertEquals(1, row.subtasks.size)
+        assertEquals("sub", row.subtasks[0].title)
+        assertEquals(true, row.subtasks[0].completed)
+        assertEquals(15, row.subtasks[0].estimatedMinutes)
+
+        val riskPreviews = plan.riskPreviews
+        assertEquals(1, riskPreviews.size)
+        assertEquals("Vendor delay", riskPreviews[0].title)
+        assertEquals("Hardware ETA slipping.", riskPreviews[0].description)
+        assertEquals("high", riskPreviews[0].level)
+    }
+
+    @Test
+    fun `FlatProject plan exposes parsed metadata via taskPreviews`() {
+        val plan = ImportPlan.FlatProject(
+            projectName = "Inbox",
+            items = listOf(
+                ParsedTodoItem(
+                    title = "Buy groceries",
+                    description = "milk, bread",
+                    dueDate = 42_000L,
+                    priority = 1,
+                    completed = true,
+                    subtasks = listOf(ParsedTodoItem(title = "Bread"))
+                )
+            )
+        )
+
+        val previews = plan.taskPreviews
+        assertEquals(1, previews.size)
+        val row = previews[0]
+        assertEquals("Buy groceries", row.title)
+        assertEquals("milk, bread", row.description)
+        assertEquals(42_000L, row.dueDate)
+        assertEquals(1, row.priority)
+        assertEquals(true, row.completed)
+        assertEquals(emptyList<String>(), row.tags)
+        assertNull(row.estimatedMinutes)
+        assertNull(row.phaseName)
+        assertEquals(1, row.subtasks.size)
+        assertEquals("Bread", row.subtasks[0].title)
+    }
+
     // ---- helpers ----
 
     private fun richResult(
