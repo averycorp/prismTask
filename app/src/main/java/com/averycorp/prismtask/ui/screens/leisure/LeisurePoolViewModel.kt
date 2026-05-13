@@ -6,6 +6,7 @@ import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
 import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
 import com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot
+import com.averycorp.prismtask.data.preferences.LeisureCategoryDisplay
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.domain.model.LeisureCategory
@@ -48,8 +49,13 @@ constructor(
         val recentSessions: List<LeisureSessionEntity>,
         val activitiesById: Map<Long, LeisureActivityEntity>,
         val minutesLoggedToday: Int,
-        val targetMinutesToday: Int
+        val targetMinutesToday: Int,
+        val categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>
     ) {
+        fun displayFor(category: LeisureCategory): LeisureCategoryDisplay =
+            categoryDisplays[category]
+                ?: LeisureCategoryDisplay(emoji = category.emoji, label = category.label)
+
         companion object {
             fun empty(): UiState = UiState(
                 activities = emptyList(),
@@ -58,18 +64,26 @@ constructor(
                 recentSessions = emptyList(),
                 activitiesById = emptyMap(),
                 minutesLoggedToday = 0,
-                targetMinutesToday = LeisureBudgetPreferences.DEFAULT_TARGET
+                targetMinutesToday = LeisureBudgetPreferences.DEFAULT_TARGET,
+                categoryDisplays = LeisureCategory.values().associateWith {
+                    LeisureCategoryDisplay(emoji = it.emoji, label = it.label)
+                }
             )
         }
     }
 
+    private val settingsFlow = combine(
+        preferences.observeSnapshot(),
+        preferences.observeCategoryDisplays()
+    ) { snap, displays -> snap to displays }
+
     val state: StateFlow<UiState> = combine(
         repository.getActivities(),
-        preferences.observeSnapshot(),
+        settingsFlow,
         repository.observeRecentSessions(limit = 200),
         repository.observeMinutesLoggedToday(),
         taskBehaviorPreferences.getDayStartHour()
-    ) { activities, snap, sessions, minutes, dayStartHour ->
+    ) { activities, (snap, displays), sessions, minutes, dayStartHour ->
         val grouped: Map<LeisureCategory, List<LeisureActivityEntity>> =
             LeisureCategory.values().associateWith { cat ->
                 activities.filter {
@@ -84,7 +98,8 @@ constructor(
             recentSessions = sessions,
             activitiesById = activities.associateBy { it.id },
             minutesLoggedToday = minutes,
-            targetMinutesToday = snap.targetForDate(today)
+            targetMinutesToday = snap.targetForDate(today),
+            categoryDisplays = displays
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.empty())
 
@@ -232,6 +247,18 @@ constructor(
     fun setEnabledCategories(categories: Set<LeisureCategory>) {
         viewModelScope.launch {
             preferences.setEnabledCategories(categories)
+        }
+    }
+
+    fun setCategoryDisplay(category: LeisureCategory, label: String, emoji: String) {
+        viewModelScope.launch {
+            preferences.setCategoryDisplay(category, label, emoji)
+        }
+    }
+
+    fun resetCategoryDisplay(category: LeisureCategory) {
+        viewModelScope.launch {
+            preferences.resetCategoryDisplay(category)
         }
     }
 

@@ -143,15 +143,34 @@ internal fun BuiltInHabitCard(
                     )
                 }
             } else {
+                val isLeisure = type == "leisure"
+                val leisurePct: Int? = if (isLeisure && progress != null && progress.total > 0) {
+                    ((progress.done.toFloat() / progress.total.toFloat()) * 100f)
+                        .toInt()
+                        .coerceAtLeast(0)
+                } else {
+                    null
+                }
+                val circleColor = when {
+                    leisurePct == null -> color
+                    leisurePct >= 100 -> prismColors.successColor
+                    else -> MaterialTheme.colorScheme.error
+                }
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .border(2.dp, color, CircleShape),
+                        .border(2.dp, circleColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (progress != null && progress.total > 0) {
-                        Text(
+                    when {
+                        leisurePct != null -> Text(
+                            text = "$leisurePct%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = circleColor
+                        )
+                        progress != null && progress.total > 0 -> Text(
                             text = "${progress.done}/${progress.total}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
