@@ -2,7 +2,6 @@ package com.averycorp.prismtask.ui.screens.pomodoro
 
 import android.content.Context
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.data.remote.api.PomodoroResponse
@@ -46,7 +45,6 @@ class SmartPomodoroViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
     private lateinit var appContext: Context
-    private lateinit var taskDao: TaskDao
     private lateinit var taskRepository: TaskRepository
     private lateinit var api: PrismTaskApi
     private lateinit var proFeatureGate: ProFeatureGate
@@ -59,12 +57,11 @@ class SmartPomodoroViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         appContext = mockk(relaxed = true)
-        taskDao = mockk(relaxed = true)
         taskRepository = mockk(relaxed = true)
         // Default cloud-id resolution for the standard fixtures used across
         // generatePlan tests. Individual tests can override as needed.
-        coEvery { taskDao.getIdByCloudId("cloud-1") } returns 1L
-        coEvery { taskDao.getIdByCloudId("cloud-2") } returns 2L
+        coEvery { taskRepository.getIdByCloudId("cloud-1") } returns 1L
+        coEvery { taskRepository.getIdByCloudId("cloud-2") } returns 2L
         api = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
         every { proFeatureGate.userTier } returns MutableStateFlow(UserTier.PRO)
@@ -93,7 +90,6 @@ class SmartPomodoroViewModelTest {
 
     private fun newViewModel() = SmartPomodoroViewModel(
         appContext,
-        taskDao,
         taskRepository,
         api,
         proFeatureGate,
@@ -171,8 +167,8 @@ class SmartPomodoroViewModelTest {
     @Test
     fun generatePlan_resolvesFirestoreCloudIdsToLocalLongIds() = runTest(dispatcher) {
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_POMODORO) } returns true
-        coEvery { taskDao.getIdByCloudId("cloud-abc") } returns 42L
-        coEvery { taskDao.getIdByCloudId("cloud-missing") } returns null
+        coEvery { taskRepository.getIdByCloudId("cloud-abc") } returns 42L
+        coEvery { taskRepository.getIdByCloudId("cloud-missing") } returns null
         coEvery { api.planPomodoro(any()) } returns PomodoroResponse(
             sessions = listOf(
                 PomodoroSessionResponse(

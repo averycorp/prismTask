@@ -3,9 +3,9 @@ package com.averycorp.prismtask.ui.screens.briefing
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.remote.api.DailyBriefingRequest
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +47,7 @@ class DailyBriefingViewModel
 @Inject
 constructor(
     private val api: PrismTaskApi,
-    private val taskDao: TaskDao,
+    private val taskRepository: TaskRepository,
     private val proFeatureGate: ProFeatureGate
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
@@ -98,7 +98,7 @@ constructor(
                 // of the briefing still renders.
                 val pendingSync = mutableListOf<String>()
                 val resolvedPriorities = response.topPriorities.mapNotNull { p ->
-                    val localId = taskDao.getIdByCloudId(p.taskId)
+                    val localId = taskRepository.getIdByCloudId(p.taskId)
                     if (localId == null) {
                         pendingSync += p.title
                         null
@@ -107,7 +107,7 @@ constructor(
                     }
                 }
                 val resolvedSuggestions = response.suggestedOrder.mapNotNull { s ->
-                    val localId = taskDao.getIdByCloudId(s.taskId)
+                    val localId = taskRepository.getIdByCloudId(s.taskId)
                     if (localId == null) {
                         pendingSync += s.title
                         null
@@ -148,7 +148,7 @@ constructor(
                     Pair(task.taskId, index)
                 }
                 for ((taskId, sortOrder) in updates) {
-                    taskDao.updatePlannedDateAndSortOrder(taskId, today, sortOrder)
+                    taskRepository.updatePlannedDateAndSortOrder(taskId, today, sortOrder)
                 }
                 _orderApplied.value = true
             } catch (e: Exception) {

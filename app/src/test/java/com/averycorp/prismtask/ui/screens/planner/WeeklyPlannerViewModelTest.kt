@@ -1,13 +1,13 @@
 package com.averycorp.prismtask.ui.screens.planner
 
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.remote.api.DayPlanResponse
 import com.averycorp.prismtask.data.remote.api.PlannedTaskResponse
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.api.UnscheduledTaskResponse
 import com.averycorp.prismtask.data.remote.api.WeeklyPlanResponse
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import io.mockk.coEvery
 import io.mockk.every
@@ -44,7 +44,7 @@ class WeeklyPlannerViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
     private lateinit var api: PrismTaskApi
-    private lateinit var taskDao: TaskDao
+    private lateinit var taskRepository: TaskRepository
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
 
@@ -52,15 +52,15 @@ class WeeklyPlannerViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         api = mockk()
-        taskDao = mockk(relaxed = true)
+        taskRepository = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
         every { proFeatureGate.userTier } returns MutableStateFlow(UserTier.PRO)
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_WEEKLY_PLAN) } returns true
         taskBehaviorPreferences = mockk(relaxed = true)
         every { taskBehaviorPreferences.getFirstDayOfWeek() } returns flowOf(DayOfWeek.MONDAY)
-        coEvery { taskDao.getIdByCloudId("cloud-1") } returns 1L
-        coEvery { taskDao.getIdByCloudId("cloud-2") } returns 2L
-        coEvery { taskDao.getIdByCloudId("cloud-5") } returns 5L
+        coEvery { taskRepository.getIdByCloudId("cloud-1") } returns 1L
+        coEvery { taskRepository.getIdByCloudId("cloud-2") } returns 2L
+        coEvery { taskRepository.getIdByCloudId("cloud-5") } returns 5L
     }
 
     @After
@@ -68,7 +68,7 @@ class WeeklyPlannerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = WeeklyPlannerViewModel(api, taskDao, proFeatureGate, taskBehaviorPreferences)
+    private fun newViewModel() = WeeklyPlannerViewModel(api, taskRepository, proFeatureGate, taskBehaviorPreferences)
 
     @Test
     fun generatePlan_resolvesCloudIdsToLocalLongs() = runTest(dispatcher) {
@@ -106,7 +106,7 @@ class WeeklyPlannerViewModelTest {
 
     @Test
     fun generatePlan_demotesUnresolvedPlannedTasksIntoUnscheduled() = runTest(dispatcher) {
-        coEvery { taskDao.getIdByCloudId("cloud-99") } returns null
+        coEvery { taskRepository.getIdByCloudId("cloud-99") } returns null
         coEvery { api.getWeeklyPlan(any()) } returns WeeklyPlanResponse(
             plan = mapOf(
                 "Monday" to DayPlanResponse(
