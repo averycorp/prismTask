@@ -98,40 +98,40 @@ fun LogPastLeisureSheet(
                     LeisureCategory.values()
                         .filter { it in state.settings.enabledCategories }
                         .forEach { cat ->
-                        val items = grouped[cat].orEmpty()
-                        if (items.isEmpty()) return@forEach
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "${cat.emoji} ${cat.label}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            enabled = false,
-                            onClick = {}
-                        )
-                        items.forEach { activity ->
+                            val items = grouped[cat].orEmpty()
+                            if (items.isEmpty()) return@forEach
+                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = {
-                                    val durationSuffix = activity
-                                        .defaultDurationMinutes
-                                        ?.let { " • $it min" }.orEmpty()
-                                    Text("${activity.name}$durationSuffix")
+                                    Text(
+                                        "${cat.emoji} ${cat.label}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 },
-                                onClick = {
-                                    selectedActivityId = activity.id
-                                    category = cat
-                                    activity.defaultDurationMinutes?.let {
-                                        durationStr = it.toString()
-                                    }
-                                    pickerOpen = false
-                                }
+                                enabled = false,
+                                onClick = {}
                             )
+                            items.forEach { activity ->
+                                DropdownMenuItem(
+                                    text = {
+                                        val durationSuffix = activity
+                                            .defaultDurationMinutes
+                                            ?.let { " • $it min" }.orEmpty()
+                                        Text("${activity.name}$durationSuffix")
+                                    },
+                                    onClick = {
+                                        selectedActivityId = activity.id
+                                        category = cat
+                                        activity.defaultDurationMinutes?.let {
+                                            durationStr = it.toString()
+                                        }
+                                        pickerOpen = false
+                                    }
+                                )
+                            }
                         }
-                    }
                 }
             }
 
