@@ -22,7 +22,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -85,28 +84,18 @@ private fun UpcomingContent(
         putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenToday.wireId)
     }
 
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .cornerRadius(palette.widgetCornerRadius)
-            .background(palette.surfaceBackground)
-            .padding(if (isLarge) 12.dp else 8.dp)
-            .clickable(actionStartActivity(mainIntent))
-    ) {
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = WidgetTextStyles.headerLabel(palette, "Upcoming"),
-                style = WidgetTextStyles.headerThemed(palette, palette.onSurface),
-                modifier = GlanceModifier.defaultWeight()
-            )
+    WidgetScaffold(
+        palette = palette,
+        isLarge = isLarge,
+        title = "Upcoming",
+        outerAction = actionStartActivity(mainIntent),
+        headerTrailing = {
             Text(
                 text = "${data.totalCount} tasks",
                 style = WidgetTextStyles.caption(palette.onSurfaceVariant)
             )
         }
+    ) {
 
         if (data.overdue.isNotEmpty()) {
             Spacer(modifier = GlanceModifier.height(4.dp))
