@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.remote.api.EisenhowerCategorization
 import com.averycorp.prismtask.data.remote.api.EisenhowerRequest
@@ -59,14 +58,13 @@ sealed interface EisenhowerUiState {
 class EisenhowerViewModel
 @Inject
 constructor(
-    private val taskDao: TaskDao,
     private val api: PrismTaskApi,
     private val taskRepository: TaskRepository,
     private val proFeatureGate: ProFeatureGate
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
 
-    private val _allIncompleteTasks = taskDao.getIncompleteRootTasks()
+    private val _allIncompleteTasks = taskRepository.getIncompleteRootTasks()
 
     val quadrants: StateFlow<Map<String, List<TaskEntity>>> = _allIncompleteTasks
         .map { tasks ->
@@ -138,11 +136,10 @@ constructor(
                         )
                         continue
                     }
-                    taskDao.updateEisenhowerQuadrant(
+                    taskRepository.updateEisenhowerQuadrant(
                         id = localId,
                         quadrant = cat.quadrant,
-                        reason = cat.reason,
-                        updatedAt = now
+                        reason = cat.reason
                     )
                 }
                 _lastCategorizedAt.value = now

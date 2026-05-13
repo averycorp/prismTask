@@ -17,10 +17,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.data.diagnostics.DiagnosticLogger
-import com.averycorp.prismtask.data.local.dao.HabitDao
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.remote.AuthManager
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.BugCategory
 import com.averycorp.prismtask.domain.model.BugReport
 import com.averycorp.prismtask.domain.model.BugSeverity
@@ -49,8 +49,8 @@ class BugReportViewModel
 @Inject
 constructor(
     @ApplicationContext private val appContext: Context,
-    private val taskDao: TaskDao,
-    private val habitDao: HabitDao,
+    private val taskRepository: TaskRepository,
+    private val habitRepository: HabitRepository,
     private val diagnosticLogger: DiagnosticLogger,
     private val authManager: AuthManager,
     private val api: PrismTaskApi,
@@ -307,12 +307,12 @@ constructor(
 
     private suspend fun collectDeviceInfo(): DeviceInfo = withContext(Dispatchers.IO) {
         val taskCount = try {
-            taskDao.getAllTasksOnce().size
+            taskRepository.getAllTasksOnce().size
         } catch (_: Exception) {
             0
         }
         val habitCount = try {
-            habitDao.getAllHabitsOnce().size
+            habitRepository.getAllHabitsOnce().size
         } catch (_: Exception) {
             0
         }

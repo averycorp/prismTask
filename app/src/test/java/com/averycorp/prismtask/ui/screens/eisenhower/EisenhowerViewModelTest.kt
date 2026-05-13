@@ -1,7 +1,6 @@
 package com.averycorp.prismtask.ui.screens.eisenhower
 
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.remote.api.EisenhowerCategorization
 import com.averycorp.prismtask.data.remote.api.EisenhowerResponse
 import com.averycorp.prismtask.data.remote.api.EisenhowerSummary
@@ -40,7 +39,6 @@ import org.junit.Test
 class EisenhowerViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
-    private lateinit var taskDao: TaskDao
     private lateinit var api: PrismTaskApi
     private lateinit var taskRepository: TaskRepository
     private lateinit var proFeatureGate: ProFeatureGate
@@ -48,12 +46,11 @@ class EisenhowerViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        taskDao = mockk(relaxed = true)
         api = mockk(relaxed = true)
         taskRepository = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
 
-        coEvery { taskDao.getIncompleteRootTasks() } returns flowOf(emptyList())
+        every { taskRepository.getIncompleteRootTasks() } returns flowOf(emptyList())
         every { proFeatureGate.userTier } returns MutableStateFlow(UserTier.FREE)
     }
 
@@ -62,7 +59,7 @@ class EisenhowerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = EisenhowerViewModel(taskDao, api, taskRepository, proFeatureGate)
+    private fun newViewModel() = EisenhowerViewModel(api, taskRepository, proFeatureGate)
 
     @Test
     fun categorize_freeTierShowsUpgradePromptAndSkipsApiCall() = runTest(dispatcher) {
@@ -102,10 +99,10 @@ class EisenhowerViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            taskDao.updateEisenhowerQuadrant(id = 1L, quadrant = "Q1", reason = "Due today", updatedAt = any())
+            taskRepository.updateEisenhowerQuadrant(id = 1L, quadrant = "Q1", reason = "Due today")
         }
         coVerify {
-            taskDao.updateEisenhowerQuadrant(id = 2L, quadrant = "Q2", reason = "Important", updatedAt = any())
+            taskRepository.updateEisenhowerQuadrant(id = 2L, quadrant = "Q2", reason = "Important")
         }
         val state = vm.uiState.value
         assertTrue("expected Success, got $state", state is EisenhowerUiState.Success)
