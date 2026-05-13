@@ -276,11 +276,19 @@ sealed interface ImportPlan {
     val projectName: String
     val taskTitles: List<String>
     val riskTitles: List<String>
+    val taskPreviews: List<TaskPreviewRow>
+    val riskPreviews: List<RiskPreviewRow>
 
     data class Rich(val result: ComprehensiveImportResult) : ImportPlan {
         override val projectName: String get() = result.project.name
         override val taskTitles: List<String> get() = result.tasks.map { it.title }
         override val riskTitles: List<String> get() = result.risks.map { it.title }
+        override val taskPreviews: List<TaskPreviewRow>
+            get() = result.tasks.map { it.toPreviewRow() }
+        override val riskPreviews: List<RiskPreviewRow>
+            get() = result.risks.map {
+                RiskPreviewRow(title = it.title, description = it.description, level = it.level)
+            }
         val phases: List<ParsedProjectPhaseDomain> get() = result.phases
         val externalAnchors: List<ParsedExternalAnchorDomain> get() = result.externalAnchors
         val taskDependencies: List<ParsedTaskDependencyDomain> get() = result.taskDependencies
@@ -292,6 +300,8 @@ sealed interface ImportPlan {
     ) : ImportPlan {
         override val taskTitles: List<String> get() = items.map { it.title }
         override val riskTitles: List<String> get() = emptyList()
+        override val taskPreviews: List<TaskPreviewRow> get() = items.map { it.toPreviewRow() }
+        override val riskPreviews: List<RiskPreviewRow> get() = emptyList()
     }
 
     data class FlatOrphans(
@@ -301,8 +311,61 @@ sealed interface ImportPlan {
         override val projectName: String get() = listName ?: "Imported List"
         override val taskTitles: List<String> get() = items.map { it.title }
         override val riskTitles: List<String> get() = emptyList()
+        override val taskPreviews: List<TaskPreviewRow> get() = items.map { it.toPreviewRow() }
+        override val riskPreviews: List<RiskPreviewRow> get() = emptyList()
     }
 }
+
+/**
+ * Display-only projection of a parsed task for the import preview screen.
+ * Carries the metadata fields the user needs to verify before approving —
+ * description, due date, priority, completion state, tags, estimated
+ * minutes, phase, and the nested subtask tree.
+ *
+ * The top-level index is what materialise drops via [ImportExclusions];
+ * subtasks ride along with their parent.
+ */
+data class TaskPreviewRow(
+    val title: String,
+    val description: String?,
+    val dueDate: Long?,
+    val priority: Int,
+    val completed: Boolean,
+    val tags: List<String>,
+    val estimatedMinutes: Int?,
+    val phaseName: String?,
+    val subtasks: List<TaskPreviewRow>
+)
+
+data class RiskPreviewRow(
+    val title: String,
+    val description: String?,
+    val level: String
+)
+
+private fun ChecklistParsedTask.toPreviewRow(): TaskPreviewRow = TaskPreviewRow(
+    title = title,
+    description = description,
+    dueDate = dueDate,
+    priority = priority,
+    completed = completed,
+    tags = tags,
+    estimatedMinutes = estimatedMinutes,
+    phaseName = phaseName,
+    subtasks = subtasks.map { it.toPreviewRow() }
+)
+
+private fun ParsedTodoItem.toPreviewRow(): TaskPreviewRow = TaskPreviewRow(
+    title = title,
+    description = description,
+    dueDate = dueDate,
+    priority = priority,
+    completed = completed,
+    tags = emptyList(),
+    estimatedMinutes = null,
+    phaseName = null,
+    subtasks = subtasks.map { it.toPreviewRow() }
+)
 
 /**
  * Per-section opt-out indices, plan-relative. Materialise drops any
