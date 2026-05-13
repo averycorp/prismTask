@@ -29,8 +29,8 @@ class SettingsSmokeTest : SmokeTestBase() {
     @Test
     fun settingsGear_isReachableFromHabitsTab() {
         composeRule.waitForIdle()
-        // Bottom-nav label is "Daily" for the habit list.
-        clickTab("Daily")
+        // Bottom-nav label is "Habits" for the habit list.
+        clickTab("Habits")
         findTab("Settings").assertIsDisplayed()
     }
 

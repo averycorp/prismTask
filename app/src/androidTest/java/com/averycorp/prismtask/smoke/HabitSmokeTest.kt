@@ -16,8 +16,8 @@ class HabitSmokeTest : SmokeTestBase() {
     @Test
     fun habitsTab_showsSeededHabits() {
         composeRule.waitForIdle()
-        // Bottom-nav label is "Daily" for the habit list (see NavGraph).
-        clickTab("Daily")
+        // Bottom-nav label is "Habits" for the habit list (see NavGraph).
+        clickTab("Habits")
 
         waitForExerciseRow()
         // Seeded habit names can appear on the list row and on a summary
@@ -29,7 +29,7 @@ class HabitSmokeTest : SmokeTestBase() {
     @Test
     fun habitList_tappingHabitDoesNotCrash() {
         composeRule.waitForIdle()
-        clickTab("Daily")
+        clickTab("Habits")
 
         // Tapping a habit opens its detail/analytics — we don't assert on the
         // detail screen specifically, just that the tap doesn't blow up the app.

@@ -11,12 +11,13 @@ class NavigationSmokeTest : SmokeTestBase() {
         composeRule.waitForIdle()
 
         // Bottom nav labels per ALL_BOTTOM_NAV_ITEMS in NavGraph.kt:
-        // Today, Tasks, Daily (not "Habits"), Timer. findTab scopes to
+        // Today, Tasks, Habits, Leisure, Timer. findTab scopes to
         // Role=Tab so duplicate "Today"/"Tasks" text nodes elsewhere in
         // the UI don't collide with the tab query.
         findTab("Today").assertIsDisplayed()
         findTab("Tasks").assertIsDisplayed()
-        findTab("Daily").assertIsDisplayed()
+        findTab("Habits").assertIsDisplayed()
+        findTab("Leisure").assertIsDisplayed()
         findTab("Timer").assertIsDisplayed()
     }
 
@@ -32,8 +33,8 @@ class NavigationSmokeTest : SmokeTestBase() {
         clickTab("Tasks")
         findTab("Tasks").assertIsDisplayed()
 
-        clickTab("Daily")
-        findTab("Daily").assertIsDisplayed()
+        clickTab("Habits")
+        findTab("Habits").assertIsDisplayed()
 
         clickTab("Today")
         findTab("Today").assertIsDisplayed()
@@ -50,7 +51,7 @@ class NavigationSmokeTest : SmokeTestBase() {
         clickTab("Tasks")
         findTab("Settings").assertIsDisplayed()
 
-        clickTab("Daily")
+        clickTab("Habits")
         findTab("Settings").assertIsDisplayed()
     }
 }

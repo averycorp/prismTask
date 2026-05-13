@@ -14,16 +14,16 @@ import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalPharmacy
-import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.Weekend
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.LocalPharmacy
-import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.outlined.Weekend
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -57,6 +57,7 @@ import androidx.navigation.navArgument
 import com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors
 import com.averycorp.prismtask.ui.coachmark.coachmarkAnchor
 import com.averycorp.prismtask.ui.screens.habits.HabitListScreen
+import com.averycorp.prismtask.ui.screens.leisure.LeisurePoolScreen
 import com.averycorp.prismtask.ui.screens.onboarding.OnboardingScreen
 import com.averycorp.prismtask.ui.screens.onboarding.OnboardingViewModel
 import com.averycorp.prismtask.ui.screens.settings.SettingsScreen
@@ -124,8 +125,6 @@ sealed class PrismTaskRoute(
     data object Timeline : PrismTaskRoute("timeline")
 
     data object HabitList : PrismTaskRoute("habit_list")
-
-    data object HabitsRecurring : PrismTaskRoute("habits_recurring")
 
     data object Timer : PrismTaskRoute("timer") {
         const val ARG_MINUTES = "minutes"
@@ -345,8 +344,8 @@ val ALL_BOTTOM_NAV_ITEMS = listOf(
         Icons.AutoMirrored.Filled.FormatListBulleted,
         Icons.AutoMirrored.Outlined.FormatListBulleted
     ),
-    BottomNavItem(PrismTaskRoute.HabitList.route, "Daily", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
-    BottomNavItem(PrismTaskRoute.HabitsRecurring.route, "Recurring", Icons.Filled.Repeat, Icons.Outlined.Repeat),
+    BottomNavItem(PrismTaskRoute.HabitList.route, "Habits", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
+    BottomNavItem(PrismTaskRoute.Leisure.route, "Leisure", Icons.Filled.Weekend, Icons.Outlined.Weekend),
     BottomNavItem(
         PrismTaskRoute.Medication.route,
         "Meds",
@@ -650,8 +649,8 @@ fun PrismTaskNavGraph(
                             onVoiceAutoStartConsumed = { autoStartVoice.value = false }
                         )
                         PrismTaskRoute.TaskList.route -> TaskListScreen(navController)
-                        PrismTaskRoute.HabitList.route -> HabitListScreen(navController, filter = "daily")
-                        PrismTaskRoute.HabitsRecurring.route -> HabitListScreen(navController, filter = "recurring")
+                        PrismTaskRoute.HabitList.route -> HabitListScreen(navController)
+                        PrismTaskRoute.Leisure.route -> LeisurePoolScreen(navController)
                         PrismTaskRoute.Medication.route ->
                             com.averycorp.prismtask.ui.screens.medication.MedicationScreen(navController)
                         PrismTaskRoute.Timer.route -> TimerScreen(navController)

@@ -112,8 +112,8 @@ class EdgeCaseEmptyStateTest {
 
     @Test
     fun testHabitListEmpty() {
-        clickTab("Daily")
-        findTab("Daily").assertIsDisplayed()
+        clickTab("Habits")
+        findTab("Habits").assertIsDisplayed()
     }
 
     // ─── 5. Eisenhower matrix ──────────────────────────────────────────────
@@ -156,12 +156,12 @@ class EdgeCaseEmptyStateTest {
 
     @Test
     fun testHabitAnalyticsEmpty() {
-        clickTab("Daily")
+        clickTab("Habits")
         // With zero habits, HabitAnalyticsScreen isn't reachable because
         // the tap-into-habit path requires a habit row. The empty state
-        // on the Daily tab prompts the user to create a habit, and that
+        // on the Habits tab prompts the user to create a habit, and that
         // tab composes without crashing — which is the smoke signal.
-        findTab("Daily").assertIsDisplayed()
+        findTab("Habits").assertIsDisplayed()
     }
 
     // ─── 9. Weekly balance report ──────────────────────────────────────────
