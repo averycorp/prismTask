@@ -38,10 +38,25 @@ constructor() {
         enabledCategories: Set<LeisureCategory>,
         now: Long = System.currentTimeMillis(),
         random: Random = Random.Default
+    ): LeisureActivityEntity? = pickByCategoryIds(
+        candidates = candidates,
+        allowedCategoryIds = enabledCategories.map { it.name }.toSet(),
+        now = now,
+        random = random
+    )
+
+    /**
+     * String-id variant accepting both built-in category names and
+     * custom category ids ([com.averycorp.prismtask.domain.model.CustomLeisureCategory.ID_PREFIX]).
+     */
+    fun pickByCategoryIds(
+        candidates: List<LeisureActivityEntity>,
+        allowedCategoryIds: Set<String>,
+        now: Long = System.currentTimeMillis(),
+        random: Random = Random.Default
     ): LeisureActivityEntity? {
         val filtered = candidates.filter { activity ->
-            activity.enabled &&
-                LeisureCategory.fromStringOrNull(activity.category)?.let { it in enabledCategories } == true
+            activity.enabled && activity.category in allowedCategoryIds
         }
         if (filtered.isEmpty()) return null
 

@@ -206,10 +206,13 @@ constructor(
         leisureBudgetPreferences.observeSnapshot(),
         leisureBudgetRepository.getActivities()
     ) { minutes, snap: LeisureBudgetSnapshot, activities ->
+        val customIds = snap.customCategories.map { it.id }.toSet()
         val enabledPool = activities.filter { activity ->
-            activity.enabled &&
-                com.averycorp.prismtask.domain.model.LeisureCategory.fromStringOrNull(activity.category)
-                    ?.let { it in snap.enabledCategories } == true
+            if (!activity.enabled) return@filter false
+            val builtIn = com.averycorp.prismtask.domain.model.LeisureCategory
+                .fromStringOrNull(activity.category)
+            if (builtIn != null) builtIn in snap.enabledCategories
+            else activity.category in customIds
         }
         val suggestion = enabledPool.firstOrNull() // ViewModel resamples lazily via repository
         LeisureBudgetCardState(

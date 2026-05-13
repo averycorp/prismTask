@@ -9,7 +9,9 @@ import com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot
 import com.averycorp.prismtask.data.preferences.LeisureCategoryDisplay
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
+import com.averycorp.prismtask.domain.model.CustomLeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureCategory
+import com.averycorp.prismtask.domain.model.LeisureCategoryRef
 import com.averycorp.prismtask.domain.model.LeisureEnforcementMode
 import com.averycorp.prismtask.domain.model.LeisureSessionSource
 import com.averycorp.prismtask.util.DayBoundary
@@ -45,14 +47,27 @@ constructor(
     data class UiState(
         val activities: List<LeisureActivityEntity>,
         val settings: LeisureBudgetSnapshot,
-        val activitiesByCategory: Map<LeisureCategory, List<LeisureActivityEntity>>,
+        val visibleCategoryRefs: List<LeisureCategoryRef>,
+        val activitiesByCategoryId: Map<String, List<LeisureActivityEntity>>,
         val recentSessions: List<LeisureSessionEntity>,
         val activitiesById: Map<Long, LeisureActivityEntity>,
         val minutesLoggedToday: Int,
         val targetMinutesToday: Int,
-        val minutesByCategoryToday: Map<LeisureCategory, Int>,
+        val minutesByCategoryIdToday: Map<String, Int>,
         val categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>
     ) {
+        /** Lookup by category id; falls back to a synthetic built-in default. */
+        fun refForId(id: String?): LeisureCategoryRef? {
+            if (id.isNullOrBlank()) return null
+            visibleCategoryRefs.firstOrNull { it.id == id }?.let { return it }
+            // Built-in not in the visible list (e.g. disabled but still on
+            // an activity): synthesize one off the display map.
+            val builtIn = LeisureCategory.fromStringOrNull(id) ?: return null
+            val display = categoryDisplays[builtIn]
+                ?: LeisureCategoryDisplay(emoji = builtIn.emoji, label = builtIn.label)
+            return LeisureCategoryRef.BuiltIn(builtIn, display.label, display.emoji)
+        }
+
         fun displayFor(category: LeisureCategory): LeisureCategoryDisplay =
             categoryDisplays[category]
                 ?: LeisureCategoryDisplay(emoji = category.emoji, label = category.label)
@@ -61,12 +76,13 @@ constructor(
             fun empty(): UiState = UiState(
                 activities = emptyList(),
                 settings = LeisureBudgetSnapshot(),
-                activitiesByCategory = LeisureCategory.values().associateWith { emptyList() },
+                visibleCategoryRefs = emptyList(),
+                activitiesByCategoryId = emptyMap(),
                 recentSessions = emptyList(),
                 activitiesById = emptyMap(),
                 minutesLoggedToday = 0,
                 targetMinutesToday = LeisureBudgetPreferences.DEFAULT_TARGET,
-                minutesByCategoryToday = LeisureCategory.values().associateWith { 0 },
+                minutesByCategoryIdToday = emptyMap(),
                 categoryDisplays = LeisureCategory.values().associateWith {
                     LeisureCategoryDisplay(emoji = it.emoji, label = it.label)
                 }
@@ -86,30 +102,37 @@ constructor(
         repository.observeMinutesLoggedToday(),
         taskBehaviorPreferences.getDayStartHour()
     ) { activities, (snap, displays), sessions, minutes, dayStartHour ->
-        val grouped: Map<LeisureCategory, List<LeisureActivityEntity>> =
-            LeisureCategory.values().associateWith { cat ->
-                activities.filter {
-                    LeisureCategory.fromStringOrNull(it.category) == cat
-                }
-            }
         val today = DayBoundary.currentLocalDate(dayStartHour)
         val startOfDay = DayBoundary.startOfCurrentDay(dayStartHour)
         val endOfDay = startOfDay + DayBoundary.DAY_MILLIS
-        val breakdown: Map<LeisureCategory, Int> = LeisureCategory.values().associateWith { cat ->
-            sessions
-                .filter { it.loggedAt in startOfDay until endOfDay }
-                .filter { LeisureCategory.fromStringOrNull(it.category) == cat }
-                .sumOf { it.durationMinutes }
-        }
+
+        val builtInRefs: List<LeisureCategoryRef> = LeisureCategory.values()
+            .filter { it in snap.enabledCategories }
+            .map { cat ->
+                val display = displays[cat] ?: LeisureCategoryDisplay(cat.emoji, cat.label)
+                LeisureCategoryRef.BuiltIn(cat, display.label, display.emoji)
+            }
+        val customRefs: List<LeisureCategoryRef> = snap.customCategories
+            .map { LeisureCategoryRef.Custom(it) }
+        val visibleRefs = builtInRefs + customRefs
+
+        val activitiesByCategoryId: Map<String, List<LeisureActivityEntity>> =
+            activities.groupBy { it.category }
+        val minutesByCategoryIdToday: Map<String, Int> = sessions
+            .filter { it.loggedAt in startOfDay until endOfDay }
+            .groupBy { it.category }
+            .mapValues { (_, list) -> list.sumOf { it.durationMinutes } }
+
         UiState(
             activities = activities,
             settings = snap,
-            activitiesByCategory = grouped,
+            visibleCategoryRefs = visibleRefs,
+            activitiesByCategoryId = activitiesByCategoryId,
             recentSessions = sessions,
             activitiesById = activities.associateBy { it.id },
             minutesLoggedToday = minutes,
             targetMinutesToday = snap.targetForDate(today),
-            minutesByCategoryToday = breakdown,
+            minutesByCategoryIdToday = minutesByCategoryIdToday,
             categoryDisplays = displays
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.empty())
@@ -118,14 +141,21 @@ constructor(
         name: String,
         category: LeisureCategory,
         defaultDurationMinutes: Int?
+    ) = addActivityByCategoryId(name, category.name, defaultDurationMinutes)
+
+    /** Accepts a built-in enum name or a custom category id. */
+    fun addActivityByCategoryId(
+        name: String,
+        categoryId: String,
+        defaultDurationMinutes: Int?
     ) {
-        if (name.isBlank()) return
+        if (name.isBlank() || categoryId.isBlank()) return
         viewModelScope.launch {
             repository.upsertActivity(
                 LeisureActivityEntity(
                     id = 0,
                     name = name.trim(),
-                    category = category.name,
+                    category = categoryId,
                     defaultDurationMinutes = defaultDurationMinutes,
                     enabled = true,
                     createdAt = System.currentTimeMillis()
@@ -158,13 +188,21 @@ constructor(
         name: String,
         category: LeisureCategory,
         defaultDurationMinutes: Int?
+    ) = updateActivityByCategoryId(activity, name, category.name, defaultDurationMinutes)
+
+    /** Accepts a built-in enum name or a custom category id. */
+    fun updateActivityByCategoryId(
+        activity: LeisureActivityEntity,
+        name: String,
+        categoryId: String,
+        defaultDurationMinutes: Int?
     ) {
-        if (name.isBlank()) return
+        if (name.isBlank() || categoryId.isBlank()) return
         viewModelScope.launch {
             repository.upsertActivity(
                 activity.copy(
                     name = name.trim(),
-                    category = category.name,
+                    category = categoryId,
                     defaultDurationMinutes = defaultDurationMinutes
                 )
             )
@@ -178,12 +216,16 @@ constructor(
      * which is fine because the session row denormalizes `category` at
      * insertion time.
      */
-    fun logCategorySession(category: LeisureCategory, durationMinutes: Int) {
+    fun logCategorySession(category: LeisureCategory, durationMinutes: Int) =
+        logCategorySessionById(category.name, durationMinutes)
+
+    /** Accepts a built-in enum name or a custom category id. */
+    fun logCategorySessionById(categoryId: String, durationMinutes: Int) {
         val minutes = durationMinutes.coerceAtLeast(1)
         viewModelScope.launch {
-            repository.logSession(
+            repository.logSessionByCategoryId(
                 activityId = null,
-                category = category,
+                categoryId = categoryId,
                 durationMinutes = minutes,
                 source = LeisureSessionSource.MANUAL
             )
@@ -211,14 +253,12 @@ constructor(
         activity: LeisureActivityEntity,
         durationMinutes: Int? = null
     ) {
-        val resolvedCategory = LeisureCategory.fromStringOrNull(activity.category)
-            ?: LeisureCategory.PASSIVE
         val resolvedDuration = (durationMinutes ?: activity.defaultDurationMinutes ?: 30)
             .coerceAtLeast(1)
         viewModelScope.launch {
-            repository.logSession(
+            repository.logSessionByCategoryId(
                 activityId = activity.id,
-                category = resolvedCategory,
+                categoryId = activity.category,
                 durationMinutes = resolvedDuration,
                 source = LeisureSessionSource.MANUAL
             )
@@ -276,6 +316,51 @@ constructor(
     }
 
     /**
+     * Add a brand-new user-defined leisure category. Stored locally only
+     * for now — the server's `leisure_activities.category` CHECK
+     * constraint still pins synced activity rows to the four built-in
+     * buckets, so activities/sessions tagged with a custom category stay
+     * on-device until a server-side schema change relaxes that.
+     */
+    fun addCustomCategory(label: String, emoji: String) {
+        val trimmedLabel = label.trim()
+        val trimmedEmoji = emoji.trim()
+        if (trimmedLabel.isBlank() || trimmedEmoji.isBlank()) return
+        viewModelScope.launch {
+            preferences.upsertCustomCategory(
+                CustomLeisureCategory(
+                    id = CustomLeisureCategory.newId(),
+                    label = trimmedLabel,
+                    emoji = trimmedEmoji
+                )
+            )
+        }
+    }
+
+    /** Rename / re-emoji an existing custom category in place. */
+    fun updateCustomCategory(id: String, label: String, emoji: String) {
+        val trimmedLabel = label.trim()
+        val trimmedEmoji = emoji.trim()
+        if (trimmedLabel.isBlank() || trimmedEmoji.isBlank()) return
+        if (!CustomLeisureCategory.isCustomId(id)) return
+        viewModelScope.launch {
+            preferences.upsertCustomCategory(
+                CustomLeisureCategory(id = id, label = trimmedLabel, emoji = trimmedEmoji)
+            )
+        }
+    }
+
+    /** Remove a custom category. Activities tagged with it keep their
+     * row (so historical sessions stay attributed correctly) but the
+     * category stops appearing in pickers. */
+    fun removeCustomCategory(id: String) {
+        if (!CustomLeisureCategory.isCustomId(id)) return
+        viewModelScope.launch {
+            preferences.removeCustomCategory(id)
+        }
+    }
+
+    /**
      * Stage an enforcement-mode change to take effect next local day.
      * SOFT changes apply immediately; MEDIUM/HARD go via the pending
      * promotion path so the user has a chance to undo before they're
@@ -305,7 +390,23 @@ constructor(
         category: LeisureCategory,
         durationMinutes: Int,
         loggedAt: Long = System.currentTimeMillis()
+    ) = logManualSessionByCategoryId(
+        activityId = activityId,
+        freeTextName = freeTextName,
+        categoryId = category.name,
+        durationMinutes = durationMinutes,
+        loggedAt = loggedAt
+    )
+
+    /** Accepts a built-in enum name or a custom category id. */
+    fun logManualSessionByCategoryId(
+        activityId: Long?,
+        freeTextName: String?,
+        categoryId: String,
+        durationMinutes: Int,
+        loggedAt: Long = System.currentTimeMillis()
     ) {
+        if (categoryId.isBlank()) return
         viewModelScope.launch {
             val resolvedActivityId = if (activityId != null) {
                 activityId
@@ -314,7 +415,7 @@ constructor(
                     LeisureActivityEntity(
                         id = 0,
                         name = freeTextName.trim(),
-                        category = category.name,
+                        category = categoryId,
                         defaultDurationMinutes = durationMinutes,
                         enabled = true,
                         createdAt = System.currentTimeMillis()
@@ -324,9 +425,9 @@ constructor(
             } else {
                 null
             }
-            repository.logSession(
+            repository.logSessionByCategoryId(
                 activityId = resolvedActivityId,
-                category = category,
+                categoryId = categoryId,
                 durationMinutes = durationMinutes,
                 loggedAt = loggedAt,
                 source = LeisureSessionSource.MANUAL
