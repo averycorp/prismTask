@@ -65,22 +65,18 @@ data class SchoolworkCardState(
 }
 
 /**
- * Today screen leisure-budget card state. Replaces the v1.x
- * music/flex-slot model with a single minutes-vs-target budget display.
+ * Today screen leisure card state. Replaces the v1.x music/flex-slot
+ * model with a single minutes-vs-minimum display.
  */
 data class LeisureBudgetCardState(
     val minutesLogged: Int,
     val targetMinutes: Int,
     val poolIsEmpty: Boolean,
     val suggestionName: String?,
-    val suggestionCategory: String?,
-    val refreshLimit: Int,
-    val refreshesConsumed: Int
+    val suggestionCategory: String?
 ) {
     val progressFraction: Float
         get() = if (targetMinutes <= 0) 0f else (minutesLogged.toFloat() / targetMinutes).coerceIn(0f, 1f)
-
-    val canRefresh: Boolean get() = refreshesConsumed < refreshLimit
 
     val targetHit: Boolean get() = targetMinutes > 0 && minutesLogged >= targetMinutes
 
@@ -90,9 +86,7 @@ data class LeisureBudgetCardState(
             targetMinutes = LeisureBudgetPreferences.DEFAULT_TARGET,
             poolIsEmpty = true,
             suggestionName = null,
-            suggestionCategory = null,
-            refreshLimit = LeisureBudgetPreferences.DEFAULT_REFRESH_LIMIT,
-            refreshesConsumed = 0
+            suggestionCategory = null
         )
     }
 }
@@ -213,9 +207,7 @@ constructor(
             targetMinutes = snap.targetForDate(date),
             poolIsEmpty = enabledPool.isEmpty(),
             suggestionName = suggestion?.name,
-            suggestionCategory = suggestion?.category,
-            refreshLimit = snap.refreshLimit,
-            refreshesConsumed = leisureBudgetPreferences.readRefreshesConsumed(date.toString())
+            suggestionCategory = suggestion?.category
         )
     }
 

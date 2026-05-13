@@ -238,15 +238,17 @@ constructor(
         }
     }
 
-    fun setRefreshLimit(limit: Int) {
-        viewModelScope.launch {
-            preferences.setRefreshLimit(limit)
-        }
-    }
-
     fun setEnabledCategories(categories: Set<LeisureCategory>) {
         viewModelScope.launch {
             preferences.setEnabledCategories(categories)
+        }
+    }
+
+    fun setCategoryEnabled(category: LeisureCategory, enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferences.snapshotOnce().enabledCategories
+            val next = if (enabled) current + category else current - category
+            preferences.setEnabledCategories(next)
         }
     }
 

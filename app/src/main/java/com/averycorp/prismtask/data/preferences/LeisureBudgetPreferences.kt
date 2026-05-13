@@ -30,11 +30,6 @@ import javax.inject.Singleton
  * the entire snapshot rather than per-key writes so the server-side
  * `pending_enforcement_mode` / `pending_enforcement_effective_date`
  * deferred-promotion pattern stays atomic.
- *
- * Refresh counter ([readRefreshesConsumed] / [incrementRefreshesConsumed])
- * is keyed by the user's *local* date (per
- * [com.averycorp.prismtask.util.DayBoundary]) so the cap rolls over at
- * SoD, not midnight UTC.
  */
 /**
  * User-overridable display values for a [LeisureCategory]. Stored in
@@ -48,12 +43,11 @@ data class LeisureBudgetSnapshot(
     val dailyTargetMinutes: Int = 60,
     val weekendTargetMinutes: Int? = null,
     val enforcementMode: LeisureEnforcementMode = LeisureEnforcementMode.SOFT,
-    val refreshLimit: Int = 3,
     val enabledCategories: Set<LeisureCategory> = LeisureCategory.DEFAULT_ENABLED,
     val pendingEnforcementMode: LeisureEnforcementMode? = null,
     val pendingEnforcementEffectiveDate: LocalDate? = null
 ) {
-    /** Returns the target appropriate for [localDate]. */
+    /** Returns the minimum minutes target appropriate for [localDate]. */
     fun targetForDate(localDate: LocalDate): Int {
         val isWeekend = when (localDate.dayOfWeek) {
             java.time.DayOfWeek.SATURDAY, java.time.DayOfWeek.SUNDAY -> true
@@ -79,24 +73,15 @@ constructor(
     companion object {
         const val MIN_TARGET = 0
         const val MAX_TARGET = 1440
-        const val MIN_REFRESH = 0
-        const val MAX_REFRESH = 10
         const val DEFAULT_TARGET = 60
-        const val DEFAULT_REFRESH_LIMIT = 3
 
         private val DAILY_TARGET_KEY = intPreferencesKey("leisure_daily_target_minutes")
         private val WEEKEND_TARGET_KEY = intPreferencesKey("leisure_weekend_target_minutes")
         private val WEEKEND_OVERRIDE_KEY = booleanPreferencesKey("leisure_weekend_override_enabled")
         private val ENFORCEMENT_KEY = stringPreferencesKey("leisure_enforcement_mode")
-        private val REFRESH_LIMIT_KEY = intPreferencesKey("leisure_refresh_limit")
         private val ENABLED_CATEGORIES_KEY = stringPreferencesKey("leisure_enabled_categories")
         private val PENDING_ENFORCEMENT_KEY = stringPreferencesKey("leisure_pending_enforcement_mode")
         private val PENDING_EFFECTIVE_DATE_KEY = stringPreferencesKey("leisure_pending_effective_date")
-
-        // Refresh-counter keys are minted per local-date so the cap
-        // rolls over with the user's SoD boundary, not UTC midnight.
-        private fun refreshCounterKey(localDate: String) =
-            intPreferencesKey("leisure_refreshes_consumed_$localDate")
 
         private fun categoryLabelKey(category: LeisureCategory) =
             stringPreferencesKey("leisure_category_label_${category.name}")
@@ -142,8 +127,6 @@ constructor(
                 .coerceIn(MIN_TARGET, MAX_TARGET),
             weekendTargetMinutes = weekendTarget?.coerceIn(MIN_TARGET, MAX_TARGET),
             enforcementMode = enforcement,
-            refreshLimit = (prefs[REFRESH_LIMIT_KEY] ?: DEFAULT_REFRESH_LIMIT)
-                .coerceIn(MIN_REFRESH, MAX_REFRESH),
             enabledCategories = enabledCategories,
             pendingEnforcementMode = pendingEnforcement,
             pendingEnforcementEffectiveDate = pendingDate
@@ -165,12 +148,6 @@ constructor(
                 prefs[WEEKEND_OVERRIDE_KEY] = true
                 prefs[WEEKEND_TARGET_KEY] = minutes.coerceIn(MIN_TARGET, MAX_TARGET)
             }
-        }
-    }
-
-    suspend fun setRefreshLimit(limit: Int) {
-        context.leisureBudgetDataStore.edit { prefs ->
-            prefs[REFRESH_LIMIT_KEY] = limit.coerceIn(MIN_REFRESH, MAX_REFRESH)
         }
     }
 
@@ -251,34 +228,6 @@ constructor(
             }
         }
         return promoted
-    }
-
-    fun observeRefreshesConsumed(localDate: String): Flow<Int> =
-        context.leisureBudgetDataStore.data.map { prefs ->
-            prefs[refreshCounterKey(localDate)] ?: 0
-        }
-
-    suspend fun readRefreshesConsumed(localDate: String): Int =
-        snapshotConsumed(localDate)
-
-    private suspend fun snapshotConsumed(localDate: String): Int {
-        var consumed = 0
-        context.leisureBudgetDataStore.data.collect {
-            consumed = it[refreshCounterKey(localDate)] ?: 0
-            return@collect
-        }
-        return consumed
-    }
-
-    /** Returns the new count post-increment. */
-    suspend fun incrementRefreshesConsumed(localDate: String): Int {
-        var next = 0
-        context.leisureBudgetDataStore.edit { prefs ->
-            val current = prefs[refreshCounterKey(localDate)] ?: 0
-            next = current + 1
-            prefs[refreshCounterKey(localDate)] = next
-        }
-        return next
     }
 
     /**

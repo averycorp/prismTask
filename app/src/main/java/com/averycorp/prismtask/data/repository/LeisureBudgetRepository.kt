@@ -64,12 +64,8 @@ constructor(
         val minutesLogged: Int,
         val targetMinutes: Int,
         val score: LeisureScorer.LeisureScore,
-        val suggestion: LeisureActivityEntity?,
-        val refreshesConsumed: Int,
-        val refreshLimit: Int
-    ) {
-        val canRefresh: Boolean get() = refreshesConsumed < refreshLimit
-    }
+        val suggestion: LeisureActivityEntity?
+    )
 
     fun getActivities(): Flow<List<LeisureActivityEntity>> = activityDao.getAll()
 
@@ -246,28 +242,20 @@ constructor(
             snapshot.enabledCategories.map { it.name }
         )
         val suggestion = if (candidates.isEmpty()) null else sampler.pick(candidates, snapshot.enabledCategories)
-        val refreshesConsumed = preferences.readRefreshesConsumed(localDate.toString())
         return TodayProgress(
             minutesLogged = minutesLogged,
             targetMinutes = target,
             score = score,
-            suggestion = if (forceResample) suggestion else suggestion,
-            refreshesConsumed = refreshesConsumed,
-            refreshLimit = snapshot.refreshLimit
+            suggestion = if (forceResample) suggestion else suggestion
         )
     }
 
     /**
-     * Consume one refresh and return the next suggestion. Returns null when
-     * the daily cap is hit or the pool is empty.
+     * Resample and return the next suggestion. Returns null when the
+     * pool is empty.
      */
     suspend fun refreshSuggestion(): LeisureActivityEntity? {
-        val hour = taskBehaviorPreferences.getDayStartHour().first()
-        val localDate = DayBoundary.currentLocalDate(hour).toString()
         val snapshot = preferences.observeSnapshot().first()
-        val consumed = preferences.readRefreshesConsumed(localDate)
-        if (consumed >= snapshot.refreshLimit) return null
-        preferences.incrementRefreshesConsumed(localDate)
         val candidates = activityDao.getEnabledInCategoriesOnce(
             snapshot.enabledCategories.map { it.name }
         )
