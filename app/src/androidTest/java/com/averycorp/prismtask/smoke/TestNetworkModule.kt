@@ -358,4 +358,25 @@ class FakePrismTaskApi : PrismTaskApi {
         body: com.averycorp.prismtask.data.remote.api.InAppFeedbackRequest
     ): com.averycorp.prismtask.data.remote.api.InAppFeedbackResponse =
         error("Not used in offline tests")
+
+    override suspend fun listLeisureActivities(
+        enabledOnly: Boolean
+    ): List<com.averycorp.prismtask.data.remote.api.LeisureActivityRemoteResponse> =
+        error("Not used in offline tests")
+
+    override suspend fun createLeisureActivity(
+        body: com.averycorp.prismtask.data.remote.api.LeisureActivityCreateRequest
+    ): com.averycorp.prismtask.data.remote.api.LeisureActivityRemoteResponse =
+        error("Not used in offline tests")
+
+    override suspend fun updateLeisureActivity(
+        activityId: String,
+        body: com.averycorp.prismtask.data.remote.api.LeisureActivityUpdateRequest
+    ): com.averycorp.prismtask.data.remote.api.LeisureActivityRemoteResponse =
+        error("Not used in offline tests")
+
+    override suspend fun deleteLeisureActivity(
+        activityId: String
+    ): retrofit2.Response<Unit> =
+        error("Not used in offline tests")
 }
