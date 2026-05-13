@@ -118,6 +118,9 @@ constructor(
     suspend fun getAllCompletionsOnce(): List<TaskCompletionEntity> =
         taskCompletionDao.getAllCompletionsOnce()
 
+    fun getCompletionsInRange(startDate: Long, endDate: Long): Flow<List<TaskCompletionEntity>> =
+        taskCompletionDao.getCompletionsInRange(startDate, endDate)
+
     private fun buildStats(completions: List<TaskCompletionEntity>, days: Int): TaskCompletionStats {
         if (completions.isEmpty()) {
             return TaskCompletionStats()

@@ -2,6 +2,7 @@ package com.averycorp.prismtask.data.repository
 
 import com.averycorp.prismtask.data.local.dao.HabitCompletionDao
 import com.averycorp.prismtask.data.local.dao.HabitDao
+import com.averycorp.prismtask.data.local.dao.HabitLastCompletion
 import com.averycorp.prismtask.data.local.dao.HabitLogDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.database.DatabaseTransactionRunner
@@ -271,6 +272,17 @@ constructor(
 
     fun getCompletionsInRange(habitId: Long, startDate: Long, endDate: Long): Flow<List<HabitCompletionEntity>> =
         completionDao.getCompletionsInRange(habitId, startDate, endDate)
+
+    fun getAllCompletionsInRange(startDate: Long, endDate: Long): Flow<List<HabitCompletionEntity>> =
+        completionDao.getAllCompletionsInRange(startDate, endDate)
+
+    fun getLastCompletionDatesPerHabit(): Flow<List<HabitLastCompletion>> =
+        completionDao.getLastCompletionDatesPerHabit()
+
+    suspend fun getAllHabitsOnce(): List<HabitEntity> = habitDao.getAllHabitsOnce()
+
+    suspend fun getByTemplateKeyOnce(key: String): HabitEntity? =
+        habitDao.getByTemplateKeyOnce(key)
 
     suspend fun getAllCategories(): List<String> = habitDao.getAllCategories()
 

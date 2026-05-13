@@ -47,6 +47,10 @@ constructor(
 
     fun getProjectById(id: Long): Flow<ProjectEntity?> = projectDao.getProjectById(id)
 
+    suspend fun getProjectByIdOnce(id: Long): ProjectEntity? = projectDao.getProjectByIdOnce(id)
+
+    suspend fun getProjectByNameOnce(name: String): ProjectEntity? = projectDao.getProjectByNameOnce(name)
+
     fun getProjectWithTaskCount(): Flow<List<ProjectWithCount>> =
         projectDao.getProjectWithTaskCount()
 
