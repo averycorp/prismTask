@@ -77,6 +77,12 @@ class TaskRepositoryTest {
             every { getLifeCategoryCustomKeywords() } returns flowOf(
                 com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords()
             )
+            every { getTaskModeCustomKeywords() } returns flowOf(
+                com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords()
+            )
+            every { getCognitiveLoadCustomKeywords() } returns flowOf(
+                com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords()
+            )
         }
         coEvery { eisenhowerClassifier.classify(any()) } returns
             Result.failure(IllegalStateException("stub"))
@@ -107,6 +113,61 @@ class TaskRepositoryTest {
     // ---------------------------------------------------------------------
     // Create / update / delete
     // ---------------------------------------------------------------------
+
+    // ---------------------------------------------------------------------
+    // Auto-classification on insert. Every primary-creation path resolves
+    // all three classifier dimensions (life category, task mode, cognitive
+    // load) so no task reaches Room with null/blank category-like fields.
+    // See `TaskRepository.resolve*ForInsert()`.
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun addTask_autoClassifiesTaskModeAndCognitiveLoadWhenNotProvided() = runBlocking {
+        // "Quick email reply" — "email" is in TaskMode.WORK keywords; "quick"
+        // and "reply" are in CognitiveLoad.EASY keywords. Both classifiers
+        // fire from the title alone, no explicit value provided.
+        val id = repo.addTask(title = "Quick email reply")
+        val task = taskDao.tasks.single { it.id == id }
+        assertEquals("WORK", task.taskMode)
+        assertEquals("EASY", task.cognitiveLoad)
+    }
+
+    @Test
+    fun addTask_preservesExplicitTaskModeAndCognitiveLoad() = runBlocking {
+        val id = repo.addTask(
+            title = "Ship the deploy",
+            taskMode = "RELAX",
+            cognitiveLoad = "HARD"
+        )
+        val task = taskDao.tasks.single { it.id == id }
+        assertEquals("RELAX", task.taskMode)
+        assertEquals("HARD", task.cognitiveLoad)
+    }
+
+    @Test
+    fun addTask_classifierMissResolvesToUncategorized() = runBlocking {
+        // Bare title with no keyword matches anywhere — every dimension must
+        // resolve to its UNCATEGORIZED sentinel (never null/blank), matching
+        // the life-category contract.
+        val id = repo.addTask(title = "xyzzy")
+        val task = taskDao.tasks.single { it.id == id }
+        assertEquals("UNCATEGORIZED", task.taskMode)
+        assertEquals("UNCATEGORIZED", task.cognitiveLoad)
+    }
+
+    @Test
+    fun insertTask_autoClassifiesAllThreeDimensions() = runBlocking {
+        val draft = com.averycorp.prismtask.data.local.entity.TaskEntity(
+            title = "Refactor the report module"
+        )
+        val id = repo.insertTask(draft)
+        val task = taskDao.tasks.single { it.id == id }
+        // "report" → LifeCategory.WORK + TaskMode.WORK (also has "report").
+        // "refactor" → CognitiveLoad.HARD.
+        assertEquals("WORK", task.lifeCategory)
+        assertEquals("WORK", task.taskMode)
+        assertEquals("HARD", task.cognitiveLoad)
+    }
 
     @Test
     fun addTask_insertsTaskWithProvidedFieldsAndTracksCreate() = runBlocking {
