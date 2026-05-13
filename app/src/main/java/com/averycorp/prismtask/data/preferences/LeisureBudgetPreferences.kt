@@ -36,6 +36,14 @@ import javax.inject.Singleton
  * [com.averycorp.prismtask.util.DayBoundary]) so the cap rolls over at
  * SoD, not midnight UTC.
  */
+/**
+ * User-overridable display values for a [LeisureCategory]. Stored in
+ * DataStore so users can rename / re-emoji the four buckets without
+ * touching the underlying enum (which the database, sync layer, and
+ * NLP parser still pin on the canonical [LeisureCategory.name]).
+ */
+data class LeisureCategoryDisplay(val emoji: String, val label: String)
+
 data class LeisureBudgetSnapshot(
     val dailyTargetMinutes: Int = 60,
     val weekendTargetMinutes: Int? = null,
@@ -89,6 +97,12 @@ constructor(
         // rolls over with the user's SoD boundary, not UTC midnight.
         private fun refreshCounterKey(localDate: String) =
             intPreferencesKey("leisure_refreshes_consumed_$localDate")
+
+        private fun categoryLabelKey(category: LeisureCategory) =
+            stringPreferencesKey("leisure_category_label_${category.name}")
+
+        private fun categoryEmojiKey(category: LeisureCategory) =
+            stringPreferencesKey("leisure_category_emoji_${category.name}")
     }
 
     fun observeSnapshot(): Flow<LeisureBudgetSnapshot> =
@@ -164,6 +178,44 @@ constructor(
         if (categories.isEmpty()) return // never let the pool dead-state
         context.leisureBudgetDataStore.edit { prefs ->
             prefs[ENABLED_CATEGORIES_KEY] = categories.joinToString(",") { it.name }
+        }
+    }
+
+    fun observeCategoryDisplays(): Flow<Map<LeisureCategory, LeisureCategoryDisplay>> =
+        context.leisureBudgetDataStore.data.map { prefs ->
+            LeisureCategory.values().associateWith { cat ->
+                LeisureCategoryDisplay(
+                    emoji = prefs[categoryEmojiKey(cat)]?.takeIf { it.isNotBlank() } ?: cat.emoji,
+                    label = prefs[categoryLabelKey(cat)]?.takeIf { it.isNotBlank() } ?: cat.label
+                )
+            }
+        }
+
+    suspend fun setCategoryDisplay(
+        category: LeisureCategory,
+        label: String,
+        emoji: String
+    ) {
+        val trimmedLabel = label.trim()
+        val trimmedEmoji = emoji.trim()
+        context.leisureBudgetDataStore.edit { prefs ->
+            if (trimmedLabel.isBlank() || trimmedLabel == category.label) {
+                prefs.remove(categoryLabelKey(category))
+            } else {
+                prefs[categoryLabelKey(category)] = trimmedLabel
+            }
+            if (trimmedEmoji.isBlank() || trimmedEmoji == category.emoji) {
+                prefs.remove(categoryEmojiKey(category))
+            } else {
+                prefs[categoryEmojiKey(category)] = trimmedEmoji
+            }
+        }
+    }
+
+    suspend fun resetCategoryDisplay(category: LeisureCategory) {
+        context.leisureBudgetDataStore.edit { prefs ->
+            prefs.remove(categoryLabelKey(category))
+            prefs.remove(categoryEmojiKey(category))
         }
     }
 
