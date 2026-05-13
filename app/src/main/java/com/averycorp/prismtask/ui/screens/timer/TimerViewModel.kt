@@ -8,7 +8,6 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.preferences.TimerPreferences
-import com.averycorp.prismtask.notifications.NotificationHelper
 import com.averycorp.prismtask.notifications.PomodoroTimerService
 import com.averycorp.prismtask.widget.TimerWidgetState
 import com.averycorp.prismtask.widget.WidgetUpdateManager
@@ -305,13 +304,6 @@ constructor(
         val state = _uiState.value
         _uiState.value = state.copy(remainingSeconds = 0, isRunning = false)
         syncWidgetState()
-        // Mirror the in-app completion notification the previous
-        // in-memory tick loop fired. The service already shows its own
-        // ongoing notification; this surfaces the alert sound/vibration the
-        // user expects regardless of which path delivers it.
-        viewModelScope.launch {
-            NotificationHelper.showTimerCompleteNotification(appContext, state.mode.name)
-        }
         onTimerCompleted()
         // onTimerCompleted flips mode (WORK -> BREAK or BREAK ->
         // WORK) and isLongBreak; resync so the widget reflects
