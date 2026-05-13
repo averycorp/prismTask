@@ -10,4 +10,5 @@
     android:widgetCategory="home_screen"
     android:widgetFeatures="reconfigurable"
     android:configure="com.averycorp.prismtask.widget.ProjectWidgetConfigActivity"
-    android:previewLayout="@layout/widget_preview_project" />
+    android:previewLayout="@layout/widget_preview_project"
+    android:previewImage="@drawable/widget_thumb_project" />

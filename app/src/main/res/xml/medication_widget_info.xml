@@ -8,4 +8,5 @@
     android:targetCellHeight="3"
     android:updatePeriodMillis="900000"
     android:widgetCategory="home_screen"
-    android:previewLayout="@layout/widget_preview_medication" />
+    android:previewLayout="@layout/widget_preview_medication"
+    android:previewImage="@drawable/widget_thumb_medication" />
