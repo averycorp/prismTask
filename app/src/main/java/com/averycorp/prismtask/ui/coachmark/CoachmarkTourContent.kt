@@ -51,6 +51,7 @@ object CoachmarkAnchors {
     const val TODAY_AI_TOOLS_CHIP = "today_ai_tools_chip"
     const val NAV_TASKS_TAB = "nav_tasks_tab"
     const val NAV_HABITS_TAB = "nav_habits_tab"
+    const val NAV_LEISURE_TAB = "nav_leisure_tab"
     const val NAV_MEDS_TAB = "nav_meds_tab"
     const val OPEN_TIMER_ENTRY = "open_timer_entry"
     const val AI_COACH_FAB = "ai_coach_fab"
@@ -69,6 +70,7 @@ object CoachmarkAnchors {
 object CoachmarkRoutes {
     const val TASKS = "route:tasks"
     const val HABITS = "route:habits"
+    const val LEISURE = "route:leisure"
     const val MEDICATIONS = "route:medications"
     const val TIMER = "route:timer"
     const val EISENHOWER = "route:eisenhower"
@@ -109,13 +111,19 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
     CoachmarkStep(
         anchorId = CoachmarkAnchors.NAV_HABITS_TAB,
         title = "Habits tab",
-        body = "Habits are forgiving. A missed day won't punish you — your streak grace days are tunable in Settings.",
+        body = "Daily and recurring routines, all in one place. A missed day won't punish you — streak grace days are tunable in Settings.",
         action = CoachmarkAction.Navigate(CoachmarkRoutes.HABITS)
+    ),
+    CoachmarkStep(
+        anchorId = CoachmarkAnchors.NAV_LEISURE_TAB,
+        title = "Leisure",
+        body = "A pool of restful activities, grouped by category. Tap a card to pick something to do — minimums keep you topped up without scheduling.",
+        action = CoachmarkAction.Navigate(CoachmarkRoutes.LEISURE)
     ),
     CoachmarkStep(
         anchorId = CoachmarkAnchors.NAV_MEDS_TAB,
         title = "Medications",
-        body = "Track meds, doses, and refills. Per-slot reminders that snooze, not nag.",
+        body = "Track meds, doses, and refills. Per-slot reminders that snooze, not nag — and one-off doses for PRN meds.",
         action = CoachmarkAction.Navigate(CoachmarkRoutes.MEDICATIONS)
     ),
     CoachmarkStep(
@@ -143,6 +151,11 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
         action = CoachmarkAction.Navigate(CoachmarkRoutes.SETTINGS_APPEARANCE)
     ),
     CoachmarkStep(
+        anchorId = CoachmarkAnchors.SETTINGS_AUTOMATIONS_ENTRY,
+        title = "Automations",
+        body = "If-this-then-that rules across tasks, habits, and time. Optional and dismissible — PrismTask works fine without them."
+    ),
+    CoachmarkStep(
         anchorId = CoachmarkAnchors.NAV_SETTINGS_TAB,
         title = "Settings",
         body = "Backups, integrations, accessibility, debug — anything you didn't see in onboarding lives here.",
@@ -151,7 +164,7 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
     CoachmarkStep(
         anchorId = CoachmarkAnchors.BOTTOM_NAV_ROW,
         title = "You're set",
-        body = "Five tabs, one tap each. Today is your home, the rest are deeper dives — you'll find your favorites.",
+        body = "Tabs along the bottom, one tap each. Today is your home, the rest are deeper dives — you'll find your favorites.",
         action = CoachmarkAction.Finish
     )
 )

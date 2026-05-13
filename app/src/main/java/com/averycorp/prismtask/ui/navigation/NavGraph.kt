@@ -366,6 +366,7 @@ private const val NAV_ANIM_DURATION = 300
 private fun bottomNavCoachmarkAnchor(route: String): String? = when (route) {
     PrismTaskRoute.TaskList.route -> CoachmarkAnchors.NAV_TASKS_TAB
     PrismTaskRoute.HabitList.route -> CoachmarkAnchors.NAV_HABITS_TAB
+    PrismTaskRoute.Leisure.route -> CoachmarkAnchors.NAV_LEISURE_TAB
     PrismTaskRoute.Medication.route -> CoachmarkAnchors.NAV_MEDS_TAB
     PrismTaskRoute.Timer.route -> CoachmarkAnchors.OPEN_TIMER_ENTRY
     PrismTaskRoute.Settings.route -> CoachmarkAnchors.NAV_SETTINGS_TAB
