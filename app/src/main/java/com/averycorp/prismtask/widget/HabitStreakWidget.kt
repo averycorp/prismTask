@@ -23,7 +23,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -77,23 +76,13 @@ private fun HabitStreakContent(
     val completedToday = data.habits.count { it.isCompletedToday }
     val totalHabits = data.habits.size
 
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .cornerRadius(palette.widgetCornerRadius)
-            .background(palette.surfaceBackground)
-            .padding(if (isLarge) 12.dp else 8.dp)
-    ) {
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(habitsIntent)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = WidgetTextStyles.headerLabel(palette, "Habits"),
-                style = WidgetTextStyles.headerThemed(palette, palette.onSurface),
-                modifier = GlanceModifier.defaultWeight()
-            )
-            if (data.longestStreak > 0) {
+    WidgetScaffold(
+        palette = palette,
+        isLarge = isLarge,
+        title = "Habits",
+        headerAction = actionStartActivity(habitsIntent),
+        headerTrailing = if (data.longestStreak > 0) {
+            {
                 Text(
                     text = "🔥 ${data.longestStreak} day${if (data.longestStreak != 1) "s" else ""}",
                     style = WidgetTextStyles.captionMedium(
@@ -101,7 +90,8 @@ private fun HabitStreakContent(
                     )
                 )
             }
-        }
+        } else null
+    ) {
         if (totalHabits > 0) {
             Text(
                 text = "$completedToday of $totalHabits done today",
