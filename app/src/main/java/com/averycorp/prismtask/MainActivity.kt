@@ -116,6 +116,9 @@ class MainActivity : ComponentActivity() {
     lateinit var habitListPreferences: com.averycorp.prismtask.data.preferences.HabitListPreferences
 
     @Inject
+    lateinit var advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+
+    @Inject
     lateinit var userPreferencesDataStore: UserPreferencesDataStore
 
     @Inject
@@ -334,6 +337,12 @@ class MainActivity : ComponentActivity() {
 
             val appearance by userPreferencesDataStore.appearanceFlow
                 .collectAsStateWithLifecycle(initialValue = AppearancePrefs())
+
+            val habitBorderBrightness by advancedTuningPreferences
+                .getHabitBorderBrightness()
+                .collectAsStateWithLifecycle(
+                    initialValue = com.averycorp.prismtask.data.preferences.HabitBorderBrightness()
+                )
 
             val priorityColors = PriorityColors(
                 none = parseColorOrDefault(priorityNone, PriorityColors().none),
@@ -602,7 +611,8 @@ class MainActivity : ComponentActivity() {
                 largeTouchTargets = largeTouchTargets,
                 compactMode = appearance.compactMode,
                 cardCornerRadius = appearance.cardCornerRadius,
-                showCardBorders = appearance.showTaskCardBorders
+                showCardBorders = appearance.showTaskCardBorders,
+                habitBorderBrightness = habitBorderBrightness.brightness
             ) {
                 val navController = androidx.navigation.compose.rememberNavController()
 

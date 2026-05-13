@@ -36,6 +36,7 @@ import com.averycorp.prismtask.data.preferences.EnergyPomodoroConfig
 import com.averycorp.prismtask.data.preferences.ExtractorConfig
 import com.averycorp.prismtask.data.preferences.ForgivenessPrefs
 import com.averycorp.prismtask.data.preferences.GoodEnoughTimerConfig
+import com.averycorp.prismtask.data.preferences.HabitBorderBrightness
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.HabitReminderFallback
 import com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords
@@ -1789,6 +1790,9 @@ constructor(
         }
         a.getAsJsonObject("selfCareTierDefaults")?.let {
             p.setSelfCareTierDefaults(gson.fromJson(it, SelfCareTierDefaults::class.java))
+        }
+        a.getAsJsonObject("habitBorderBrightness")?.let {
+            p.setHabitBorderBrightness(gson.fromJson(it, HabitBorderBrightness::class.java))
         }
     }
 

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.repository.HabitWithStatus
 import com.averycorp.prismtask.ui.components.StreakBadge
 import com.averycorp.prismtask.ui.theme.ChipShape
+import com.averycorp.prismtask.ui.theme.LocalHabitBorderBrightness
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
@@ -94,13 +95,14 @@ internal fun HabitItem(
 
     val cardShape = RoundedCornerShape(attrs.cardRadius.dp)
 
+    val borderAlpha = LocalHabitBorderBrightness.current
     // Cyberpunk: left border strip colored by habit color
     val cardModifier = modifier
         .fillMaxWidth()
         .clickable { onClick() }
         .border(
             width = 1.dp,
-            color = colors.primary.copy(alpha = 0.4f),
+            color = colors.primary.copy(alpha = borderAlpha),
             shape = cardShape
         )
 
