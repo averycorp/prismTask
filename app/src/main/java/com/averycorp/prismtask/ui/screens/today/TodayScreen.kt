@@ -113,7 +113,8 @@ fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     coachingViewModel: CoachingViewModel = hiltViewModel(),
     autoStartVoice: Boolean = false,
-    onVoiceAutoStartConsumed: () -> Unit = {}
+    onVoiceAutoStartConsumed: () -> Unit = {},
+    onOpenLeisure: () -> Unit = { navController.navigate(PrismTaskRoute.Leisure.route) }
 ) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val overdueTasks by viewModel.overdueTasks.collectAsStateWithLifecycle()
@@ -703,9 +704,7 @@ fun TodayScreen(
                                     onOpenAssignment = {
                                         navController.navigate(PrismTaskRoute.Schoolwork.route)
                                     },
-                                    onOpenLeisurePool = {
-                                        navController.navigate(PrismTaskRoute.Leisure.route)
-                                    },
+                                    onOpenLeisurePool = onOpenLeisure,
                                     onDismissHint = { viewModel.onDismissDailyEssentialsHint() },
                                     onOpenSettings = {
                                         navController.navigate("settings/layout")
@@ -739,9 +738,7 @@ fun TodayScreen(
                                     if (showLeisureRow) {
                                         TodayLeisureMinimumRow(
                                             state = leisureBudget,
-                                            onClick = {
-                                                navController.navigate(PrismTaskRoute.Leisure.route)
-                                            }
+                                            onClick = onOpenLeisure
                                         )
                                     }
                                     todayHabits.forEach { hws ->

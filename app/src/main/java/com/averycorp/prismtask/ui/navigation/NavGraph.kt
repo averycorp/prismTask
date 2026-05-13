@@ -647,7 +647,19 @@ fun PrismTaskNavGraph(
                         PrismTaskRoute.Today.route -> TodayScreen(
                             navController = navController,
                             autoStartVoice = autoStartVoice.value,
-                            onVoiceAutoStartConsumed = { autoStartVoice.value = false }
+                            onVoiceAutoStartConsumed = { autoStartVoice.value = false },
+                            onOpenLeisure = {
+                                val leisureIndex = bottomNavItems.indexOfFirst {
+                                    it.route == PrismTaskRoute.Leisure.route
+                                }
+                                if (leisureIndex >= 0) {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(leisureIndex)
+                                    }
+                                } else {
+                                    navController.navigate(PrismTaskRoute.Leisure.route)
+                                }
+                            }
                         )
                         PrismTaskRoute.TaskList.route -> TaskListScreen(navController)
                         PrismTaskRoute.HabitList.route -> HabitListScreen(navController)
