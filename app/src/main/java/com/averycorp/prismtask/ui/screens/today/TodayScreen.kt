@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -87,6 +86,8 @@ import com.averycorp.prismtask.ui.screens.today.components.SelfCareNudgeCard
 import com.averycorp.prismtask.ui.screens.today.components.SwipeableTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.TodayBalanceSection
 import com.averycorp.prismtask.ui.screens.today.components.TodayCognitiveLoadSection
+import com.averycorp.prismtask.ui.screens.today.components.TodayHabitCheckItem
+import com.averycorp.prismtask.ui.screens.today.components.TodayLeisureMinimumRow
 import com.averycorp.prismtask.ui.screens.today.components.neutralGray
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.DailyEssentialsActions
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.DailyEssentialsSection
@@ -100,7 +101,7 @@ import com.averycorp.prismtask.ui.theme.prismGlow
 private const val SECTION_OVERDUE = "overdue"
 private const val SECTION_TODAY_TASKS = "today_tasks"
 private const val SECTION_DAILY_ESSENTIALS = "daily_essentials"
-private const val SECTION_SCHEDULED = "scheduled_today"
+private const val SECTION_HABITS = "habits"
 private const val SECTION_PLANNED = "planned"
 private const val SECTION_PLAN_MORE = "plan_more"
 private const val SECTION_COMPLETED = "completed"
@@ -127,6 +128,7 @@ fun TodayScreen(
     val startOfTomorrow by viewModel.startOfTomorrow.collectAsStateWithLifecycle()
     val scheduledTodayHabits by viewModel.scheduledTodayHabits.collectAsStateWithLifecycle()
     val overdueBookableHabits by viewModel.overdueBookableHabits.collectAsStateWithLifecycle()
+    val todayHabits by viewModel.todayHabits.collectAsStateWithLifecycle()
     val combinedTotal by viewModel.combinedTotal.collectAsStateWithLifecycle()
     val combinedCompleted by viewModel.combinedCompleted.collectAsStateWithLifecycle()
     val combinedProgress by viewModel.combinedProgress.collectAsStateWithLifecycle()
@@ -722,18 +724,51 @@ fun TodayScreen(
                         }
                     }
 
-                    if (scheduledTodayHabits.isNotEmpty()) {
-                        item(key = "section_scheduled_habits") {
-                            val expanded = SECTION_SCHEDULED !in collapsedSections
+                    val leisureBudget = dailyEssentials.leisureBudget
+                    val showLeisureRow = leisureBudget.targetMinutes > 0
+                    val hasHabitSectionContent = todayHabits.isNotEmpty() ||
+                        scheduledTodayHabits.isNotEmpty() ||
+                        overdueBookableHabits.isNotEmpty() ||
+                        showLeisureRow
+                    if (SECTION_HABITS !in hiddenSections && hasHabitSectionContent) {
+                        val expanded = SECTION_HABITS !in collapsedSections
+                        val sectionCount = todayHabits.size +
+                            scheduledTodayHabits.size +
+                            overdueBookableHabits.size
+                        item(key = "section_habits") {
                             CollapsibleSection(
-                                emoji = "\uD83D\uDCC5",
-                                title = "Scheduled Today",
-                                count = scheduledTodayHabits.size,
+                                emoji = "\uD83C\uDF31",
+                                title = "Habits",
+                                count = sectionCount,
                                 accentColor = prismColors.secondary,
                                 expanded = expanded,
-                                onToggle = { viewModel.onToggleSectionCollapsed(SECTION_SCHEDULED) }
+                                onToggle = { viewModel.onToggleSectionCollapsed(SECTION_HABITS) }
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    if (showLeisureRow) {
+                                        TodayLeisureMinimumRow(
+                                            state = leisureBudget,
+                                            onClick = {
+                                                navController.navigate(PrismTaskRoute.Leisure.route)
+                                            }
+                                        )
+                                    }
+                                    todayHabits.forEach { hws ->
+                                        TodayHabitCheckItem(
+                                            habitWithStatus = hws,
+                                            onToggle = {
+                                                viewModel.onToggleHabitCompletion(
+                                                    hws.habit.id,
+                                                    hws.isCompletedToday
+                                                )
+                                            },
+                                            onClick = {
+                                                navController.navigate(
+                                                    PrismTaskRoute.HabitDetail.createRoute(hws.habit.id)
+                                                )
+                                            }
+                                        )
+                                    }
                                     scheduledTodayHabits.forEach { hws ->
                                         BookableHabitReminderCard(
                                             habitWithStatus = hws,
@@ -744,50 +779,49 @@ fun TodayScreen(
                                             }
                                         )
                                     }
-                                }
-                            }
-                        }
-                    }
-
-                    if (overdueBookableHabits.isNotEmpty()) {
-                        items(overdueBookableHabits, key = { "overdue_bookable_${it.habit.id}" }) { hws ->
-                            val daysAgo = if (hws.lastLogDate != null) {
-                                java.util.concurrent.TimeUnit.MILLISECONDS.toDays(
-                                    System.currentTimeMillis() - hws.lastLogDate
-                                )
-                            } else {
-                                null
-                            }
-                            val label = if (daysAgo != null) "last done $daysAgo days ago" else "never done"
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        navController.navigate(
-                                            PrismTaskRoute.HabitDetail.createRoute(hws.habit.id)
-                                        )
-                                    },
-                                shape = MaterialTheme.shapes.medium,
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                                )
-                            ) {
-                                androidx.compose.foundation.layout.Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "\uD83D\uDCCB",
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "${hws.habit.name} \u2014 $label",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    overdueBookableHabits.forEach { hws ->
+                                        val daysAgo = hws.lastLogDate?.let { last ->
+                                            java.util.concurrent.TimeUnit.MILLISECONDS.toDays(
+                                                System.currentTimeMillis() - last
+                                            )
+                                        }
+                                        val label = if (daysAgo != null) {
+                                            "last done $daysAgo days ago"
+                                        } else {
+                                            "never done"
+                                        }
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    navController.navigate(
+                                                        PrismTaskRoute.HabitDetail.createRoute(hws.habit.id)
+                                                    )
+                                                },
+                                            shape = MaterialTheme.shapes.medium,
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                            )
+                                        ) {
+                                            androidx.compose.foundation.layout.Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "\u23F0",
+                                                    style = MaterialTheme.typography.bodyLarge
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "${hws.habit.name} \u2014 $label",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
