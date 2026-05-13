@@ -20,7 +20,6 @@ import com.averycorp.prismtask.ui.components.settings.SectionHeader
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AboutSection(
-    latestReleaseTag: String?,
     onRefreshWidgets: (() -> Unit)? = null,
     onDebugReseed: (() -> Unit)? = null
 ) {
@@ -50,12 +49,6 @@ fun AboutSection(
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface,
         modifier = versionModifier
-    )
-    Text(
-        text = "Latest GitHub Release: ${latestReleaseTag ?: "Loading..."}",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 4.dp)
     )
     Text(
         text = "Made by Avery Karlin",

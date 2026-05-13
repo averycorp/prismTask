@@ -84,7 +84,6 @@ fun SettingsScreen(
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
     val isExporting by viewModel.isExporting.collectAsStateWithLifecycle()
 
-    val latestReleaseTag by viewModel.latestReleaseTag.collectAsStateWithLifecycle()
     val clinicalReportUri by viewModel.clinicalReportUri.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -390,7 +389,6 @@ fun SettingsScreen(
                             }
                         )
                         AboutSection(
-                            latestReleaseTag = latestReleaseTag,
                             onRefreshWidgets = viewModel::refreshWidgets,
                             onDebugReseed = viewModel::debugReseedDefaults
                         )
