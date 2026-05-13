@@ -26,7 +26,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -95,25 +94,15 @@ private fun TodayWidgetContent(
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenToday.wireId)
     }
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .cornerRadius(palette.widgetCornerRadius)
-            .background(palette.surfaceBackground)
-            .padding(if (isLarge) 12.dp else 8.dp)
-    ) {
-        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(
-                    text = WidgetTextStyles.headerLabel(palette, "Today"),
-                    style = WidgetTextStyles.headerThemed(palette, palette.onSurface)
-                )
-                if (!isSmall) {
-                    Text(text = todayLabel, style = WidgetTextStyles.caption(palette.onSurfaceVariant))
-                }
-            }
+    WidgetScaffold(
+        palette = palette,
+        isLarge = isLarge,
+        title = "Today",
+        subtitle = if (!isSmall) todayLabel else null,
+        headerTrailing = {
             ScoreBadge(score = data.productivityScore, palette = palette, sizeDp = if (isSmall) 30 else 34)
         }
+    ) {
         if (isSmall) {
             Spacer(modifier = GlanceModifier.height(8.dp))
             Text(
