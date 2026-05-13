@@ -392,3 +392,53 @@ Phase 2 will fan out PRs for #1 and #2.
 - Adding new persistence layers (search history, recent emojis, etc.).
   No data exists today to lose; cross-device-sync of nothing is still
   nothing.
+
+---
+
+## Phase 3 — Bundle summary
+
+Per CLAUDE.md ("Audit-first Phase 3 + 4 fire pre-merge"), this section
+lands while the implementation PRs are still in-flight rather than after
+merge. The two PROCEED items shipped as separate, focused PRs:
+
+- **PR #1292 — `fix(sync): wire SyncTracker into TaskTimingRepository`.**
+  Adds the four missing `trackCreate / trackUpdate / trackDelete` calls
+  on the mutating paths. `deleteByTaskId` snapshots affected ids before
+  the bulk delete so each row enters the queue with a stable identity.
+  Unit tests assert each tracker call happens on the matching op.
+  Measured impact (post-merge, expected): per-task time entries now
+  push to Firestore on edit, restoring per-task time analytics,
+  productivity dashboard minutes, and Pomodoro session history across
+  devices.
+- **PR #1293 — `fix(sync): sync Google Calendar user settings across
+  devices`.** Registration-only change: `gcal_sync_prefs` joins the
+  generic sync set with `excludeKeys = setOf("gcal_last_sync_timestamp")`
+  so user-facing settings push/pull while the per-device pull watermark
+  stays local. No new code path — `PreferenceSyncSerialization` already
+  honours per-spec `excludeKeys` (verified by the existing
+  `PreferenceSyncSerializationTest`). Visibility flip on
+  `Context.calendarSyncDataStore` (private → internal) and a doc-comment
+  rewrite in `PreferenceSyncModule.kt` are the only secondary edits.
+  Measured impact (post-merge, expected): a fresh install on device B
+  inherits the user's calendar choice, direction, frequency, display
+  calendars, and completed-task push setting from device A.
+
+**Re-baselined wall-clock-per-PR estimate.** Both items landed under
+the ~30–45 min targets from the ranked table. PR #1292 was ~30 min
+(repo edit + 4 new tests + run). PR #1293 was ~15 min (turned out to
+be a registration-only change once `excludeKeys` was discovered to
+already be wired through). The cheaper-than-estimated path came from
+reading the dispatch infrastructure end-to-end before recommending
+schema or DataStore-split work.
+
+**Memory entry candidates.** None surprising enough to keep. The
+"audit before splitting a DataStore" lesson is already covered by
+existing memory and the audit-first skill; no new entry needed.
+
+**Schedule for next audit.** The four DEFERRED items each merit a
+follow-up pass when scheduled:
+- Per-widget-type default-config sync (Finding 3).
+- Synced notification snooze state (Finding 5).
+- Surfaced + synced last-Drive-backup timestamp (Finding 12).
+- Firestore-vs-backend dual-write reconciliation (Finding 14) — the
+  largest of the four; merits its own dedicated audit pass.
