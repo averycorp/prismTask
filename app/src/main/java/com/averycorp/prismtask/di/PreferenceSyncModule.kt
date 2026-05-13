@@ -35,11 +35,16 @@ import dagger.multibindings.ElementsIntoSet
  * - `pro_status_prefs`   — billing cache; server-authoritative.
  * - `backend_sync_prefs` — pull-watermark; per-device.
  * - `built_in_sync_prefs`, `medication_migration_prefs` — one-time migration flags.
- * - `gcal_sync_prefs`    — Google Calendar sync tokens; per-device.
  * - `sync_device_prefs`  — the sync service's own device identity.
  * - `theme_prefs` / `sort_prefs` — covered by dedicated sync services that do
  *   extra work (sort does per-project cloud-id translation; theme pre-dates
  *   the generic layer).
+ *
+ * Per-key exclusions: `gcal_sync_prefs` syncs every user-facing setting
+ * (enabled, target calendar, direction, frequency, completed-task push,
+ * display calendars, show-events) but withholds the per-device pull
+ * watermark `gcal_last_sync_timestamp` — it's bumped on every calendar
+ * sync and replicating it across devices would silently skip pulls.
  *
  * Renaming a firestoreDocName in this file orphans already-synced state for
  * existing installs — add migration logic before changing any of these strings.
@@ -58,6 +63,11 @@ object PreferenceSyncModule {
         PreferenceSyncSpec("coaching_prefs", context.coachingDataStore),
         PreferenceSyncSpec("daily_essentials_prefs", context.dailyEssentialsDataStore),
         PreferenceSyncSpec("dashboard_prefs", context.dashboardDataStore),
+        PreferenceSyncSpec(
+            firestoreDocName = "gcal_sync_prefs",
+            dataStore = context.calendarSyncDataStore,
+            excludeKeys = setOf("gcal_last_sync_timestamp")
+        ),
         PreferenceSyncSpec("habit_list_prefs", context.habitListDataStore),
         PreferenceSyncSpec("leisure_budget_prefs", context.leisureBudgetDataStore),
         PreferenceSyncSpec("medication_prefs", context.medicationDataStore),
