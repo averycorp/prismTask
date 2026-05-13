@@ -40,12 +40,17 @@ fun LogPastLeisureSheet(
 
     var selectedActivityId by remember { mutableStateOf<Long?>(null) }
     var freeText by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(LeisureCategory.PHYSICAL) }
+    val defaultCategory = state.settings.enabledCategories.firstOrNull()
+        ?: LeisureCategory.PHYSICAL
+    var category by remember(defaultCategory) { mutableStateOf(defaultCategory) }
     var durationStr by remember { mutableStateOf("30") }
     var pickerOpen by remember { mutableStateOf(false) }
     var categoryMenuOpen by remember { mutableStateOf(false) }
 
     val selectedActivity = state.activities.firstOrNull { it.id == selectedActivityId }
+    val selectableCategories = LeisureCategory.values()
+        .filter { it in state.settings.enabledCategories || it == category }
+        .ifEmpty { LeisureCategory.values().toList() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -90,7 +95,9 @@ fun LogPastLeisureSheet(
                     val grouped = state.activities
                         .filter { it.enabled }
                         .groupBy { LeisureCategory.fromStringOrNull(it.category) }
-                    LeisureCategory.values().forEach { cat ->
+                    LeisureCategory.values()
+                        .filter { it in state.settings.enabledCategories }
+                        .forEach { cat ->
                         val items = grouped[cat].orEmpty()
                         if (items.isEmpty()) return@forEach
                         HorizontalDivider()
@@ -152,7 +159,7 @@ fun LogPastLeisureSheet(
                     expanded = categoryMenuOpen,
                     onDismissRequest = { categoryMenuOpen = false }
                 ) {
-                    LeisureCategory.values().forEach { c ->
+                    selectableCategories.forEach { c ->
                         DropdownMenuItem(
                             text = { Text("${c.emoji} ${c.label}") },
                             onClick = {
