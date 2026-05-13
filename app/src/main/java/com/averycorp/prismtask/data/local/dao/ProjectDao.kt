@@ -16,7 +16,9 @@ data class ProjectWithCount(
     val icon: String,
     val createdAt: Long,
     val updatedAt: Long,
-    val taskCount: Int
+    val taskCount: Int,
+    /** [com.averycorp.prismtask.domain.model.ProjectStatus] name. Defaults to "ACTIVE" for legacy rows. */
+    val status: String = "ACTIVE"
 )
 
 /**
@@ -52,7 +54,8 @@ interface ProjectDao {
         """
         SELECT p.id, p.name, p.color, p.icon,
                p.created_at AS createdAt, p.updated_at AS updatedAt,
-               COUNT(t.id) AS taskCount
+               COUNT(t.id) AS taskCount,
+               p.status AS status
         FROM projects p
         LEFT JOIN tasks t ON t.project_id = p.id
         GROUP BY p.id

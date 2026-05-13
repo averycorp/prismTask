@@ -285,7 +285,9 @@ fun ProjectListScreen(
                         onDelete = { projectToDelete = project },
                         onAnalytics = {
                             navController.navigate(PrismTaskRoute.TaskAnalytics.createRoute(project.id))
-                        }
+                        },
+                        onArchive = { viewModel.onArchiveProject(project.id) },
+                        onReopen = { viewModel.onReopenProject(project.id) }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -359,9 +361,12 @@ private fun ProjectItem(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onAnalytics: () -> Unit = {}
+    onAnalytics: () -> Unit = {},
+    onArchive: () -> Unit = {},
+    onReopen: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val isArchived = project.status == "ARCHIVED"
 
     val projectColor = try {
         Color(android.graphics.Color.parseColor(project.color))
@@ -440,6 +445,23 @@ private fun ProjectItem(
                             onAnalytics()
                         }
                     )
+                    if (isArchived) {
+                        DropdownMenuItem(
+                            text = { Text("Unarchive") },
+                            onClick = {
+                                menuExpanded = false
+                                onReopen()
+                            }
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text("Archive") },
+                            onClick = {
+                                menuExpanded = false
+                                onArchive()
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
                         onClick = {

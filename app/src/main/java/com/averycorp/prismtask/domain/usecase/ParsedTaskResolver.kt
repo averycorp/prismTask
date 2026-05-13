@@ -51,7 +51,12 @@ constructor(
         var unmatchedProject: String? = null
         if (parsed.projectName != null) {
             val allProjects = projectRepository.getAllProjects().firstOrNull() ?: emptyList()
-            val match = allProjects.find { it.name.equals(parsed.projectName, ignoreCase = true) }
+            // Skip archived projects so a recycled name re-resolves to a
+            // fresh project rather than silently auto-assigning the retired one.
+            val match = allProjects.find {
+                it.status != "ARCHIVED" &&
+                    it.name.equals(parsed.projectName, ignoreCase = true)
+            }
             if (match != null) {
                 projectId = match.id
             } else {

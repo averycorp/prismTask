@@ -1,6 +1,9 @@
 package com.averycorp.prismtask.ui.screens.projects.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,13 +17,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,19 +55,37 @@ import com.averycorp.prismtask.ui.theme.LocalPrismColors
  * text. Everything else flows through [LocalPrismColors] so the card
  * reskins cleanly across Cyberpunk / Synthwave / Matrix / Void.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProjectCard(
     data: ProjectWithProgress,
     onClick: () -> Unit,
     nowMillis: Long,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onArchive: (() -> Unit)? = null,
+    onReopen: (() -> Unit)? = null,
+    onComplete: (() -> Unit)? = null
 ) {
     val prismColors = LocalPrismColors.current
     val accent = parseAccentColor(data.project.themeColorKey ?: data.project.color, prismColors.primary)
+    var menuOpen by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val supportsContextMenu =
+        onArchive != null || onReopen != null || onComplete != null
 
     Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = if (supportsContextMenu) {
+                    { menuOpen = true }
+                } else {
+                    null
+                }
+            ),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = prismColors.surface,
@@ -134,6 +166,54 @@ fun ProjectCard(
                     if (daysSince != null && daysSince > 3) {
                         Spacer(Modifier.weight(1f))
                         DaysSinceBadge(days = daysSince)
+                    }
+                }
+
+                // Long-press context menu anchored under the card content.
+                // Active projects: Complete + Archive; non-active: Reopen.
+                if (supportsContextMenu) {
+                    Box {
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            when (data.status) {
+                                ProjectStatus.ACTIVE -> {
+                                    if (onComplete != null) {
+                                        DropdownMenuItem(
+                                            text = { Text("Mark Completed") },
+                                            leadingIcon = { Icon(Icons.Default.CheckCircle, null) },
+                                            onClick = {
+                                                menuOpen = false
+                                                onComplete()
+                                            }
+                                        )
+                                    }
+                                    if (onArchive != null) {
+                                        DropdownMenuItem(
+                                            text = { Text("Archive") },
+                                            leadingIcon = { Icon(Icons.Default.Archive, null) },
+                                            onClick = {
+                                                menuOpen = false
+                                                onArchive()
+                                            }
+                                        )
+                                    }
+                                }
+                                ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED -> {
+                                    if (onReopen != null) {
+                                        DropdownMenuItem(
+                                            text = { Text("Reopen") },
+                                            leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                                            onClick = {
+                                                menuOpen = false
+                                                onReopen()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

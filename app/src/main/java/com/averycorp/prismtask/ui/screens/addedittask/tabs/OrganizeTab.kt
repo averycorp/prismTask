@@ -218,8 +218,15 @@ internal fun OrganizeTabContent(
 
     // ---- Project picker sheet ----
     if (showProjectPicker) {
+        // Archived projects don't appear in the picker so the dropdown stays
+        // focused on still-relevant work; the currently-selected project is
+        // preserved even if archived so an in-flight edit doesn't lose its
+        // assignment when the user opens the sheet.
+        val pickerProjects = remember(projects, viewModel.projectId) {
+            projects.filter { it.status != "ARCHIVED" || it.id == viewModel.projectId }
+        }
         ProjectPickerSheet(
-            projects = projects,
+            projects = pickerProjects,
             selectedProjectId = viewModel.projectId,
             showCreateForm = showCreateProjectForm,
             onShowCreateForm = { showCreateProjectForm = true },
