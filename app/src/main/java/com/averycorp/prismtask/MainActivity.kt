@@ -770,6 +770,7 @@ class MainActivity : ComponentActivity() {
         when (routeKey) {
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.TASKS,
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.HABITS,
+            com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.LEISURE,
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.MEDICATIONS,
             com.averycorp.prismtask.ui.coachmark.CoachmarkRoutes.SETTINGS -> {
                 // Top-level bottom-nav targets — host pager is the navigator,

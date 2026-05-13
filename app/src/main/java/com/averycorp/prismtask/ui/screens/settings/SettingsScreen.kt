@@ -348,6 +348,9 @@ fun SettingsScreen(
                             subtitle = "If-this-then-that rules across tasks, habits, time",
                             iconEmoji = "⚡",
                             iconBgColor = ColAi,
+                            modifier = Modifier.coachmarkAnchor(
+                                com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.SETTINGS_AUTOMATIONS_ENTRY
+                            ),
                             onClick = { navController.navigate(PrismTaskRoute.Automation.route) }
                         )
                     }

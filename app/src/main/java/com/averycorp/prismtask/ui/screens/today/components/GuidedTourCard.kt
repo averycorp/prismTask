@@ -58,8 +58,8 @@ val GUIDED_TOUR_STEPS: List<GuidedTourStep> = listOf(
     ),
     GuidedTourStep(
         emoji = "🗂️",
-        title = "Tasks, habits, and meds",
-        body = "Tabs along the bottom hold each surface. Streaks here forgive a missed day — they won't punish you."
+        title = "Tasks, Habits, Leisure, Meds",
+        body = "Tabs along the bottom hold each surface. Leisure suggests restful activities; streaks forgive a missed day."
     ),
     GuidedTourStep(
         emoji = "⏱️",
@@ -69,12 +69,12 @@ val GUIDED_TOUR_STEPS: List<GuidedTourStep> = listOf(
     GuidedTourStep(
         emoji = "🤖",
         title = "AI assistant — optional",
-        body = "Settings → AI to turn it on. Off by default. It lives where you are and never pushes."
+        body = "Chat, drop a screenshot of a syllabus, or paste a list. Settings → AI to turn it on — off by default."
     ),
     GuidedTourStep(
         emoji = "🎨",
         title = "Make it yours",
-        body = "Themes, widgets, integrations, exports — all live in Settings, ready when you want them."
+        body = "Themes, widgets, automations, integrations, exports — all live in Settings, ready when you want them."
     )
 )
 
