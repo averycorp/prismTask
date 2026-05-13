@@ -117,7 +117,8 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
     CoachmarkStep(
         anchorId = CoachmarkAnchors.NAV_LEISURE_TAB,
         title = "Leisure",
-        body = "A pool of restful activities, grouped by category. Tap a card to pick something to do — minimums keep you topped up without scheduling.",
+        body = "A pool of restful activities, grouped by category. Tap a card to pick something to do — " +
+            "minimums keep you topped up without scheduling.",
         action = CoachmarkAction.Navigate(CoachmarkRoutes.LEISURE)
     ),
     CoachmarkStep(

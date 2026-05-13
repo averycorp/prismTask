@@ -96,7 +96,6 @@ private fun UpcomingContent(
             )
         }
     ) {
-
         if (data.overdue.isNotEmpty()) {
             Spacer(modifier = GlanceModifier.height(4.dp))
             Box(

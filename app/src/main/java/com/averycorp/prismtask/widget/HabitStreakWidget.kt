@@ -90,7 +90,9 @@ private fun HabitStreakContent(
                     )
                 )
             }
-        } else null
+        } else {
+            null
+        }
     ) {
         if (totalHabits > 0) {
             Text(

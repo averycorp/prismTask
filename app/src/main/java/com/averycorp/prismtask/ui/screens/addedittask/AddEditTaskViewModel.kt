@@ -665,8 +665,13 @@ constructor(
      *
      * - Skips when the user has already manually picked a chip, unless
      *   [force] is set (i.e. the operator explicitly tapped Auto to reset).
-     * - Empty title or no-keyword-match leaves the chip unselected so the
-     *   next title/description edit gets another chance to pick.
+     * - Implicit auto-press (force=false): on UNCATEGORIZED, clears the chip
+     *   so the next title edit gets another chance.
+     * - Explicit Auto tap (force=true): on UNCATEGORIZED, preserves any
+     *   existing chip and emits a Snackbar via [_errorMessages] so the user
+     *   isn't punished with a silent chip-clear when neither the keyword
+     *   classifier nor Claude can match (was reported as "Auto button does
+     *   nothing" — PR #1134 audit carry-over for OrganizeTab).
      * - Never flips [lifeCategoryManuallySet] to `true` — that's reserved for
      *   real user taps so the boundary-suggestion gate at the top of this
      *   class can still override an auto-picked value.
@@ -681,9 +686,14 @@ constructor(
                 .withCustomKeywords(lifeCategoryCustomKeywords.value)
                 .classify(title, description.ifBlank { null })
         }
-        lifeCategory = guess.takeIf { it != LifeCategory.UNCATEGORIZED }
+        val localPick = guess.takeIf { it != LifeCategory.UNCATEGORIZED }
+        if (localPick != null) {
+            lifeCategory = localPick
+        } else if (!force) {
+            lifeCategory = null
+        }
         if (force) {
-            tryUpgradeLifeCategoryWithClaude()
+            tryUpgradeLifeCategoryWithClaude(localPickSucceeded = localPick != null)
         }
     }
 
@@ -696,31 +706,44 @@ constructor(
      *
      * On any failure (AI features off, no auth, network, 429, 451, 5xx,
      * malformed response) the local pick stays — never blanks a successful
-     * local chip.
+     * local chip. When neither the local classifier nor Claude can match
+     * (or AI is off and the local result was UNCATEGORIZED), emit a user-
+     * facing Snackbar so the Auto tap doesn't look broken.
      */
-    private fun tryUpgradeLifeCategoryWithClaude() {
-        if (title.isBlank()) return
+    private fun tryUpgradeLifeCategoryWithClaude(localPickSucceeded: Boolean) {
+        if (title.isBlank()) {
+            if (!localPickSucceeded) emitAutoPickFailureMessage("Life Category")
+            return
+        }
         val titleSnapshot = title
         val descriptionSnapshot = description
         viewModelScope.launch {
             val aiPrefs = userPreferencesDataStore.aiFeaturePrefsFlow.firstOrNull()
-            if (aiPrefs?.enabled != true) return@launch
+            if (aiPrefs?.enabled != true) {
+                if (!localPickSucceeded) emitAutoPickFailureMessage("Life Category")
+                return@launch
+            }
             lifeCategoryAutoPickInFlight = true
+            var remoteMatched = false
             try {
                 val result = lifeCategoryRemoteClassifier.classify(
                     titleSnapshot,
                     descriptionSnapshot.ifBlank { null }
                 )
                 val classification = result.getOrNull() ?: return@launch
+                remoteMatched = classification.category != LifeCategory.UNCATEGORIZED
                 if (lifeCategoryManuallySet) return@launch
                 if (title != titleSnapshot || description != descriptionSnapshot) return@launch
-                if (classification.category == LifeCategory.UNCATEGORIZED) {
-                    lifeCategory = null
-                } else {
+                if (remoteMatched) {
                     lifeCategory = classification.category
+                } else if (!localPickSucceeded) {
+                    lifeCategory = null
                 }
             } finally {
                 lifeCategoryAutoPickInFlight = false
+                if (!localPickSucceeded && !remoteMatched) {
+                    emitAutoPickFailureMessage("Life Category")
+                }
             }
         }
     }
@@ -736,7 +759,14 @@ constructor(
                 .withCustomKeywords(taskModeCustomKeywords.value)
                 .classify(title, description.ifBlank { null })
         }
-        taskMode = guess.takeIf { it != TaskMode.UNCATEGORIZED }
+        val localPick = guess.takeIf { it != TaskMode.UNCATEGORIZED }
+        if (localPick != null) {
+            taskMode = localPick
+        } else if (!force) {
+            taskMode = null
+        } else {
+            emitAutoPickFailureMessage("Task Mode")
+        }
     }
 
     /** Auto-press the Cognitive Load chip — see [autoPickLifeCategory]. */
@@ -750,7 +780,22 @@ constructor(
                 .withCustomKeywords(cognitiveLoadCustomKeywords.value)
                 .classify(title, description.ifBlank { null })
         }
-        cognitiveLoad = guess.takeIf { it != CognitiveLoad.UNCATEGORIZED }
+        val localPick = guess.takeIf { it != CognitiveLoad.UNCATEGORIZED }
+        if (localPick != null) {
+            cognitiveLoad = localPick
+        } else if (!force) {
+            cognitiveLoad = null
+        } else {
+            emitAutoPickFailureMessage("Cognitive Load")
+        }
+    }
+
+    private fun emitAutoPickFailureMessage(fieldLabel: String) {
+        viewModelScope.launch {
+            _errorMessages.emit(
+                "Couldn't auto-detect $fieldLabel — add more detail to the title or pick a chip manually."
+            )
+        }
     }
 
     /**
