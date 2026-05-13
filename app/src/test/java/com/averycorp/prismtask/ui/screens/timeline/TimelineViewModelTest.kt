@@ -1,7 +1,6 @@
 package com.averycorp.prismtask.ui.screens.timeline
 
 import com.averycorp.prismtask.data.billing.UserTier
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
@@ -46,7 +45,6 @@ import org.junit.Test
 class TimelineViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
-    private lateinit var taskDao: TaskDao
     private lateinit var taskRepository: TaskRepository
     private lateinit var projectRepository: ProjectRepository
     private lateinit var sortPreferences: SortPreferences
@@ -57,13 +55,12 @@ class TimelineViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        taskDao = mockk(relaxed = true)
-        every { taskDao.getIncompleteRootTasks() } returns flowOf(emptyList())
-        every { taskDao.getTasksDueOnDate(any(), any()) } returns flowOf(emptyList())
-        // Default cloud-id resolution for the canonical fixtures.
-        coEvery { taskDao.getIdByCloudId("cloud-7") } returns 7L
-        coEvery { taskDao.getIdByCloudId("cloud-42") } returns 42L
         taskRepository = mockk(relaxed = true)
+        every { taskRepository.getIncompleteRootTasks() } returns flowOf(emptyList())
+        every { taskRepository.getTasksDueOnDate(any(), any()) } returns flowOf(emptyList())
+        // Default cloud-id resolution for the canonical fixtures.
+        coEvery { taskRepository.getIdByCloudId("cloud-7") } returns 7L
+        coEvery { taskRepository.getIdByCloudId("cloud-42") } returns 42L
         projectRepository = mockk(relaxed = true)
         every { projectRepository.getAllProjects() } returns flowOf(emptyList())
         sortPreferences = mockk(relaxed = true)
@@ -85,7 +82,6 @@ class TimelineViewModelTest {
     }
 
     private fun newViewModel() = TimelineViewModel(
-        taskDao,
         taskRepository,
         projectRepository,
         sortPreferences,
@@ -144,7 +140,7 @@ class TimelineViewModelTest {
         val success = vm.scheduleUiState.value as AiScheduleUiState.Success
         assertEquals(1, success.schedule.blocks.size)
         assertEquals("2026-04-22", success.schedule.blocks[0].date)
-        coVerify(exactly = 0) { taskDao.update(any()) }
+        coVerify(exactly = 0) { taskRepository.updateTask(any()) }
     }
 
     @Test
@@ -180,9 +176,9 @@ class TimelineViewModelTest {
         } returns response
 
         val existingTask = TaskEntity(id = 7L, title = "Deep work")
-        coEvery { taskDao.getTaskByIdOnce(7L) } returns existingTask
+        coEvery { taskRepository.getTaskByIdOnce(7L) } returns existingTask
         val updateSlot = slot<TaskEntity>()
-        coEvery { taskDao.update(capture(updateSlot)) } just Runs
+        coEvery { taskRepository.updateTask(capture(updateSlot)) } just Runs
 
         val vm = newViewModel()
         vm.runAutoBlockMyDay()
@@ -191,7 +187,7 @@ class TimelineViewModelTest {
         advanceUntilIdle()
 
         // Exactly one task row written (the break has no taskId).
-        coVerify(exactly = 1) { taskDao.update(any()) }
+        coVerify(exactly = 1) { taskRepository.updateTask(any()) }
         val saved = updateSlot.captured
         assertEquals(60, saved.estimatedDuration)
         // scheduled_start_time should be a non-null epoch millis pointing at
@@ -230,7 +226,7 @@ class TimelineViewModelTest {
         vm.cancelProposedSchedule()
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { taskDao.update(any()) }
+        coVerify(exactly = 0) { taskRepository.updateTask(any()) }
         assertFalse(vm.showPreviewSheet.value)
         assertEquals(AiScheduleUiState.Idle, vm.scheduleUiState.value)
     }
@@ -259,7 +255,7 @@ class TimelineViewModelTest {
     @Test
     fun runAutoBlockMyDay_unresolvedCloudId_demotesIntoUnscheduled() = runTest(dispatcher) {
         // "cloud-99" is not in the dao mocks → returns null → demote.
-        coEvery { taskDao.getIdByCloudId("cloud-99") } returns null
+        coEvery { taskRepository.getIdByCloudId("cloud-99") } returns null
         val response = TimeBlockResponse(
             schedule = listOf(
                 ScheduleBlockResponse(

@@ -6,7 +6,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
@@ -44,7 +43,6 @@ data class DayInfo(
 class MonthViewModel
 @Inject
 constructor(
-    private val taskDao: TaskDao,
     private val taskRepository: TaskRepository,
     private val projectRepository: ProjectRepository,
     private val sortPreferences: SortPreferences,
@@ -56,7 +54,7 @@ constructor(
         .getAllProjects()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val taskCountByProject: StateFlow<Map<Long, Int>> = taskDao
+    val taskCountByProject: StateFlow<Map<Long, Int>> = taskRepository
         .getIncompleteRootTasks()
         .map { tasks ->
             tasks
@@ -101,7 +99,7 @@ constructor(
                 .toEpochMilli()
             val today = LocalDate.now()
 
-            taskDao.getTasksDueOnDate(startMillis, endMillis).map { tasks ->
+            taskRepository.getTasksDueOnDate(startMillis, endMillis).map { tasks ->
                 val rootTasks = tasks.filter { it.parentTaskId == null && it.archivedAt == null }
                 val grouped = mutableMapOf<LocalDate, MutableList<TaskEntity>>()
                 for (task in rootTasks) {
@@ -136,7 +134,7 @@ constructor(
                     .atStartOfDay(zone)
                     .toInstant()
                     .toEpochMilli()
-                taskDao.getTasksDueOnDate(start, end).map { tasks ->
+                taskRepository.getTasksDueOnDate(start, end).map { tasks ->
                     tasks.filter { it.parentTaskId == null && it.archivedAt == null }
                 }
             }

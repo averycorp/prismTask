@@ -6,7 +6,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
@@ -36,7 +35,6 @@ import javax.inject.Inject
 class WeekViewModel
 @Inject
 constructor(
-    private val taskDao: TaskDao,
     private val taskRepository: TaskRepository,
     private val projectRepository: ProjectRepository,
     private val sortPreferences: SortPreferences,
@@ -46,7 +44,7 @@ constructor(
         .getAllProjects()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val taskCountByProject: StateFlow<Map<Long, Int>> = taskDao
+    val taskCountByProject: StateFlow<Map<Long, Int>> = taskRepository
         .getIncompleteRootTasks()
         .map { tasks ->
             tasks
@@ -102,7 +100,7 @@ constructor(
                 .atStartOfDay(zone)
                 .toInstant()
                 .toEpochMilli()
-            taskDao.getTasksDueOnDate(startMillis, endMillis).map { tasks -> start to tasks }
+            taskRepository.getTasksDueOnDate(startMillis, endMillis).map { tasks -> start to tasks }
         },
         currentSort
     ) { (start, tasks), sort ->
@@ -149,7 +147,7 @@ constructor(
     fun onMoveTask(taskId: Long, newDate: LocalDate) {
         val millis = newDate.atStartOfDay(zone).toInstant().toEpochMilli()
         viewModelScope.launch {
-            taskDao.updateDueDate(taskId, millis)
+            taskRepository.updateDueDate(taskId, millis)
         }
     }
 
