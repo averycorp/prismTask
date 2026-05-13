@@ -180,8 +180,11 @@ fun FileExtractionSuggestion.Companion.fromResponse(
             // fromStorage returns UNCATEGORIZED for unknown inputs — drop
             // that signal unless the LLM explicitly returned UNCATEGORIZED,
             // so the UI doesn't surface a misleading apply toggle.
-            if (parsed == LifeCategory.UNCATEGORIZED && raw != "UNCATEGORIZED") null
-            else parsed
+            if (parsed == LifeCategory.UNCATEGORIZED && raw != "UNCATEGORIZED") {
+                null
+            } else {
+                parsed
+            }
         },
     estimatedDurationMinutes = response.estimatedDurationMinutes?.takeIf { it in 0..(24 * 60) },
     recurrenceHint = response.recurrenceHint?.trim()?.takeIf { it.isNotBlank() },

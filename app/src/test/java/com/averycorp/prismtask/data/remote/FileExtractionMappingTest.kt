@@ -299,8 +299,8 @@ class FileExtractionMappingTest {
             FileExtractionResponse(
                 title = "X",
                 technicalMetadata = FileTechnicalMetadataResponse(
-                    gpsLat = 100.0,  // > 90
-                    gpsLon = -200.0  // < -180
+                    gpsLat = 100.0, // > 90
+                    gpsLon = -200.0 // < -180
                 )
             )
         )
