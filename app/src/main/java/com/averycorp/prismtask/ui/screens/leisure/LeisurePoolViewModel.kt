@@ -3,12 +3,15 @@ package com.averycorp.prismtask.ui.screens.leisure
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
+import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
 import com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.domain.model.LeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureEnforcementMode
 import com.averycorp.prismtask.domain.model.LeisureSessionSource
+import com.averycorp.prismtask.util.DayBoundary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,34 +37,55 @@ class LeisurePoolViewModel
 @Inject
 constructor(
     private val repository: LeisureBudgetRepository,
-    private val preferences: LeisureBudgetPreferences
+    private val preferences: LeisureBudgetPreferences,
+    private val taskBehaviorPreferences: TaskBehaviorPreferences
 ) : ViewModel() {
 
     data class UiState(
         val activities: List<LeisureActivityEntity>,
         val settings: LeisureBudgetSnapshot,
-        val activitiesByCategory: Map<LeisureCategory, List<LeisureActivityEntity>>
+        val activitiesByCategory: Map<LeisureCategory, List<LeisureActivityEntity>>,
+        val recentSessions: List<LeisureSessionEntity>,
+        val activitiesById: Map<Long, LeisureActivityEntity>,
+        val minutesLoggedToday: Int,
+        val targetMinutesToday: Int
     ) {
         companion object {
             fun empty(): UiState = UiState(
                 activities = emptyList(),
                 settings = LeisureBudgetSnapshot(),
-                activitiesByCategory = LeisureCategory.values().associateWith { emptyList() }
+                activitiesByCategory = LeisureCategory.values().associateWith { emptyList() },
+                recentSessions = emptyList(),
+                activitiesById = emptyMap(),
+                minutesLoggedToday = 0,
+                targetMinutesToday = LeisureBudgetPreferences.DEFAULT_TARGET
             )
         }
     }
 
     val state: StateFlow<UiState> = combine(
         repository.getActivities(),
-        preferences.observeSnapshot()
-    ) { activities, snap ->
+        preferences.observeSnapshot(),
+        repository.observeRecentSessions(limit = 200),
+        repository.observeMinutesLoggedToday(),
+        taskBehaviorPreferences.getDayStartHour()
+    ) { activities, snap, sessions, minutes, dayStartHour ->
         val grouped: Map<LeisureCategory, List<LeisureActivityEntity>> =
             LeisureCategory.values().associateWith { cat ->
                 activities.filter {
                     LeisureCategory.fromStringOrNull(it.category) == cat
                 }
             }
-        UiState(activities = activities, settings = snap, activitiesByCategory = grouped)
+        val today = DayBoundary.currentLocalDate(dayStartHour)
+        UiState(
+            activities = activities,
+            settings = snap,
+            activitiesByCategory = grouped,
+            recentSessions = sessions,
+            activitiesById = activities.associateBy { it.id },
+            minutesLoggedToday = minutes,
+            targetMinutesToday = snap.targetForDate(today)
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.empty())
 
     fun addActivity(
@@ -118,6 +142,37 @@ constructor(
                     defaultDurationMinutes = defaultDurationMinutes
                 )
             )
+        }
+    }
+
+    /**
+     * Quick-log a category-only session — no activity attached. Backs
+     * the category cards on `LeisurePoolScreen`: tapping a category +
+     * choosing a duration drops a session with `activityId = null`,
+     * which is fine because the session row denormalizes `category` at
+     * insertion time.
+     */
+    fun logCategorySession(category: LeisureCategory, durationMinutes: Int) {
+        val minutes = durationMinutes.coerceAtLeast(1)
+        viewModelScope.launch {
+            repository.logSession(
+                activityId = null,
+                category = category,
+                durationMinutes = minutes,
+                source = LeisureSessionSource.MANUAL
+            )
+        }
+    }
+
+    fun deleteSession(sessionId: Long) {
+        viewModelScope.launch {
+            repository.deleteSession(sessionId)
+        }
+    }
+
+    fun updateSessionTime(sessionId: Long, newLoggedAt: Long) {
+        viewModelScope.launch {
+            repository.updateSessionTime(sessionId, newLoggedAt)
         }
     }
 
