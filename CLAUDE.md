@@ -94,7 +94,7 @@ current sub-package contents (it drifts faster than this file is updated).
 - **Timeline**: Daily view with scheduled time blocks, duration management, current time indicator
 - **Export/Import**: JSON full backup (tasks, habits, habit completions, self-care logs/steps, leisure logs, courses, assignments, course completions, all preferences/config) + CSV tasks export; JSON import with merge/replace modes
 - **Habits**: Habit tracking with daily/weekly frequency, streaks, analytics, contribution grid, weekly summary notification
-- **Widgets**: 14 Glance-based home screen widgets (Today, Habit Streak, Quick-Add, Calendar, Productivity, Timer, Upcoming, Project, Eisenhower, Focus, Inbox, Medication, Stats Sparkline, Streak Calendar) themed off the active PrismTheme palette, with per-instance configuration; launcher previews wired via `android:previewLayout` (API 31+, app-icon fallback below)
+- **Widgets**: 14 Glance-based home screen widgets (Today, Habit Streak, Quick-Add, Calendar, Productivity, Timer, Upcoming, Project, Eisenhower, Focus, Inbox, Medication, Stats Sparkline, Streak Calendar) themed off the active PrismTheme palette, with per-instance configuration; launcher previews wired via `android:previewLayout` (API 31+) with per-widget `android:previewImage="@drawable/widget_thumb_<name>"` vector fallback for API 26-30
 - **Dashboard**: Customizable Today section order and visibility via DashboardPreferences DataStore
 - **Task Templates**: Reusable blueprints with backend sync
 - **Tabbed Editor**: Bottom sheet with Details/Schedule/Organize tabs (extracted into `addedittask/tabs/`)

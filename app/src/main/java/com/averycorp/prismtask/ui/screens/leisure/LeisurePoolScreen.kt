@@ -1,5 +1,7 @@
 package com.averycorp.prismtask.ui.screens.leisure
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,16 +20,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +51,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -140,55 +145,39 @@ fun LeisurePoolScreen(
         }
     ) { padding ->
         val sessionDays = remember(state.recentSessions) { groupSessionsByDay(state.recentSessions) }
+        val enabledCategories = remember(state.settings.enabledCategories) {
+            LeisureCategory.values().filter { it in state.settings.enabledCategories }
+        }
+        var manageExpanded by remember { mutableStateOf(false) }
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                TodayProgressCard(
+                TodayHeroCard(
                     minutesLogged = state.minutesLoggedToday,
-                    targetMinutes = state.targetMinutesToday
+                    targetMinutes = state.targetMinutesToday,
+                    breakdown = state.minutesByCategoryToday,
+                    enabledCategories = enabledCategories,
+                    displayFor = state::displayFor
                 )
             }
+
+            item { SectionHeader("Quick Log") }
             item {
-                Text(
-                    "Log By Category",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 4.dp)
+                CategoryTileGrid(
+                    categories = enabledCategories,
+                    activitiesByCategory = state.activitiesByCategory,
+                    displayFor = state::displayFor,
+                    onCategoryClick = { pickingCategory = it }
                 )
             }
-            items(
-                LeisureCategory.values().filter { it in state.settings.enabledCategories }
-            ) { category ->
-                CategoryLogCard(
-                    display = state.displayFor(category),
-                    activityCount = state.activitiesByCategory[category]?.size ?: 0,
-                    onClick = { pickingCategory = category },
-                    onEdit = { editingCategory = category }
-                )
-            }
-            item {
-                CategoryManagerCard(
-                    enabledCategories = state.settings.enabledCategories,
-                    categoryDisplays = state.categoryDisplays,
-                    onToggle = { category, enabled ->
-                        viewModel.setCategoryEnabled(category, enabled)
-                    }
-                )
-            }
-            item {
-                Text(
-                    "Log",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
+
+            item { SectionHeader("Recent Activity") }
             if (sessionDays.isEmpty()) {
                 item { EmptyLogHint() }
             } else {
@@ -202,36 +191,28 @@ fun LeisurePoolScreen(
                     )
                 }
             }
-            item { BudgetTargetCard(viewModel = viewModel, snapshot = state.settings) }
-            if (state.activities.isNotEmpty()) {
-                item {
-                    Text(
-                        "Activity Pool",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-                items(state.activities, key = { it.id }) { activity ->
-                    ActivityRow(
-                        activity = activity,
-                        categoryDisplays = state.categoryDisplays,
-                        onCheckOff = {
-                            val defaultDuration = activity.defaultDurationMinutes
-                            if (defaultDuration != null && defaultDuration > 0) {
-                                logCheckOff(activity, defaultDuration)
-                            } else {
-                                checkingOff = activity
-                            }
-                        },
-                        onEdit = { editing = activity },
-                        onToggleEnabled = { enabled ->
-                            viewModel.setActivityEnabled(activity, enabled)
-                        },
-                        onDelete = { viewModel.deleteActivity(activity) }
-                    )
-                }
+
+            item {
+                ManageSection(
+                    expanded = manageExpanded,
+                    onToggle = { manageExpanded = !manageExpanded },
+                    viewModel = viewModel,
+                    snapshot = state.settings,
+                    enabledCategories = state.settings.enabledCategories,
+                    categoryDisplays = state.categoryDisplays,
+                    activities = state.activities,
+                    onEditActivity = { editing = it },
+                    onCheckOffActivity = { activity ->
+                        val defaultDuration = activity.defaultDurationMinutes
+                        if (defaultDuration != null && defaultDuration > 0) {
+                            logCheckOff(activity, defaultDuration)
+                        } else {
+                            checkingOff = activity
+                        }
+                    }
+                )
             }
+
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
@@ -370,40 +351,83 @@ fun LeisurePoolScreen(
     }
 }
 
+private val LeisureAccent = Color(0xFF8B5CF6)
+
 @Composable
-private fun TodayProgressCard(minutesLogged: Int, targetMinutes: Int) {
-    val accent = Color(0xFF8B5CF6)
-    val fraction = if (targetMinutes > 0) {
-        (minutesLogged.toFloat() / targetMinutes).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Today",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = if (targetMinutes > 0) {
-                        "$minutesLogged / $targetMinutes min"
-                    } else {
-                        "$minutesLogged min"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = accent
-                )
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 0.dp)
+    )
+}
+
+@Composable
+private fun TodayHeroCard(
+    minutesLogged: Int,
+    targetMinutes: Int,
+    breakdown: Map<LeisureCategory, Int>,
+    enabledCategories: List<LeisureCategory>,
+    displayFor: (LeisureCategory) -> LeisureCategoryDisplay
+) {
+    val accent = LeisureAccent
+    val fractionRaw = if (targetMinutes > 0) minutesLogged.toFloat() / targetMinutes else 0f
+    val fraction by animateFloatAsState(
+        targetValue = fractionRaw.coerceIn(0f, 1f),
+        label = "leisure-progress"
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Today",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "$minutesLogged",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = accent
+                        )
+                        Text(
+                            text = " min",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
+                }
+                if (targetMinutes > 0) {
+                    Text(
+                        text = "of $targetMinutes min",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             if (targetMinutes > 0) {
                 LinearProgressIndicator(
                     progress = { fraction },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = accent
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = accent,
+                    trackColor = accent.copy(alpha = 0.16f)
                 )
             } else {
                 Text(
@@ -412,59 +436,132 @@ private fun TodayProgressCard(minutesLogged: Int, targetMinutes: Int) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            val totalBreakdown = enabledCategories.sumOf { breakdown[it] ?: 0 }
+            if (totalBreakdown > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    enabledCategories.forEach { category ->
+                        val minutes = breakdown[category] ?: 0
+                        val display = displayFor(category)
+                        BreakdownPill(
+                            emoji = display.emoji,
+                            minutes = minutes,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun CategoryLogCard(
+private fun BreakdownPill(
+    emoji: String,
+    minutes: Int,
+    modifier: Modifier = Modifier
+) {
+    val faded = minutes == 0
+    val contentColor = if (faded) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = emoji,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "$minutes",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor
+        )
+    }
+}
+
+@Composable
+private fun CategoryTileGrid(
+    categories: List<LeisureCategory>,
+    activitiesByCategory: Map<LeisureCategory, List<LeisureActivityEntity>>,
+    displayFor: (LeisureCategory) -> LeisureCategoryDisplay,
+    onCategoryClick: (LeisureCategory) -> Unit
+) {
+    if (categories.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        categories.chunked(2).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                row.forEach { category ->
+                    CategoryTile(
+                        display = displayFor(category),
+                        activityCount = activitiesByCategory[category]?.count { it.enabled } ?: 0,
+                        onClick = { onCategoryClick(category) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryTile(
     display: LeisureCategoryDisplay,
     activityCount: Int,
     onClick: () -> Unit,
-    onEdit: () -> Unit
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation()
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            Text(
-                text = display.emoji,
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = display.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    text = display.emoji,
+                    style = MaterialTheme.typography.headlineSmall
                 )
-                Text(
-                    text = when (activityCount) {
-                        0 -> "Tap to pick an activity"
-                        1 -> "1 activity • tap to pick"
-                        else -> "$activityCount activities • tap to pick"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = onEdit) {
+                Spacer(modifier = Modifier.weight(1f))
                 Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit ${display.label} Category",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Log ${display.label}",
+                    tint = LeisureAccent
                 )
             }
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Log ${display.label}",
-                tint = MaterialTheme.colorScheme.primary
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = display.label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = when (activityCount) {
+                    0 -> "No activities"
+                    1 -> "1 activity"
+                    else -> "$activityCount activities"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -605,25 +702,110 @@ private fun SessionRow(
 
 @Composable
 private fun EmptyLogHint() {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Nothing Logged Yet",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Tap a category card above to log your first leisure session.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    Text(
+        text = "Nothing logged yet — tap a category above to start.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun ManageSection(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    viewModel: LeisurePoolViewModel,
+    snapshot: com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot,
+    enabledCategories: Set<LeisureCategory>,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
+    activities: List<LeisureActivityEntity>,
+    onEditActivity: (LeisureActivityEntity) -> Unit,
+    onCheckOffActivity: (LeisureActivityEntity) -> Unit
+) {
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "manage-chevron"
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Manage",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${snapshot.dailyTargetMinutes} min/day · ${enabledCategories.size} categories",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.rotate(chevronRotation),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    DailyMinimumSubsection(viewModel = viewModel, snapshot = snapshot)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    CategoriesSubsection(
+                        enabledCategories = enabledCategories,
+                        categoryDisplays = categoryDisplays,
+                        onToggle = { category, enabled ->
+                            viewModel.setCategoryEnabled(category, enabled)
+                        }
+                    )
+                    if (activities.isNotEmpty()) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        ActivityPoolSubsection(
+                            activities = activities,
+                            categoryDisplays = categoryDisplays,
+                            onCheckOff = onCheckOffActivity,
+                            onEdit = onEditActivity,
+                            onToggleEnabled = { activity, enabled ->
+                                viewModel.setActivityEnabled(activity, enabled)
+                            },
+                            onDelete = { viewModel.deleteActivity(it) }
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun BudgetTargetCard(
+private fun SubsectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun DailyMinimumSubsection(
     viewModel: LeisurePoolViewModel,
     snapshot: com.averycorp.prismtask.data.preferences.LeisureBudgetSnapshot
 ) {
@@ -634,10 +816,9 @@ private fun BudgetTargetCard(
     var weekendTarget by remember(snapshot) {
         mutableIntStateOf(snapshot.weekendTargetMinutes ?: snapshot.dailyTargetMinutes)
     }
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Daily Minimum", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        SubsectionLabel("Daily Minimum")
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(
                 text = "$dailyTarget minutes",
                 style = MaterialTheme.typography.bodyMedium,
@@ -650,9 +831,12 @@ private fun BudgetTargetCard(
                 valueRange = 0f..LeisureBudgetPreferences.MAX_TARGET.toFloat() / 4f,
                 steps = 0
             )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Different Minimum On Weekends", modifier = Modifier.weight(1f))
+                Text(
+                    "Different Minimum On Weekends",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
                 Switch(
                     checked = weekendOverrideEnabled,
                     onCheckedChange = { enabled ->
@@ -662,7 +846,6 @@ private fun BudgetTargetCard(
                 )
             }
             if (weekendOverrideEnabled) {
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Weekend: $weekendTarget minutes",
                     style = MaterialTheme.typography.bodyMedium,
@@ -681,61 +864,72 @@ private fun BudgetTargetCard(
 }
 
 @Composable
-private fun CategoryManagerCard(
+private fun CategoriesSubsection(
     enabledCategories: Set<LeisureCategory>,
     categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
     onToggle: (LeisureCategory, Boolean) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Categories",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Add or remove categories from your leisure pool. Disabled categories are hidden from the log and from suggestions.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            LeisureCategory.values().forEach { category ->
-                val isEnabled = category in enabledCategories
-                val display = categoryDisplays[category]
-                    ?: LeisureCategoryDisplay(category.emoji, category.label)
-                val canDisable = !isEnabled || enabledCategories.size > 1
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = display.emoji,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = display.label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = isEnabled,
-                        enabled = canDisable,
-                        onCheckedChange = { onToggle(category, it) }
-                    )
-                }
-            }
-            if (enabledCategories.size <= 1) {
-                Spacer(modifier = Modifier.height(4.dp))
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        SubsectionLabel("Categories")
+        LeisureCategory.values().forEach { category ->
+            val isEnabled = category in enabledCategories
+            val display = categoryDisplays[category]
+                ?: LeisureCategoryDisplay(category.emoji, category.label)
+            val canDisable = !isEnabled || enabledCategories.size > 1
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "Keep at least one category enabled.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = display.emoji,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = display.label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = isEnabled,
+                    enabled = canDisable,
+                    onCheckedChange = { onToggle(category, it) }
                 )
             }
+        }
+        if (enabledCategories.size <= 1) {
+            Text(
+                "Keep at least one category enabled.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivityPoolSubsection(
+    activities: List<LeisureActivityEntity>,
+    categoryDisplays: Map<LeisureCategory, LeisureCategoryDisplay>,
+    onCheckOff: (LeisureActivityEntity) -> Unit,
+    onEdit: (LeisureActivityEntity) -> Unit,
+    onToggleEnabled: (LeisureActivityEntity, Boolean) -> Unit,
+    onDelete: (LeisureActivityEntity) -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        SubsectionLabel("Activity Pool")
+        activities.forEach { activity ->
+            ActivityRow(
+                activity = activity,
+                categoryDisplays = categoryDisplays,
+                onCheckOff = { onCheckOff(activity) },
+                onEdit = { onEdit(activity) },
+                onToggleEnabled = { enabled -> onToggleEnabled(activity, enabled) },
+                onDelete = { onDelete(activity) }
+            )
         }
     }
 }
@@ -749,59 +943,85 @@ private fun ActivityRow(
     onToggleEnabled: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(activity.name, style = MaterialTheme.typography.bodyLarge)
-                val parsedCategory = LeisureCategory.fromStringOrNull(activity.category)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (parsedCategory != null) {
-                        val parsedDisplay = categoryDisplays[parsedCategory]
-                            ?: LeisureCategoryDisplay(parsedCategory.emoji, parsedCategory.label)
-                        AssistChip(
-                            onClick = onEdit,
-                            label = {
-                                Text("${parsedDisplay.emoji} ${parsedDisplay.label}")
-                            },
-                            colors = AssistChipDefaults.assistChipColors()
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    activity.defaultDurationMinutes?.let { duration ->
-                        Text(
-                            "$duration min default",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+    var menuOpen by remember { mutableStateOf(false) }
+    val parsedCategory = LeisureCategory.fromStringOrNull(activity.category)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = activity.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (activity.enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 }
+            )
+            val parts = buildList {
+                parsedCategory?.let {
+                    val d = categoryDisplays[it] ?: LeisureCategoryDisplay(it.emoji, it.label)
+                    add("${d.emoji} ${d.label}")
+                }
+                activity.defaultDurationMinutes?.let { add("$it min") }
+                if (!activity.enabled) add("Disabled")
             }
-            IconButton(
-                onClick = onCheckOff,
-                enabled = activity.enabled
-            ) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Check Off As Done",
-                    tint = if (activity.enabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+            if (parts.isNotEmpty()) {
+                Text(
+                    text = parts.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit Activity")
-            }
-            Switch(
-                checked = activity.enabled,
-                onCheckedChange = onToggleEnabled
+        }
+        IconButton(onClick = onCheckOff, enabled = activity.enabled) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = "Log ${activity.name}",
+                tint = if (activity.enabled) LeisureAccent else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete Activity")
+        }
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "More Options For ${activity.name}",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    onClick = {
+                        menuOpen = false
+                        onEdit()
+                    },
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                )
+                DropdownMenuItem(
+                    text = { Text(if (activity.enabled) "Disable" else "Enable") },
+                    onClick = {
+                        menuOpen = false
+                        onToggleEnabled(!activity.enabled)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        menuOpen = false
+                        onDelete()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                )
             }
         }
     }

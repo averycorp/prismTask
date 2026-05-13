@@ -8,4 +8,5 @@
     android:targetCellHeight="2"
     android:updatePeriodMillis="900000"
     android:widgetCategory="home_screen"
-    android:previewLayout="@layout/widget_preview_focus" />
+    android:previewLayout="@layout/widget_preview_focus"
+    android:previewImage="@drawable/widget_thumb_focus" />
