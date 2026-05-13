@@ -886,15 +886,15 @@ private fun CategoriesSubsection(
 ) {
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
         SubsectionLabel("Categories")
-        LeisureCategory.values().forEach { category ->
-            val isEnabled = category in enabledCategories
+        val activeBuiltIns = LeisureCategory.values().filter { it in enabledCategories }
+        val removedBuiltIns = LeisureCategory.values().filter { it !in enabledCategories }
+        activeBuiltIns.forEach { category ->
             val display = categoryDisplays[category]
                 ?: LeisureCategoryDisplay(category.emoji, category.label)
-            val canDisable = !isEnabled || enabledCategories.size > 1 || customCategories.isNotEmpty()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = isEnabled) {
+                    .clickable {
                         onEditCategoryRef(
                             LeisureCategoryRef.BuiltIn(category, display.label, display.emoji)
                         )
@@ -918,20 +918,53 @@ private fun CategoriesSubsection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = isEnabled,
-                    enabled = canDisable,
-                    onCheckedChange = { onToggle(category, it) }
-                )
+                IconButton(onClick = { onToggle(category, false) }) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove ${display.label}",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
-        if (enabledCategories.size + customCategories.size <= 1) {
-            Text(
-                "Keep at least one category active.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        if (removedBuiltIns.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
+            SubsectionLabel("Removed Defaults")
+            removedBuiltIns.forEach { category ->
+                val display = categoryDisplays[category]
+                    ?: LeisureCategoryDisplay(category.emoji, category.label)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = display.emoji,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = display.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { onToggle(category, true) }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Restore")
+                    }
+                }
+            }
         }
         if (customCategories.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
