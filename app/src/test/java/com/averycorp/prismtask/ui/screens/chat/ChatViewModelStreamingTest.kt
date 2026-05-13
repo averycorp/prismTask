@@ -20,6 +20,7 @@ import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.averycorp.prismtask.domain.usecase.ResolvedTask
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -187,7 +188,7 @@ class ChatViewModelStreamingTest {
         // owns the message list, so this is what reaches the screen.
         val textSlot = slot<String>()
         val actionsSlot = slot<List<ChatActionResponse>>()
-        verify {
+        coVerify {
             chatRepository.commitAssistantTurn(
                 userText = any(),
                 text = capture(textSlot),
@@ -226,7 +227,7 @@ class ChatViewModelStreamingTest {
             viewModel.error.value
         )
         assertEquals(ChatViewModel.ChatTurnState.Idle, viewModel.turnState.value)
-        verify(exactly = 0) {
+        coVerify(exactly = 0) {
             chatRepository.commitAssistantTurn(
                 userText = any(),
                 text = any(),
@@ -261,7 +262,7 @@ class ChatViewModelStreamingTest {
 
         val textSlot = slot<String>()
         val actionsSlot = slot<List<ChatActionResponse>>()
-        verify {
+        coVerify {
             chatRepository.commitAssistantTurn(
                 userText = any(),
                 text = capture(textSlot),
@@ -284,7 +285,7 @@ class ChatViewModelStreamingTest {
         advanceUntilIdle()
 
         assertEquals(ChatViewModel.ChatTurnState.Idle, viewModel.turnState.value)
-        verify(exactly = 0) {
+        coVerify(exactly = 0) {
             chatRepository.commitAssistantTurn(
                 userText = any(),
                 text = any(),
@@ -313,7 +314,7 @@ class ChatViewModelStreamingTest {
         advanceUntilIdle()
 
         val textSlot = slot<String>()
-        verify {
+        coVerify {
             chatRepository.commitAssistantTurn(
                 userText = any(),
                 text = capture(textSlot),

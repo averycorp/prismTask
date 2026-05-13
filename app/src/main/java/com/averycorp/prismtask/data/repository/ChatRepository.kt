@@ -17,9 +17,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -173,23 +174,26 @@ constructor(
         userMessage: String,
         taskContextId: Long? = null,
         taskContext: ChatTaskContext? = null
-    ): Flow<ChatStreamEvent> {
+    ): Flow<ChatStreamEvent> = flow {
         resetIfNewDay()
         val convId = _conversationId.value
 
-        val historyPayload = runBlocking {
-            chatMessageDao.getForConversation(convId)
-                .takeLast(maxHistoryPairs * 2)
-                .map { ChatHistoryEntry(role = it.role, content = it.content) }
-        }
+        // Suspend the rolling-history fetch inside the cold flow's coroutine
+        // context so the caller's collector dispatcher (not a blocking thread)
+        // drives it. Replaces an earlier runBlocking on the calling thread.
+        val historyPayload = chatMessageDao.getForConversation(convId)
+            .takeLast(maxHistoryPairs * 2)
+            .map { ChatHistoryEntry(role = it.role, content = it.content) }
 
-        return streamClient.stream(
-            ChatRequest(
-                message = userMessage,
-                conversationId = convId,
-                taskContextId = taskContextId,
-                taskContext = taskContext,
-                history = historyPayload
+        emitAll(
+            streamClient.stream(
+                ChatRequest(
+                    message = userMessage,
+                    conversationId = convId,
+                    taskContextId = taskContextId,
+                    taskContext = taskContext,
+                    history = historyPayload
+                )
             )
         )
     }
@@ -202,7 +206,7 @@ constructor(
      * are used as Room PKs so pullHistory()'s REPLACE-on-PK collapses
      * cleanly; on cancel (or older backend) we fall back to fresh UUIDs.
      */
-    fun commitAssistantTurn(
+    suspend fun commitAssistantTurn(
         userText: String,
         text: String,
         actions: List<ChatActionResponse>,
@@ -231,14 +235,12 @@ constructor(
             // +1ms so chronological retrieval orders user-then-assistant.
             createdAt = now + 1
         )
-        runBlocking {
-            chatMessageDao.upsertAll(listOf(userRow, assistantRow))
-            // Mirror the authoritative AI-memory snapshot in lockstep with
-            // the chat messages. Empty list (legacy backend or no prefs)
-            // collapses to a no-op REPLACE-all.
-            if (userPreferences.isNotEmpty()) {
-                userAiPreferenceRepository.mirrorFromChat(userPreferences)
-            }
+        chatMessageDao.upsertAll(listOf(userRow, assistantRow))
+        // Mirror the authoritative AI-memory snapshot in lockstep with
+        // the chat messages. Empty list (legacy backend or no prefs)
+        // collapses to a no-op REPLACE-all.
+        if (userPreferences.isNotEmpty()) {
+            userAiPreferenceRepository.mirrorFromChat(userPreferences)
         }
     }
 

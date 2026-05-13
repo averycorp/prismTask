@@ -15,7 +15,6 @@ import com.averycorp.prismtask.data.calendar.FREQUENCY_MANUAL
 import com.averycorp.prismtask.data.calendar.FREQUENCY_REALTIME
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,12 +36,17 @@ constructor(
      * Inspects current preferences and (re)schedules [CalendarSyncWorker]
      * accordingly. Safe to call repeatedly — uses `UPDATE` policy so
      * duplicate calls don't pile up jobs.
+     *
+     * Callers are expected to run this from a coroutine scope (the
+     * application scope on startup, or `viewModelScope` from Settings).
+     * DataStore reads suspend, so this stays off the main thread by
+     * the caller's dispatcher rather than wrapping in a runBlocking.
      */
-    fun applyPreferences() = runBlocking {
+    suspend fun applyPreferences() {
         val enabled = calendarSyncPreferences.getCalendarSyncEnabled()
         if (!enabled) {
             cancel()
-            return@runBlocking
+            return
         }
         val frequency = calendarSyncPreferences.getSyncFrequency().first()
         val intervalMinutes = when (frequency) {
@@ -53,7 +57,7 @@ constructor(
         }
         if (intervalMinutes == null) {
             cancel()
-            return@runBlocking
+            return
         }
         val request = PeriodicWorkRequestBuilder<CalendarSyncWorker>(
             intervalMinutes,
