@@ -433,7 +433,12 @@ internal fun DetailsTabContent(
                     applyPriority = selections.applyPriority,
                     applyProject = selections.applyProject,
                     applyTags = selections.applyTags,
-                    applySubtasks = selections.applySubtasks
+                    applySubtasks = selections.applySubtasks,
+                    applyLifeCategory = selections.applyLifeCategory,
+                    applyEstimatedDuration = selections.applyEstimatedDuration,
+                    applyLocation = selections.applyLocation,
+                    applyRecurrenceHint = selections.applyRecurrenceHint,
+                    applyReminderOffset = selections.applyReminderOffset
                 )
             }
         )

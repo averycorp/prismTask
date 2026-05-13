@@ -129,10 +129,71 @@ data class FileExtractedSubtaskResponse(
 )
 
 /**
+ * One person mentioned in the uploaded file. Any subset of fields may be null;
+ * the LLM is instructed to omit entries with only a name and no contact info.
+ */
+data class FileContactResponse(
+    val name: String? = null,
+    val email: String? = null,
+    val phone: String? = null
+)
+
+/**
+ * Deterministic file-side metadata block. The backend fills this from the
+ * raw bytes / parser output before invoking the LLM, so it's available even
+ * when the AI extraction returns nothing actionable. All fields nullable
+ * because the answer depends on the file type — only PDFs carry
+ * ``pageCount``, only XLSX carry ``sheetNames`` etc.
+ */
+data class FileTechnicalMetadataResponse(
+    @SerializedName("file_size_bytes") val fileSizeBytes: Long? = null,
+    // PDF
+    @SerializedName("page_count") val pageCount: Int? = null,
+    @SerializedName("doc_title") val docTitle: String? = null,
+    @SerializedName("doc_author") val docAuthor: String? = null,
+    @SerializedName("doc_subject") val docSubject: String? = null,
+    @SerializedName("doc_keywords") val docKeywords: String? = null,
+    @SerializedName("doc_creation_date") val docCreationDate: String? = null,
+    @SerializedName("doc_modification_date") val docModificationDate: String? = null,
+    // DOCX
+    @SerializedName("doc_last_modified_by") val docLastModifiedBy: String? = null,
+    @SerializedName("doc_revision") val docRevision: Int? = null,
+    @SerializedName("paragraph_count") val paragraphCount: Int? = null,
+    @SerializedName("table_count") val tableCount: Int? = null,
+    // XLSX
+    @SerializedName("sheet_names") val sheetNames: List<String> = emptyList(),
+    @SerializedName("sheet_count") val sheetCount: Int? = null,
+    @SerializedName("row_count_total") val rowCountTotal: Int? = null,
+    // Images
+    @SerializedName("width_px") val widthPx: Int? = null,
+    @SerializedName("height_px") val heightPx: Int? = null,
+    @SerializedName("image_taken_at") val imageTakenAt: String? = null,
+    @SerializedName("camera_make") val cameraMake: String? = null,
+    @SerializedName("camera_model") val cameraModel: String? = null,
+    @SerializedName("gps_lat") val gpsLat: Double? = null,
+    @SerializedName("gps_lon") val gpsLon: Double? = null,
+    // Text-like
+    @SerializedName("line_count") val lineCount: Int? = null,
+    @SerializedName("word_count") val wordCount: Int? = null,
+    @SerializedName("char_count") val charCount: Int? = null
+)
+
+/**
  * Suggestion payload for `POST /api/v1/ai/files/extract`. The Android UI
  * renders this in `FileImportSuggestionSheet`; the user picks which fields
  * to apply before any task state is mutated. All list fields default to
  * empty so a missing JSON field never NPEs the deserializer.
+ *
+ * Three groups of fields:
+ *   1. Task-shape fields (title / description / due / priority / project /
+ *      tags / subtasks) — directly applied to the editor on accept.
+ *   2. Enrichment fields (lifeCategory / estimatedDurationMinutes /
+ *      recurrenceHint / location / reminderOffsetMinutes / urls / contacts
+ *      / keyEntities / documentType / actionOrInfo / language) — LLM-extracted,
+ *      surfaced with their own apply toggles where the field maps to a
+ *      task property.
+ *   3. ``technicalMetadata`` — deterministic file-side metadata. Read-only
+ *      panel in the sheet; never applied to the task draft.
  */
 data class FileExtractionResponse(
     val title: String = "",
@@ -146,7 +207,19 @@ data class FileExtractionResponse(
     val confidence: Float = 0f,
     val notes: String? = null,
     @SerializedName("source_file_name") val sourceFileName: String? = null,
-    @SerializedName("source_mime_type") val sourceMimeType: String? = null
+    @SerializedName("source_mime_type") val sourceMimeType: String? = null,
+    @SerializedName("life_category") val lifeCategory: String? = null,
+    @SerializedName("estimated_duration_minutes") val estimatedDurationMinutes: Int? = null,
+    @SerializedName("recurrence_hint") val recurrenceHint: String? = null,
+    val location: String? = null,
+    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int? = null,
+    val urls: List<String> = emptyList(),
+    val contacts: List<FileContactResponse> = emptyList(),
+    @SerializedName("key_entities") val keyEntities: List<String> = emptyList(),
+    @SerializedName("document_type") val documentType: String? = null,
+    @SerializedName("action_or_info") val actionOrInfo: String? = null,
+    val language: String? = null,
+    @SerializedName("technical_metadata") val technicalMetadata: FileTechnicalMetadataResponse? = null
 )
 
 // G — vision: extract tasks from a screenshot. Reuses
