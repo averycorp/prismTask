@@ -24,9 +24,11 @@ val LocalCardCornerRadius = compositionLocalOf<Dp> { 12.dp }
 val LocalShowCardBorders = staticCompositionLocalOf { true }
 
 /**
- * Alpha (0f..1f) applied to the outer border of habit-style cards
- * (HabitItem, BuiltInHabitCard, BookableHabitItem, SelfCareRoutineCard).
- * Default 0.4f preserves the value used before this knob was added.
+ * Alpha (0f..1f) applied to the outer border of habit-style cards on both
+ * the Habits tab (HabitItem, BuiltInHabitCard, BookableHabitItem,
+ * SelfCareRoutineCard) and the Today screen (TodayHabitCheckItem,
+ * BookableHabitReminderCard). Default 0.4f preserves the value used before
+ * this knob was added.
  */
 val LocalHabitBorderBrightness = compositionLocalOf { 0.4f }
 
