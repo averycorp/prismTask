@@ -61,10 +61,31 @@ class ProjectsPaneViewModelTest {
         val handle = SavedStateHandle()
         val vm = buildViewModel(FakeProjectDao(), FakeMilestoneDao(), handle)
 
+        vm.setStatusFilter(ProjectStatus.COMPLETED)
+
+        assertEquals("COMPLETED", handle.get<String?>(ProjectsPaneViewModel.KEY_STATUS_FILTER))
+        assertEquals(ProjectStatus.COMPLETED, vm.statusFilter.first())
+    }
+
+    @Test
+    fun `setStatusFilter rejects ARCHIVED since archived view is separate`() = runTest {
+        val handle = SavedStateHandle()
+        val vm = buildViewModel(FakeProjectDao(), FakeMilestoneDao(), handle)
+
         vm.setStatusFilter(ProjectStatus.ARCHIVED)
 
-        assertEquals("ARCHIVED", handle.get<String?>(ProjectsPaneViewModel.KEY_STATUS_FILTER))
-        assertEquals(ProjectStatus.ARCHIVED, vm.statusFilter.first())
+        assertEquals(null, handle.get<String?>(ProjectsPaneViewModel.KEY_STATUS_FILTER))
+        assertEquals(null, vm.statusFilter.first())
+    }
+
+    @Test
+    fun `SavedStateHandle with stale ARCHIVED filter falls back to ACTIVE`() = runTest {
+        val handle = SavedStateHandle()
+        handle[ProjectsPaneViewModel.KEY_STATUS_FILTER] = "ARCHIVED"
+
+        val vm = buildViewModel(FakeProjectDao(), FakeMilestoneDao(), handle)
+
+        assertEquals(ProjectStatus.ACTIVE, vm.statusFilter.first())
     }
 
     @Test
@@ -137,7 +158,7 @@ class ProjectsPaneViewModelTest {
     }
 
     @Test
-    fun `projects flow reflects the selected status filter`() = runTest {
+    fun `projects flow reflects the selected status filter and excludes ARCHIVED from All`() = runTest {
         val projectDao = FakeProjectDao().apply {
             projects.add(ProjectEntity(id = 1, name = "Act", status = "ACTIVE"))
             projects.add(ProjectEntity(id = 2, name = "Done", status = "COMPLETED"))
@@ -154,7 +175,47 @@ class ProjectsPaneViewModelTest {
 
         vm.setStatusFilter(null)
         advanceUntilIdle()
-        assertEquals(setOf("Act", "Done", "Gone"), vm.projects.first().map { it.project.name }.toSet())
+        // All-filter must drop archived rows — archived projects only show
+        // up inside the separate archived view (see showArchived test).
+        assertEquals(setOf("Act", "Done"), vm.projects.first().map { it.project.name }.toSet())
+    }
+
+    @Test
+    fun `setShowArchived swaps projects flow to ARCHIVED-only and persists`() = runTest {
+        val projectDao = FakeProjectDao().apply {
+            projects.add(ProjectEntity(id = 1, name = "Act", status = "ACTIVE"))
+            projects.add(ProjectEntity(id = 2, name = "Done", status = "COMPLETED"))
+            projects.add(ProjectEntity(id = 3, name = "Gone", status = "ARCHIVED"))
+            projects.add(ProjectEntity(id = 4, name = "AlsoGone", status = "ARCHIVED"))
+        }
+        val handle = SavedStateHandle()
+        val vm = buildViewModel(projectDao, FakeMilestoneDao(), handle)
+        advanceUntilIdle()
+        assertEquals(setOf("Act"), vm.projects.first().map { it.project.name }.toSet())
+
+        vm.setShowArchived(true)
+        advanceUntilIdle()
+
+        assertEquals(true, handle.get<Boolean?>(ProjectsPaneViewModel.KEY_SHOW_ARCHIVED))
+        assertEquals(setOf("Gone", "AlsoGone"), vm.projects.first().map { it.project.name }.toSet())
+
+        vm.setShowArchived(false)
+        advanceUntilIdle()
+        assertEquals(false, handle.get<Boolean?>(ProjectsPaneViewModel.KEY_SHOW_ARCHIVED))
+        assertEquals(setOf("Act"), vm.projects.first().map { it.project.name }.toSet())
+    }
+
+    @Test
+    fun `archivedCount reflects the number of ARCHIVED projects`() = runTest {
+        val projectDao = FakeProjectDao().apply {
+            projects.add(ProjectEntity(id = 1, name = "Act", status = "ACTIVE"))
+            projects.add(ProjectEntity(id = 2, name = "Gone1", status = "ARCHIVED"))
+            projects.add(ProjectEntity(id = 3, name = "Gone2", status = "ARCHIVED"))
+        }
+        val vm = buildViewModel(projectDao, FakeMilestoneDao(), SavedStateHandle())
+        advanceUntilIdle()
+
+        assertEquals(2, vm.archivedCount.first())
     }
 
     // ---------------------------------------------------------------------
