@@ -80,6 +80,12 @@ constructor(
         const val MAX_TARGET = 1440
         const val DEFAULT_TARGET = 60
 
+        // Sentinel for an explicitly-empty enabled-categories set. The
+        // DataStore key being absent means "never set, default to all
+        // built-ins"; this marker says "the user removed every built-in
+        // on purpose" so the read path doesn't snap them back.
+        private const val EXPLICIT_NONE_SENTINEL = "__none__"
+
         private val DAILY_TARGET_KEY = intPreferencesKey("leisure_daily_target_minutes")
         private val WEEKEND_TARGET_KEY = intPreferencesKey("leisure_weekend_target_minutes")
         private val WEEKEND_OVERRIDE_KEY = booleanPreferencesKey("leisure_weekend_override_enabled")
@@ -115,13 +121,15 @@ constructor(
         val pendingDate = prefs[PENDING_EFFECTIVE_DATE_KEY]?.let { raw ->
             runCatching { LocalDate.parse(raw) }.getOrNull()
         }
-        val enabledCategories: Set<LeisureCategory> =
-            prefs[ENABLED_CATEGORIES_KEY]
-                ?.split(",")
-                ?.mapNotNull { LeisureCategory.fromStringOrNull(it.trim()) }
-                ?.toSet()
-                ?.takeIf { it.isNotEmpty() }
-                ?: LeisureCategory.DEFAULT_ENABLED
+        val rawEnabled = prefs[ENABLED_CATEGORIES_KEY]
+        val enabledCategories: Set<LeisureCategory> = when {
+            rawEnabled == null -> LeisureCategory.DEFAULT_ENABLED
+            rawEnabled == EXPLICIT_NONE_SENTINEL -> emptySet()
+            else -> rawEnabled
+                .split(",")
+                .mapNotNull { LeisureCategory.fromStringOrNull(it.trim()) }
+                .toSet()
+        }
         val customCategories: List<CustomLeisureCategory> =
             decodeCustomCategories(prefs[CUSTOM_CATEGORIES_KEY])
         return LeisureBudgetSnapshot(
@@ -184,9 +192,12 @@ constructor(
     }
 
     suspend fun setEnabledCategories(categories: Set<LeisureCategory>) {
-        if (categories.isEmpty()) return // never let the pool dead-state
         context.leisureBudgetDataStore.edit { prefs ->
-            prefs[ENABLED_CATEGORIES_KEY] = categories.joinToString(",") { it.name }
+            prefs[ENABLED_CATEGORIES_KEY] = if (categories.isEmpty()) {
+                EXPLICIT_NONE_SENTINEL
+            } else {
+                categories.joinToString(",") { it.name }
+            }
         }
     }
 
