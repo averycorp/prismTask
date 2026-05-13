@@ -58,11 +58,20 @@ data class AssignmentSummary(
     val completed: Boolean
 )
 
+data class CourseCompletionStatus(
+    val courseId: Long,
+    val name: String,
+    val code: String,
+    val icon: String,
+    val color: Int,
+    val completedToday: Boolean
+)
+
 data class SchoolworkCardState(
-    val habit: HabitCardState?,
+    val courses: List<CourseCompletionStatus>,
     val assignmentsDueToday: List<AssignmentSummary>
 ) {
-    val hasContent: Boolean get() = habit != null || assignmentsDueToday.isNotEmpty()
+    val hasContent: Boolean get() = courses.isNotEmpty() || assignmentsDueToday.isNotEmpty()
 }
 
 /**
@@ -163,7 +172,7 @@ constructor(
                     observeRoutineCard("bedtime", "Bedtime Routine", todayStart),
                     observeHouseworkCard(todayLocal),
                     observeRoutineCard("housework", "Housework", todayStart),
-                    observeSchoolworkCard(todayLocal, windowStart, windowEnd),
+                    observeSchoolworkCard(todayStart, windowStart, windowEnd),
                     observeLeisureBudgetCard(date),
                     dailyEssentialsPreferences.hasSeenHint
                 ) { args -> combineDailyEssentials(args) }
@@ -262,25 +271,26 @@ constructor(
         }
 
     private fun observeSchoolworkCard(
-        todayLocal: String,
+        todayStart: Long,
         windowStart: Long,
         windowEnd: Long
     ): Flow<SchoolworkCardState?> {
-        val habitCardFlow: Flow<HabitCardState?> =
-            dailyEssentialsPreferences.schoolworkHabitId.flatMapLatest { habitId ->
-                if (habitId == null) {
-                    flowOf(null)
-                } else {
-                    habitDao.getHabitById(habitId).flatMapLatest { habit ->
-                        if (habit == null || habit.isArchived) {
-                            flowOf(null)
-                        } else {
-                            habitCompletionDao.isCompletedOnDateLocal(habit.id, todayLocal)
-                                .map { completed -> habit.toHabitCardState(completed) }
-                        }
-                    }
-                }
+        val coursesFlow: Flow<List<CourseCompletionStatus>> = combine(
+            schoolworkDao.getActiveCourses(),
+            schoolworkDao.getCompletionsForDate(todayStart)
+        ) { courses, completions ->
+            val doneIds = completions.filter { it.completed }.map { it.courseId }.toSet()
+            courses.map { course ->
+                CourseCompletionStatus(
+                    courseId = course.id,
+                    name = course.name,
+                    code = course.code,
+                    icon = course.icon,
+                    color = course.color,
+                    completedToday = course.id in doneIds
+                )
             }
+        }
 
         val assignmentsFlow: Flow<List<AssignmentSummary>> = combine(
             schoolworkDao.getAssignmentsDueBetween(windowStart, windowEnd),
@@ -290,11 +300,11 @@ constructor(
             assignments.map { it.toSummary(courseById) }
         }
 
-        return combine(habitCardFlow, assignmentsFlow) { habit, assignments ->
-            if (habit == null && assignments.isEmpty()) {
+        return combine(coursesFlow, assignmentsFlow) { courses, assignments ->
+            if (courses.isEmpty() && assignments.isEmpty()) {
                 null
             } else {
-                SchoolworkCardState(habit = habit, assignmentsDueToday = assignments)
+                SchoolworkCardState(courses = courses, assignmentsDueToday = assignments)
             }
         }
     }

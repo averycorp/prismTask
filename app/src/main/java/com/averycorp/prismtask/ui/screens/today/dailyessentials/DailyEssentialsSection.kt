@@ -24,7 +24,7 @@ import com.averycorp.prismtask.ui.theme.LocalPrismColors
 data class DailyEssentialsActions(
     val onToggleRoutineStep: (routineType: String, stepId: String) -> Unit,
     val onToggleHousework: () -> Unit,
-    val onToggleSchoolworkHabit: () -> Unit,
+    val onToggleCourse: (courseId: Long) -> Unit,
     val onOpenAssignment: (assignmentId: Long) -> Unit,
     val onOpenLeisurePool: () -> Unit,
     val onDismissHint: () -> Unit,
@@ -106,7 +106,7 @@ fun DailyEssentialsSection(
             state.schoolwork?.takeIf { it.hasContent }?.let { schoolwork ->
                 SchoolworkCard(
                     state = schoolwork,
-                    onToggleHabit = actions.onToggleSchoolworkHabit,
+                    onToggleCourse = actions.onToggleCourse,
                     onOpenAssignment = actions.onOpenAssignment
                 )
             }

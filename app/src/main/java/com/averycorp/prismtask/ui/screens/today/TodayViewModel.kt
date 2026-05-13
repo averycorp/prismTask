@@ -749,7 +749,9 @@ constructor(
         SelfCareRepository.MORNING_HABIT_NAME,
         SelfCareRepository.BEDTIME_HABIT_NAME,
         SelfCareRepository.MEDICATION_HABIT_NAME,
-        SelfCareRepository.HOUSEWORK_HABIT_NAME
+        SelfCareRepository.HOUSEWORK_HABIT_NAME,
+        SchoolworkRepository.SCHOOL_HABIT_NAME,
+        LeisureBudgetRepository.LEISURE_META_HABIT_NAME
     )
 
     val todayHabits: StateFlow<List<HabitWithStatus>> = allTodayHabits
@@ -1250,9 +1252,14 @@ constructor(
         onToggleHabitCompletion(habitId, isCompleted)
     }
 
-    fun onToggleSchoolworkHabit() {
-        val habit = dailyEssentials.value.schoolwork?.habit ?: return
-        onToggleHabitCompletion(habit.habitId, habit.completedToday)
+    fun onToggleCourse(courseId: Long) {
+        viewModelScope.launch {
+            try {
+                schoolworkRepository.toggleCourseCompletion(courseId)
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to toggle course completion", e)
+            }
+        }
     }
 
     fun onDismissDailyEssentialsHint() {
