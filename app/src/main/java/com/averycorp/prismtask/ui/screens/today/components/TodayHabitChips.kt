@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.repository.HabitWithStatus
+import com.averycorp.prismtask.ui.theme.LocalHabitBorderBrightness
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
 import java.text.SimpleDateFormat
@@ -49,6 +50,7 @@ internal fun BookableHabitReminderCard(
     val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
     val noteStr = habit.bookedNote?.let { " — $it" } ?: ""
     val dateStr = habit.bookedDate?.let { dateFormat.format(Date(it)) } ?: ""
+    val borderAlpha = LocalHabitBorderBrightness.current
 
     Card(
         modifier = Modifier
@@ -56,7 +58,7 @@ internal fun BookableHabitReminderCard(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = colors.border,
+                color = colors.primary.copy(alpha = borderAlpha),
                 shape = MaterialTheme.shapes.medium
             ),
         shape = MaterialTheme.shapes.medium,

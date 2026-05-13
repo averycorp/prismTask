@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.repository.HabitWithStatus
 import com.averycorp.prismtask.ui.components.CircularCheckbox
 import com.averycorp.prismtask.ui.components.StreakBadge
+import com.averycorp.prismtask.ui.theme.LocalHabitBorderBrightness
 import com.averycorp.prismtask.ui.theme.LocalPrismAttrs
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 import com.averycorp.prismtask.ui.theme.LocalPrismFonts
@@ -63,6 +64,7 @@ internal fun TodayHabitCheckItem(
             colors.primary
         }
     }
+    val borderAlpha = LocalHabitBorderBrightness.current
 
     Card(
         modifier = modifier
@@ -70,7 +72,7 @@ internal fun TodayHabitCheckItem(
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
-                color = colors.border,
+                color = colors.primary.copy(alpha = borderAlpha),
                 shape = MaterialTheme.shapes.medium
             )
             .prismCardBackground()
