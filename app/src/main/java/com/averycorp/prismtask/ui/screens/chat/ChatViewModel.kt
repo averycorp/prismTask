@@ -350,12 +350,14 @@ constructor(
         // fired), so commitAssistantTurn falls back to fresh client UUIDs.
         // The cancelled turn is not server-persisted; pullHistory won't
         // double-render it because no server row exists for it.
-        chatRepository.commitAssistantTurn(
-            userText = userText,
-            text = committed,
-            actions = emptyList(),
-            userTaskContext = userTaskContext
-        )
+        viewModelScope.launch {
+            chatRepository.commitAssistantTurn(
+                userText = userText,
+                text = committed,
+                actions = emptyList(),
+                userTaskContext = userTaskContext
+            )
+        }
         finishTurn()
     }
 

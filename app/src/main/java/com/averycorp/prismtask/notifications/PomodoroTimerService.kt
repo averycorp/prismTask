@@ -27,7 +27,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 /**
  * Foreground service that runs a Pomodoro focus/break countdown. A plain
@@ -213,30 +212,36 @@ class PomodoroTimerService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         manager?.cancel(NOTIFICATION_ID_ONGOING)
 
-        val buzzUntilDismissed = runBlocking {
-            TimerPreferences(this@PomodoroTimerService)
+        // Hoist the (suspend) preference read + optional continuous-buzz onto
+        // serviceScope so the service never blocks its dispatcher to await
+        // DataStore / VibrationAdapter work. The completion notification and
+        // stop sequence now happen inside the coroutine to preserve ordering
+        // (notification must post BEFORE startContinuousBuzz arms its
+        // dismiss path).
+        serviceScope.launch {
+            val buzzUntilDismissed = TimerPreferences(this@PomodoroTimerService)
                 .getBuzzUntilDismissed()
                 .first()
-        }
-        val completion = buildCompletionNotification(buzzUntilDismissed)
-        manager?.notify(NOTIFICATION_ID_COMPLETE, completion)
+            val completion = buildCompletionNotification(buzzUntilDismissed)
+            manager?.notify(NOTIFICATION_ID_COMPLETE, completion)
 
-        if (buzzUntilDismissed) {
-            runBlocking { NotificationHelper.startContinuousBuzz(this@PomodoroTimerService) }
-        }
-
-        sendBroadcast(
-            Intent(ACTION_COMPLETE).apply {
-                setPackage(packageName)
-                putExtra(EXTRA_SESSION_INDEX, sessionIndex)
-                putExtra(EXTRA_SESSION_TYPE, sessionType)
-                putExtra(EXTRA_OWNER, owner)
+            if (buzzUntilDismissed) {
+                NotificationHelper.startContinuousBuzz(this@PomodoroTimerService)
             }
-        )
-        serviceScope.launch { pushWidgetRunState(running = false, paused = false) }
 
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+            sendBroadcast(
+                Intent(ACTION_COMPLETE).apply {
+                    setPackage(packageName)
+                    putExtra(EXTRA_SESSION_INDEX, sessionIndex)
+                    putExtra(EXTRA_SESSION_TYPE, sessionType)
+                    putExtra(EXTRA_OWNER, owner)
+                }
+            )
+            pushWidgetRunState(running = false, paused = false)
+
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     /**
