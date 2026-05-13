@@ -51,13 +51,19 @@ fun AboutSection(
         modifier = versionModifier
     )
     Text(
-        text = "In Memory of Morris and Tobi Isaac",
+        text = "Made by Avery Karlin",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 4.dp)
     )
     Text(
-        text = "Made by Avery Karlin",
+        text = "In Honor of Andrei Karlin",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+    Text(
+        text = "In Memory of Morris and Tobi Isaac",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
