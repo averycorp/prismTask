@@ -2,6 +2,9 @@ package com.averycorp.prismtask.data.repository
 
 import com.averycorp.prismtask.data.local.dao.TaskTimingDao
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
+import com.averycorp.prismtask.data.remote.SyncTracker
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -14,7 +17,8 @@ import org.junit.Test
 class TaskTimingRepositoryTest {
 
     private val dao = FakeTaskTimingDao()
-    private val repo = TaskTimingRepository(dao)
+    private val syncTracker = mockk<SyncTracker>(relaxed = true)
+    private val repo = TaskTimingRepository(dao, syncTracker)
 
     @Test
     fun `logTime inserts a manual entry with the supplied duration`() = runTest {
@@ -137,6 +141,35 @@ class TaskTimingRepositoryTest {
     @Test
     fun `getByIdOnce returns null when the id is unknown`() = runTest {
         assertNull(dao.getByIdOnce(999L))
+    }
+
+    @Test
+    fun `logTime tracks a create on the sync queue`() = runTest {
+        val id = repo.logTime(taskId = 1L, durationMinutes = 25)
+        coVerify { syncTracker.trackCreate(id, "task_timing") }
+    }
+
+    @Test
+    fun `update tracks an update on the sync queue`() = runTest {
+        val id = repo.logTime(1L, 10)
+        repo.update(TaskTimingEntity(id = id, taskId = 1L, durationMinutes = 30))
+        coVerify { syncTracker.trackUpdate(id, "task_timing") }
+    }
+
+    @Test
+    fun `deleteById tracks a delete on the sync queue`() = runTest {
+        val id = repo.logTime(1L, 10)
+        repo.deleteById(id)
+        coVerify { syncTracker.trackDelete(id, "task_timing") }
+    }
+
+    @Test
+    fun `deleteByTaskId tracks a delete for every removed timing`() = runTest {
+        val id1 = repo.logTime(1L, 10)
+        val id2 = repo.logTime(1L, 25)
+        repo.deleteByTaskId(1L)
+        coVerify { syncTracker.trackDelete(id1, "task_timing") }
+        coVerify { syncTracker.trackDelete(id2, "task_timing") }
     }
 
     /** In-memory DAO fake for JVM-only repository tests. */

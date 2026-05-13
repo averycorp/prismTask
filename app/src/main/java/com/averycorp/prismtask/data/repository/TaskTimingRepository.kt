@@ -2,18 +2,15 @@ package com.averycorp.prismtask.data.repository
 
 import com.averycorp.prismtask.data.local.dao.TaskTimingDao
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
+import com.averycorp.prismtask.data.remote.SyncTracker
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Repository wrapper around `TaskTimingDao`. Sync tracking is intentionally
- * NOT wired here — cross-device sync of `task_timings` is a follow-up
- * (P2-D, see `docs/audits/ANALYTICS_C4_C5_TIME_TRACKING_DESIGN.md`).
- */
 @Singleton
 class TaskTimingRepository @Inject constructor(
-    private val taskTimingDao: TaskTimingDao
+    private val taskTimingDao: TaskTimingDao,
+    private val syncTracker: SyncTracker
 ) {
     suspend fun logTime(
         taskId: Long,
@@ -32,14 +29,26 @@ class TaskTimingRepository @Inject constructor(
             source = source,
             notes = notes
         )
-        return taskTimingDao.insert(entity)
+        val id = taskTimingDao.insert(entity)
+        syncTracker.trackCreate(id, ENTITY_TYPE)
+        return id
     }
 
-    suspend fun update(timing: TaskTimingEntity) = taskTimingDao.update(timing)
+    suspend fun update(timing: TaskTimingEntity) {
+        taskTimingDao.update(timing)
+        syncTracker.trackUpdate(timing.id, ENTITY_TYPE)
+    }
 
-    suspend fun deleteById(id: Long) = taskTimingDao.deleteById(id)
+    suspend fun deleteById(id: Long) {
+        taskTimingDao.deleteById(id)
+        syncTracker.trackDelete(id, ENTITY_TYPE)
+    }
 
-    suspend fun deleteByTaskId(taskId: Long) = taskTimingDao.deleteByTaskId(taskId)
+    suspend fun deleteByTaskId(taskId: Long) {
+        val ids = taskTimingDao.getTimingsForTaskOnce(taskId).map { it.id }
+        taskTimingDao.deleteByTaskId(taskId)
+        ids.forEach { syncTracker.trackDelete(it, ENTITY_TYPE) }
+    }
 
     fun getTimingsForTask(taskId: Long): Flow<List<TaskTimingEntity>> =
         taskTimingDao.getTimingsForTask(taskId)
@@ -55,4 +64,8 @@ class TaskTimingRepository @Inject constructor(
 
     fun observeSumMinutesForTask(taskId: Long): Flow<Int> =
         taskTimingDao.observeSumMinutesForTask(taskId)
+
+    companion object {
+        private const val ENTITY_TYPE = "task_timing"
+    }
 }
