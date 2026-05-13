@@ -12,6 +12,7 @@ import com.averycorp.prismtask.domain.model.LeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureEnforcementMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import javax.inject.Inject
@@ -93,14 +94,8 @@ constructor(
     fun observeSnapshot(): Flow<LeisureBudgetSnapshot> =
         context.leisureBudgetDataStore.data.map { prefs -> readSnapshot(prefs) }
 
-    suspend fun snapshotOnce(): LeisureBudgetSnapshot {
-        var snap: LeisureBudgetSnapshot = LeisureBudgetSnapshot()
-        context.leisureBudgetDataStore.data.collect {
-            snap = readSnapshot(it)
-            return@collect
-        }
-        return snap
-    }
+    suspend fun snapshotOnce(): LeisureBudgetSnapshot =
+        readSnapshot(context.leisureBudgetDataStore.data.first())
 
     private fun readSnapshot(prefs: Preferences): LeisureBudgetSnapshot {
         val rawEnforcement = prefs[ENFORCEMENT_KEY]
