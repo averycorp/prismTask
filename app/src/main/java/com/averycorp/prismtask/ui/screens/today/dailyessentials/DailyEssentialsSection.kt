@@ -27,9 +27,6 @@ data class DailyEssentialsActions(
     val onToggleSchoolworkHabit: () -> Unit,
     val onOpenAssignment: (assignmentId: Long) -> Unit,
     val onOpenLeisurePool: () -> Unit,
-    val onStartLeisureTimer: () -> Unit,
-    val onLogPastLeisure: () -> Unit,
-    val onRefreshLeisureSuggestion: () -> Unit,
     val onDismissHint: () -> Unit,
     val onOpenSettings: () -> Unit
 )
@@ -116,10 +113,7 @@ fun DailyEssentialsSection(
             if (leisureVisible) {
                 LeisureBudgetCard(
                     state = state.leisureBudget,
-                    onTapBody = actions.onOpenLeisurePool,
-                    onStartTimer = actions.onStartLeisureTimer,
-                    onLogPast = actions.onLogPastLeisure,
-                    onRefresh = actions.onRefreshLeisureSuggestion
+                    onTapBody = actions.onOpenLeisurePool
                 )
             }
             state.bedtime?.let { bedtime ->

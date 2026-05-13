@@ -95,7 +95,6 @@ constructor(
     private val dailyEssentialsPreferences: DailyEssentialsPreferences,
     private val selfCareRepository: SelfCareRepository,
     private val schoolworkRepository: SchoolworkRepository,
-    private val leisureRepository: LeisureBudgetRepository,
     private val localDateFlow: LocalDateFlow,
     private val tourCardPreferences: TourCardPreferences,
     private val coachmarkController: CoachmarkController,
@@ -1258,20 +1257,6 @@ constructor(
     fun onToggleSchoolworkHabit() {
         val habit = dailyEssentials.value.schoolwork?.habit ?: return
         onToggleHabitCompletion(habit.habitId, habit.completedToday)
-    }
-
-    /**
-     * Leisure Budget v2.0 — Today card actions.
-     * Refresh a leisure suggestion (consumes one of the daily refreshes).
-     */
-    fun onRefreshLeisureSuggestion() {
-        viewModelScope.launch {
-            try {
-                leisureRepository.refreshSuggestion()
-            } catch (e: Exception) {
-                Log.e("TodayVM", "Failed to refresh leisure suggestion", e)
-            }
-        }
     }
 
     fun onDismissDailyEssentialsHint() {

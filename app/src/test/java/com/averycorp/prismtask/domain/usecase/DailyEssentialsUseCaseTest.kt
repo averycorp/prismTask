@@ -84,6 +84,7 @@ class DailyEssentialsUseCaseTest {
                 AssignmentSummary(
                     id = 1L,
                     title = "Essay",
+                    courseId = 7L,
                     courseName = "History",
                     courseColor = 0,
                     completed = false

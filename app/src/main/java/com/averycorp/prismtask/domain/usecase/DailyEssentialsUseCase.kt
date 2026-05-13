@@ -52,6 +52,7 @@ data class HabitCardState(
 data class AssignmentSummary(
     val id: Long,
     val title: String,
+    val courseId: Long,
     val courseName: String,
     val courseColor: Int,
     val completed: Boolean
@@ -314,6 +315,7 @@ constructor(
         return AssignmentSummary(
             id = id,
             title = title,
+            courseId = courseId,
             courseName = course?.name.orEmpty(),
             courseColor = course?.color ?: 0,
             completed = completed

@@ -96,12 +96,73 @@ fun SchoolworkCard(
                 }
             }
 
-            state.assignmentsDueToday.forEach { assignment ->
-                AssignmentRow(
-                    summary = assignment,
-                    onClick = { onOpenAssignment(assignment.id) }
-                )
+            groupByClass(state.assignmentsDueToday).forEach { group ->
+                ClassGroup(group = group, onOpenAssignment = onOpenAssignment)
             }
+        }
+    }
+}
+
+private data class ClassAssignmentGroup(
+    val courseId: Long,
+    val courseName: String,
+    val courseColor: Int,
+    val assignments: List<AssignmentSummary>
+)
+
+private fun groupByClass(
+    assignments: List<AssignmentSummary>
+): List<ClassAssignmentGroup> {
+    if (assignments.isEmpty()) return emptyList()
+    // Preserve assignment order within each class; order classes by first
+    // appearance so the visual order matches the underlying due-date sort.
+    val byCourse = linkedMapOf<Long, MutableList<AssignmentSummary>>()
+    for (a in assignments) {
+        byCourse.getOrPut(a.courseId) { mutableListOf() }.add(a)
+    }
+    return byCourse.map { (courseId, items) ->
+        ClassAssignmentGroup(
+            courseId = courseId,
+            courseName = items.first().courseName,
+            courseColor = items.first().courseColor,
+            assignments = items
+        )
+    }
+}
+
+@Composable
+private fun ClassGroup(
+    group: ClassAssignmentGroup,
+    onOpenAssignment: (assignmentId: Long) -> Unit
+) {
+    val dot = if (group.courseColor != 0) Color(group.courseColor) else Color.Gray
+    val headerLabel = group.courseName.ifBlank { "Unassigned" }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(dot)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = headerLabel,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        group.assignments.forEach { assignment ->
+            AssignmentRow(
+                summary = assignment,
+                onClick = { onOpenAssignment(assignment.id) }
+            )
         }
     }
 }
@@ -111,40 +172,23 @@ private fun AssignmentRow(
     summary: AssignmentSummary,
     onClick: () -> Unit
 ) {
-    val dot = if (summary.courseColor != 0) Color(summary.courseColor) else Color.Gray
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 48.dp)
+            .defaultMinSize(minHeight = 44.dp)
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(dot)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = summary.title,
-                style = MaterialTheme.typography.bodyMedium,
-                textDecoration = if (summary.completed) TextDecoration.LineThrough else null,
-                color = if (summary.completed) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
-            )
-            if (summary.courseName.isNotBlank()) {
-                Text(
-                    text = summary.courseName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Text(
+            text = summary.title,
+            style = MaterialTheme.typography.bodyMedium,
+            textDecoration = if (summary.completed) TextDecoration.LineThrough else null,
+            color = if (summary.completed) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
             }
-        }
+        )
     }
 }
