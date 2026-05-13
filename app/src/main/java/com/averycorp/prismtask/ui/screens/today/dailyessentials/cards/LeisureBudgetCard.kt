@@ -1,6 +1,5 @@
 package com.averycorp.prismtask.ui.screens.today.dailyessentials.cards
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,21 +17,14 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.domain.usecase.LeisureBudgetCardState
 
 /**
- * Leisure Budget v2.0 — Item 3.
- *
- * Replaces the v1.x slot-pick LeisureCard with a minimum-progress card:
- *   • progress bar of minutesLogged / targetMinutes
- *   • suggested activity (recency-weighted random pull)
- *   • Start Timer / Log Past / Refresh actions
- *   • empty-pool CTA → LeisurePoolScreen
+ * Today-page leisure summary card. Display-only: shows progress toward
+ * the daily minimum and the current suggestion. Logging time / completing
+ * a slot lives on the Leisure screen — tap the card body to open it.
  */
 @Composable
 fun LeisureBudgetCard(
     state: LeisureBudgetCardState,
     onTapBody: () -> Unit,
-    onStartTimer: () -> Unit,
-    onLogPast: () -> Unit,
-    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = Color(0xFF8B5CF6)
@@ -99,14 +90,6 @@ fun LeisureBudgetCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (!state.poolIsEmpty && state.suggestionName != null) {
-                    TextButton(onClick = onStartTimer) { Text("Start") }
-                    TextButton(onClick = onRefresh) { Text("Refresh") }
-                }
-                TextButton(onClick = onLogPast) { Text("Log Past") }
             }
         }
     }

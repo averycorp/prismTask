@@ -706,15 +706,6 @@ fun TodayScreen(
                                     onOpenLeisurePool = {
                                         navController.navigate(PrismTaskRoute.Leisure.route)
                                     },
-                                    onStartLeisureTimer = {
-                                        navController.navigate(PrismTaskRoute.Leisure.route)
-                                    },
-                                    onLogPastLeisure = {
-                                        navController.navigate(PrismTaskRoute.Leisure.route)
-                                    },
-                                    onRefreshLeisureSuggestion = {
-                                        viewModel.onRefreshLeisureSuggestion()
-                                    },
                                     onDismissHint = { viewModel.onDismissDailyEssentialsHint() },
                                     onOpenSettings = {
                                         navController.navigate("settings/layout")

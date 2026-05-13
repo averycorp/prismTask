@@ -17,7 +17,6 @@ import com.averycorp.prismtask.data.preferences.TourCardPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.CheckInLogRepository
 import com.averycorp.prismtask.data.repository.HabitRepository
-import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.MedicationRefillRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
@@ -78,7 +77,6 @@ class TodayViewModelTest {
     private lateinit var dailyEssentialsPreferences: DailyEssentialsPreferences
     private lateinit var selfCareRepository: SelfCareRepository
     private lateinit var schoolworkRepository: SchoolworkRepository
-    private lateinit var leisureRepository: LeisureBudgetRepository
     private lateinit var localDateFlow: LocalDateFlow
     private lateinit var tourCardPreferences: TourCardPreferences
     private lateinit var coachmarkController: CoachmarkController
@@ -108,7 +106,6 @@ class TodayViewModelTest {
         dailyEssentialsPreferences = mockk(relaxed = true)
         selfCareRepository = mockk(relaxed = true)
         schoolworkRepository = mockk(relaxed = true)
-        leisureRepository = mockk(relaxed = true)
         tourCardPreferences = mockk(relaxed = true)
         coEvery { tourCardPreferences.eligible() } returns flowOf(false)
         coEvery { tourCardPreferences.dismissed() } returns flowOf(false)
@@ -190,7 +187,6 @@ class TodayViewModelTest {
         dailyEssentialsPreferences,
         selfCareRepository,
         schoolworkRepository,
-        leisureRepository,
         localDateFlow,
         tourCardPreferences,
         coachmarkController,
