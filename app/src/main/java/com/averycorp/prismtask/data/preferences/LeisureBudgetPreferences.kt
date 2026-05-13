@@ -8,9 +8,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.averycorp.prismtask.domain.model.CustomLeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureEnforcementMode
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -45,6 +48,7 @@ data class LeisureBudgetSnapshot(
     val weekendTargetMinutes: Int? = null,
     val enforcementMode: LeisureEnforcementMode = LeisureEnforcementMode.SOFT,
     val enabledCategories: Set<LeisureCategory> = LeisureCategory.DEFAULT_ENABLED,
+    val customCategories: List<CustomLeisureCategory> = emptyList(),
     val pendingEnforcementMode: LeisureEnforcementMode? = null,
     val pendingEnforcementEffectiveDate: LocalDate? = null
 ) {
@@ -81,6 +85,7 @@ constructor(
         private val WEEKEND_OVERRIDE_KEY = booleanPreferencesKey("leisure_weekend_override_enabled")
         private val ENFORCEMENT_KEY = stringPreferencesKey("leisure_enforcement_mode")
         private val ENABLED_CATEGORIES_KEY = stringPreferencesKey("leisure_enabled_categories")
+        private val CUSTOM_CATEGORIES_KEY = stringPreferencesKey("leisure_custom_categories")
         private val PENDING_ENFORCEMENT_KEY = stringPreferencesKey("leisure_pending_enforcement_mode")
         private val PENDING_EFFECTIVE_DATE_KEY = stringPreferencesKey("leisure_pending_effective_date")
 
@@ -117,15 +122,47 @@ constructor(
                 ?.toSet()
                 ?.takeIf { it.isNotEmpty() }
                 ?: LeisureCategory.DEFAULT_ENABLED
+        val customCategories: List<CustomLeisureCategory> =
+            decodeCustomCategories(prefs[CUSTOM_CATEGORIES_KEY])
         return LeisureBudgetSnapshot(
             dailyTargetMinutes = (prefs[DAILY_TARGET_KEY] ?: DEFAULT_TARGET)
                 .coerceIn(MIN_TARGET, MAX_TARGET),
             weekendTargetMinutes = weekendTarget?.coerceIn(MIN_TARGET, MAX_TARGET),
             enforcementMode = enforcement,
             enabledCategories = enabledCategories,
+            customCategories = customCategories,
             pendingEnforcementMode = pendingEnforcement,
             pendingEnforcementEffectiveDate = pendingDate
         )
+    }
+
+    private fun decodeCustomCategories(raw: String?): List<CustomLeisureCategory> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val id = obj.optString("id").takeIf { it.isNotBlank() } ?: continue
+                    val label = obj.optString("label").takeIf { it.isNotBlank() } ?: continue
+                    val emoji = obj.optString("emoji").takeIf { it.isNotBlank() } ?: continue
+                    add(CustomLeisureCategory(id = id, label = label, emoji = emoji))
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun encodeCustomCategories(categories: List<CustomLeisureCategory>): String {
+        val arr = JSONArray()
+        categories.forEach { c ->
+            arr.put(
+                JSONObject()
+                    .put("id", c.id)
+                    .put("label", c.label)
+                    .put("emoji", c.emoji)
+            )
+        }
+        return arr.toString()
     }
 
     suspend fun setDailyTargetMinutes(minutes: Int) {
@@ -223,6 +260,37 @@ constructor(
             }
         }
         return promoted
+    }
+
+    /**
+     * Add or replace a user-defined custom category. Matched by [CustomLeisureCategory.id].
+     * Trims blanks; no-ops when label or emoji is blank.
+     */
+    suspend fun upsertCustomCategory(category: CustomLeisureCategory) {
+        val trimmedLabel = category.label.trim()
+        val trimmedEmoji = category.emoji.trim()
+        if (trimmedLabel.isBlank() || trimmedEmoji.isBlank()) return
+        if (!CustomLeisureCategory.isCustomId(category.id)) return
+        context.leisureBudgetDataStore.edit { prefs ->
+            val current = decodeCustomCategories(prefs[CUSTOM_CATEGORIES_KEY])
+            val updated = current.toMutableList().apply {
+                val idx = indexOfFirst { it.id == category.id }
+                val normalized = category.copy(label = trimmedLabel, emoji = trimmedEmoji)
+                if (idx >= 0) set(idx, normalized) else add(normalized)
+            }
+            prefs[CUSTOM_CATEGORIES_KEY] = encodeCustomCategories(updated)
+        }
+    }
+
+    /** Remove a custom category by id. No-op when [id] doesn't exist. */
+    suspend fun removeCustomCategory(id: String) {
+        context.leisureBudgetDataStore.edit { prefs ->
+            val current = decodeCustomCategories(prefs[CUSTOM_CATEGORIES_KEY])
+            val updated = current.filterNot { it.id == id }
+            if (updated.size != current.size) {
+                prefs[CUSTOM_CATEGORIES_KEY] = encodeCustomCategories(updated)
+            }
+        }
     }
 
     /**

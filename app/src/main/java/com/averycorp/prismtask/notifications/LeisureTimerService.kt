@@ -148,11 +148,12 @@ class LeisureTimerService : Service() {
         val elapsedMin = elapsedSec / 60
         serviceScope.launch {
             if (elapsedMin >= 1) {
-                val cat = LeisureCategory.fromStringOrNull(category) ?: LeisureCategory.PASSIVE
+                val categoryId = category.takeIf { it.isNotBlank() }
+                    ?: LeisureCategory.PASSIVE.name
                 runCatching {
-                    repository.logSession(
+                    repository.logSessionByCategoryId(
                         activityId = activityId,
-                        category = cat,
+                        categoryId = categoryId,
                         durationMinutes = elapsedMin,
                         loggedAt = System.currentTimeMillis(),
                         source = LeisureSessionSource.TIMER

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.averycorp.prismtask.domain.model.LeisureCategory
+import com.averycorp.prismtask.domain.model.LeisureCategoryRef
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,17 +41,26 @@ fun LogPastLeisureSheet(
 
     var selectedActivityId by remember { mutableStateOf<Long?>(null) }
     var freeText by remember { mutableStateOf("") }
-    val defaultCategory = state.settings.enabledCategories.firstOrNull()
-        ?: LeisureCategory.PHYSICAL
-    var category by remember(defaultCategory) { mutableStateOf(defaultCategory) }
+    val defaultCategoryId = state.visibleCategoryRefs.firstOrNull()?.id
+        ?: LeisureCategory.PHYSICAL.name
+    var categoryId by remember(defaultCategoryId) { mutableStateOf(defaultCategoryId) }
     var durationStr by remember { mutableStateOf("30") }
     var pickerOpen by remember { mutableStateOf(false) }
     var categoryMenuOpen by remember { mutableStateOf(false) }
 
     val selectedActivity = state.activities.firstOrNull { it.id == selectedActivityId }
-    val selectableCategories = LeisureCategory.values()
-        .filter { it in state.settings.enabledCategories || it == category }
-        .ifEmpty { LeisureCategory.values().toList() }
+    val activityRef = selectedActivity?.let { state.refForId(it.category) }
+    val selectableRefs: List<LeisureCategoryRef> = (
+        state.visibleCategoryRefs +
+            listOfNotNull(state.refForId(categoryId))
+        ).distinctBy { it.id }
+        .ifEmpty {
+            LeisureCategory.values().map {
+                LeisureCategoryRef.BuiltIn(it, it.label, it.emoji)
+            }
+        }
+    val currentCategoryRef = selectableRefs.firstOrNull { it.id == categoryId }
+        ?: selectableRefs.first()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -65,16 +75,14 @@ fun LogPastLeisureSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             Box {
-                val selectedCategory = selectedActivity
-                    ?.let { LeisureCategory.fromStringOrNull(it.category) }
                 OutlinedButton(
                     onClick = { pickerOpen = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         when {
-                            selectedActivity != null && selectedCategory != null ->
-                                "${selectedCategory.emoji} ${selectedActivity.name}"
+                            selectedActivity != null && activityRef != null ->
+                                "${activityRef.emoji} ${selectedActivity.name}"
                             selectedActivity != null -> selectedActivity.name
                             freeText.isNotBlank() -> "Free text: $freeText"
                             else -> "Pick an activity…"
@@ -94,44 +102,42 @@ fun LogPastLeisureSheet(
                     )
                     val grouped = state.activities
                         .filter { it.enabled }
-                        .groupBy { LeisureCategory.fromStringOrNull(it.category) }
-                    LeisureCategory.values()
-                        .filter { it in state.settings.enabledCategories }
-                        .forEach { cat ->
-                            val items = grouped[cat].orEmpty()
-                            if (items.isEmpty()) return@forEach
-                            HorizontalDivider()
+                        .groupBy { it.category }
+                    state.visibleCategoryRefs.forEach { ref ->
+                        val items = grouped[ref.id].orEmpty()
+                        if (items.isEmpty()) return@forEach
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "${ref.emoji} ${ref.label}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            enabled = false,
+                            onClick = {}
+                        )
+                        items.forEach { activity ->
                             DropdownMenuItem(
                                 text = {
-                                    Text(
-                                        "${cat.emoji} ${cat.label}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    val durationSuffix = activity
+                                        .defaultDurationMinutes
+                                        ?.let { " • $it min" }.orEmpty()
+                                    Text("${activity.name}$durationSuffix")
                                 },
-                                enabled = false,
-                                onClick = {}
-                            )
-                            items.forEach { activity ->
-                                DropdownMenuItem(
-                                    text = {
-                                        val durationSuffix = activity
-                                            .defaultDurationMinutes
-                                            ?.let { " • $it min" }.orEmpty()
-                                        Text("${activity.name}$durationSuffix")
-                                    },
-                                    onClick = {
-                                        selectedActivityId = activity.id
-                                        category = cat
-                                        activity.defaultDurationMinutes?.let {
-                                            durationStr = it.toString()
-                                        }
-                                        pickerOpen = false
+                                onClick = {
+                                    selectedActivityId = activity.id
+                                    categoryId = ref.id
+                                    activity.defaultDurationMinutes?.let {
+                                        durationStr = it.toString()
                                     }
-                                )
-                            }
+                                    pickerOpen = false
+                                }
+                            )
                         }
+                    }
                 }
             }
 
@@ -153,17 +159,17 @@ fun LogPastLeisureSheet(
                     onClick = { categoryMenuOpen = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("${category.emoji} ${category.label}")
+                    Text("${currentCategoryRef.emoji} ${currentCategoryRef.label}")
                 }
                 DropdownMenu(
                     expanded = categoryMenuOpen,
                     onDismissRequest = { categoryMenuOpen = false }
                 ) {
-                    selectableCategories.forEach { c ->
+                    selectableRefs.forEach { ref ->
                         DropdownMenuItem(
-                            text = { Text("${c.emoji} ${c.label}") },
+                            text = { Text("${ref.emoji} ${ref.label}") },
                             onClick = {
-                                category = c
+                                categoryId = ref.id
                                 categoryMenuOpen = false
                             }
                         )
@@ -184,10 +190,10 @@ fun LogPastLeisureSheet(
                 onClick = {
                     val duration = durationStr.toIntOrNull() ?: 0
                     if (duration < 1) return@Button
-                    viewModel.logManualSession(
+                    viewModel.logManualSessionByCategoryId(
                         activityId = selectedActivityId,
                         freeTextName = if (selectedActivityId == null) freeText else null,
-                        category = category,
+                        categoryId = currentCategoryRef.id,
                         durationMinutes = duration
                     )
                     onDismiss()

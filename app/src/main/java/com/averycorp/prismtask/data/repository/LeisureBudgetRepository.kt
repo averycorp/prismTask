@@ -104,11 +104,30 @@ constructor(
         durationMinutes: Int,
         loggedAt: Long = System.currentTimeMillis(),
         source: LeisureSessionSource
+    ): Long = logSessionByCategoryId(
+        activityId = activityId,
+        categoryId = category.name,
+        durationMinutes = durationMinutes,
+        loggedAt = loggedAt,
+        source = source
+    )
+
+    /**
+     * String-id variant. Accepts either a built-in [LeisureCategory.name]
+     * or a custom category id (see
+     * [com.averycorp.prismtask.domain.model.CustomLeisureCategory.ID_PREFIX]).
+     */
+    suspend fun logSessionByCategoryId(
+        activityId: Long?,
+        categoryId: String,
+        durationMinutes: Int,
+        loggedAt: Long = System.currentTimeMillis(),
+        source: LeisureSessionSource
     ): Long {
         val id = sessionDao.insert(
             LeisureSessionEntity(
                 activityId = activityId,
-                category = category.name,
+                category = categoryId,
                 durationMinutes = durationMinutes.coerceAtLeast(1),
                 loggedAt = loggedAt,
                 source = source.name
@@ -238,10 +257,10 @@ constructor(
         // wired the streak yet; the Today card surfaces score breakdown
         // separately from the streak badge.
         val score = scorer.scoreDay(sessions, target, currentStreakDays = 0)
-        val candidates = activityDao.getEnabledInCategoriesOnce(
-            snapshot.enabledCategories.map { it.name }
-        )
-        val suggestion = if (candidates.isEmpty()) null else sampler.pick(candidates, snapshot.enabledCategories)
+        val allowedIds = allowedCategoryIds(snapshot)
+        val candidates = activityDao.getEnabledInCategoriesOnce(allowedIds.toList())
+        val suggestion = if (candidates.isEmpty()) null
+            else sampler.pickByCategoryIds(candidates, allowedIds)
         return TodayProgress(
             minutesLogged = minutesLogged,
             targetMinutes = target,
@@ -256,11 +275,15 @@ constructor(
      */
     suspend fun refreshSuggestion(): LeisureActivityEntity? {
         val snapshot = preferences.observeSnapshot().first()
-        val candidates = activityDao.getEnabledInCategoriesOnce(
-            snapshot.enabledCategories.map { it.name }
-        )
-        return if (candidates.isEmpty()) null else sampler.pick(candidates, snapshot.enabledCategories)
+        val allowedIds = allowedCategoryIds(snapshot)
+        val candidates = activityDao.getEnabledInCategoriesOnce(allowedIds.toList())
+        return if (candidates.isEmpty()) null
+            else sampler.pickByCategoryIds(candidates, allowedIds)
     }
+
+    private fun allowedCategoryIds(snapshot: LeisureBudgetSnapshot): Set<String> =
+        snapshot.enabledCategories.map { it.name }.toSet() +
+            snapshot.customCategories.map { it.id }.toSet()
 
     /**
      * Reactive sparkline data — last 7 days of minutes-logged-per-day
