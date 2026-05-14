@@ -276,6 +276,26 @@ export async function getTierStatesForDate(
   return snap.docs.map((d) => docToTierState(d.id, d.data()));
 }
 
+/**
+ * Range read used by `MedicationHistoryScreen` (parity Batch 5 PR-5).
+ * Filters by `dateIso` inclusive on both ends. Single Firestore range
+ * query rather than per-day fetches.
+ */
+export async function getTierStatesInRange(
+  uid: string,
+  startDateIso: string,
+  endDateIso: string,
+): Promise<MedicationTierState[]> {
+  const snap = await getDocs(
+    query(
+      tierStatesCol(uid),
+      where('dateIso', '>=', startDateIso),
+      where('dateIso', '<=', endDateIso),
+    ),
+  );
+  return snap.docs.map((d) => docToTierState(d.id, d.data()));
+}
+
 export async function getTierState(
   uid: string,
   dateIso: string,

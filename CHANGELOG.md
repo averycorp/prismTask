@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/medication): log/history view (parity Batch 5 PR-5). New
+  `/medication/history` route with `MedicationHistoryScreen.tsx` reads
+  `medication_doses` + `medication_tier_states` over the selected
+  lookback (7/30/90-day options). Grouped by date; per-medication
+  filter; tier badges per slot for each day. New
+  `getAllDosesInRange` / `getTierStatesInRange` cross-medication
+  helpers. Synthetic-skip rows are excluded.
 - feat(web/medication): refill management screen (parity Batch 5 PR-4).
   New `/medication/refills` route with `MedicationRefillScreen.tsx` lists
   every `users/{uid}/medication_refills` row with a Tier-coloured
