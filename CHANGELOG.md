@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage
