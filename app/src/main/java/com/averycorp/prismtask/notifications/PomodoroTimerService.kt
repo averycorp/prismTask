@@ -428,8 +428,8 @@ class PomodoroTimerService : Service() {
         silenceChannelSound: Boolean = false
     ): Notification {
         val title = when (sessionType) {
-            SESSION_TYPE_BREAK, SESSION_TYPE_LONG_BREAK -> "Break Complete!"
-            else -> "Session Complete!"
+            SESSION_TYPE_BREAK, SESSION_TYPE_LONG_BREAK -> "Break complete"
+            else -> "Session complete"
         }
         val body = when {
             buzzUntilDismissed -> TimerBuzzerDismissReceiver.BUZZ_BODY_TEXT
