@@ -4,6 +4,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import {
   Archive,
   ArchiveRestore,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -413,6 +414,16 @@ export function MedicationScreen() {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          <Link to="/medication/history">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="View history"
+              title="View history"
+            >
+              <CalendarDays className="h-4 w-4" />
+            </Button>
+          </Link>
           <Link to="/medication/refills">
             <Button
               variant="ghost"

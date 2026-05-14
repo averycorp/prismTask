@@ -133,6 +133,28 @@ export async function getDosesInRange(
 }
 
 /**
+ * Cross-medication range read used by `MedicationHistoryScreen`
+ * (parity Batch 5 PR-5). Returns every non-synthetic dose between the
+ * inclusive date bounds across all medications + custom entries. The
+ * UI groups by medication on the read side.
+ */
+export async function getAllDosesInRange(
+  uid: string,
+  startDateIso: string,
+  endDateIso: string,
+): Promise<MedicationDoseDoc[]> {
+  const q = query(
+    dosesCol(uid),
+    where('takenDateLocal', '>=', startDateIso),
+    where('takenDateLocal', '<=', endDateIso),
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => docToDose(d.id, d.data()))
+    .filter((d) => !d.is_synthetic_skip);
+}
+
+/**
  * Mark a dose as taken for `(medication, slot, day)`. Uses `setDoc(merge)`
  * with the deterministic id so a re-tap is idempotent.
  *
