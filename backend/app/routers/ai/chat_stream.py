@@ -23,6 +23,10 @@ from app.middleware.rate_limit import daily_ai_rate_limiter
 from app.models import ChatMessage as ChatMessageModel, User
 from app.schemas.ai import ChatActionPayload, ChatRequest
 from app.services.beta_codes import resolve_effective_tier
+from app.services.crisis_keywords import (
+    contains_crisis_signal,
+    crisis_safety_response,
+)
 
 from .memory import (
     _apply_preference_diff,
@@ -96,23 +100,42 @@ async def chat_stream(
         {"id": p.id, "text": p.preference_text} for p in existing_prefs
     ]
 
+    # G2 — defense-in-depth crisis pre-filter. Mirrors the non-streaming
+    # /chat handler. We synthesize a single 'done' event with the static
+    # safety reply rather than streaming tokens, since the static text is
+    # already complete and there is no upstream Claude call to await.
+    crisis_short_circuit = contains_crisis_signal(data.message)
+
     async def event_generator():
         persisted = False
         try:
-            from app.services.ai_productivity import generate_chat_response_stream
+            if crisis_short_circuit:
+                safety = crisis_safety_response()
 
-            stream_iter = generate_chat_response_stream(
-                message=data.message,
-                conversation_id=data.conversation_id,
-                task_context_id=data.task_context_id,
-                task_context=(
-                    data.task_context.model_dump(exclude_none=True)
-                    if data.task_context is not None
-                    else None
-                ),
-                history=[h.model_dump() for h in data.history],
-                user_preferences=prefs_for_prompt,
-            )
+                def _crisis_stream():
+                    yield {
+                        "type": "done",
+                        "message": safety["message"],
+                        "actions": [],
+                        "tokens_used": safety["tokens_used"],
+                    }
+
+                stream_iter = _crisis_stream()
+            else:
+                from app.services.ai_productivity import generate_chat_response_stream
+
+                stream_iter = generate_chat_response_stream(
+                    message=data.message,
+                    conversation_id=data.conversation_id,
+                    task_context_id=data.task_context_id,
+                    task_context=(
+                        data.task_context.model_dump(exclude_none=True)
+                        if data.task_context is not None
+                        else None
+                    ),
+                    history=[h.model_dump() for h in data.history],
+                    user_preferences=prefs_for_prompt,
+                )
             for event in stream_iter:
                 if event.get("type") == "done":
                     # Validate each AI-proposed action against

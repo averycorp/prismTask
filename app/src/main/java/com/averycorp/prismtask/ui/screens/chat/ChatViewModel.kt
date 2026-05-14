@@ -18,6 +18,7 @@ import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.toCalendarDayOfWeek
+import com.averycorp.prismtask.domain.model.CrisisKeywords
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
 import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
@@ -230,6 +231,19 @@ constructor(
         // guard covers streaming turns too.
         if (_turnState.value !is ChatTurnState.Idle) return
 
+        // R5 — Free-tier crisis-only chat fallback. A high-confidence
+        // crisis term short-circuits BEFORE the paywall check so a Free
+        // user never sees a paywall prompt on a crisis-keyword input —
+        // it looks like the chat responded warmly and pointed to the
+        // in-app resources surface. Pro users hit the backend, which
+        // has its own defense-in-depth pre-filter at the router layer
+        // (G2). Keeping the client check on for Pro too is harmless and
+        // saves one network round-trip.
+        if (CrisisKeywords.containsCrisisSignal(text)) {
+            renderClientSafetyReply(userText = text)
+            return
+        }
+
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_CONVERSATIONAL)) {
             _showUpgradePrompt.value = true
             return
@@ -261,6 +275,37 @@ constructor(
         // even if the user taps Stop before the task-context snapshot
         // resolves.
         streamingJob = contextSnapshotJob
+    }
+
+    /**
+     * R5 — client-side crisis safety reply. Reuses the chat-repository
+     * commit path so the user-then-assistant turn lands in Room with
+     * the same shape as a normal turn, just without ever calling the
+     * backend. The assistant content matches the backend's
+     * `CRISIS_STATIC_REPLY` so cross-device history (when the user is
+     * on Pro and synced) renders consistently.
+     *
+     * Notably:
+     *  - No paywall prompt is surfaced — Free users on crisis input
+     *    should never see "upgrade to unlock chat".
+     *  - No `actions` are emitted — the reply is text-only by design.
+     *  - The turn is NOT mirrored to the server. That's deliberate:
+     *    Free users have no server chat history at all, and Pro users
+     *    are routed through the streaming path which has its own
+     *    backend short-circuit. Leaving this purely local also means a
+     *    user who deletes the conversation never has a residue of the
+     *    crisis message on the backend.
+     */
+    private fun renderClientSafetyReply(userText: String) {
+        viewModelScope.launch {
+            val snapshot = buildTaskContextSnapshot(_contextTask.value)
+            chatRepository.commitAssistantTurn(
+                userText = userText,
+                text = CrisisKeywords.STATIC_REPLY,
+                actions = emptyList(),
+                userTaskContext = snapshot
+            )
+        }
     }
 
     private fun startStreamingTurn(text: String, snapshot: ChatTaskContext?) {
