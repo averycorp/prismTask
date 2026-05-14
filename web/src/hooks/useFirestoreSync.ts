@@ -57,6 +57,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   );
   const subscribeToStartOfDayHour = useSettingsStore(
     (s) => s.subscribeToStartOfDayHour,
+  );
   const subscribeToDependencies = useTaskDependencyStore(
     (s) => s.subscribeToDependencies,
   );

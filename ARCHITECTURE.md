@@ -218,8 +218,13 @@ The Android app maintains a local Room database that is significantly richer
 than the backend model. The Android app is the primary data store;
 Firebase Firestore provides cross-device cloud sync for core entities.
 
-**Current schema version: 54** (53 cumulative migrations,
-`MIGRATION_1_2` through `MIGRATION_53_54`)
+**Current schema version: read `CURRENT_DB_VERSION` in
+[`app/src/main/java/com/averycorp/prismtask/data/local/database/Migrations.kt`](app/src/main/java/com/averycorp/prismtask/data/local/database/Migrations.kt)
+(currently `82`).** Migrations are cumulative `MIGRATION_1_2` through
+`MIGRATION_{N-1}_{N}` and the source file is the canonical record — per-migration
+intent + backfill SQL live there. Don't restate the migration history in this
+doc; it drifts. The entity tables below capture the *shape* of each entity group
+but reference migrations only where the backfill semantics matter for callers.
 
 ### Entity Groups
 
@@ -298,6 +303,8 @@ Firebase Firestore provides cross-device cloud sync for core entities.
 | `sync_metadata` | Local ↔ Firestore cloud ID mapping |
 | `calendar_sync` | Google Calendar event sync records |
 | `usage_logs` | Keyword-based suggestion engine input |
+| `task_timings` | Per-task elapsed-time records (manual entries + Pomodoro auto-log); feeds time-tracking analytics |
+| `chat_messages` | Local Room mirror of AI Coach chat history (server-authoritative; `/api/v1/ai/chat/history` is the source of truth). No Firestore involvement — follows the BackendSyncService precedent. |
 
 ### Migration History (selected)
 
@@ -329,13 +336,18 @@ https://averytask-api.up.railway.app/api/v1
 
 ### Authentication
 
-| Endpoint          | Method | Description              |
-|-------------------|--------|--------------------------|
-| `/auth/register`  | POST   | Create account           |
-| `/auth/login`     | POST   | Get JWT access + refresh |
-| `/auth/refresh`   | POST   | Refresh access token     |
+| Endpoint          | Method | Description                                                       |
+|-------------------|--------|-------------------------------------------------------------------|
+| `/auth/firebase`  | POST   | Exchange a Firebase ID token for a backend JWT (modern clients)   |
+| `/auth/register`  | POST   | Create a backend-native account (legacy email/password path)      |
+| `/auth/login`     | POST   | Get JWT access + refresh (legacy email/password path)             |
+| `/auth/refresh`   | POST   | Refresh access token                                              |
+| `/auth/me`        | GET    | Current user                                                      |
 
-All other endpoints require `Authorization: Bearer <token>` header.
+Modern Android and web clients sign in with Firebase Auth, then call
+`/auth/firebase` to get a backend JWT for `Authorization: Bearer <token>`. The
+legacy email/password endpoints remain wired but are not exercised by current
+client builds.
 
 ### Goals
 

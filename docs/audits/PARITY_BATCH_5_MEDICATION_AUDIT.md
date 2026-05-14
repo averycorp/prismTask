@@ -286,3 +286,89 @@ Per `docs/audits/2026-04-25_migration_json_silent_default.md`:
   audit A.2 (Batch 6).
 
 ---
+
+## Phase 3 — Bundle summary
+
+**Shipped this session:**
+- PR #1344 — `docs/parity-batch-5-medication-audit`. Merged into `main`
+  (squash). Lands this audit doc with D-E2 / D-E3 / D-E4 on record.
+
+**Punted to Batch 5.1 (next session, in dependency order):**
+- PR-1 (E.1a) `feat/web-medication-crud-baseline` — ~600 LOC, foundational.
+- PR-2 (E.1b) `feat/web-medication-dose-toggle` — ~150 LOC, depends on PR-1.
+- PR-3 (E.1f) `feat/web-virtual-slot-derivation` — ~120 LOC, depends on PR-1.
+- PR-4 (E.1c) `feat/web-medication-refills` — ~400 LOC, depends on PR-1.
+- PR-5 (E.1d) `feat/web-medication-log-history` — ~300 LOC, depends on PR-2.
+- PR-6 (E.1e) `feat/web-medication-clinical-report` — ~250 web + ~150
+  backend; needs a new `/api/v1/medications/clinical-report` endpoint.
+- PR-7 (E.2) `refactor/medication-slots-collection-rename` — ~250 LOC,
+  web-only schema-merge per D-E2. **No Android Room touch.**
+- PR-8 (E.3) `refactor/medication-tier-state-deterministic-doc-ids` —
+  ~200 LOC, Android-only push-helper + one-time backfill per D-E3.
+  **No Room schema change.**
+- PR-9 (E.4) `refactor/medication-slot-completions-backend-authoritative`
+  — ~60 LOC, Android-only subtractive change per D-E4. Touches
+  `SyncService.kt`, `SyncDispatchTables.kt`, `SyncListenerManager.kt`,
+  `SyncPullOrchestrator.kt`.
+
+**Rationale for punt-not-ship:** Full 9-PR fan-out is ~10.5 engineer-days
+nominal; single-session capacity is ≤ 3 PRs. Shipping the audit alone
+gets the architectural decisions on record and unblocks parallel
+execution across follow-up sessions without re-litigating D-E2/D-E3/D-E4.
+
+**Risk surface preserved by punting:** Zero Room migrations land before
+the architectural decisions are reviewed. Zero `DROP COLUMN` operations
+exist anywhere in the 9-PR plan — that safety survives the punt because
+no implementation has shipped yet.
+
+---
+
+## Phase 4 — Claude Chat handoff block
+
+```
+Batch 5 Medication — Phase 1 audit shipped, Phase 2 follow-ups parked.
+
+Merged this session:
+- PR #1344 docs/parity-batch-5-medication-audit — architectural decisions
+  D-E2 / D-E3 / D-E4 locked in. Lives at
+  docs/audits/PARITY_BATCH_5_MEDICATION_AUDIT.md.
+
+Decisions to honor in follow-up sessions (do NOT re-litigate):
+- D-E2: Web migrates to `medication_slots` (NOT the parent audit's
+  `medication_slot_defs` direction). Web-only schema-merge; Android
+  Room untouched.
+- D-E3: Tier-state Firestore doc id is deterministic
+  `${medCloudId}__${dateIso}__${slotCloudId}`. Android-side push-helper
+  change + one-time backfill. Zero Room migration.
+- D-E4: Drop Android's legacy Firestore arms for
+  daily_essential_slot_completions; BackendSyncService is authoritative.
+
+Next-session targets (in dependency order — PR-1 is foundational):
+1. PR-1 feat/web-medication-crud-baseline       ~600 LOC web         2d
+2. PR-2 feat/web-medication-dose-toggle         ~150 LOC web (→PR-1) 0.5d
+3. PR-3 feat/web-virtual-slot-derivation        ~120 LOC web (→PR-1) 0.5d
+4. PR-4 feat/web-medication-refills             ~400 LOC web (→PR-1) 1.5d
+5. PR-5 feat/web-medication-log-history         ~300 LOC web (→PR-2) 1d
+6. PR-6 feat/web-medication-clinical-report     ~250 web+~150 backend 1.5d
+7. PR-7 refactor/medication-slots-collection-rename
+                                                ~250 LOC web         1.5d
+8. PR-8 refactor/medication-tier-state-deterministic-doc-ids
+                                                ~200 LOC Android,
+                                                no Room migration    1.5d
+9. PR-9 refactor/medication-slot-completions-backend-authoritative
+                                                ~60 LOC Android,
+                                                subtractive          0.5d
+
+Migration-hazard reminders:
+- Zero DROP COLUMN across the whole batch. PR-7/PR-8/PR-9 are all
+  no-Room-migration designs.
+- Backfills (PR-8) MUST be guarded by a one-shot preference flag and
+  use setDoc(..., {merge: true}) so retries are idempotent.
+- Web idb@^8.0.4 is broken on npm — node_modules symlink is the workaround.
+- Repo does NOT have GitHub auto-merge — use `gh pr merge <num> --squash`.
+
+To resume: read docs/audits/PARITY_BATCH_5_MEDICATION_AUDIT.md, then
+start PR-1. PR-1 is foundational — every other E.1.x PR depends on
+medications-write-path being live on web.
+```
+
