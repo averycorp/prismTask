@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
 - feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
