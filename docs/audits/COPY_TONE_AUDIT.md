@@ -408,3 +408,56 @@ Audited 99 user-facing strings across notifications, Today banners, streak/habit
 4. Starter prompt 2 (*"Help me reschedule overdue tasks"*) — rewriting to *"…tasks from earlier"* requires verifying the backend `/api/v1/ai/chat` router doesn't parse "overdue" as a routing keyword.
 ```
 
+---
+
+## Phase 3 update — Phase 2 shipped (2026-05-14)
+
+**Premise correction discovered at Phase 2 start.** PR [#1399](https://github.com/averycorp/prismTask/pull/1399) (`fix(mh-first): re-align user-facing copy with FORGIVENESS_FIRST and WORK_PLAY_RELAX`) merged at `2026-05-14T05:37:45Z`, **6 minutes before** this audit's Phase 1 doc PR [#1401](https://github.com/averycorp/prismTask/pull/1401) merged at `05:43:49Z`. PR #1399 ran in parallel as Bundle A of the `MENTAL_HEALTH_FIRST_AUDIT.md` (#1396) and fixed **3 of this audit's 8 RED items** before this audit's doc landed:
+
+| Audit RED # | Site | Status |
+|---:|---|---|
+| 1 | `OverloadCheckWorker.kt:82` prescriptive body | ✅ shipped by #1399 |
+| 2 | `TodayBalanceBar.kt:263` overload banner subtitle | ✅ shipped by #1399 |
+| 5 | `ForgivenessStreakSection.kt:37` banned phrase | ✅ shipped by #1399 |
+
+Phase 2 of *this* audit therefore narrowed to the 5 remaining RED + 1 adjacent YELLOW.
+
+### Phase 2 PRs shipped from this audit
+
+| PR | Surface | RED items closed | Audit refs |
+|---|---|---|---|
+| [#1410](https://github.com/averycorp/prismTask/pull/1410) | Notifications | #3 escalation headlines + #6/#7 "!" sweep + CognitiveLoadOverloadCheckWorker prescriptive bodies | RED #3, S1, S2 |
+| [#1411](https://github.com/averycorp/prismTask/pull/1411) | Analytics | #4 `Best`/`Worst` → `Highest`/`Lowest` | RED #4 |
+
+Each PR is structured one-commit-per-tone-fix so reverts stay surgical:
+- #1410 c1: escalation headlines (LOUD_VIBRATE "Action needed" → "Reminder"; FULL_SCREEN "Critical" → "Final reminder").
+- #1410 c2: timer-completion `"!"` sweep (NotificationHelper + PomodoroTimerService).
+- #1410 c3: CognitiveLoadOverloadCheckWorker bodies (voice-aligned to OverloadCheckWorker post-#1399).
+- #1411 c1: ProductivityScoreSection tile labels ("Best"/"Worst" → "Highest"/"Lowest").
+
+### Still RED / YELLOW after Phase 2 (deferred)
+
+- **S3 — `HabitsSection.kt:108-109,227-228` "missed" / "break" framing.** YELLOW pattern, settings copy.
+- **Channel label renames** ("Overload Alerts" / "Load Balance Alerts" / "Pomodoro Alerts"). YELLOW. Label-only rename safe; id rename orphans user settings.
+- **Starter prompt 2 "overdue"** (`ChatScreen.kt:394`). YELLOW. Backend routing-keyword verification required.
+- **Error message softening** ("Export failed" / "Import failed" / "Sync failed"). YELLOW.
+- **`AdvancedTuningViewModel.kt:241,243` "Invalid Cutoff" caption.** YELLOW. Blocks on operator's open question #2.
+- **Trend chips "Improving" / "Declining".** YELLOW. Blocks on operator's open question #3.
+
+### Bundled-by-coincidence note
+
+PR #1399 was prepared from a separate-but-related audit (`MENTAL_HEALTH_FIRST_AUDIT.md` #1396) that ran in parallel. Both audits independently identified `ForgivenessStreakSection.kt:37` as the verbatim-banned-phrase RED, and both independently identified the prescriptive-balance pattern. The two audits arrived at compatible rewrites (#1399 picked *"One missed day still counts as part of the streak"* vs this audit's *"A single missed day won't reset your streak"* — close enough that no follow-up reconciliation is needed).
+
+### Re-baselined PR-cost estimate
+
+Phase 2 actuals: 8–12 min per PR. The Phase 3 estimate of "~1 hr per surface inc. CI watch" was over by 4–5× because (a) no tests asserted on the changed strings, (b) all changes were pure-string with no behavioral coupling, and (c) auto-merge cleared immediately on copy-only PRs.
+
+### Memory updates landed (candidates)
+
+- *"When multiple mental-health-philosophy audits run in parallel, the second-to-ship Phase 2 must re-grep current source before editing — PR #1399 silently closed 3 of this audit's RED items between Phase 1 grep and Phase 2 start."* — worth banking.
+- *"Notification channel **labels** are user-visible but channel **ids** govern OS-side per-channel user settings. Label rename = transparent on next install. Id rename = orphans existing user settings under 'Other'."* — Android gotcha worth banking.
+
+### Schedule for next audit
+
+None auto-scheduled. Re-trigger criteria unchanged. The remaining YELLOW items above are operator-gated — surface for a follow-on prompt when the operator wants to close them.
+
