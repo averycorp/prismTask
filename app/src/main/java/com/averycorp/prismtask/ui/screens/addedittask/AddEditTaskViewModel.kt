@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.screens.addedittask
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -667,11 +668,10 @@ constructor(
      *   [force] is set (i.e. the operator explicitly tapped Auto to reset).
      * - Implicit auto-press (force=false): on UNCATEGORIZED, clears the chip
      *   so the next title edit gets another chance.
-     * - Explicit Auto tap (force=true): on UNCATEGORIZED, preserves any
-     *   existing chip and emits a Snackbar via [_errorMessages] so the user
-     *   isn't punished with a silent chip-clear when neither the keyword
-     *   classifier nor Claude can match (was reported as "Auto button does
-     *   nothing" — PR #1134 audit carry-over for OrganizeTab).
+     * - Explicit Auto tap (force=true): always leaves a real chip selected.
+     *   Keeps any existing chip when the classifier finds nothing; otherwise
+     *   falls back to [DEFAULT_LIFE_CATEGORY] so the press never silently
+     *   "does nothing" due to a blank or unmatched title.
      * - Never flips [lifeCategoryManuallySet] to `true` — that's reserved for
      *   real user taps so the boundary-suggestion gate at the top of this
      *   class can still override an auto-picked value.
@@ -691,59 +691,47 @@ constructor(
             lifeCategory = localPick
         } else if (!force) {
             lifeCategory = null
+        } else if (lifeCategory == null) {
+            lifeCategory = DEFAULT_LIFE_CATEGORY
         }
         if (force) {
-            tryUpgradeLifeCategoryWithClaude(localPickSucceeded = localPick != null)
+            tryUpgradeLifeCategoryWithClaude()
         }
     }
 
     /**
      * Fire-and-forget Claude-backed life-category classification. The local
-     * keyword pick has already been written to [lifeCategory] for instant
-     * feedback; this method runs the remote classifier and overwrites the
-     * chip iff (a) AI features are enabled, (b) the remote returns a real
-     * category, and (c) the user has not manually picked in the meantime.
+     * keyword pick (or default fallback) has already been written to
+     * [lifeCategory] for instant feedback; this method runs the remote
+     * classifier and overwrites the chip iff (a) AI features are enabled,
+     * (b) the remote returns a real category, and (c) the user has not
+     * manually picked in the meantime.
      *
      * On any failure (AI features off, no auth, network, 429, 451, 5xx,
-     * malformed response) the local pick stays — never blanks a successful
-     * local chip. When neither the local classifier nor Claude can match
-     * (or AI is off and the local result was UNCATEGORIZED), emit a user-
-     * facing Snackbar so the Auto tap doesn't look broken.
+     * malformed response, remote returns UNCATEGORIZED) the current chip
+     * stays — the Auto press always leaves a real selection.
      */
-    private fun tryUpgradeLifeCategoryWithClaude(localPickSucceeded: Boolean) {
-        if (title.isBlank()) {
-            if (!localPickSucceeded) emitAutoPickFailureMessage("Life Category")
-            return
-        }
+    private fun tryUpgradeLifeCategoryWithClaude() {
+        if (title.isBlank()) return
         val titleSnapshot = title
         val descriptionSnapshot = description
         viewModelScope.launch {
             val aiPrefs = userPreferencesDataStore.aiFeaturePrefsFlow.firstOrNull()
-            if (aiPrefs?.enabled != true) {
-                if (!localPickSucceeded) emitAutoPickFailureMessage("Life Category")
-                return@launch
-            }
+            if (aiPrefs?.enabled != true) return@launch
             lifeCategoryAutoPickInFlight = true
-            var remoteMatched = false
             try {
                 val result = lifeCategoryRemoteClassifier.classify(
                     titleSnapshot,
                     descriptionSnapshot.ifBlank { null }
                 )
                 val classification = result.getOrNull() ?: return@launch
-                remoteMatched = classification.category != LifeCategory.UNCATEGORIZED
                 if (lifeCategoryManuallySet) return@launch
                 if (title != titleSnapshot || description != descriptionSnapshot) return@launch
-                if (remoteMatched) {
+                if (classification.category != LifeCategory.UNCATEGORIZED) {
                     lifeCategory = classification.category
-                } else if (!localPickSucceeded) {
-                    lifeCategory = null
                 }
             } finally {
                 lifeCategoryAutoPickInFlight = false
-                if (!localPickSucceeded && !remoteMatched) {
-                    emitAutoPickFailureMessage("Life Category")
-                }
             }
         }
     }
@@ -764,8 +752,8 @@ constructor(
             taskMode = localPick
         } else if (!force) {
             taskMode = null
-        } else {
-            emitAutoPickFailureMessage("Task Mode")
+        } else if (taskMode == null) {
+            taskMode = DEFAULT_TASK_MODE
         }
     }
 
@@ -785,16 +773,8 @@ constructor(
             cognitiveLoad = localPick
         } else if (!force) {
             cognitiveLoad = null
-        } else {
-            emitAutoPickFailureMessage("Cognitive Load")
-        }
-    }
-
-    private fun emitAutoPickFailureMessage(fieldLabel: String) {
-        viewModelScope.launch {
-            _errorMessages.emit(
-                "Couldn't auto-detect $fieldLabel — add more detail to the title or pick a chip manually."
-            )
+        } else if (cognitiveLoad == null) {
+            cognitiveLoad = DEFAULT_COGNITIVE_LOAD
         }
     }
 
@@ -1471,5 +1451,18 @@ constructor(
             _errorMessages.emit("Couldn't duplicate task")
             null
         }
+    }
+
+    companion object {
+        // Fallback chips for the on-screen Auto button. The keyword
+        // classifier returns UNCATEGORIZED when the title is blank or has
+        // no matching keyword; tapping Auto must still leave a real chip
+        // selected, so we drop in the safest middle-of-the-road option.
+        @VisibleForTesting
+        internal val DEFAULT_LIFE_CATEGORY = LifeCategory.PERSONAL
+        @VisibleForTesting
+        internal val DEFAULT_TASK_MODE = TaskMode.WORK
+        @VisibleForTesting
+        internal val DEFAULT_COGNITIVE_LOAD = CognitiveLoad.MEDIUM
     }
 }

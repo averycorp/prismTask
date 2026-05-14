@@ -886,7 +886,7 @@ class AddEditTaskViewModelTest {
     }
 
     @Test
-    fun `autoPickTaskMode force emits failure message when classifier finds nothing`() = runTest {
+    fun `autoPickTaskMode force assigns default chip when classifier finds nothing`() = runTest {
         val vm = newViewModel()
         vm.initialize(taskId = null, projectId = null, initialDate = null)
         vm.onTitleChange("xyzzy")
@@ -897,13 +897,14 @@ class AddEditTaskViewModelTest {
         vm.autoPickTaskMode(force = true)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(1, messages.size)
-        assertTrue(messages.single().contains("Task Mode"))
+        assertEquals(AddEditTaskViewModel.DEFAULT_TASK_MODE, vm.taskMode)
+        assertFalse(vm.taskModeManuallySet)
+        assertTrue(messages.isEmpty())
         collectJob.cancel()
     }
 
     @Test
-    fun `autoPickCognitiveLoad force emits failure message when classifier finds nothing`() = runTest {
+    fun `autoPickCognitiveLoad force assigns default chip when classifier finds nothing`() = runTest {
         val vm = newViewModel()
         vm.initialize(taskId = null, projectId = null, initialDate = null)
         vm.onTitleChange("xyzzy")
@@ -914,13 +915,14 @@ class AddEditTaskViewModelTest {
         vm.autoPickCognitiveLoad(force = true)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(1, messages.size)
-        assertTrue(messages.single().contains("Cognitive Load"))
+        assertEquals(AddEditTaskViewModel.DEFAULT_COGNITIVE_LOAD, vm.cognitiveLoad)
+        assertFalse(vm.cognitiveLoadManuallySet)
+        assertTrue(messages.isEmpty())
         collectJob.cancel()
     }
 
     @Test
-    fun `autoPickLifeCategory force emits failure message when AI disabled and classifier finds nothing`() = runTest {
+    fun `autoPickLifeCategory force assigns default chip when AI disabled and classifier finds nothing`() = runTest {
         // setUp defaults aiFeaturePrefsFlow to disabled.
         val vm = newViewModel()
         vm.initialize(taskId = null, projectId = null, initialDate = null)
@@ -932,14 +934,15 @@ class AddEditTaskViewModelTest {
         vm.autoPickLifeCategory(force = true)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(1, messages.size)
-        assertTrue(messages.single().contains("Life Category"))
+        assertEquals(AddEditTaskViewModel.DEFAULT_LIFE_CATEGORY, vm.lifeCategory)
+        assertFalse(vm.lifeCategoryManuallySet)
+        assertTrue(messages.isEmpty())
         coVerify(exactly = 0) { lifeCategoryRemoteClassifier.classify(any(), any()) }
         collectJob.cancel()
     }
 
     @Test
-    fun `autoPickLifeCategory force does NOT emit when local picks a category`() = runTest {
+    fun `autoPickLifeCategory force keeps local pick over the default`() = runTest {
         val vm = newViewModel()
         vm.initialize(taskId = null, projectId = null, initialDate = null)
         vm.onTitleChange("Email project status update to manager")
@@ -953,6 +956,30 @@ class AddEditTaskViewModelTest {
         assertEquals(LifeCategory.WORK, vm.lifeCategory)
         assertTrue(messages.isEmpty())
         collectJob.cancel()
+    }
+
+    @Test
+    fun `autoPickLifeCategory force keeps default chip when Claude also returns UNCATEGORIZED`() = runTest {
+        every { userPreferencesDataStore.aiFeaturePrefsFlow } returns
+            flowOf(AiFeaturePrefs(enabled = true))
+        coEvery { lifeCategoryRemoteClassifier.classify(any(), any()) } returns
+            Result.success(
+                LifeCategoryRemoteClassifier.Classification(
+                    category = LifeCategory.UNCATEGORIZED,
+                    reason = "no signal"
+                )
+            )
+
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("xyzzy")
+
+        vm.autoPickLifeCategory(force = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Local default landed first; Claude UNCATEGORIZED must not blank it.
+        assertEquals(AddEditTaskViewModel.DEFAULT_LIFE_CATEGORY, vm.lifeCategory)
+        assertFalse(vm.lifeCategoryManuallySet)
     }
 
     @Test
