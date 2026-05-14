@@ -37,6 +37,10 @@ import {
   medicationDoseId,
   type MedicationDoseDoc,
 } from '@/api/firestore/medicationDoses';
+import {
+  deriveVirtualSlots,
+  mergeVirtualWithMaterialized,
+} from '@/features/medication/virtualSlots';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -233,7 +237,11 @@ export function MedicationScreen() {
     load(dateIso);
   }, [dateIso, load]);
 
-  const slots = useMemo(() => rows.map(rowToSlot), [rows]);
+  const slots = useMemo(() => {
+    const materialized = rows.map(rowToSlot);
+    const virtual = deriveVirtualSlots(medications);
+    return mergeVirtualWithMaterialized(materialized, virtual);
+  }, [rows, medications]);
   const takenCount = slots.filter((s) => s.takenAt !== null).length;
 
   const handleToggle = async (slot: MedicationSlot, taken: boolean) => {
@@ -453,7 +461,7 @@ export function MedicationScreen() {
         <EmptyState
           icon={<PlusCircle className="h-8 w-8" />}
           title="No medication slots"
-          description="Set up your medication schedule on Android — slot config on web is coming later in Phase G."
+          description="Add a medication below to derive slot rows from its schedule."
         />
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
