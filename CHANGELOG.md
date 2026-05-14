@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/medication): web-native medication CRUD baseline (parity Batch
+  5 PR-1). `web/src/api/firestore/medications.ts` gains
+  `createMedication`/`updateMedication`/`archiveMedication`/`unarchiveMedication`
+  helpers mirroring Android's `MedicationSyncMapper.medicationToMap` field
+  set; new `MedicationEditorDialog.tsx` exposes the add/edit modal; the
+  Medication screen now surfaces a "My Medications" library section with
+  archive/restore. LWW guard on update merges so an in-flight Android
+  slot-link push isn't clobbered. Android-only fields (`slotCloudIds`)
+  intentionally omitted on web write so round-trips don't blank them.
 - feat(web/weekly-review): persist weekly reviews to Firestore so cross-device users see the same week breakdown without re-running the aggregator. New `web/src/api/firestore/weeklyReviews.ts` mapper using Pattern A canonical-row id (`{YYYY-MM-DD-of-Monday}`); `WeeklyReviewScreen` upserts both Free-tier local-only and Pro-tier AI-augmented reviews. Closes parity audit C.4a (the backend auto-gen cron half is C.4b, deferred to a backend-batch follow-up).
 - feat(web/mood): port the mood/energy ↔ tasks/habits/self-care Pearson correlation engine (`web/src/utils/moodCorrelation.ts`) and surface a Correlations section on the Mood screen. Top-3 strongest correlations per axis once the user has 7+ mood-logged days; falls silent gracefully below that. Closes parity audit C.3.
 - feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
