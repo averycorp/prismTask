@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/ai): add typed `aiChat` / `aiChatHistory` / `aiLifeCategoryClassifyText` REST helpers + Chat-related TypeScript types (parity Batch 3 D.1 PR-1; foundation for web AI Coach chat).
+
+
 - feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
 - feat(web/sync): write `task_completions` rows to Firestore so analytics history populates cross-device — closes parity audit B.6.
 - **Batch adjustments through AI Chat.** The Coach can now propose a
