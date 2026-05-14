@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Unsubscribe } from 'firebase/firestore';
+import { backfillLegacySlotDefs } from '@/api/firestore/medicationSlots';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
@@ -109,6 +110,12 @@ export function useFirestoreSync(uid: string | null | undefined): void {
         console.warn(`[useFirestoreSync] Failed to subscribe to ${label}`, err);
       }
     };
+
+    // One-time legacy → canonical slot-defs backfill (parity Batch 5 PR-7,
+    // decision D-E2). Guarded by a localStorage flag inside the helper
+    // so re-mounts and re-signs no-op after the first success. Fires
+    // in the background — failure doesn't gate subscriptions.
+    void backfillLegacySlotDefs(uid).catch(() => undefined);
 
     safeSubscribe(subscribeToTasks, 'tasks');
     safeSubscribe(subscribeToTaskCompletions, 'task-completions');
