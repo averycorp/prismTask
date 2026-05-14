@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { addDays, format, parseISO } from 'date-fns';
 import {
   Archive,
@@ -11,6 +12,7 @@ import {
   Pill,
   Plus,
   PlusCircle,
+  RefreshCw,
   Undo2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -411,6 +413,16 @@ export function MedicationScreen() {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          <Link to="/medication/refills">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Manage refills"
+              title="Manage refills"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             size="sm"

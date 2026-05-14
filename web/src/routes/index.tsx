@@ -46,6 +46,7 @@ const WeeklyPlannerScreen = lazy(() => import('@/features/planner/WeeklyPlannerS
 const AnalyticsScreen = lazy(() => import('@/features/analytics/AnalyticsScreen').then(m => ({ default: m.AnalyticsScreen })));
 const ConversationExtractScreen = lazy(() => import('@/features/extract/ConversationExtractScreen').then(m => ({ default: m.ConversationExtractScreen })));
 const MedicationScreen = lazy(() => import('@/features/medication/MedicationScreen').then(m => ({ default: m.MedicationScreen })));
+const MedicationRefillScreen = lazy(() => import('@/features/medication/MedicationRefillScreen').then(m => ({ default: m.MedicationRefillScreen })));
 const MoodScreen = lazy(() => import('@/features/mood/MoodScreen').then(m => ({ default: m.MoodScreen })));
 const FocusReleaseScreen = lazy(() => import('@/features/focus/FocusReleaseScreen').then(m => ({ default: m.FocusReleaseScreen })));
 const ChatScreen = lazy(() => import('@/features/chat/ChatScreen').then(m => ({ default: m.ChatScreen })));
@@ -129,6 +130,7 @@ const routes: RouteObject[] = [
       { path: 'analytics', element: <LazyRoute Component={AnalyticsScreen} /> },
       { path: 'extract', element: <LazyRoute Component={ConversationExtractScreen} /> },
       { path: 'medication', element: <LazyRoute Component={MedicationScreen} /> },
+      { path: 'medication/refills', element: <LazyRoute Component={MedicationRefillScreen} /> },
       { path: 'mood', element: <LazyRoute Component={MoodScreen} /> },
       { path: 'focus', element: <LazyRoute Component={FocusReleaseScreen} /> },
       { path: 'chat', element: <LazyRoute Component={ChatScreen} /> },
