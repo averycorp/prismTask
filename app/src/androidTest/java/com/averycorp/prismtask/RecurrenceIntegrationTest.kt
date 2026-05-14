@@ -27,6 +27,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -112,7 +113,12 @@ class RecurrenceIntegrationTest {
 
         val newTask = allTasks.find { it.id != taskId }!!
         assertFalse(newTask.isCompleted)
-        assertEquals(LocalDate.of(2025, 1, 7).toMillis(), newTask.dueDate)
+        // PR #1334 anchored the spawn to completion time so an overdue daily
+        // task catches up instead of spawning another still-overdue child.
+        // Expect "tomorrow" in the device's local zone, independent of the
+        // original due date.
+        val expectedNext = LocalDate.now(ZoneId.systemDefault()).plusDays(1).toMillis()
+        assertEquals(expectedNext, newTask.dueDate)
 
         val newRule = RecurrenceConverter.fromJson(newTask.recurrenceRule!!)!!
         assertEquals(1, newRule.occurrenceCount)
@@ -183,7 +189,16 @@ class RecurrenceIntegrationTest {
         assertEquals(2, allTasks.size)
 
         val newTask = allTasks.find { !it.isCompleted }!!
-        assertEquals(LocalDate.of(2025, 1, 8).toMillis(), newTask.dueDate) // Wednesday
+        // PR #1334 anchored the spawn to completion time. For a Mon/Wed/Fri
+        // weekly rule the next due lands on the soonest of those days
+        // strictly after today's local date (RecurrenceEngine.calculateWeekly
+        // excludes "today" from the candidate set).
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val activeDays = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)
+        val expectedNext = generateSequence(today.plusDays(1)) { it.plusDays(1) }
+            .first { it.dayOfWeek in activeDays }
+            .toMillis()
+        assertEquals(expectedNext, newTask.dueDate)
     }
 
     // Audit: docs/audits/RECURRING_TASKS_DUPLICATE_DAILY_AUDIT.md (Item 1).

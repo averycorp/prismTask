@@ -22,6 +22,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Smoke tests for recurrence. Uses the real Room database (seeded by
@@ -115,11 +118,9 @@ class RecurrenceSmokeTest : SmokeTestBase() {
     @Test
     fun completingWeeklyRecurringTask_movesToNextActiveDay() = runBlocking {
         val repo = buildRepository()
-        // Monday-only weekly rule — after completing, next due should land
-        // on a Monday, which is 1–7 days out depending on today's day of
-        // week. The computation is done via LocalDate in the production
-        // code, so the device timezone determines "today" and therefore
-        // the exact gap. Widen to 1–8 days to absorb timezone variance.
+        // Monday-only weekly rule. PR #1334 anchored the spawn to completion
+        // time, so the next due is the first Monday strictly after today's
+        // local date (the engine excludes "today" from candidate days).
         val rule = RecurrenceRule(
             type = RecurrenceType.WEEKLY,
             daysOfWeek = listOf(1)
@@ -142,12 +143,14 @@ class RecurrenceSmokeTest : SmokeTestBase() {
             .filter { it.title == "Monday ritual" }
             .single { it.id != id }
         assert(next.dueDate != null)
-        val gap = next.dueDate!! - dueDate
-        val day = 24L * 60 * 60 * 1000
-        // Between "tomorrow" (1 day) and "next Monday after today's Monday"
-        // (~8 days including timezone slack).
-        assert(gap in day..(8 * day)) {
-            "Next weekly occurrence should land 1–8 days after the original; got ${gap / day}d"
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val expected = generateSequence(today.plusDays(1)) { it.plusDays(1) }
+            .first { it.dayOfWeek == DayOfWeek.MONDAY }
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        assert(next.dueDate == expected) {
+            "Next weekly Monday should be $expected; got ${next.dueDate}"
         }
     }
 
