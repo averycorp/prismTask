@@ -605,7 +605,7 @@ object NotificationHelper {
         val channelId = channelIdFor(BASE_TIMER_CHANNEL_ID, style)
 
         val isBreak = mode.equals("BREAK", ignoreCase = true)
-        val title = if (isBreak) "Break Complete!" else "Timer Complete!"
+        val title = if (isBreak) "Break complete" else "Timer complete"
         val buzzUntilDismissed = TimerPreferences(context).getBuzzUntilDismissed().first()
         val body = when {
             buzzUntilDismissed -> TimerBuzzerDismissReceiver.BUZZ_BODY_TEXT
@@ -806,8 +806,8 @@ object NotificationHelper {
         val headline = when (stepAction) {
             EscalationStepAction.GENTLE_PING -> "Gentle nudge"
             EscalationStepAction.STANDARD_ALERT -> "Still pending"
-            EscalationStepAction.LOUD_VIBRATE -> "Action needed"
-            EscalationStepAction.FULL_SCREEN -> "Critical"
+            EscalationStepAction.LOUD_VIBRATE -> "Reminder"
+            EscalationStepAction.FULL_SCREEN -> "Final reminder"
         }
 
         val builder = NotificationCompat
