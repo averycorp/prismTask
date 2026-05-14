@@ -113,7 +113,7 @@ object AutomationStarterLibrary {
         ),
         actions = listOf(
             notify(
-                title = "Overdue Urgent Task",
+                title = "Urgent Task From Earlier",
                 body = "An urgent task is past its due date — tap to review."
             )
         )
@@ -160,7 +160,7 @@ object AutomationStarterLibrary {
         actions = listOf(
             notify(
                 title = "Review Tomorrow's Plan",
-                body = "A 2-minute look at tomorrow's tasks now saves a frantic morning."
+                body = "A 2-minute look at tomorrow's tasks now sets up a calmer morning."
             )
         )
     )
@@ -192,7 +192,7 @@ object AutomationStarterLibrary {
         actions = listOf(
             notify(
                 title = "7-Day Streak Hit",
-                body = "You hit a milestone streak — keep it going!"
+                body = "7 days in a row — milestone hit."
             ),
             log("Streak achievement fired")
         )
@@ -222,8 +222,8 @@ object AutomationStarterLibrary {
         condition = cmpGte("habit.streakCount", 100),
         actions = listOf(
             notify(
-                title = "100-Day Streak — Legendary",
-                body = "100 days. Few make it this far. Keep going."
+                title = "100-Day Streak Milestone",
+                body = "100 days of consistency — that's habit territory."
             )
         )
     )
@@ -238,7 +238,7 @@ object AutomationStarterLibrary {
         actions = listOf(
             notify(
                 title = "Review Your Habits This Week",
-                body = "Quick check-in: which habits stuck, which slipped, and what changes?"
+                body = "Quick check-in: what's working, what needs a tweak?"
             )
         )
     )
@@ -326,7 +326,7 @@ object AutomationStarterLibrary {
         actions = listOf(
             notify(
                 title = "Time For A 25-Min Focus Block",
-                body = "Pick the highest-leverage task and protect 25 minutes for it."
+                body = "Pick one task and protect 25 minutes for it."
             )
         )
     )
