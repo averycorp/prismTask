@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   orderBy,
@@ -13,6 +12,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 import type { Project, ProjectDetail } from '@/types/project';
 import { timestampToIso } from './converters';
 
@@ -61,8 +61,13 @@ function projectCreateToDoc(data: { title: string; description?: string; color?:
   };
 }
 
-function projectUpdateToDoc(data: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = { updatedAt: Date.now() };
+function projectUpdateToDoc(
+  data: Record<string, unknown>,
+  now: number = Date.now(),
+): Record<string, unknown> {
+  // `now` is threaded through so the LWW guard's comparison and the
+  // doc's `updatedAt` use the same wall-clock millis. See `lww.ts`.
+  const result: Record<string, unknown> = { updatedAt: now };
   if (data.title !== undefined) result.name = data.title;
   if (data.description !== undefined) result.description = data.description;
   if (data.color !== undefined) result.color = data.color;
@@ -100,8 +105,12 @@ export async function updateProject(
   projectId: string,
   data: Record<string, unknown>,
 ): Promise<Project> {
-  const firestoreData = projectUpdateToDoc(data);
-  await updateDoc(projectDoc(uid, projectId), firestoreData);
+  // LWW guard — Android-side project lifecycle edits (status flip,
+  // end_date / theme_color_key writes the web doesn't own) shouldn't
+  // be clobbered by a web rename or sort-order edit. Parity audit A.2.
+  const now = Date.now();
+  const firestoreData = projectUpdateToDoc(data, now);
+  await lwwUpdate(projectDoc(uid, projectId), firestoreData as Parameters<typeof lwwUpdate>[1]);
   const snap = await getDoc(projectDoc(uid, projectId));
   return docToProject(snap.id, snap.data()!, uid);
 }
