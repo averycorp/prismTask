@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Removed
+
+- chore(web): remove dead web/src/api/sync.ts HTTP-sync stub — Firestore-direct path superseded it (parity audit A.3).
+
 ### Added
 
 - feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
+- feat(web/sync): write `task_completions` rows to Firestore so analytics history populates cross-device — closes parity audit B.6.
 - **Batch adjustments through AI Chat.** The Coach can now propose a
   `batch_command` inline action when a user asks for multi-entity
   changes that go beyond the existing single-task / `reschedule_batch`
@@ -46,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(web/auth): clear Firestore IndexedDB cache on logout so a different user on the same browser doesn't see stale data — closes parity audit G.7.
 - **Focus Timer auto-switches the work/break tab on completion outside
   Pomodoro Mode.** When Pomodoro Mode was off, the Focus Timer's
   segmented Work / Break / Custom selector stayed put when the active
