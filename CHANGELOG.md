@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - chore(web): remove dead web/src/api/sync.ts HTTP-sync stub — Firestore-direct path superseded it (parity audit A.3).
 
+### Changed
+
+- refactor(web/medication): canonicalise slot-defs collection to
+  `medication_slots` (parity Batch 5 PR-7, decision D-E2). Web now
+  writes the same collection Android does and the schema-merge fields
+  (`idealTime`, `driftMinutes`, `isActive` + Android-shape `name`)
+  alongside its existing field set. `getSlotDefs` does a dual-read
+  union of canonical + legacy `medication_slot_defs` during the
+  transition window; a one-shot localStorage-guarded backfill copies
+  every legacy doc into the canonical collection via `setDoc(merge)`
+  on next sign-in. **No Android Room touch** — the schema merge happens
+  entirely on the JS side per the D-E2 contract. Old collection docs
+  are intentionally NOT deleted so older clients keep reading them.
+
 ### Added
 
 - feat(web/medication): clinical report export (parity Batch 5 PR-6).

@@ -41,7 +41,7 @@ beforeEach(() => {
   setDocMock.mockReset();
   docMock.mockReset();
   docMock.mockReturnValue({
-    path: 'users/uid-1/medication_slot_defs/slot-1',
+    path: 'users/uid-1/medication_slots/slot-1',
   });
   txGetMock.mockResolvedValue({
     exists: () => true,
