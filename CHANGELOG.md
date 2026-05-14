@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(web/auth): clear Firestore IndexedDB cache on logout so a different user on the same browser doesn't see stale data — closes parity audit G.7.
 - **Focus Timer auto-switches the work/break tab on completion outside
   Pomodoro Mode.** When Pomodoro Mode was off, the Focus Timer's
   segmented Work / Break / Custom selector stayed put when the active
