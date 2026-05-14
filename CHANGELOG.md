@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/medication): per-med dose toggle on slot cards (parity Batch
+  5 PR-2). New `web/src/api/firestore/medicationDoses.ts` with
+  `logDose`/`deleteDose`/`getDosesForDay` using deterministic doc id
+  `${medCloudId}__${slotKey}__${dateIso}` so two-device toggles dedupe.
+  Slot cards on `/medication` now render a per-medication tick row;
+  taking marks the dose, untaking deletes the doc. Synthetic-skip rows
+  written by Android's tier-state engine are filtered out of UI reads.
 - feat(web/medication): web-native medication CRUD baseline (parity Batch
   5 PR-1). `web/src/api/firestore/medications.ts` gains
   `createMedication`/`updateMedication`/`archiveMedication`/`unarchiveMedication`

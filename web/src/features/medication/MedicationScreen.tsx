@@ -30,6 +30,13 @@ import {
   unarchiveMedication,
   type MedicationDoc,
 } from '@/api/firestore/medications';
+import {
+  deleteDose,
+  getDosesForDay,
+  logDose,
+  medicationDoseId,
+  type MedicationDoseDoc,
+} from '@/api/firestore/medicationDoses';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -101,6 +108,12 @@ export function MedicationScreen() {
     null,
   );
   const [bulkMarkOpen, setBulkMarkOpen] = useState(false);
+  // Per-medication dose toggles (parity Batch 5 PR-2). Keyed by Firestore
+  // dose docId so a re-tap toggles the same doc rather than racing two
+  // writes for the same (med, slot, day) triple.
+  const [dosesByKey, setDosesByKey] = useState<
+    Record<string, MedicationDoseDoc>
+  >({});
   // Medication library (parity Batch 5 PR-1): full add / edit / archive
   // surface backed by `users/{uid}/medications` Firestore writes.
   const [medications, setMedications] = useState<MedicationDoc[]>([]);
@@ -143,6 +156,36 @@ export function MedicationScreen() {
         } catch {
           setTierStates({});
         }
+        // Per-medication doses for the day (PR-2). One read per (med, slot)
+        // pair is wasteful; instead we union the medication cloud-ids from
+        // the slot rows and pull each medication's doses for the day. The
+        // result is keyed by the deterministic doc id so the toggle UI can
+        // look up state in O(1).
+        try {
+          const uid = getFirebaseUid();
+          const medCloudIds = new Set<string>();
+          for (const row of fetched) {
+            for (const raw of row.med_ids) {
+              if (raw.startsWith('med:')) {
+                medCloudIds.add(raw.slice('med:'.length));
+              }
+            }
+          }
+          const allDoses = await Promise.all(
+            [...medCloudIds].map((medId) =>
+              getDosesForDay(uid, medId, iso).catch(() => []),
+            ),
+          );
+          const byDoseKey: Record<string, MedicationDoseDoc> = {};
+          for (const list of allDoses) {
+            for (const dose of list) {
+              byDoseKey[dose.id] = dose;
+            }
+          }
+          setDosesByKey(byDoseKey);
+        } catch {
+          setDosesByKey({});
+        }
       } catch (e) {
         toast.error((e as Error).message || 'Failed to load slots');
       } finally {
@@ -151,6 +194,39 @@ export function MedicationScreen() {
     },
     [],
   );
+
+  const isMedTakenInSlot = (
+    slotKey: string,
+    medCloudId: string,
+  ): boolean => {
+    const id = medicationDoseId(medCloudId, slotKey, dateIso);
+    return dosesByKey[id] !== undefined;
+  };
+
+  const handleDoseToggle = async (slotKey: string, medCloudId: string) => {
+    try {
+      const uid = getFirebaseUid();
+      const id = medicationDoseId(medCloudId, slotKey, dateIso);
+      const existing = dosesByKey[id];
+      if (existing !== undefined) {
+        await deleteDose(uid, existing.id);
+        setDosesByKey((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      } else {
+        const dose = await logDose(uid, {
+          medicationCloudId: medCloudId,
+          slotKey,
+          dateIso,
+        });
+        setDosesByKey((prev) => ({ ...prev, [dose.id]: dose }));
+      }
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to toggle dose');
+    }
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: load slots on mount and when date changes
@@ -412,11 +488,66 @@ export function MedicationScreen() {
                       {taken ? 'Taken' : 'Pending'}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    {slot.medLabels.length === 0
-                      ? 'No medications linked'
-                      : slot.medLabels.join(', ')}
-                  </p>
+                  {slot.medIds.length === 0 ? (
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      No medications linked
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-1">
+                      {slot.medIds.map((raw, idx) => {
+                        const isMedRow = raw.startsWith('med:');
+                        const medCloudId = isMedRow
+                          ? raw.slice('med:'.length)
+                          : null;
+                        const label = slot.medLabels[idx] ?? raw;
+                        const checked =
+                          medCloudId !== null &&
+                          isMedTakenInSlot(slot.slotKey, medCloudId);
+                        return (
+                          <li
+                            key={raw}
+                            className="flex items-center justify-between gap-2 text-xs"
+                          >
+                            <span
+                              className={`flex-1 truncate ${
+                                checked
+                                  ? 'text-[var(--color-text-secondary)] line-through'
+                                  : 'text-[var(--color-text-primary)]'
+                              }`}
+                              title={label}
+                            >
+                              {label}
+                            </span>
+                            {medCloudId !== null ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDoseToggle(slot.slotKey, medCloudId)
+                                }
+                                aria-pressed={checked}
+                                aria-label={
+                                  checked
+                                    ? `Mark ${label} not taken`
+                                    : `Mark ${label} taken`
+                                }
+                                className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
+                                  checked
+                                    ? 'border-emerald-500 bg-emerald-500 text-white'
+                                    : 'border-[var(--color-border)] bg-[var(--color-bg-card)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]'
+                                }`}
+                              >
+                                {checked ? 'Taken' : 'Mark'}
+                              </button>
+                            ) : (
+                              <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                                {raw.split(':')[0]}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                   <div className="flex flex-col gap-1">
                     <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
                       Tier
