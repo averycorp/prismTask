@@ -82,6 +82,12 @@ internal class DeviceConfigImporter(
             t.get("buzzUntilDismissed")?.takeIf { !it.isJsonNull }?.asBoolean?.let {
                 timerPreferences.setBuzzUntilDismissed(it)
             }
+            t.get("overrideVolume")?.takeIf { !it.isJsonNull }?.asBoolean?.let {
+                timerPreferences.setOverrideVolume(it)
+            }
+            t.get("alarmVolumePercent")?.takeIf { !it.isJsonNull }?.asInt?.let {
+                timerPreferences.setAlarmVolumePercent(it)
+            }
         }
     }
 

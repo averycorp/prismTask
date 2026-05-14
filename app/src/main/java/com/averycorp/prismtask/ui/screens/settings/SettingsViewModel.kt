@@ -618,6 +618,18 @@ constructor(
         .getBuzzUntilDismissed()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val timerOverrideVolume: StateFlow<Boolean> = timerPreferences
+        .getOverrideVolume()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val timerAlarmVolumePercent: StateFlow<Int> = timerPreferences
+        .getAlarmVolumePercent()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            TimerPreferences.DEFAULT_ALARM_VOLUME_PERCENT
+        )
+
     // ---- A2 Pomodoro+ AI Coaching toggles ---------------------------
     // All three default true — UI reflects that via the initial value.
     val pomodoroPreSessionCoachingEnabled: StateFlow<Boolean> = timerPreferences
@@ -658,6 +670,14 @@ constructor(
 
     fun setTimerBuzzUntilDismissed(enabled: Boolean) {
         viewModelScope.launch { timerPreferences.setBuzzUntilDismissed(enabled) }
+    }
+
+    fun setTimerOverrideVolume(enabled: Boolean) {
+        viewModelScope.launch { timerPreferences.setOverrideVolume(enabled) }
+    }
+
+    fun setTimerAlarmVolumePercent(percent: Int) {
+        viewModelScope.launch { timerPreferences.setAlarmVolumePercent(percent) }
     }
 
     fun setPomodoroPreSessionCoachingEnabled(enabled: Boolean) {

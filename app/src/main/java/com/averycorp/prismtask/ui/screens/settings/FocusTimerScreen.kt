@@ -37,6 +37,8 @@ fun FocusTimerScreen(
     val pomodoroAvailableMinutes by viewModel.pomodoroAvailableMinutes.collectAsStateWithLifecycle()
     val pomodoroFocusPreference by viewModel.pomodoroFocusPreference.collectAsStateWithLifecycle()
     val timerBuzzUntilDismissed by viewModel.timerBuzzUntilDismissed.collectAsStateWithLifecycle()
+    val timerOverrideVolume by viewModel.timerOverrideVolume.collectAsStateWithLifecycle()
+    val timerAlarmVolumePercent by viewModel.timerAlarmVolumePercent.collectAsStateWithLifecycle()
     val preSessionCoaching by viewModel.pomodoroPreSessionCoachingEnabled.collectAsStateWithLifecycle()
     val breakCoaching by viewModel.pomodoroBreakCoachingEnabled.collectAsStateWithLifecycle()
     val recapCoaching by viewModel.pomodoroRecapCoachingEnabled.collectAsStateWithLifecycle()
@@ -68,6 +70,8 @@ fun FocusTimerScreen(
                 pomodoroAvailableMinutes = pomodoroAvailableMinutes,
                 pomodoroFocusPreference = pomodoroFocusPreference,
                 buzzUntilDismissed = timerBuzzUntilDismissed,
+                overrideVolume = timerOverrideVolume,
+                alarmVolumePercent = timerAlarmVolumePercent,
                 preSessionCoachingEnabled = preSessionCoaching,
                 breakCoachingEnabled = breakCoaching,
                 recapCoachingEnabled = recapCoaching,
@@ -78,6 +82,8 @@ fun FocusTimerScreen(
                 onPomodoroAvailableMinutesChange = viewModel::setPomodoroAvailableMinutes,
                 onPomodoroFocusPreferenceChange = viewModel::setPomodoroFocusPreference,
                 onBuzzUntilDismissedChange = viewModel::setTimerBuzzUntilDismissed,
+                onOverrideVolumeChange = viewModel::setTimerOverrideVolume,
+                onAlarmVolumePercentChange = viewModel::setTimerAlarmVolumePercent,
                 onPreSessionCoachingChange = viewModel::setPomodoroPreSessionCoachingEnabled,
                 onBreakCoachingChange = viewModel::setPomodoroBreakCoachingEnabled,
                 onRecapCoachingChange = viewModel::setPomodoroRecapCoachingEnabled

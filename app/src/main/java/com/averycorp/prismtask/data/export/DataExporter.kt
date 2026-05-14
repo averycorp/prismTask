@@ -496,6 +496,8 @@ constructor(
         addProperty("pomodoroAvailableMinutes", timerPreferences.getPomodoroAvailableMinutes().first())
         addProperty("pomodoroFocusPreference", timerPreferences.getPomodoroFocusPreference().first())
         addProperty("buzzUntilDismissed", timerPreferences.getBuzzUntilDismissed().first())
+        addProperty("overrideVolume", timerPreferences.getOverrideVolume().first())
+        addProperty("alarmVolumePercent", timerPreferences.getAlarmVolumePercent().first())
     }
 
     private suspend fun exportNotificationConfig(): JsonObject = JsonObject().apply {

@@ -39,6 +39,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!--
+        Needed to override the user's alarm-stream volume when the timer
+        completes, so the "ring at set volume" preference can take effect
+        regardless of where the user left the volume rocker.
+    -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!--
         Foreground service used to keep the Pomodoro countdown alive when
         the app is backgrounded. Without this, a viewModelScope coroutine
         is cancelled as soon as the user switches apps and the completion
