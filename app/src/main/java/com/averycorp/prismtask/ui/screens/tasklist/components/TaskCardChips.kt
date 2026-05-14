@@ -122,8 +122,9 @@ internal fun TagChip(tag: TagEntity) {
 }
 
 /**
- * Compact project chip: project name rendered in the project's
- * stored hex color against a matching soft-tinted background.
+ * Compact project chip: leading colored dot + project name, tinted with
+ * the project's stored hex color. Mirrors [TagChip] so projects read at
+ * the same glance weight as tags on every task card.
  */
 @Composable
 internal fun ProjectChip(project: ProjectEntity) {
@@ -133,16 +134,25 @@ internal fun ProjectChip(project: ProjectEntity) {
         MaterialTheme.colorScheme.tertiary
     }
 
-    Box(
+    Row(
         modifier = Modifier
             .clip(LocalPrismShapes.current.chip)
             .background(chipColor.copy(alpha = 0.15f))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(chipColor)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = project.name,
             style = MaterialTheme.typography.labelSmall,
             color = chipColor,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
