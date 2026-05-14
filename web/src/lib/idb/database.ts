@@ -35,7 +35,7 @@ export function openIdb(): Promise<IDBPDatabase> {
       // Another tab holds an old version. The user-visible symptom is
       // that the new tab waits for the other to close. Logging here
       // helps debugging without requiring leader-election (deferred).
-      // eslint-disable-next-line no-console
+       
       console.warn(
         '[idb] Upgrade blocked — another tab has the database open at an older version.',
       );

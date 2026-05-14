@@ -95,7 +95,7 @@ export async function replaceBatchHistoryForUser(
 export async function migrateFromLocalStorageIfNeeded(
   uid: string,
 ): Promise<BatchHistoryRecord[] | null> {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = localStorage.getItem(legacyStorageKey(uid));
   } catch {

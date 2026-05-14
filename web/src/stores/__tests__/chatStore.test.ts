@@ -30,7 +30,7 @@ describe('chatStore — initialize', () => {
     await useChatStore.getState().initialize(0);
     const { conversationId, conversationDate } = useChatStore.getState();
     expect(conversationId).toMatch(/^chat_\d{4}-\d{2}-\d{2}_[a-z0-9]{8}$/);
-    expect(conversationId.endsWith(conversationDate.slice(0, 0))).toBe(false);
+    expect(conversationId).toContain(conversationDate);
     expect(aiChatHistoryMock).toHaveBeenCalledWith({
       conversation_id: conversationId,
       limit: 200,
