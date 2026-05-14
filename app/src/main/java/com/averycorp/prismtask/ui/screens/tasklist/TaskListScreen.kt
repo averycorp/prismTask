@@ -743,6 +743,7 @@ fun TaskListScreen(
             ProjectFilterRow(
                 projects = projects,
                 selectedProjectId = selectedProjectId,
+                taskCountByProject = taskCountByProject,
                 onSelectProject = viewModel::onSelectProject,
                 onManageProjects = { navController.navigate(PrismTaskRoute.ProjectList.route) }
             )

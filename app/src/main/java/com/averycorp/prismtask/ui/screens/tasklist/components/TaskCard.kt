@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,18 +103,28 @@ internal fun TaskItem(
             }
         )
     ) {
-        // Cyberpunk: 3dp colored left strip for high/urgent priority tasks
-        val urgentStripColor = when {
+        // Left accent stripe: project color when the task has a project, so
+        // project membership reads as a strong visual signal on every theme.
+        // On Cyberpunk-bracket themes urgent/high priority overrides — urgency
+        // is the higher-stakes signal there.
+        val projectStripColor = project?.let {
+            try {
+                Color(android.graphics.Color.parseColor(it.color))
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val stripColor = when {
             prismAttrs.brackets && task.priority == 4 -> prismColors.urgentAccent
             prismAttrs.brackets && task.priority == 3 -> prismColors.primary
-            else -> null
+            else -> projectStripColor
         }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (urgentStripColor != null) {
-                        val c = urgentStripColor
+                    if (stripColor != null) {
+                        val c = stripColor
                         Modifier.drawBehind {
                             drawRect(c, size = Size(3.dp.toPx(), size.height))
                         }
@@ -122,7 +133,7 @@ internal fun TaskItem(
                     }
                 )
                 .padding(
-                    start = if (urgentStripColor != null) 7.dp else 4.dp,
+                    start = if (stripColor != null) 7.dp else 4.dp,
                     end = 4.dp,
                     top = 8.dp,
                     bottom = 8.dp

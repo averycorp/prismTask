@@ -40,13 +40,16 @@ import com.averycorp.prismtask.domain.model.TaskFilter
 /**
  * Horizontal scrolling row of project filter chips + an "All" reset
  * chip + a "Manage" assist chip that opens the project management
- * screen. Each project's chip is tinted with the project's own color.
+ * screen. Each project's chip is tinted with the project's own color
+ * and shows its incomplete-task count, so the row reads as a small
+ * project dashboard rather than a flat filter list.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProjectFilterRow(
     projects: List<ProjectEntity>,
     selectedProjectId: Long?,
+    taskCountByProject: Map<Long, Int>,
     onSelectProject: (Long?) -> Unit,
     onManageProjects: () -> Unit
 ) {
@@ -72,6 +75,7 @@ internal fun ProjectFilterRow(
             } catch (_: Exception) {
                 MaterialTheme.colorScheme.primary
             }
+            val count = taskCountByProject[project.id] ?: 0
             FilterChip(
                 selected = selectedProjectId == project.id,
                 onClick = { onSelectProject(project.id) },
@@ -85,10 +89,19 @@ internal fun ProjectFilterRow(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(project.name)
+                        if (count > 0) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = count.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = projectColor.copy(alpha = 0.85f)
+                            )
+                        }
                     }
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = projectColor.copy(alpha = 0.15f),
+                    containerColor = projectColor.copy(alpha = 0.06f),
+                    selectedContainerColor = projectColor.copy(alpha = 0.18f),
                     selectedLabelColor = projectColor
                 )
             )
