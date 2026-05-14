@@ -6,10 +6,10 @@ import {
   getDocs,
   orderBy,
   query,
-  updateDoc,
   type DocumentData,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 
 /**
  * Firestore-native user-declared boundary rules. Stored at
@@ -112,14 +112,18 @@ export async function updateRule(
   id: string,
   input: Partial<BoundaryRuleInput>,
 ): Promise<void> {
-  const payload: Record<string, unknown> = { updatedAt: Date.now() };
+  // LWW guard. An Android-side enable/disable toggle (e.g. burnout
+  // scorer auto-suspending a rule) shouldn't be silently undone by a
+  // concurrent web label-rename. Parity audit A.2.
+  const now = Date.now();
+  const payload: Record<string, unknown> = { updatedAt: now };
   if (input.type !== undefined) payload.type = input.type;
   if (input.label !== undefined) payload.label = input.label;
   if (input.value !== undefined) payload.value = input.value;
   if (input.secondary_value !== undefined)
     payload.secondaryValue = input.secondary_value;
   if (input.enabled !== undefined) payload.enabled = input.enabled;
-  await updateDoc(ruleDoc(uid, id), payload);
+  await lwwUpdate(ruleDoc(uid, id), payload as Parameters<typeof lwwUpdate>[1]);
 }
 
 export async function deleteRule(uid: string, id: string): Promise<void> {

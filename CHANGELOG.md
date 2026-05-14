@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(web/sync): LWW timestamp guard on `updateHabit` — extends the parity A.2 contract to habit edits so an in-flight Android booking-state toggle isn't clobbered by a web rename / color change.
 - feat(web/sync): LWW timestamp guard on `updateProject` — extends parity A.2 to project edits so Android-side lifecycle writes (start/end date, theme color, archived/completed timestamps) survive a concurrent web rename.
 - feat(web/sync): LWW timestamp guard on `updateSlotDef` (medication slot definitions) — extends parity A.2 so a web slot rename doesn't clobber an Android-side reminder-mode flip on the same slot.
+- feat(web/sync): LWW timestamp guard on the wellness-logs write paths (`setCheckIn`, `updateLog` for mood/energy, `updateRule` for boundaries) — extends parity A.2 so concurrent same-day edits from a sibling device aren't silently overwritten.
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage
