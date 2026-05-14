@@ -396,6 +396,98 @@ class TaskRepositoryTest {
     }
 
     // ---------------------------------------------------------------------
+    // Recheck: logging another completion on an already-completed recurring
+    // task without flipping the row back to incomplete or re-spawning the
+    // next instance.
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun logAdditionalCompletion_completedRecurring_recordsCompletionWithoutSpawn() = runBlocking {
+        val id = taskDao.insert(
+            taskFixture(
+                title = "Stretch",
+                dueDate = 1_700_000_000_000L,
+                recurrenceRule = """{"type":"DAILY","interval":1}""",
+                isCompleted = true,
+                completedAt = 1_700_000_000_000L
+            )
+        )
+        val tasksBefore = taskDao.tasks.size
+        coEvery {
+            taskCompletionRepository.recordCompletion(any(), any(), spawnedRecurrenceId = null)
+        } returns 42L
+
+        val completionId = repo.logAdditionalCompletion(id)
+
+        assertEquals(42L, completionId)
+        assertEquals(
+            "No new task should be spawned by a recheck",
+            tasksBefore,
+            taskDao.tasks.size
+        )
+        coVerify(exactly = 1) {
+            taskCompletionRepository.recordCompletion(any(), any(), spawnedRecurrenceId = null)
+        }
+    }
+
+    @Test
+    fun logAdditionalCompletion_nonRecurring_returnsNullWithoutLogging() = runBlocking {
+        val id = taskDao.insert(
+            taskFixture(title = "Pay rent", isCompleted = true, completedAt = 1L)
+        )
+
+        val result = repo.logAdditionalCompletion(id)
+
+        assertNull(result)
+        coVerify(exactly = 0) {
+            taskCompletionRepository.recordCompletion(any(), any(), any())
+        }
+    }
+
+    @Test
+    fun logAdditionalCompletion_notYetCompleted_returnsNullWithoutLogging() = runBlocking {
+        val id = taskDao.insert(
+            taskFixture(
+                title = "Stretch",
+                dueDate = 1L,
+                recurrenceRule = """{"type":"DAILY","interval":1}"""
+            )
+        )
+
+        val result = repo.logAdditionalCompletion(id)
+
+        assertNull(result)
+        coVerify(exactly = 0) {
+            taskCompletionRepository.recordCompletion(any(), any(), any())
+        }
+    }
+
+    @Test
+    fun logAdditionalCompletion_habitLinked_returnsNullWithoutLogging() = runBlocking {
+        val id = taskDao.insert(
+            taskFixture(title = "Meditate", isCompleted = true, completedAt = 1L)
+                .copy(
+                    recurrenceRule = """{"type":"DAILY","interval":1}""",
+                    sourceHabitId = 7L
+                )
+        )
+
+        val result = repo.logAdditionalCompletion(id)
+
+        assertNull(result)
+        coVerify(exactly = 0) {
+            taskCompletionRepository.recordCompletion(any(), any(), any())
+        }
+    }
+
+    @Test
+    fun undoAdditionalCompletion_deletesCompletionRow() = runBlocking {
+        repo.undoAdditionalCompletion(99L)
+
+        coVerify(exactly = 1) { taskCompletionRepository.deleteCompletionById(99L) }
+    }
+
+    // ---------------------------------------------------------------------
     // Reschedule / reminders
     // ---------------------------------------------------------------------
 
