@@ -18,8 +18,8 @@ function makeDeps(): ChatActionDispatchDeps & {
     updateTask: vi.fn().mockResolvedValue({}),
     completeTask: vi.fn().mockResolvedValue({}),
     deleteTask: vi.fn().mockResolvedValue({}),
-    setPendingBatchCommand: vi.fn(),
-    navigate: vi.fn(),
+    setPendingBatchCommand: vi.fn<(cmd: string | null) => void>(),
+    navigate: vi.fn<(to: string) => void>(),
   };
 }
 

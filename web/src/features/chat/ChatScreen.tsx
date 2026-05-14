@@ -8,12 +8,12 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
-import { useChatStore } from '@/stores/chatStore';
+import { useChatStore, type ChatUiMessage } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useBatchStore } from '@/stores/batchStore';
 import { useAuthStore } from '@/stores/authStore';
-import type { ChatActionPayload, ChatUiMessage } from '@/types/chat';
+import type { ChatActionPayload } from '@/types/chat';
 import {
   actionLabel,
   actionSignature,

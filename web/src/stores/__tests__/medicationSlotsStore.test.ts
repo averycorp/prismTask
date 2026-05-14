@@ -31,6 +31,9 @@ const sampleDef: MedicationSlotDef = {
   sort_order: 0,
   reminder_mode: null,
   reminder_interval_minutes: null,
+  ideal_time: '09:00',
+  drift_minutes: 180,
+  is_active: true,
   created_at: 0,
   updated_at: 0,
 };
