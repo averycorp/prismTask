@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.domain.usecase.DailyEssentialsUiState
 import com.averycorp.prismtask.ui.screens.today.components.CollapsibleSection
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.HabitCard
-import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.LeisureBudgetCard
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.RoutineCard
 import com.averycorp.prismtask.ui.screens.today.dailyessentials.cards.SchoolworkCard
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
@@ -26,7 +25,6 @@ data class DailyEssentialsActions(
     val onToggleHousework: () -> Unit,
     val onToggleCourse: (courseId: Long) -> Unit,
     val onOpenAssignment: (assignmentId: Long) -> Unit,
-    val onOpenLeisurePool: () -> Unit,
     val onDismissHint: () -> Unit,
     val onOpenSettings: () -> Unit
 )
@@ -34,9 +32,7 @@ data class DailyEssentialsActions(
 /**
  * Collapsible section wrapper for the Daily Essentials cards.
  *
- * Leisure Budget v2.0 — the two slot-pick cards (music + flex) have
- * been replaced by a single budget-progress card. The remaining card
- * order is: Morning → Housework → Schoolwork → Leisure Budget → Bedtime.
+ * Card order: Morning → Housework → Schoolwork → Bedtime.
  */
 @Composable
 fun DailyEssentialsSection(
@@ -47,17 +43,11 @@ fun DailyEssentialsSection(
     modifier: Modifier = Modifier
 ) {
     val prismColors = LocalPrismColors.current
-    // The leisure budget card always renders when the user has any
-    // configuration (pool entries OR minutes logged); otherwise it's
-    // counted as empty and the empty-state hint can decide to fire.
-    val leisureVisible = !state.leisureBudget.poolIsEmpty ||
-        state.leisureBudget.minutesLogged > 0
     val visibleCardCount = listOfNotNull(
         state.morning,
         state.housework,
         state.houseworkRoutine,
         state.schoolwork?.takeIf { it.hasContent },
-        state.leisureBudget.takeIf { leisureVisible },
         state.bedtime
     ).size
 
@@ -110,12 +100,6 @@ fun DailyEssentialsSection(
                     onOpenAssignment = actions.onOpenAssignment
                 )
             }
-            if (leisureVisible) {
-                LeisureBudgetCard(
-                    state = state.leisureBudget,
-                    onTapBody = actions.onOpenLeisurePool
-                )
-            }
             state.bedtime?.let { bedtime ->
                 RoutineCard(
                     state = bedtime,
@@ -152,7 +136,7 @@ private fun EmptyStateHint(
             )
             Text(
                 text = "Pick the habits and routines you want to see every morning " +
-                    "— housework, leisure, and more.",
+                    "— housework, schoolwork, and more.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
