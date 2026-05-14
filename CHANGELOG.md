@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
+- **LeisurePoolScreen on web (parity F.1a).** Web port of
+  `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
+  Quick-Log category tiles + Recent Activity day-grouped list + Manage
+  section (daily/weekend target sliders, category enable toggles,
+  activity-pool editor). Reachable at `/leisure`. Wired through a new
+  `web/src/stores/leisureStore.ts` Zustand store that mirrors
+  `LeisurePoolViewModel.UiState`. Custom categories surface visually but
+  remain device-local — the backend's `LeisureCategoryT` CHECK constraint
+  pins synced rows to the four built-in buckets, matching Android's
+  behavior. Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
+- feat(web/balance): port `LifeCategoryClassifier` + `BalanceTracker` engines to web (`web/src/utils/lifeCategoryClassifier.ts`, `web/src/utils/balanceTracker.ts`), add Firestore-synced balance preferences (`balancePreferences.ts`), and ship a Work-Life Balance settings section with target-ratio sliders, overload threshold, and balance-bar toggle — closes parity audit C.2a/b/d. Also fixes pre-existing parse errors in `useFirestoreSync.ts` and its test that were blocking lint/vitest from a prior bad merge between PR #1340 and #1341.
 - feat(web/ai): add typed `aiChat` / `aiChatHistory` / `aiLifeCategoryClassifyText` REST helpers + Chat-related TypeScript types (parity Batch 3 D.1 PR-1; foundation for web AI Coach chat).
 - **Leisure REST client + types on web (parity F.1d).** Added `web/src/api/leisure.ts` mirroring the Android `LeisureSyncService` request shape: activities (list/create/update/delete), sessions (list/create), and singleton settings (get/patch). Custom-category-tagged rows are filtered out at the network boundary before any write so they don't 422 against the backend's `LeisureCategoryT` CHECK constraint — they stay device-local just like on Android. No UI yet; this is foundation for the LeisurePoolScreen port and the Today leisure-minimum row. Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
