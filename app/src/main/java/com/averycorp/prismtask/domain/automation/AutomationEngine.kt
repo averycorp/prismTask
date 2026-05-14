@@ -31,6 +31,11 @@ import javax.inject.Singleton
  *  5. AI-action daily cap: [AutomationRateLimiter].
  *  6. Failure isolation: each handler in try/catch; one failure doesn't
  *     halt the action chain or the engine.
+ *  7. Per-task notify soft cap (mental-health class): one rule may not
+ *     fire more than [AutomationRateLimiter.MAX_NOTIFIES_PER_TASK_PER_DAY]
+ *     notify actions against the same task in a 24h window. See
+ *     `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md`
+ *     Option C.
  *
  * Composed triggers are emitted back to the bus as
  * [AutomationEvent.RuleFired] rather than recursively dispatched, which
@@ -89,7 +94,7 @@ class AutomationEngine @Inject constructor(
             val trigger = AutomationJsonAdapter.decodeTrigger(rule.triggerJson) ?: continue
             if (!triggerMatches(trigger, event, rule.id)) continue
             val now = System.currentTimeMillis()
-            when (val decision = rateLimiter.canFire(rule, now)) {
+            when (val decision = rateLimiter.canFire(rule, event, now)) {
                 is AutomationRateLimiter.Decision.Blocked -> {
                     Log.i(TAG, "rule=${rule.id} blocked: ${decision.reason}")
                     ruleRepository.recordFiring(

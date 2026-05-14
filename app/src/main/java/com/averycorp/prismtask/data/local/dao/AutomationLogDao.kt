@@ -27,6 +27,36 @@ interface AutomationLogDao {
     )
     suspend fun countAiSince(since: Long): Int
 
+    /**
+     * Count prior firings of [ruleId] in the window that fired at least
+     * one notify action against the same [taskId]. Backs the per-task
+     * notify soft cap (7th engine safety mechanism — see
+     * `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md` Option C).
+     *
+     * `taskMarkerComma` and `taskMarkerBrace` are pre-built LIKE patterns
+     * (`%"taskId":<n>,%` and `%"taskId":<n>}%`) — the OR covers both
+     * "taskId is last field" and "taskId followed by another field"
+     * shapes in `trigger_event_json`. Two patterns prevent prefix
+     * collisions (e.g. `taskId:12` matching a log for `taskId:123`).
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM automation_logs
+        WHERE rule_id = :ruleId
+          AND fired_at >= :since
+          AND condition_passed = 1
+          AND actions_executed_json LIKE '%"type":"notify"%'
+          AND (trigger_event_json LIKE :taskMarkerComma
+               OR trigger_event_json LIKE :taskMarkerBrace)
+        """
+    )
+    suspend fun countNotifiesForRuleAndTaskSince(
+        ruleId: Long,
+        taskMarkerComma: String,
+        taskMarkerBrace: String,
+        since: Long
+    ): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(log: AutomationLogEntity): Long
 
