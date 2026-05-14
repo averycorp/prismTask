@@ -18,6 +18,7 @@ import {
   type MedicationTierState,
 } from '@/api/firestore/medicationSlots';
 import { getFirebaseUid } from '@/stores/firebaseUid';
+import { ClinicalReportPanel } from '@/features/medication/ClinicalReportPanel';
 
 /**
  * Web port of Android's Medication Log. Reads `medication_doses` +
@@ -235,6 +236,10 @@ export function MedicationHistoryScreen() {
         <Button variant="ghost" size="sm" onClick={() => load()}>
           Refresh
         </Button>
+      </div>
+
+      <div className="mt-8">
+        <ClinicalReportPanel />
       </div>
     </div>
   );
