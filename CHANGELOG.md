@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/weekly-review): persist weekly reviews to Firestore so cross-device users see the same week breakdown without re-running the aggregator. New `web/src/api/firestore/weeklyReviews.ts` mapper using Pattern A canonical-row id (`{YYYY-MM-DD-of-Monday}`); `WeeklyReviewScreen` upserts both Free-tier local-only and Pro-tier AI-augmented reviews. Closes parity audit C.4a (the backend auto-gen cron half is C.4b, deferred to a backend-batch follow-up).
 - **Schoolwork class-row Today section (parity F.2).** Web port of
   Android's PR #1314 `SchoolworkCard` (post the "Leisure + School as
   modes" refactor). Each active course renders as a checkable row on
