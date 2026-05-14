@@ -1460,8 +1460,10 @@ constructor(
         // selected, so we drop in the safest middle-of-the-road option.
         @VisibleForTesting
         internal val DEFAULT_LIFE_CATEGORY = LifeCategory.PERSONAL
+
         @VisibleForTesting
         internal val DEFAULT_TASK_MODE = TaskMode.WORK
+
         @VisibleForTesting
         internal val DEFAULT_COGNITIVE_LOAD = CognitiveLoad.MEDIUM
     }

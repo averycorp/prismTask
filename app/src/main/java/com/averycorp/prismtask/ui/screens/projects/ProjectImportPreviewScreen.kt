@@ -336,7 +336,7 @@ private fun TaskMetadataRow(row: TaskPreviewRow) {
     val bits = buildList {
         if (row.priority > 0) add(priorityLabel(row.priority))
         row.dueDate?.let { add("Due ${formatDate(it)}") }
-        row.estimatedMinutes?.let { add("~${it} min") }
+        row.estimatedMinutes?.let { add("~$it min") }
         row.phaseName?.let { add("Phase: $it") }
     }
     if (bits.isEmpty()) return
@@ -394,7 +394,7 @@ private fun SubtaskTree(subtasks: List<TaskPreviewRow>, depth: Int) {
             val subBits = buildList {
                 if (sub.priority > 0) add(priorityLabel(sub.priority))
                 sub.dueDate?.let { add("Due ${formatDate(it)}") }
-                sub.estimatedMinutes?.let { add("~${it} min") }
+                sub.estimatedMinutes?.let { add("~$it min") }
             }
             if (subBits.isNotEmpty()) {
                 Text(

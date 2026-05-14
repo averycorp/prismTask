@@ -12,11 +12,11 @@ import com.averycorp.prismtask.domain.model.CustomLeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureEnforcementMode
 import dagger.hilt.android.qualifiers.ApplicationContext
-import org.json.JSONArray
-import org.json.JSONObject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -125,10 +125,11 @@ constructor(
         val enabledCategories: Set<LeisureCategory> = when {
             rawEnabled == null -> LeisureCategory.DEFAULT_ENABLED
             rawEnabled == EXPLICIT_NONE_SENTINEL -> emptySet()
-            else -> rawEnabled
-                .split(",")
-                .mapNotNull { LeisureCategory.fromStringOrNull(it.trim()) }
-                .toSet()
+            else ->
+                rawEnabled
+                    .split(",")
+                    .mapNotNull { LeisureCategory.fromStringOrNull(it.trim()) }
+                    .toSet()
         }
         val customCategories: List<CustomLeisureCategory> =
             decodeCustomCategories(prefs[CUSTOM_CATEGORIES_KEY])

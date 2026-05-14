@@ -890,4 +890,3 @@ private fun tierColorFor(tier: AchievedTier): Color {
         AchievedTier.COMPLETE -> c.successColor
     }
 }
-
