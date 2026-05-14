@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/medication): clinical report export (parity Batch 5 PR-6).
+  Client-side `generateClinicalReport` ports Android
+  `ClinicalReportGenerator` to web (overview / medications / refill
+  projections sections). New `ClinicalReportPanel` on the history
+  screen offers Copy / Download .md / Download .txt actions over the
+  selected lookback window. Backend endpoint deferred to a follow-up;
+  client-side generation covers the patient-portal-paste workflow.
 - feat(web/medication): log/history view (parity Batch 5 PR-5). New
   `/medication/history` route with `MedicationHistoryScreen.tsx` reads
   `medication_doses` + `medication_tier_states` over the selected
