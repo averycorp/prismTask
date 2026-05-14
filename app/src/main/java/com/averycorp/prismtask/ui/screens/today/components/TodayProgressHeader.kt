@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -72,6 +74,7 @@ internal fun CompactProgressHeader(
     progress: Float,
     progressStyle: String = "ring",
     onAnalyticsClick: (() -> Unit)? = null,
+    onCompletedClick: (() -> Unit)? = null,
     productivityBadge: @Composable (() -> Unit)? = null,
     trailingActions: @Composable (() -> Unit)? = null
 ) {
@@ -159,11 +162,22 @@ internal fun CompactProgressHeader(
 
             Spacer(modifier = Modifier.width(12.dp))
 
+            val completedClickModifier = if (onCompletedClick != null && completed > 0) {
+                Modifier.clickable(
+                    role = Role.Button,
+                    onClickLabel = "Show completed tasks"
+                ) { onCompletedClick() }
+            } else {
+                Modifier
+            }
+
             when (progressStyle) {
                 "ring" -> {
                     val ringSize = (36f * barScale).dp
                     Box(
-                        modifier = Modifier.size(ringSize),
+                        modifier = Modifier
+                            .size(ringSize)
+                            .then(completedClickModifier),
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.foundation.Canvas(
@@ -264,7 +278,8 @@ internal fun CompactProgressHeader(
                         style = MaterialTheme.typography.headlineSmall,
                         fontFamily = displayFont,
                         fontWeight = FontWeight.Bold,
-                        color = colors.primary
+                        color = colors.primary,
+                        modifier = completedClickModifier
                     )
                     Spacer(modifier = Modifier.weight(1f))
                 }
@@ -301,11 +316,13 @@ internal fun CompactProgressHeader(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            TerminalLabel(
-                text = "$completed done",
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.primary
-            )
+            Box(modifier = completedClickModifier) {
+                TerminalLabel(
+                    text = "$completed done",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.primary
+                )
+            }
 
             if (productivityBadge != null) {
                 Spacer(modifier = Modifier.width(4.dp))
