@@ -7,10 +7,13 @@ import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -27,9 +30,21 @@ import org.junit.runner.RunWith
  *
  * Cleanup cancels whatever notifications this test may have posted so
  * no user-visible notification leaks into the real device tray.
+ *
+ * Hilt-aware because PR #1418 / #1420 / #1421 added EntryPointAccessors
+ * lookups (pause-gate, mood-low gate, rest-day gate) on the receiver →
+ * helper path. Under `HiltTestApplication`, the SingletonComponent is
+ * only constructed when a test uses [HiltAndroidRule]; without the rule
+ * the lookups throw `IllegalStateException("The component was not
+ * created…")`, which the receiver's catch swallows silently, leaving the
+ * notification unposted and this assertion failing with `active IDs=[]`.
  */
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class ReminderBroadcastInstrumentedTest {
+
+    @get:Rule
+    val hiltRule = HiltAndroidRule(this)
 
     private lateinit var context: Context
     private lateinit var manager: NotificationManager
@@ -41,6 +56,10 @@ class ReminderBroadcastInstrumentedTest {
         // getActiveNotifications is M+; the receiver itself works pre-M
         // but we can't assert without active-notification introspection.
         assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        // Trigger SingletonComponent creation so EntryPointAccessors calls
+        // in the receiver / NotificationHelper succeed. Without `inject()`,
+        // HiltAndroidRule alone doesn't always force component creation.
+        hiltRule.inject()
         context = InstrumentationRegistry.getInstrumentation().targetContext
         manager = context.getSystemService(NotificationManager::class.java)
         // Start from a clean notification tray so the polling assertion
