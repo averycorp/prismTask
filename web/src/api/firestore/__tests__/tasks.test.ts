@@ -3,13 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   addDocMock,
   updateDocMock,
+  setDocMock,
   getDocMock,
+  txGetMock,
+  runTransactionMock,
   docMock,
   collectionMock,
 } = vi.hoisted(() => ({
   addDocMock: vi.fn(),
   updateDocMock: vi.fn(),
+  setDocMock: vi.fn(),
   getDocMock: vi.fn(),
+  txGetMock: vi.fn(),
+  runTransactionMock: vi.fn(),
   docMock: vi.fn(),
   collectionMock: vi.fn(),
 }));
@@ -17,7 +23,9 @@ const {
 vi.mock('firebase/firestore', () => ({
   addDoc: addDocMock,
   updateDoc: updateDocMock,
+  setDoc: setDocMock,
   getDoc: getDocMock,
+  runTransaction: runTransactionMock,
   doc: docMock,
   collection: collectionMock,
   // Unused-by-these-tests primitives — stubbed so the module loads.
@@ -35,13 +43,33 @@ import { createTask, updateTask } from '@/api/firestore/tasks';
 beforeEach(() => {
   addDocMock.mockReset();
   updateDocMock.mockReset();
+  setDocMock.mockReset();
   getDocMock.mockReset();
+  txGetMock.mockReset();
+  runTransactionMock.mockReset();
   docMock.mockReset();
   collectionMock.mockReset();
-  docMock.mockReturnValue({});
+  docMock.mockReturnValue({ path: 'users/uid-1/tasks/task-1' });
   collectionMock.mockReturnValue({});
   // addDoc returns a fake ref with an id
   addDocMock.mockResolvedValue({ id: 'new-task-id' });
+  // Default runTransaction: invokes the callback with a tx that delegates
+  // `get` to txGetMock (returning a doc-exists snapshot whose updatedAt is
+  // older than `Date.now()` so the LWW guard always applies) and
+  // `update`/`set` to the corresponding mocks. Individual tests override
+  // `txGetMock` to inject newer remote timestamps (stale-write cases).
+  txGetMock.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ updatedAt: 0 }),
+  });
+  runTransactionMock.mockImplementation(async (_db: unknown, fn: (tx: unknown) => Promise<unknown>) => {
+    const tx = {
+      get: (ref: unknown) => txGetMock(ref),
+      update: (ref: unknown, patch: unknown) => updateDocMock(ref, patch),
+      set: (ref: unknown, patch: unknown, opts?: unknown) => setDocMock(ref, patch, opts),
+    };
+    return fn(tx);
+  });
 });
 
 describe('createTask payload shape', () => {
@@ -255,5 +283,106 @@ describe('updateTask merge-write payload shape', () => {
     ]) {
       expect(key in payload).toBe(false);
     }
+  });
+});
+
+// ── LWW guard tests (parity audit A.2) ────────────────────────────────
+
+describe('updateTask LWW timestamp guard', () => {
+  beforeEach(() => {
+    // The post-write re-read returns the same snapshot the guard saw
+    // when it allowed the write through; aborts just round-trip the
+    // stale remote.
+    getDocMock.mockResolvedValue({
+      id: 'task-1',
+      exists: () => true,
+      data: () => ({ title: 'Existing title' }),
+    });
+  });
+
+  it('aborts the write when remote updatedAt is strictly newer', async () => {
+    // Stamp the remote 100ms in the future relative to Date.now() at
+    // call time. The LWW guard reads the snapshot inside the
+    // transaction, sees remote > local, and skips `tx.update`.
+    const farFuture = Date.now() + 1_000_000;
+    txGetMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ updatedAt: farFuture }),
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await updateTask('uid-1', 'task-1', { title: 'Stale write' });
+
+    expect(updateDocMock).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[lww] aborted stale write'),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('lets the write through when remote updatedAt is older', async () => {
+    txGetMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ updatedAt: 1000 }),
+    });
+
+    await updateTask('uid-1', 'task-1', { title: 'Newer write' });
+
+    expect(updateDocMock).toHaveBeenCalledTimes(1);
+    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.title).toBe('Newer write');
+    expect(payload.updatedAt).toEqual(expect.any(Number));
+  });
+
+  it('treats remote.updatedAt === local as not stale (equality wins)', async () => {
+    // Pre-seed `Date.now()` to a known value via jest fake timers so
+    // local == remote precisely.
+    const now = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    txGetMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ updatedAt: now }),
+    });
+
+    await updateTask('uid-1', 'task-1', { title: 'Tie' });
+
+    expect(updateDocMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('first-create wins when the remote doc does not exist', async () => {
+    txGetMock.mockResolvedValue({
+      exists: () => false,
+      data: () => undefined,
+    });
+    // When the doc is missing the LWW helper uses `tx.set(ref, patch,
+    // {merge:true})` instead of `tx.update`.
+    await updateTask('uid-1', 'task-1', { title: 'First create' });
+    expect(setDocMock).toHaveBeenCalledTimes(1);
+    expect(updateDocMock).not.toHaveBeenCalled();
+  });
+
+  it('stamps the same `updatedAt` on the patch as it compares against', async () => {
+    // The guard must use ONE wall-clock millis for both the
+    // comparison and the doc write — otherwise the same Firestore
+    // write would land with a different timestamp than the value the
+    // guard authorised.
+    txGetMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ updatedAt: 0 }),
+    });
+
+    await updateTask('uid-1', 'task-1', { title: 'Coherent stamp' });
+
+    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    const stamp = payload.updatedAt as number;
+    expect(typeof stamp).toBe('number');
+    // We can't observe what the guard internally compared against, but
+    // we *can* assert the stamp on the patch is consistent with
+    // wall-clock-at-call-time (within a generous window).
+    expect(stamp).toBeGreaterThan(Date.now() - 5_000);
+    expect(stamp).toBeLessThanOrEqual(Date.now());
   });
 });
