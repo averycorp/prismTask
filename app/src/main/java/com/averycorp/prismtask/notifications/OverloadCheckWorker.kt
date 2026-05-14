@@ -13,12 +13,14 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.averycorp.prismtask.R
+import com.averycorp.prismtask.data.diagnostics.DiagnosticLogger
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.BalanceConfig
 import com.averycorp.prismtask.domain.usecase.BalanceTracker
+import com.averycorp.prismtask.domain.usecase.RecentMoodSignal
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -47,12 +49,24 @@ constructor(
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val notificationPreferences: NotificationPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
-    private val notificationPauseGate: NotificationPauseGate
+    private val notificationPauseGate: NotificationPauseGate,
+    private val recentMoodSignal: RecentMoodSignal,
+    private val diagnosticLogger: DiagnosticLogger
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!notificationPreferences.overloadAlertsEnabled.first()) return Result.success()
         // MH-first G4: pause-all silences overload alerts. Medication exempt.
         if (notificationPauseGate.isPausedNow()) return Result.success()
+        // Mental-Health-First § G7 — suppress non-critical cadence after a
+        // recent low-mood log (≤2/5 within 48h). Silent deferral by
+        // design; the next periodic firing re-evaluates the gate.
+        if (recentMoodSignal.isLowMoodWithin()) {
+            diagnosticLogger.info(
+                tag = "MoodGate",
+                message = "OverloadCheckWorker skipped — recent low mood within 48h"
+            )
+            return Result.success()
+        }
         val prefs = userPreferencesDataStore.workLifeBalanceFlow.first()
         if (!prefs.showBalanceBar) return Result.success()
 

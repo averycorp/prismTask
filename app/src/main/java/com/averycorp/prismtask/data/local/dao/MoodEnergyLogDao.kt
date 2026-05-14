@@ -55,6 +55,26 @@ interface MoodEnergyLogDao {
     @Query("SELECT * FROM mood_energy_logs WHERE cloud_id = :cloudId LIMIT 1")
     suspend fun getByCloudIdOnce(cloudId: String): MoodEnergyLogEntity?
 
+    /**
+     * Returns the count of mood entries whose [MoodEnergyLogEntity.mood] is
+     * less than or equal to [moodCeiling] and whose
+     * [MoodEnergyLogEntity.createdAt] is at or after [sinceCreatedAtMillis].
+     *
+     * Used by `RecentMoodSignal` to decide whether to suppress
+     * non-critical notification cadence after a low-mood log. Filters on
+     * `created_at` (wall-clock entry time) rather than `date`
+     * (midnight-normalized) so a 48-hour window is exact rather than
+     * day-aligned.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM mood_energy_logs " +
+            "WHERE mood <= :moodCeiling AND created_at >= :sinceCreatedAtMillis"
+    )
+    suspend fun countLowMoodSinceOnce(
+        moodCeiling: Int,
+        sinceCreatedAtMillis: Long
+    ): Int
+
     @Query("UPDATE mood_energy_logs SET cloud_id = :cloudId, updated_at = :now WHERE id = :id")
     suspend fun setCloudId(id: Long, cloudId: String?, now: Long)
 
