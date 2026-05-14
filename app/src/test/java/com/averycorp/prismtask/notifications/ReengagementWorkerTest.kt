@@ -11,6 +11,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
+import com.averycorp.prismtask.data.diagnostics.DiagnosticLogger
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
@@ -19,6 +20,7 @@ import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.api.ReengagementRequest
 import com.averycorp.prismtask.data.remote.api.ReengagementResponse
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
+import com.averycorp.prismtask.domain.usecase.RecentMoodSignal
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -58,6 +60,8 @@ class ReengagementWorkerTest {
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var notificationPreferences: NotificationPreferences
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
+    private lateinit var recentMoodSignal: RecentMoodSignal
+    private lateinit var diagnosticLogger: DiagnosticLogger
 
     private val keySentCount = intPreferencesKey("reengagement_sent_count")
     private val keyLastOpenTime = longPreferencesKey("last_open_time")
@@ -70,6 +74,8 @@ class ReengagementWorkerTest {
         proFeatureGate = mockk(relaxed = true)
         notificationPreferences = mockk(relaxed = true)
         advancedTuningPreferences = mockk(relaxed = true)
+        recentMoodSignal = mockk(relaxed = true)
+        diagnosticLogger = mockk(relaxed = true)
 
         coEvery { proFeatureGate.hasAccess(ProFeatureGate.AI_REENGAGEMENT) } returns true
         coEvery { notificationPreferences.reengagementEnabled } returns flowOf(true)
@@ -77,6 +83,8 @@ class ReengagementWorkerTest {
         coEvery { taskDao.getLastCompletedTask() } returns null
         coEvery { taskDao.getIncompleteTaskCount() } returns 0
         coEvery { api.getReengagementNudge(any()) } returns ReengagementResponse(nudge = "Welcome back")
+        // Default: no recent low mood → existing behaviour preserved.
+        coEvery { recentMoodSignal.isLowMoodWithin(any()) } returns false
     }
 
     private fun buildWorker(): ReengagementWorker {
@@ -92,7 +100,9 @@ class ReengagementWorkerTest {
                 taskDao = taskDao,
                 proFeatureGate = proFeatureGate,
                 notificationPreferences = notificationPreferences,
-                advancedTuningPreferences = advancedTuningPreferences
+                advancedTuningPreferences = advancedTuningPreferences,
+                recentMoodSignal = recentMoodSignal,
+                diagnosticLogger = diagnosticLogger
             )
         }
         return TestListenableWorkerBuilder
@@ -135,6 +145,23 @@ class ReengagementWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 0) { api.getReengagementNudge(any<ReengagementRequest>()) }
         assertEquals(1, storedSentCount())
+    }
+
+    @Test
+    fun doWork_skips_when_recent_low_mood_within_48h() = runBlocking {
+        // Mental-Health-First § G7 — re-engagement nudges must defer
+        // silently when a ≤2/5 mood was logged in the last 48h.
+        seedAbsenceDays(3)
+        coEvery { recentMoodSignal.isLowMoodWithin(any()) } returns true
+
+        val result = buildWorker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify(exactly = 0) { api.getReengagementNudge(any<ReengagementRequest>()) }
+        // Counter must NOT increment — silent deferral, not a "used"
+        // nudge. Otherwise we'd permanently lose the user's only nudge
+        // for this absence period to a mood spike.
+        assertEquals(0, storedSentCount())
     }
 
     @Test

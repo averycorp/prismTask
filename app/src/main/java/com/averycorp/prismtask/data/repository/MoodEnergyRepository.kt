@@ -69,4 +69,13 @@ constructor(
         dao.delete(id)
         syncTracker.trackDelete(id, "mood_energy_log")
     }
+
+    /**
+     * Returns true iff at least one mood entry with `mood <= moodCeiling`
+     * was created at or after [sinceCreatedAtMillis]. Filters on
+     * `created_at` so the window is wall-clock-exact rather than tied to
+     * the midnight-normalized `date` column.
+     */
+    suspend fun hasLowMoodSince(moodCeiling: Int, sinceCreatedAtMillis: Long): Boolean =
+        dao.countLowMoodSinceOnce(moodCeiling, sinceCreatedAtMillis) > 0
 }
