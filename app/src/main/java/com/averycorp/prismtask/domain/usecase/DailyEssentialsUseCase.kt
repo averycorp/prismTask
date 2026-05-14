@@ -121,9 +121,7 @@ data class DailyEssentialsUiState(
             bedtime == null &&
             housework == null &&
             houseworkRoutine == null &&
-            (schoolwork == null || !schoolwork.hasContent) &&
-            leisureBudget.minutesLogged == 0 &&
-            leisureBudget.poolIsEmpty
+            (schoolwork == null || !schoolwork.hasContent)
 
     companion object {
         fun empty(): DailyEssentialsUiState = DailyEssentialsUiState(

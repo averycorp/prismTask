@@ -33,7 +33,7 @@ import com.averycorp.prismtask.ui.components.settings.SectionHeader
  * Settings entry point for the Daily Essentials section. Only two
  * configuration points live here — the rest are deep links into the
  * dedicated management screens that already own those features
- * (Self-Care for Morning/Bedtime, Medication, Leisure).
+ * (Self-Care for Morning/Bedtime, Medication).
  */
 @Composable
 fun DailyEssentialsSettingsSection(
@@ -44,8 +44,7 @@ fun DailyEssentialsSettingsSection(
     onSchoolworkHabitChange: (Long?) -> Unit,
     onOpenMorningRoutine: () -> Unit,
     onOpenBedtimeRoutine: () -> Unit,
-    onOpenMedication: () -> Unit,
-    onOpenLeisure: () -> Unit
+    onOpenMedication: () -> Unit
 ) {
     SectionHeader("Daily Essentials")
 
@@ -88,12 +87,6 @@ fun DailyEssentialsSettingsSection(
         body = "Medications are configured under Self-Care \u2192 Medication and habit reminders.",
         actionLabel = "Open Medication",
         onAction = onOpenMedication
-    )
-    InfoRow(
-        title = "Leisure",
-        body = "Music and flex activities are managed under Leisure \u2192 Customize.",
-        actionLabel = "Open Leisure",
-        onAction = onOpenLeisure
     )
 
     HorizontalDivider()

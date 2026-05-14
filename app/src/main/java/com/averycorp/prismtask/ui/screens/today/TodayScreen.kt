@@ -704,7 +704,6 @@ fun TodayScreen(
                                     onOpenAssignment = {
                                         navController.navigate(PrismTaskRoute.Schoolwork.route)
                                     },
-                                    onOpenLeisurePool = onOpenLeisure,
                                     onDismissHint = { viewModel.onDismissDailyEssentialsHint() },
                                     onOpenSettings = {
                                         navController.navigate("settings/layout")
