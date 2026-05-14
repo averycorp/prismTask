@@ -46,10 +46,13 @@ constructor(
     private val taskRepository: TaskRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val notificationPreferences: NotificationPreferences,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!notificationPreferences.overloadAlertsEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences overload alerts. Medication exempt.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         val prefs = userPreferencesDataStore.workLifeBalanceFlow.first()
         if (!prefs.showBalanceBar) return Result.success()
 

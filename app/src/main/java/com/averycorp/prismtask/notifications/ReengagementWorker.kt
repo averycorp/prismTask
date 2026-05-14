@@ -51,11 +51,16 @@ constructor(
     private val taskDao: TaskDao,
     private val proFeatureGate: ProFeatureGate,
     private val notificationPreferences: NotificationPreferences,
-    private val advancedTuningPreferences: AdvancedTuningPreferences
+    private val advancedTuningPreferences: AdvancedTuningPreferences,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_REENGAGEMENT)) return Result.success()
         if (!notificationPreferences.reengagementEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences re-engagement nudges. The
+        // counter is intentionally NOT incremented while paused so the
+        // user doesn't burn their daily nudge quota during the pause.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
 
         val config = advancedTuningPreferences.getReengagementConfig().first()
 

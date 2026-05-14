@@ -67,11 +67,14 @@ constructor(
     private val habitDao: HabitDao,
     private val completionDao: HabitCompletionDao,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
-    private val notificationPreferences: NotificationPreferences
+    private val notificationPreferences: NotificationPreferences,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = try {
         if (!notificationPreferences.weeklySummaryEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences weekly habit summary.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         val data = WeeklyHabitSummaryCalculator.generateWeeklySummary(
             habitDao = habitDao,
             completionDao = completionDao,
