@@ -53,7 +53,49 @@ jobs:
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'ci:integration')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Sharded into 3 parallel jobs so no single bucket hits the AVD-job
+    # ceiling. The unsharded suite was running ~45 min on the heaviest pass
+    # (e.g. successful run 25831728676 measured 2699s, exactly the prior
+    # timeout-minutes: 45 wall) and timing-out runs were the failure mode
+    # this split exists to fix. Each shard now has headroom: smoke is the
+    # heaviest at ~20 UI tests, sync runs ~13 emulator-backed scenarios
+    # excluding the `MedicationCrossDeviceConvergenceTest` class that
+    # already runs in `cross-device-tests`, and dao covers the remaining
+    # ~57 fast Room/migration/healer/notification/ui-screen classes via
+    # `package=com.averycorp.prismtask` + `notPackage=...smoke,...sync`.
+    # `fail-fast: false` keeps a single shard's failure from cancelling
+    # the others — independent failure isolation matters more than
+    # short-circuiting CI minutes here.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: smoke
+            # Heaviest UI bucket on its own. AndroidJUnitRunner's `package`
+            # filter is prefix-match (matches subpackages too) per
+            # TestRequestBuilder.IncludePackagePredicate, but
+            # `com.averycorp.prismtask.smoke` has no further subpackages so
+            # this resolves to exactly the smoke suite.
+            filter-args: -Pandroid.testInstrumentationRunnerArguments.package=com.averycorp.prismtask.smoke
+          - shard: sync
+            # sync.fuzz + sync.scenarios. `notClass` excludes the single
+            # cross-device convergence class that the dedicated
+            # `cross-device-tests` job already runs — without this the
+            # class would execute twice per push and the convergence
+            # assertion would race the parallel job's emulator state.
+            filter-args: >-
+              -Pandroid.testInstrumentationRunnerArguments.package=com.averycorp.prismtask.sync
+              -Pandroid.testInstrumentationRunnerArguments.notClass=com.averycorp.prismtask.sync.scenarios.MedicationCrossDeviceConvergenceTest
+          - shard: dao
+            # Root DAO + Migration + Healer + Backfiller classes plus the
+            # `notifications` and `ui.screens` subpackages. `package=` is
+            # prefix-match so this would normally also include smoke and
+            # sync; `notPackage=` (also prefix-match) carves them back
+            # out, leaving everything else.
+            filter-args: >-
+              -Pandroid.testInstrumentationRunnerArguments.package=com.averycorp.prismtask
+              -Pandroid.testInstrumentationRunnerArguments.notPackage=com.averycorp.prismtask.smoke,com.averycorp.prismtask.sync
     env:
       # Flips `USE_FIREBASE_EMULATOR` at build time via the env-var hook
       # in app/build.gradle.kts, so the APK under test routes Firestore
@@ -153,6 +195,34 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Same write-then-bash pattern as `cross-device-tests` (PRs
+      # #773 / #776): `reactivecircus/android-emulator-runner@v2` splits
+      # multi-line `script:` input on newlines and runs each line in a
+      # fresh `sh -c`, which breaks any multi-line construct AND eats
+      # newlines inside long matrix-supplied `filter-args` strings.
+      # Materializing the script keeps the runner-arg value intact.
+      - name: Write shard test runner
+        env:
+          FILTER_ARGS: ${{ matrix.filter-args }}
+        run: |
+          cat > "$RUNNER_TEMP/run-shard-tests.sh" <<BASH
+          #!/usr/bin/env bash
+          set -euo pipefail
+          adb devices
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          # AVD already reaches the host emulators via 10.0.2.2 (hard-
+          # coded in PrismTaskApplication.configureFirebaseEmulator),
+          # so no \`adb reverse\` is needed. Confirm by pinging the
+          # emulator UI from inside the AVD.
+          adb shell "ping -c 1 10.0.2.2 || true"
+          ./gradlew :app:connectedDebugAndroidTest \\
+            ${FILTER_ARGS} \\
+            --no-daemon --continue
+          BASH
+          chmod +x "$RUNNER_TEMP/run-shard-tests.sh"
+
       - name: Run instrumented tests against AVD + Firebase emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -161,19 +231,10 @@ jobs:
           arch: x86_64
           profile: pixel_6
           emulator-boot-timeout: 1200
-          # Headless runner; no window server. Disable animations so
-          # Compose interactions don't race against spurious redraws.
-          script: |
-            adb devices
-            adb shell settings put global window_animation_scale 0
-            adb shell settings put global transition_animation_scale 0
-            adb shell settings put global animator_duration_scale 0
-            # AVD already reaches the host emulators via 10.0.2.2 (hard-
-            # coded in PrismTaskApplication.configureFirebaseEmulator),
-            # so no `adb reverse` is needed. Confirm by pinging the
-            # emulator UI from inside the AVD.
-            adb shell "ping -c 1 10.0.2.2 || true"
-            ./gradlew connectedDebugAndroidTest --no-daemon --continue
+          # Headless runner; no window server. Animations are disabled
+          # inside the runner script so Compose interactions don't race
+          # against spurious redraws.
+          script: bash "$RUNNER_TEMP/run-shard-tests.sh"
 
       - name: Stop Firebase emulators
         if: always()
@@ -187,7 +248,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: firebase-emulator-log
+          # Per-shard suffix because matrix instances upload in parallel
+          # and `actions/upload-artifact@v7` rejects duplicate names.
+          name: firebase-emulator-log-${{ matrix.shard }}
           path: ${{ runner.temp }}/firebase-emulators.log
           retention-days: 7
           if-no-files-found: ignore
@@ -196,7 +259,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: connected-test-results
+          name: connected-test-results-${{ matrix.shard }}
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
