@@ -12,6 +12,7 @@ import { authApi } from '@/api/auth';
 import { setFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useA11yStore } from '@/stores/a11yStore';
 
 /**
  * Tri-state deletion status that gates the authed UI.
@@ -174,11 +175,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     // Pull cross-device synced settings (e.g. AI-features opt-out,
-    // Start-of-Day hour, theme) from Firestore so Android's values
-    // propagate immediately. Best-effort.
+    // Start-of-Day hour, theme, a11y) from Firestore so Android's
+    // values propagate immediately. Best-effort.
     void useSettingsStore.getState().loadAiFeaturesFromFirestore(fbUser.uid);
     void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
     void useThemeStore.getState().loadFromFirestore(fbUser.uid);
+    void useA11yStore.getState().loadFromFirestore(fbUser.uid);
 
     // Link with FastAPI backend for NLP/AI features
     await ensureBackendAccount(fbUser);
@@ -214,11 +216,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
 
         // Pull cross-device synced settings (e.g. AI-features opt-out,
-        // Start-of-Day hour, theme) from Firestore so Android's values
-        // propagate on session restore.
+        // Start-of-Day hour, theme, a11y) from Firestore so Android's
+        // values propagate on session restore.
         void useSettingsStore.getState().loadAiFeaturesFromFirestore(fbUser.uid);
         void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
         void useThemeStore.getState().loadFromFirestore(fbUser.uid);
+        void useA11yStore.getState().loadFromFirestore(fbUser.uid);
 
         // Restore JWT tokens from localStorage
         const accessToken = localStorage.getItem('prismtask_access_token');
