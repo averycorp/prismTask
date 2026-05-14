@@ -13,6 +13,7 @@ import { useProjectRiskStore } from '@/stores/projectRiskStore';
 import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 import { useCourseStore } from '@/stores/courseStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useA11yStore } from '@/stores/a11yStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -70,6 +71,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   );
   const subscribeToCourses = useCourseStore((s) => s.subscribe);
   const subscribeToTheme = useThemeStore((s) => s.subscribeToFirestore);
+  const subscribeToA11y = useA11yStore((s) => s.subscribeToFirestore);
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
   const resetDependencies = useTaskDependencyStore((s) => s.reset);
@@ -119,6 +121,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToAnchors, 'external-anchors');
     safeSubscribe(subscribeToCourses, 'courses');
     safeSubscribe(subscribeToTheme, 'theme-preferences');
+    safeSubscribe(subscribeToA11y, 'a11y-preferences');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -148,6 +151,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToAnchors,
     subscribeToCourses,
     subscribeToTheme,
+    subscribeToA11y,
     resetSlots,
     resetPrefs,
     resetDependencies,
