@@ -75,6 +75,7 @@ import com.averycorp.prismtask.ui.screens.today.components.CheckInCompleteChip
 import com.averycorp.prismtask.ui.screens.today.components.CollapsibleSection
 import com.averycorp.prismtask.ui.screens.today.components.CompactProgressHeader
 import com.averycorp.prismtask.ui.screens.today.components.CompletedTaskItem
+import com.averycorp.prismtask.ui.screens.today.components.CompletedTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.FloatingQuickAddBar
 import com.averycorp.prismtask.ui.screens.today.components.GUIDED_TOUR_STEPS
 import com.averycorp.prismtask.ui.screens.today.components.GuidedTourCard
@@ -212,6 +213,7 @@ fun TodayScreen(
 
     var editorSheetTaskId by remember { mutableStateOf<Long?>(null) }
     var showEditorSheet by remember { mutableStateOf(false) }
+    var showCompletedSheet by remember { mutableStateOf(false) }
     var showAiHub by remember { mutableStateOf(false) }
     var upsellFeature by remember { mutableStateOf<ProGatedFeature?>(null) }
     var reschedulePopupTask by remember { mutableStateOf<TaskEntity?>(null) }
@@ -242,6 +244,7 @@ fun TodayScreen(
                 progress = combinedProgress,
                 progressStyle = progressStyle,
                 onAnalyticsClick = { navController.navigate(PrismTaskRoute.TaskAnalytics.createRoute()) },
+                onCompletedClick = { showCompletedSheet = true },
                 productivityBadge = {
                     ProductivityScoreBadge(
                         onClick = { navController.navigate(PrismTaskRoute.TaskAnalytics.createRoute()) }
@@ -947,6 +950,15 @@ fun TodayScreen(
             navController = navController,
             onDismiss = { showAiHub = false },
             onShowUpsell = { feature -> upsellFeature = feature }
+        )
+    }
+
+    if (showCompletedSheet) {
+        CompletedTodaySheet(
+            completedTasks = completedToday,
+            completedHabits = todayHabits.filter { it.isCompletedToday },
+            onUncompleteTask = { taskId -> viewModel.onToggleComplete(taskId, true) },
+            onDismiss = { showCompletedSheet = false }
         )
     }
 
