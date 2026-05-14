@@ -50,6 +50,7 @@ import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -159,6 +160,20 @@ constructor(
 
     private fun userCollection(collection: String) =
         authManager.userId?.let { firestore.collection("users").document(it).collection(collection) }
+
+    /**
+     * Deterministic doc id for `medication_tier_states` (parity Batch 5
+     * PR-8, decision D-E3). The id collapses two devices toggling the
+     * same (med, slot, day) triple into a single Firestore doc rather
+     * than racing on auto-ids. Matches the shape callers can produce
+     * deterministically from any read of the parent
+     * `MedicationTierStateEntity`.
+     */
+    private fun tierStateDeterministicDocId(
+        medCloudId: String,
+        logDate: String,
+        slotCloudId: String
+    ): String = "${medCloudId}__${logDate}__${slotCloudId}"
 
     suspend fun initialUpload() {
         if (authManager.userId == null) return
@@ -902,10 +917,18 @@ constructor(
         // flag in MedicationMigrationPreferences.
         val medicationsOk = runMedicationsBackfillIfNeeded()
         val medicationDosesOk = runMedicationDosesBackfillIfNeeded()
+        // Parity Batch 5 PR-8 — rewrite existing tier-state docs to
+        // deterministic id form. Runs AFTER the medications + doses
+        // pushes so syncMetadataDao has populated cloud_ids for the
+        // referenced medications + slots. Its own one-shot flag means
+        // it no-ops after the first success regardless of the other
+        // family flags.
+        val tierStateIdsOk = runTierStateDocIdBackfillIfNeeded()
 
         val allSucceeded = coursesOk && courseCompletionsOk &&
             selfCareStepsOk && selfCareLogsOk &&
-            medicationsOk && medicationDosesOk
+            medicationsOk && medicationDosesOk &&
+            tierStateIdsOk
         if (allSucceeded) {
             builtInSyncPreferences.setNewEntitiesBackfillDone(true)
             logger.info("upload.new_entities_backfill", status = "success")
@@ -1150,6 +1173,94 @@ constructor(
         }
     }
 
+    /**
+     * One-time backfill of `medication_tier_states` Firestore docs to
+     * the deterministic id form `${medCloudId}__${logDate}__${slotCloudId}`
+     * (parity Batch 5 PR-8, decision D-E3).
+     *
+     * Iterates every local tier-state row, computes the deterministic
+     * id, writes via `setDoc(merge=true)` at the new path, then deletes
+     * the old auto-id doc (if any) and updates the local `cloud_id` in
+     * `sync_metadata`. **No Room migration** — the `cloud_id` column
+     * already exists; we just rewrite its value.
+     *
+     * Safety:
+     * - Guarded by [MedicationMigrationPreferences.isTierStateDocIdBackfillDone];
+     *   re-runs are no-ops after success.
+     * - `setDoc(merge = true)` makes each write idempotent so a partial
+     *   failure stays retryable.
+     * - The old auto-id doc is only deleted AFTER the deterministic
+     *   write lands; a crash between the two leaves duplicate docs that
+     *   the next sync resolves naturally (deterministic write is the
+     *   one with the newest `updatedAt`).
+     * - Skips rows that already point at a deterministic-form id —
+     *   `cloud_id == detId` is a no-op.
+     */
+    private suspend fun runTierStateDocIdBackfillIfNeeded(): Boolean {
+        if (medicationMigrationPreferences.isTierStateDocIdBackfillDone()) return true
+        if (authManager.userId == null) return false
+        return try {
+            val rows = medicationTierStateDao.getAllOnce()
+            logger.debug(
+                "backfill.tier_state_doc_id",
+                status = "begin",
+                detail = "count=${rows.size}"
+            )
+            val collection = userCollection("medication_tier_states") ?: return false
+            for (row in rows) {
+                try {
+                    val medCloudId = syncMetadataDao.getCloudId(row.medicationId, "medication")
+                        ?: continue
+                    val slotCloudId = syncMetadataDao.getCloudId(row.slotId, "medication_slot")
+                        ?: continue
+                    val detId = tierStateDeterministicDocId(medCloudId, row.logDate, slotCloudId)
+                    val existingCloudId = syncMetadataDao.getCloudId(row.id, "medication_tier_state")
+                    if (existingCloudId == detId) continue
+                    val payload = MedicationSyncMapper.medicationTierStateToMap(row, medCloudId, slotCloudId)
+                    // Write deterministic doc first (idempotent merge).
+                    collection.document(detId).set(payload, SetOptions.merge()).await()
+                    // Delete the old auto-id doc if it differs. Swallow
+                    // NOT_FOUND — a previous partial-success retry may
+                    // have already deleted it.
+                    if (existingCloudId != null && existingCloudId.isNotEmpty() && existingCloudId != detId) {
+                        try {
+                            collection.document(existingCloudId).delete().await()
+                        } catch (e: FirebaseFirestoreException) {
+                            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw e
+                        }
+                    }
+                    // Update local sync_metadata to the new id so future
+                    // pushUpdate paths target the deterministic doc.
+                    syncMetadataDao.upsert(
+                        SyncMetadataEntity(
+                            localId = row.id,
+                            entityType = "medication_tier_state",
+                            cloudId = detId,
+                            lastSyncedAt = System.currentTimeMillis()
+                        )
+                    )
+                } catch (e: Exception) {
+                    logger.error(
+                        operation = "backfill.tier_state_doc_id",
+                        entity = "medication_tier_state",
+                        id = row.id.toString(),
+                        throwable = e
+                    )
+                }
+            }
+            medicationMigrationPreferences.setTierStateDocIdBackfillDone(true)
+            logger.info(
+                operation = "backfill.tier_state_doc_id",
+                status = "success",
+                detail = "rows=${rows.size}"
+            )
+            true
+        } catch (e: Exception) {
+            logger.error(operation = "backfill.tier_state_doc_id", throwable = e)
+            false
+        }
+    }
+
     fun launchInitialUpload() {
         scope.launch {
             val start = System.currentTimeMillis()
@@ -1194,6 +1305,26 @@ constructor(
     // call. TODO: refactor pushCreate to reduce early return statements.
     private suspend fun pushCreate(meta: SyncMetadataEntity) {
         val collection = userCollection(collectionNameFor(meta.entityType)) ?: return
+        // Deterministic doc id for medication_tier_state (parity Batch 5
+        // PR-8, decision D-E3). Two devices toggling the same
+        // (medication, slot, day) collapse into one doc rather than
+        // racing on `collection.document()` auto-ids. The id shape is
+        // `${medCloudId}__${logDate}__${slotCloudId}` — read order:
+        // 1. fetch state row → resolve med + slot cloud ids
+        // 2. mint the doc ref by id (not auto)
+        // 3. setDoc(merge=true) so retries are idempotent
+        // No Room migration; the cloud_id column already exists.
+        if (meta.entityType == "medication_tier_state") {
+            val state = medicationTierStateDao.getByIdOnce(meta.localId) ?: return
+            val medCloudId = syncMetadataDao.getCloudId(state.medicationId, "medication") ?: return
+            val slotCloudId = syncMetadataDao.getCloudId(state.slotId, "medication_slot") ?: return
+            val detId = tierStateDeterministicDocId(medCloudId, state.logDate, slotCloudId)
+            val payload = MedicationSyncMapper.medicationTierStateToMap(state, medCloudId, slotCloudId)
+            val tierDoc = collection.document(detId)
+            tierDoc.set(payload, SetOptions.merge()).await()
+            syncMetadataDao.upsert(meta.copy(cloudId = tierDoc.id, pendingAction = null, lastSyncedAt = System.currentTimeMillis()))
+            return
+        }
         val docRef = collection.document()
         val data = when (meta.entityType) {
             "task" -> {

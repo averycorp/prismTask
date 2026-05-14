@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- refactor(android/medication): tier-state Firestore doc-ids become
+  deterministic (parity Batch 5 PR-8, decision D-E3). New push path in
+  `SyncService.kt` writes `medication_tier_states/${medCloudId}__${logDate}__${slotCloudId}`
+  via `setDoc(merge=true)` instead of `collection.document()` auto-id,
+  so two devices toggling the same (med, slot, day) triple collapse
+  into one Firestore doc. One-time backfill (`runTierStateDocIdBackfillIfNeeded`)
+  iterates every local row, rewrites its cloud doc to the
+  deterministic id, deletes the old auto-id doc, and updates
+  `sync_metadata.cloud_id` — gated by a new
+  `MedicationMigrationPreferences.tier_state_doc_id_backfill_done`
+  one-shot flag so re-syncs no-op. **No Room migration** — the
+  `cloud_id` column already exists.
 - refactor(web/medication): canonicalise slot-defs collection to
   `medication_slots` (parity Batch 5 PR-7, decision D-E2). Web now
   writes the same collection Android does and the schema-merge fields

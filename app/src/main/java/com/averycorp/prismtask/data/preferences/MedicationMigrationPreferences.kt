@@ -36,6 +36,8 @@ constructor(
         private val MIGRATION_PUSHED_TO_CLOUD = booleanPreferencesKey("migration_pushed_to_cloud")
         private val SOURCE_DATA_PURGED_PHASE_2 = booleanPreferencesKey("source_data_purged_phase_2")
         private val V54_APPLIED_AT_MS = longPreferencesKey("v54_applied_at_ms")
+        private val TIER_STATE_DOC_ID_BACKFILL_DONE =
+            booleanPreferencesKey("tier_state_doc_id_backfill_done")
     }
 
     /**
@@ -116,6 +118,26 @@ constructor(
             if (!prefs.contains(V54_APPLIED_AT_MS)) {
                 prefs[V54_APPLIED_AT_MS] = nowMs
             }
+        }
+    }
+
+    /**
+     * True once the parity Batch 5 PR-8 tier-state doc-id backfill
+     * has rewritten every existing Firestore tier-state doc to the
+     * deterministic `${medCloudId}__${logDate}__${slotCloudId}` form.
+     * Guarded so the per-row scan doesn't re-run on every sync.
+     *
+     * Set only after the loop completes successfully — partial-failure
+     * stays retryable on the next app start because each
+     * `setDoc(..., merge = true)` call is idempotent.
+     */
+    suspend fun isTierStateDocIdBackfillDone(): Boolean =
+        context.medicationMigrationDataStore.data.first()[TIER_STATE_DOC_ID_BACKFILL_DONE]
+            ?: false
+
+    suspend fun setTierStateDocIdBackfillDone(done: Boolean) {
+        context.medicationMigrationDataStore.edit {
+            it[TIER_STATE_DOC_ID_BACKFILL_DONE] = done
         }
     }
 }
