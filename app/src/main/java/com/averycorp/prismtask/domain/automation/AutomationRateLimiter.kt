@@ -15,6 +15,12 @@ import javax.inject.Singleton
  *    300 times in 5 seconds).
  *  - AI-action daily cap: separate stricter limit because Anthropic
  *    calls cost money. Counted across all rules with `ai.*` actions.
+ *  - Per-task notify soft cap (mental-health class): one rule may not
+ *    fire more than [MAX_NOTIFIES_PER_TASK_PER_DAY] notify actions
+ *    against the same task in a 24h window. Scoped per (rule, task) —
+ *    distinct rules each firing one notify against the same task are
+ *    fine (medication-escalation use case). See Option C of
+ *    `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md`.
  *
  * Defaults below are intentionally conservative; the per-rule cap is
  * overridable via JSON `"maxFiresPerDay": N` on the rule's trigger blob.
@@ -23,7 +29,11 @@ import javax.inject.Singleton
 class AutomationRateLimiter @Inject constructor(
     private val logDao: AutomationLogDao
 ) {
-    suspend fun canFire(rule: AutomationRuleEntity, now: Long): Decision {
+    suspend fun canFire(
+        rule: AutomationRuleEntity,
+        event: AutomationEvent,
+        now: Long
+    ): Decision {
         // Per-rule daily cap.
         val cap = rule.perRuleDailyCap()
         if (rule.dailyFireCount >= cap) {
@@ -42,6 +52,24 @@ class AutomationRateLimiter @Inject constructor(
                 return Decision.Blocked("AI-action daily cap reached ($MAX_AI_ACTIONS_PER_DAY)")
             }
         }
+        // Per-task notify soft cap. Only meaningful when (a) the rule
+        // has at least one notify action and (b) the trigger event
+        // references a task — TimeTick / Manual / RuleFired bypass.
+        val taskId = event.taskIdOrNull()
+        if (taskId != null && rule.actionJson.contains("\"type\":\"notify\"")) {
+            val notifyCount = logDao.countNotifiesForRuleAndTaskSince(
+                ruleId = rule.id,
+                taskMarkerComma = "%\"taskId\":$taskId,%",
+                taskMarkerBrace = "%\"taskId\":$taskId}%",
+                since = now - DAY_MS
+            )
+            if (notifyCount >= MAX_NOTIFIES_PER_TASK_PER_DAY) {
+                return Decision.Blocked(
+                    "per-task notify cap reached " +
+                        "($MAX_NOTIFIES_PER_TASK_PER_DAY/day on task $taskId)"
+                )
+            }
+        }
         return Decision.Allowed
     }
 
@@ -58,10 +86,19 @@ class AutomationRateLimiter @Inject constructor(
         return match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: MAX_FIRES_PER_RULE_PER_DAY
     }
 
+    private fun AutomationEvent.taskIdOrNull(): Long? = when (this) {
+        is AutomationEvent.TaskCreated -> taskId
+        is AutomationEvent.TaskUpdated -> taskId
+        is AutomationEvent.TaskCompleted -> taskId
+        is AutomationEvent.TaskDeleted -> taskId
+        else -> null
+    }
+
     companion object {
         const val MAX_FIRES_PER_RULE_PER_DAY = 100
         const val MAX_GLOBAL_FIRES_PER_HOUR = 500
         const val MAX_AI_ACTIONS_PER_DAY = 50
+        const val MAX_NOTIFIES_PER_TASK_PER_DAY = 3
         const val HOUR_MS = 60L * 60_000L
         const val DAY_MS = 24L * HOUR_MS
     }
