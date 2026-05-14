@@ -12,6 +12,7 @@ import { useProjectPhaseStore } from '@/stores/projectPhaseStore';
 import { useProjectRiskStore } from '@/stores/projectRiskStore';
 import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 import { useCourseStore } from '@/stores/courseStore';
+import { useThemeStore } from '@/stores/themeStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -68,6 +69,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     (s) => s.subscribeToAnchors,
   );
   const subscribeToCourses = useCourseStore((s) => s.subscribe);
+  const subscribeToTheme = useThemeStore((s) => s.subscribeToFirestore);
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
   const resetDependencies = useTaskDependencyStore((s) => s.reset);
@@ -116,6 +118,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToRisks, 'project-risks');
     safeSubscribe(subscribeToAnchors, 'external-anchors');
     safeSubscribe(subscribeToCourses, 'courses');
+    safeSubscribe(subscribeToTheme, 'theme-preferences');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -144,6 +147,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToRisks,
     subscribeToAnchors,
     subscribeToCourses,
+    subscribeToTheme,
     resetSlots,
     resetPrefs,
     resetDependencies,
