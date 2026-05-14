@@ -17,6 +17,7 @@ import com.averycorp.prismtask.data.diagnostics.DiagnosticLogger
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
+import com.averycorp.prismtask.data.repository.RestDayRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.BalanceConfig
 import com.averycorp.prismtask.domain.usecase.BalanceTracker
@@ -51,12 +52,17 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val notificationPauseGate: NotificationPauseGate,
     private val recentMoodSignal: RecentMoodSignal,
+    private val restDayRepository: RestDayRepository,
     private val diagnosticLogger: DiagnosticLogger
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!notificationPreferences.overloadAlertsEnabled.first()) return Result.success()
         // MH-first G4: pause-all silences overload alerts. Medication exempt.
         if (notificationPauseGate.isPausedNow()) return Result.success()
+        // Rest-day suppression (MH-First audit § G3). Overload alerts are
+        // a non-medication notification — pause for the user's logical
+        // rest day and resume tomorrow's run unchanged.
+        if (restDayRepository.isRestDayToday()) return Result.success()
         // Mental-Health-First § G7 — suppress non-critical cadence after a
         // recent low-mood log (≤2/5 within 48h). Silent deferral by
         // design; the next periodic firing re-evaluates the gate.

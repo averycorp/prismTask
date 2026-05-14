@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.GridView
@@ -85,6 +86,8 @@ import com.averycorp.prismtask.ui.screens.today.components.PauseAllNotifications
 import com.averycorp.prismtask.ui.screens.today.components.PauseStatusPill
 import com.averycorp.prismtask.ui.screens.today.components.PlanForTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.ProductivityScoreBadge
+import com.averycorp.prismtask.ui.screens.today.components.RestDayBanner
+import com.averycorp.prismtask.ui.screens.today.components.RestDayConfirmDialog
 import com.averycorp.prismtask.ui.screens.today.components.SelfCareNudgeCard
 import com.averycorp.prismtask.ui.screens.today.components.SwipeableTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.TodayBalanceSection
@@ -154,7 +157,19 @@ fun TodayScreen(
     val tourCardState by viewModel.tourCardState.collectAsStateWithLifecycle()
     val resumeTourVisible by viewModel.resumeTourVisible.collectAsStateWithLifecycle()
     val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
+    val isRestDayToday by viewModel.isRestDayToday.collectAsStateWithLifecycle()
+    var showRestDayConfirm by remember { mutableStateOf(false) }
     var overloadBannerDismissed by remember { mutableStateOf(false) }
+
+    if (showRestDayConfirm) {
+        RestDayConfirmDialog(
+            onConfirm = {
+                viewModel.markRestDayToday()
+                showRestDayConfirm = false
+            },
+            onDismiss = { showRestDayConfirm = false }
+        )
+    }
 
     // A2 NLP batch ops — listens to BatchUndoEventBus so we can offer
     // a "Undo" Snackbar after a batch lands while the user is back here.
@@ -341,6 +356,23 @@ fun TodayScreen(
                         .expandedWidthCap(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Rest Day takeover (MH-First audit § G3). When the
+                    // user has marked today as a rest day the banner
+                    // replaces the dense task / habit list. Tasks remain
+                    // in Room — not deleted, not auto-rescheduled — and
+                    // come back the moment rest day ends. Medication
+                    // reminders are unaffected (see RestDayGate). Takes
+                    // precedence over the pause-all pill (G4) — a rest
+                    // day is the stronger user intent.
+                    if (isRestDayToday) {
+                        item(key = "rest_day_banner") {
+                            RestDayBanner(onEndRestDay = { viewModel.unmarkRestDayToday() })
+                        }
+                        item(key = "rest_day_bottom_pad") {
+                            Spacer(modifier = Modifier.height(80.dp))
+                        }
+                        return@LazyColumn
+                    }
                     // MH-first G4: descriptive status pill, only renders
                     // when an ad-hoc pause is active. Composes with the
                     // bell-with-slash icon in the header.
@@ -630,6 +662,26 @@ fun TodayScreen(
                                 modifier = Modifier.coachmarkAnchor(
                                     com.averycorp.prismtask.ui.coachmark.CoachmarkAnchors.TODAY_AI_TOOLS_CHIP
                                 )
+                            )
+                            // Rest Day chip (MH-First audit § G3). One-tap
+                            // entry into the rest-day flow — confirmation
+                            // dialog lives at the screen scope so the
+                            // user can think twice before flipping the
+                            // gate. Voice is descriptive: chip label is
+                            // "Rest Day", never "I'm too tired" / "I
+                            // can't today" framing.
+                            AssistChip(
+                                onClick = { showRestDayConfirm = true },
+                                label = { Text("Rest Day") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Bedtime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                colors = chipColors,
+                                border = chipBorder
                             )
                         }
                     }

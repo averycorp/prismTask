@@ -150,6 +150,13 @@ class MedicationReminderReceiver : BroadcastReceiver() {
         val totalDoses = intent.getIntExtra("totalDoses", 1)
         val alarmKind = intent.getStringExtra(HabitReminderScheduler.EXTRA_ALARM_KIND)
 
+        // Rest-day suppression (MH-First audit § G3). Habit alarms route
+        // through this branch — including the daily-time path — and the
+        // audit specifies non-medication notifications pause. The
+        // re-register-tomorrow step below still runs so the chain
+        // resumes naturally on the next logical day.
+        val isRestDay = RestDayGate.shouldSuppress(context)
+
         val scheduler = entryPoint.habitReminderScheduler()
         val habit = entryPoint.habitDao().getHabitByIdOnce(habitId)
 
@@ -178,12 +185,20 @@ class MedicationReminderReceiver : BroadcastReceiver() {
             }
         }
 
+        // Rest day (MH-first § G3) → drop the habit nag (the
+        // re-register above already queued tomorrow). Medications never
+        // route through this branch (they use AlarmKind.Medication /
+        // SlotClock / etc.), so this never suppresses a real medication
+        // reminder.
+        if (isRestDay) {
+            Log.d("MedReminderReceiver", "Rest day — suppressing habit nag habitId=$habitId")
+            return
+        }
         // Mental-Health-First § G7 — suppress habit-reminder cadence when
         // a low-mood log (≤2/5) lands within 48h. Medication-related
-        // habits are exempt: adherence safety wins over cadence
-        // reduction. Detection covers both built-in medication habits
-        // (templateKey == KEY_MEDICATION) and user-tagged ones
-        // (category == "medication", case-insensitive).
+        // habits are exempt even though we already reach this branch
+        // only for habit alarms: a Daily Essentials medication habit
+        // routes here, and we never want to gate its nag on mood.
         if (habit != null && !isMedicationHabit(habit)) {
             if (entryPoint.recentMoodSignal().isLowMoodWithin()) {
                 entryPoint.diagnosticLogger().info(

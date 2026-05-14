@@ -317,6 +317,14 @@ object NotificationHelper {
             Log.d("NotificationHelper", "Pause-all active — skipping task=$taskId")
             return
         }
+        // Rest-day suppression (MH-First audit § G3). Non-medication
+        // reminders pause until tomorrow's logical day. Medications still
+        // fire — they have their own showMedication* fns that intentionally
+        // do not call this gate.
+        if (RestDayGate.shouldSuppress(context)) {
+            Log.d("NotificationHelper", "Rest day in effect — suppressing task=$taskId")
+            return
+        }
         Log.d("NotificationHelper", "Showing notification for task=$taskId")
         createNotificationChannel(context)
         val style = currentStyle(context)
@@ -744,6 +752,13 @@ object NotificationHelper {
         // through the same gate as the legacy [showTaskReminder].
         if (pauseGateOf(context).isPausedNow()) {
             Log.d("NotificationHelper", "Pause-all active — skipping task=$taskId")
+            return
+        }
+        // Rest-day suppression (MH-First audit § G3). Profile-aware path
+        // mirrors the legacy showTaskReminder gate so both routes stay
+        // consistent.
+        if (RestDayGate.shouldSuppress(context)) {
+            Log.d("NotificationHelper", "Rest day in effect — suppressing task=$taskId (profile path)")
             return
         }
         val channelId = ensureProfileChannel(

@@ -84,14 +84,15 @@ object StreakCalculator {
         completions: List<HabitCompletionEntity>,
         habit: HabitEntity,
         today: LocalDate = LocalDate.now(),
-        config: ForgivenessConfig = ForgivenessConfig.DEFAULT
+        config: ForgivenessConfig = ForgivenessConfig.DEFAULT,
+        restDays: Set<LocalDate> = emptySet()
     ): StreakResult {
         val target = habit.targetFrequency
         val metDates = completions
             .groupBy { it.completedDate.toLocalDate() }
             .filterValues { it.size >= target }
             .keys
-        return DailyForgivenessStreakCore.calculate(metDates, today, config)
+        return DailyForgivenessStreakCore.calculate(metDates, today, config, restDays)
     }
 
     /**
@@ -103,10 +104,11 @@ object StreakCalculator {
         completions: List<HabitCompletionEntity>,
         habit: HabitEntity,
         today: LocalDate = LocalDate.now(),
-        config: ForgivenessConfig = ForgivenessConfig.DEFAULT
+        config: ForgivenessConfig = ForgivenessConfig.DEFAULT,
+        restDays: Set<LocalDate> = emptySet()
     ): StreakResult {
         if (habit.frequencyPeriod == "daily" || habit.frequencyPeriod.isBlank()) {
-            return calculateResilientDailyStreak(completions, habit, today, config)
+            return calculateResilientDailyStreak(completions, habit, today, config, restDays)
         }
         val strict = calculateCurrentStreak(completions, habit, today)
         return StreakResult(

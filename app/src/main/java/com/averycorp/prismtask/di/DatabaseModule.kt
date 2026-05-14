@@ -35,6 +35,7 @@ import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.ProjectPhaseDao
 import com.averycorp.prismtask.data.local.dao.ProjectRiskDao
 import com.averycorp.prismtask.data.local.dao.ProjectTemplateDao
+import com.averycorp.prismtask.data.local.dao.RestDayDao
 import com.averycorp.prismtask.data.local.dao.SavedFilterDao
 import com.averycorp.prismtask.data.local.dao.SchoolworkDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
@@ -228,6 +229,9 @@ object DatabaseModule {
     @Provides
     fun provideUserAiPreferenceDao(database: PrismTaskDatabase): UserAiPreferenceDao =
         database.userAiPreferenceDao()
+
+    @Provides
+    fun provideRestDayDao(database: PrismTaskDatabase): RestDayDao = database.restDayDao()
 }
 
 /**

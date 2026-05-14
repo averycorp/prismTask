@@ -52,6 +52,10 @@ class EscalationBroadcastReceiver : BroadcastReceiver() {
             "Escalation step $stepIndex fired for task=$taskId action=${action.key} tier=${tier.key}"
         )
 
+        // Rest-day suppression (MH-First audit § G3) + pause-all (G4)
+        // compose: either gate short-circuits the whole chain.
+        // goAsync() keeps the receiver alive while the suspend gate
+        // check runs.
         val pauseGate = EntryPointAccessors
             .fromApplication(context.applicationContext, PauseEntryPoint::class.java)
             .notificationPauseGate()
@@ -62,6 +66,10 @@ class EscalationBroadcastReceiver : BroadcastReceiver() {
             try {
                 if (pauseGate.isPausedNow()) {
                     Log.d(TAG, "Pause-all active — skipping escalation step $stepIndex task=$taskId")
+                    return@launch
+                }
+                if (RestDayGate.shouldSuppress(context)) {
+                    Log.d(TAG, "Rest day — suppressing escalation step taskId=$taskId step=$stepIndex")
                     return@launch
                 }
                 NotificationHelper.showEscalatedTaskReminder(

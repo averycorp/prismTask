@@ -34,6 +34,7 @@ import com.averycorp.prismtask.data.local.dao.ProjectDao
 import com.averycorp.prismtask.data.local.dao.ProjectPhaseDao
 import com.averycorp.prismtask.data.local.dao.ProjectRiskDao
 import com.averycorp.prismtask.data.local.dao.ProjectTemplateDao
+import com.averycorp.prismtask.data.local.dao.RestDayDao
 import com.averycorp.prismtask.data.local.dao.SavedFilterDao
 import com.averycorp.prismtask.data.local.dao.SchoolworkDao
 import com.averycorp.prismtask.data.local.dao.SelfCareDao
@@ -83,6 +84,7 @@ import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.ProjectPhaseEntity
 import com.averycorp.prismtask.data.local.entity.ProjectRiskEntity
 import com.averycorp.prismtask.data.local.entity.ProjectTemplateEntity
+import com.averycorp.prismtask.data.local.entity.RestDayEntity
 import com.averycorp.prismtask.data.local.entity.SavedFilterEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareLogEntity
 import com.averycorp.prismtask.data.local.entity.SelfCareStepEntity
@@ -151,7 +153,8 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
         TaskDependencyEntity::class,
         ExternalAnchorEntity::class,
         ChatMessageEntity::class,
-        UserAiPreferenceEntity::class
+        UserAiPreferenceEntity::class,
+        RestDayEntity::class
     ],
     // Inlined intentionally: Room/KSP must read this as a literal int.
     // When any non-trivial compile error elsewhere in the module stops KSP
@@ -160,7 +163,7 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
     // Database" failure, which then breaks ktlint's no-unused-imports
     // resolution and triggers an autofix-strips-imports cascade. Keep this
     // in sync with `CURRENT_DB_VERSION` in Migrations.kt.
-    version = 82,
+    version = 83,
     exportSchema = false
 )
 abstract class PrismTaskDatabase : RoomDatabase() {
@@ -253,4 +256,6 @@ abstract class PrismTaskDatabase : RoomDatabase() {
     abstract fun chatMessageDao(): ChatMessageDao
 
     abstract fun userAiPreferenceDao(): UserAiPreferenceDao
+
+    abstract fun restDayDao(): RestDayDao
 }

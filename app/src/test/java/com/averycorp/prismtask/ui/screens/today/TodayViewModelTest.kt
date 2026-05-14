@@ -77,6 +77,7 @@ class TodayViewModelTest {
     private lateinit var tourCardPreferences: TourCardPreferences
     private lateinit var coachmarkController: CoachmarkController
     private lateinit var habitDailyTaskGenerator: com.averycorp.prismtask.domain.usecase.HabitDailyTaskGenerator
+    private lateinit var restDayRepository: com.averycorp.prismtask.data.repository.RestDayRepository
 
     @Before
     fun setUp() {
@@ -109,6 +110,8 @@ class TodayViewModelTest {
         coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(0)
         coachmarkController = mockk(relaxed = true)
         habitDailyTaskGenerator = mockk(relaxed = true)
+        restDayRepository = mockk(relaxed = true)
+        every { restDayRepository.observeIsRestDayToday(any()) } returns flowOf(false)
         // Mock LocalDateFlow so `observe()` returns a single-emission flow that
         // completes. The real production flow re-emits forever via an internal
         // `delay(timeUntilNextBoundary)` loop — which would keep `runTest`'s
@@ -182,7 +185,8 @@ class TodayViewModelTest {
         localDateFlow,
         tourCardPreferences,
         coachmarkController,
-        habitDailyTaskGenerator
+        habitDailyTaskGenerator,
+        restDayRepository
     )
 
     @Test

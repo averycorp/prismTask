@@ -19,6 +19,7 @@ import com.averycorp.prismtask.data.preferences.ReengagementConfig
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.api.ReengagementRequest
 import com.averycorp.prismtask.data.remote.api.ReengagementResponse
+import com.averycorp.prismtask.data.repository.RestDayRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.averycorp.prismtask.domain.usecase.RecentMoodSignal
 import io.mockk.coEvery
@@ -62,6 +63,7 @@ class ReengagementWorkerTest {
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
     private lateinit var notificationPauseGate: NotificationPauseGate
     private lateinit var recentMoodSignal: RecentMoodSignal
+    private lateinit var restDayRepository: RestDayRepository
     private lateinit var diagnosticLogger: DiagnosticLogger
 
     private val keySentCount = intPreferencesKey("reengagement_sent_count")
@@ -77,6 +79,7 @@ class ReengagementWorkerTest {
         advancedTuningPreferences = mockk(relaxed = true)
         notificationPauseGate = mockk(relaxed = true)
         recentMoodSignal = mockk(relaxed = true)
+        restDayRepository = mockk(relaxed = true)
         diagnosticLogger = mockk(relaxed = true)
 
         coEvery { proFeatureGate.hasAccess(ProFeatureGate.AI_REENGAGEMENT) } returns true
@@ -91,6 +94,10 @@ class ReengagementWorkerTest {
         // MH-first G7: default to "no recent low mood" so existing test
         // cases keep their original semantics.
         coEvery { recentMoodSignal.isLowMoodWithin(any()) } returns false
+        // MH-first G3: default to "not a rest day" so existing test
+        // cases keep their original semantics. Rest-day-specific
+        // behavior is covered by a dedicated test further down.
+        coEvery { restDayRepository.isRestDayToday(any()) } returns false
     }
 
     private fun buildWorker(): ReengagementWorker {
@@ -109,6 +116,7 @@ class ReengagementWorkerTest {
                 advancedTuningPreferences = advancedTuningPreferences,
                 notificationPauseGate = notificationPauseGate,
                 recentMoodSignal = recentMoodSignal,
+                restDayRepository = restDayRepository,
                 diagnosticLogger = diagnosticLogger
             )
         }
@@ -178,6 +186,22 @@ class ReengagementWorkerTest {
 
         ReengagementWorker.onAppOpened(context)
 
+        assertEquals(0, storedSentCount())
+    }
+
+    @Test
+    fun doWork_restDay_suppresses_nudge_without_consuming_counter() = runBlocking {
+        // MH-First audit § G3 — reengagement nudges are non-medication
+        // notifications and pause on a rest day. Critically: the sent
+        // counter must NOT be touched, so tomorrow's run (when rest day
+        // is over) can still fire the once-per-period nudge.
+        coEvery { restDayRepository.isRestDayToday(any()) } returns true
+        seedAbsenceDays(3)
+
+        val result = buildWorker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify(exactly = 0) { api.getReengagementNudge(any<ReengagementRequest>()) }
         assertEquals(0, storedSentCount())
     }
 }
