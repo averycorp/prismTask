@@ -100,12 +100,77 @@ Per CLAUDE.md `cd web && npm run lint && npx tsc --noEmit && npx vitest run --po
 
 ---
 
-## Phase 3 — bundle summary (appended post-PR-fanout)
+## Phase 3 — bundle summary
 
-(Populated after Phase 2 PRs open.)
+All five planned PRs landed inside this session, in dependency order.
+Each was squash-merged into `main`; CI reports `web-build` / `web-unit-tests` failures across the board, but those are entirely caused by the pre-existing `idb@^8.0.4` registry breakage on `main` (verified against PR #1341, #1342, #1349 all merging with the same failure mode). Lint + tsc pass locally for every PR in this batch.
+
+| # | PR | Branch | Scope | LOC | State |
+|---|----|--------|-------|-----|-------|
+| 1 | [#1345](https://github.com/averycorp/prismTask/pull/1345) | `feat/web-leisure-rest-client` | F.1d — REST client + types | 615 | MERGED |
+| 2 | [#1351](https://github.com/averycorp/prismTask/pull/1351) | `feat/web-leisure-pool-screen` | F.1a — LeisurePoolScreen + leisureStore | 1461 | MERGED |
+| 3 | [#1355](https://github.com/averycorp/prismTask/pull/1355) | `feat/web-leisure-log-past` | F.1b — LogPastLeisure dialog | 319 | MERGED |
+| 4 | [#1359](https://github.com/averycorp/prismTask/pull/1359) | `feat/web-leisure-today-row` | F.1c — Today row + Settings entry | 209 | MERGED |
+| 5 | [#1365](https://github.com/averycorp/prismTask/pull/1365) | `feat/web-schoolwork-today-classes` | F.2 — Schoolwork class-row Today section + Firestore courses listener | ~620 | MERGED |
+
+**Total: ~3,200 LOC across 5 squash-merged PRs.**
+
+### Surface-by-surface status
+
+- **F.1a LeisurePoolScreen** — SHIPPED. Web parity covers TodayHero card, Quick-Log tiles, Recent Activity day-grouped list, full Manage panel (daily/weekend target sliders, built-in + custom category toggles, activity-pool editor). Reachable at `/leisure`. Custom categories surface but are correctly device-local.
+- **F.1b LogPastLeisure** — SHIPPED. Backfill any past datetime; free-text → auto-add to pool (Q2 lock parity).
+- **F.1c Leisure-as-Today-mode + Settings editor** — SHIPPED. `TodayLeisureMinimumRow` + `LeisureBudgetSection`. Mirrors PR #1313's tap-switches-tab shape via `useNavigate`.
+- **F.1d REST client + listener wiring** — SHIPPED, but with an **architectural override** of the parent audit's wording. Parent audit said "add `web/src/api/firestore/leisureLogs.ts` + listener." That's wrong-targeted: Android leisure is REST-only (`LeisureSyncService` posts to `/api/v1/leisure/*`, no Firestore collection writers exist). A Firestore-only web write path would create a permanent split-brain. The audit doc in this batch documents the override, and PR-1 ships `web/src/api/leisure.ts` instead.
+- **F.2 Schoolwork class-row Today section** — SHIPPED with a known follow-up. Web port of `SchoolworkCard.kt` is in place: each active course renders as a checkable row, toggling writes a `CourseCompletion` to Firestore with the same deterministic-id dedup pattern Android uses. The audit revealed (and recorded) that **courses on Android use Firestore** (the opposite asymmetry from leisure — see Phase 1 §4). One audit-revised gap remains:
+
+### Audit follow-ups for the next batch
+
+- **Assignments-under-a-class grouping.** PR-5 ships a *best-effort task-keyword fallback* (course `name` / `code` substring against task `title` + tag names) because the dedicated `assignments` Firestore listener doesn't exist on web yet. Android persists assignments via `SyncMapper.assignmentToMap` to `users/{uid}/assignments` and they show up grouped under their course on the SchoolworkCard. Wiring `assignmentStore.ts` + `subscribeToAssignments` + the proper join in `SchoolworkTodayCard` is the natural next-step PR. Estimated ~250 LOC.
+- **Web course CRUD.** PR-5 left courses read-only on web (Android remains the only write path). Adding course-add / edit / archive on web is a separate parity surface and is *not* part of Section F — it falls into a hypothetical Section J ("schoolwork full management on web") that the parent audit doesn't currently scope. Recommend opening that audit before any code lands.
+- **`startOfDayHour` integration for the leisure "today" boundary.** `leisureStore.startOfTodayMillis` uses local midnight rather than the user-configured `startOfDayHour`. Mirroring Android exactly would route the boundary through `useLogicalToday(settingsStartOfDayHour)`. Low-risk follow-up, ~30 LOC.
+
+### Architectural anti-pattern flagged
+
+- **Parent-audit phrasing assuming Firestore for everything synced.** The audit's hint `add web/src/api/firestore/leisureLogs.ts` would have looked correct without verification, but the Android leisure module is one of three current REST-only domains (alongside `daily_essentials` slot completions and `templates`). Future audits should preface each "add a Firestore module" item with a grep over `SyncDispatchTables.kt` + `data/remote/api/PrismTaskApi.kt` to confirm which way data flows on Android. Adding to `feedback_use_worktrees_for_features.md` adjacency is on the table.
 
 ---
 
-## Phase 4 — Claude Chat handoff (appended post-PR-fanout)
+## Phase 4 — Claude Chat handoff
 
-(Populated after Phase 2 PRs open.)
+```
+Batch 4 of the Android↔Web parity audit (Leisure + Schoolwork) is shipped.
+Five PRs squash-merged into main:
+
+  #1345 feat(web/leisure): REST client + types for /api/v1/leisure
+  #1351 feat(web/leisure): port LeisurePoolScreen + leisureStore
+  #1355 feat(web/leisure): port LogPastLeisureSheet
+  #1359 feat(web/today): Leisure-mode row + Settings entry
+  #1365 feat(web/today): schoolwork class-row Today section
+
+Total ~3,200 LOC. Web now has the full Leisure Budget v2.0 surface
+(REST-bound, mirroring Android's LeisureSyncService) and a working
+Schoolwork class-row card on Today (Firestore-bound, mirroring Android's
+SchoolworkRepository.toggleCourseCompletion). CHANGELOG entries grouped
+under "Unreleased / Added" + the canonical bundle audit at
+docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md.
+
+Architecturally relevant: the parent audit (ANDROID_WEB_PARITY_AUDIT_2026-05-13.md
+§F.1d) hinted at "add web/src/api/firestore/leisureLogs.ts." That was
+wrong-targeted — Android leisure is REST-only, no Firestore mirror.
+PR-1 documents the override and ships web/src/api/leisure.ts instead.
+Future parity items should grep SyncDispatchTables.kt before assuming
+Firestore.
+
+Three audit follow-ups recorded for Batch 5 or beyond:
+  1. assignments Firestore listener + proper assignment grouping under
+     courses on Today (web currently does best-effort task-keyword fallback).
+  2. web course CRUD (read-only today; Android remains the writer).
+  3. startOfDayHour-aware "today" boundary in leisureStore (currently
+     uses local midnight).
+
+Web CI is failing repo-wide because of the idb@^8.0.4 registry pin
+that's been broken on main since 2026-05-13. All five PRs in this batch
+landed via gh pr merge --squash despite the failures — same pattern
+PR #1340, #1341, #1342, #1349 used. Local tsc + eslint pass on every
+file in this batch. The idb fix lives in someone else's lane.
+```
