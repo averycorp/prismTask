@@ -27,11 +27,18 @@ data class NdPreferences(
     val reduceHaptics: Boolean = true,
     val softContrast: Boolean = true,
     // --- ADHD Mode sub-settings (all flip ON when adhdModeEnabled first enabled) ---
+    // NOTE: forgiveness-first streak behavior is owned by the GLOBAL
+    // `UserPreferencesDataStore.ForgivenessPrefs.enabled` (default `true`),
+    // which is what `StreakCalculator`, `DailyForgivenessStreakCore`,
+    // `ProjectRepository`, `LeisureScoreSectionViewModel`, and
+    // `WidgetDataProvider` actually read. A duplicate `forgivenessStreaks`
+    // field used to live here and was removed in the mental-health-first
+    // audit § R6 (it was a dead phantom — no consumer altered behavior on
+    // its value). See `docs/audits/MENTAL_HEALTH_FIRST_AUDIT.md` § R6.
     val checkInIntervalMinutes: Int = 25,
     val completionAnimations: Boolean = true,
     val streakCelebrations: Boolean = true,
     val showProgressBars: Boolean = true,
-    val forgivenessStreaks: Boolean = true,
     // --- Focus & Release Mode sub-settings ---
     // Good Enough Timers
     val goodEnoughTimersEnabled: Boolean = true,

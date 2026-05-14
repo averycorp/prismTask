@@ -182,7 +182,10 @@ internal class AdvancedTuningImporter(
             "completionAnimations" to "completion_animations",
             "streakCelebrations" to "streak_celebrations",
             "showProgressBars" to "show_progress_bars",
-            "forgivenessStreaks" to "forgiveness_streaks",
+            // `forgivenessStreaks` was removed in the mental-health-first
+            // audit § R6 (duplicate of the global ForgivenessPrefs.enabled,
+            // no consumer). Old backups carrying this key fall through the
+            // `?: return@forEach` path in `importNdConfig` and are ignored.
             "goodEnoughTimersEnabled" to "good_enough_timers_enabled",
             "defaultGoodEnoughMinutes" to "default_good_enough_minutes",
             "goodEnoughEscalation" to "good_enough_escalation",
