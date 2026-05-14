@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Leisure mode on Today + Settings entry (parity F.1c).** Added
+  `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
+  the daily leisure minimum as `% of target`; tapping routes to
+  `/leisure`. Hidden when no target is set. Also added a
+  `LeisureBudgetSection` to Settings showing daily/weekend targets +
+  enabled-category count + pool size, with shortcut buttons to the full
+  screen. Mirrors PR #1313 (taps switch tabs instead of overlaying) and
+  PR #1314 (Leisure treated as a Today mode). Audit:
+  `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
   `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
   session for an arbitrary past datetime — pick an existing pool activity

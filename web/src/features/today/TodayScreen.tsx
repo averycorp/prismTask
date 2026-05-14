@@ -22,6 +22,7 @@ import type { DashboardSummary } from '@/types/api';
 import { MedicationSlotList } from '@/features/daily-essentials/MedicationSlotList';
 import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
+import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
 import { useLogicalToday } from '@/utils/useLogicalToday';
@@ -281,6 +282,7 @@ export function TodayScreen() {
 
       <BoundaryTodayBanner />
       <MorningCheckInCard />
+      <TodayLeisureMinimumRow />
 
       {/* AI Briefing teaser — hidden by default respect setting */}
       {settingsShowBriefing && (
