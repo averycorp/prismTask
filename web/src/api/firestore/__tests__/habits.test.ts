@@ -6,6 +6,8 @@ const {
   updateDocMock,
   getDocMock,
   getDocsMock,
+  txGetMock,
+  runTransactionMock,
   docMock,
   collectionMock,
   queryMock,
@@ -13,10 +15,14 @@ const {
   deleteDocMock,
 } = vi.hoisted(() => {
   const addDocMock = vi.fn();
-  const setDocMock = vi.fn(async () => undefined);
+  const setDocMock = vi.fn(
+    async (_ref?: unknown, _data?: unknown, _opts?: unknown) => undefined,
+  );
   const updateDocMock = vi.fn();
   const getDocMock = vi.fn();
   const getDocsMock = vi.fn();
+  const txGetMock = vi.fn();
+  const runTransactionMock = vi.fn();
   // Mocked `doc(...)` returns an object identifying the doc by the
   // segments passed to it — last segment is the doc id we care about.
   const docMock = vi.fn((..._segments: unknown[]) => {
@@ -39,6 +45,8 @@ const {
     updateDocMock,
     getDocMock,
     getDocsMock,
+    txGetMock,
+    runTransactionMock,
     docMock,
     collectionMock,
     queryMock,
@@ -53,6 +61,7 @@ vi.mock('firebase/firestore', () => ({
   updateDoc: updateDocMock,
   getDoc: getDocMock,
   getDocs: getDocsMock,
+  runTransaction: runTransactionMock,
   doc: docMock,
   collection: collectionMock,
   query: queryMock,
@@ -79,6 +88,8 @@ beforeEach(() => {
   updateDocMock.mockReset();
   getDocMock.mockReset();
   getDocsMock.mockReset();
+  txGetMock.mockReset();
+  runTransactionMock.mockReset();
   docMock.mockClear();
   collectionMock.mockClear();
   queryMock.mockReset();
@@ -86,6 +97,27 @@ beforeEach(() => {
   whereMock.mockClear();
   deleteDocMock.mockReset();
   deleteDocMock.mockResolvedValue(undefined);
+  // Default `runTransaction`: invoke the callback with a tx whose `get`
+  // delegates to txGetMock (defaulting to a doc-exists snapshot with an
+  // older `updatedAt` so the LWW guard always lets the write through)
+  // and whose `update`/`set` forward to the existing mocks. Tests that
+  // care about a stale-write abort override `txGetMock` to return a
+  // newer remote timestamp.
+  txGetMock.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ updatedAt: 0 }),
+  });
+  runTransactionMock.mockImplementation(
+    async (_db: unknown, fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: (ref: unknown) => txGetMock(ref),
+        update: (ref: unknown, patch: unknown) => updateDocMock(ref, patch),
+        set: (ref: unknown, patch: unknown, opts?: unknown) =>
+          setDocMock(ref, patch, opts),
+      };
+      return fn(tx);
+    },
+  );
 });
 
 // Helper: stub out the three reads `toggleCompletion` makes when the
@@ -203,6 +235,34 @@ describe('updateHabit (web → Firestore merge-on-write parity)', () => {
 
     const patch = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
     expect(patch.isArchived).toBe(true);
+  });
+
+  it('aborts the write when remote updatedAt is strictly newer (LWW guard)', async () => {
+    txGetMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ updatedAt: Date.now() + 1_000_000 }),
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await updateHabit('uid-1', 'habit-1', { name: 'Stale write' });
+
+    expect(updateDocMock).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[lww] aborted stale write'),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('first-create wins when the remote habit doc does not exist (LWW guard)', async () => {
+    txGetMock.mockResolvedValue({
+      exists: () => false,
+      data: () => undefined,
+    });
+    await updateHabit('uid-1', 'habit-1', { name: 'New habit' });
+    // Missing-doc path goes through `tx.set(..., {merge:true})`.
+    expect(setDocMock).toHaveBeenCalledTimes(1);
+    expect(updateDocMock).not.toHaveBeenCalled();
   });
 });
 
