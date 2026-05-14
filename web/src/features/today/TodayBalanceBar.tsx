@@ -53,7 +53,7 @@ export function TodayBalanceBar() {
 
   useEffect(() => {
     if (!uid) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: load balance preferences on mount and when uid changes
+     
     getBalancePreferences(uid)
       .then((p) => setPrefs(p))
       .catch(() => {

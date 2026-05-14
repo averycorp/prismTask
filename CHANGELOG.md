@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(web/build): bump `idb` pin from `^8.0.4` to `^8.0.3` — `8.0.4` was never published to npm so every clean `npm install` since PR #1239 (2026-05-10) failed with `ETARGET`, silently turning web CI red across the repo. Also cleans up 3 pre-existing lint errors (`no-useless-assignment` in `batchHistoryStore.ts` + `batchStore.ts`; `react-hooks/set-state-in-effect` in `WorkLifeBalanceSection.tsx`) plus 1 tautology test (`endsWith(slice(0,0))` always true) in `chatStore.test.ts`. Web suite now lint + tsc + vitest clean: 72/72 files, 679/679 tests.
 - fix(web/sync): repair `useFirestoreSync.ts` + matching test file syntax left broken by PR #1340's botched manual merge — restores the missing `)` after `subscribeToStartOfDayHour`, the missing `});` after the `taskBehaviorPreferences` mock, and the duplicate `it('subscribes to all 8 …')` line. Web CI was failing every PR since 2026-05-13.
 
 ### Removed
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   archive/restore. LWW guard on update merges so an in-flight Android
   slot-link push isn't clobbered. Android-only fields (`slotCloudIds`)
   intentionally omitted on web write so round-trips don't blank them.
+- feat(web/nd): port Neurodivergent Mode preferences (`web/src/api/firestore/ndPreferences.ts` + `ndPreferencesStore.ts` + `useNdPreferences` hook). Three independent mode toggles (ADHD / Calm / Focus & Release) with mode-activation cascades matching Android's `NdPreferencesDataStore`. Firestore-synced at `users/{uid}/prefs/nd_prefs` using Android's raw DataStore key names so `GenericPreferenceSyncService` round-trips unchanged. Listener wired through `useFirestoreSync`. Closes parity audit C.7a/b.
 - feat(web/weekly-review): persist weekly reviews to Firestore so cross-device users see the same week breakdown without re-running the aggregator. New `web/src/api/firestore/weeklyReviews.ts` mapper using Pattern A canonical-row id (`{YYYY-MM-DD-of-Monday}`); `WeeklyReviewScreen` upserts both Free-tier local-only and Pro-tier AI-augmented reviews. Closes parity audit C.4a (the backend auto-gen cron half is C.4b, deferred to a backend-batch follow-up).
 - feat(web/mood): port the mood/energy ↔ tasks/habits/self-care Pearson correlation engine (`web/src/utils/moodCorrelation.ts`) and surface a Correlations section on the Mood screen. Top-3 strongest correlations per axis once the user has 7+ mood-logged days; falls silent gracefully below that. Closes parity audit C.3.
 - feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).

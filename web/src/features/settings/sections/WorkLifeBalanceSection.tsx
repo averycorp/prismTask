@@ -34,10 +34,10 @@ export function WorkLifeBalanceSection() {
 
   useEffect(() => {
     if (!uid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: one-shot reset when signed out
       setLoading(false);
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: load preferences on mount
     setLoading(true);
     getBalancePreferences(uid)
       .then((p) => setPrefs(p))

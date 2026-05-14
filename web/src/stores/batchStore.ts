@@ -515,7 +515,7 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
     const now = Date.now();
     const nextHistory = get().history.filter((r) => r.expires_at > now);
     if (nextHistory.length !== get().history.length) {
-      let uid: string | null = null;
+      let uid: string | null;
       try {
         uid = getFirebaseUid();
       } catch {
