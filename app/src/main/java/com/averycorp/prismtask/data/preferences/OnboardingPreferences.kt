@@ -27,6 +27,15 @@ constructor(
         private val ONBOARDING_COMPLETED_AT = longPreferencesKey("onboarding_completed_at")
         private val HAS_SHOWN_BATTERY_OPTIMIZATION_PROMPT =
             booleanPreferencesKey("has_shown_battery_optimization_prompt")
+
+        // Mental-Health-First § G6: when the user picks "I have low-energy
+        // days often" on the onboarding tuning step, we prime them for the
+        // forthcoming Rest Day surface (audit G3). The Rest Day screen
+        // reads this flag on first launch to decide whether to surface a
+        // one-time intro card. Independent of `forgivenessStreaks` because
+        // a returning user who already has forgiveness on shouldn't get
+        // a re-intro on next install.
+        private val REST_DAY_PRIMED = booleanPreferencesKey("rest_day_primed")
     }
 
     fun hasCompletedOnboarding(): Flow<Boolean> = context.onboardingDataStore.data.map { prefs ->
@@ -100,6 +109,23 @@ constructor(
     }
 
     /**
+     * Whether the user has been primed for the Rest Day feature via the
+     * onboarding tuning step (audit § G6 → "I have low-energy days
+     * often"). The Rest Day surface (audit § G3) reads this on first
+     * launch to decide whether to show a one-time intro card.
+     */
+    fun isRestDayPrimed(): Flow<Boolean> =
+        context.onboardingDataStore.data.map { prefs ->
+            prefs[REST_DAY_PRIMED] ?: false
+        }
+
+    suspend fun setRestDayPrimed(primed: Boolean) {
+        context.onboardingDataStore.edit { prefs ->
+            prefs[REST_DAY_PRIMED] = primed
+        }
+    }
+
+    /**
      * Restores onboarding state from a JSON backup. Unlike [setOnboardingCompleted]
      * (which stamps `completed_at` to `now`), this writes the exact original
      * timestamp so a restored install doesn't look like it just finished
@@ -123,6 +149,7 @@ constructor(
             prefs.remove(HAS_COMPLETED_ONBOARDING)
             prefs.remove(ONBOARDING_COMPLETED_AT)
             prefs.remove(HAS_SHOWN_BATTERY_OPTIMIZATION_PROMPT)
+            prefs.remove(REST_DAY_PRIMED)
         }
     }
 }

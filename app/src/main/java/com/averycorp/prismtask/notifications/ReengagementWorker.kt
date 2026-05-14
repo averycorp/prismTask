@@ -54,16 +54,23 @@ constructor(
     private val proFeatureGate: ProFeatureGate,
     private val notificationPreferences: NotificationPreferences,
     private val advancedTuningPreferences: AdvancedTuningPreferences,
+    private val notificationPauseGate: NotificationPauseGate,
     private val recentMoodSignal: RecentMoodSignal,
     private val diagnosticLogger: DiagnosticLogger
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_REENGAGEMENT)) return Result.success()
         if (!notificationPreferences.reengagementEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences re-engagement nudges. The
+        // counter is intentionally NOT incremented while paused so the
+        // user doesn't burn their daily nudge quota during the pause.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         // Mental-Health-First § G7 — re-engagement is the textbook case
         // the audit calls out: a user who logged a 1/5 mood yesterday
         // does not need an "are you still there?" nudge. Silent
-        // deferral; the next periodic firing re-evaluates.
+        // deferral; the next periodic firing re-evaluates. Like the
+        // pause gate above, the daily quota counter is NOT incremented
+        // while gated so it isn't burned during a low-mood stretch.
         if (recentMoodSignal.isLowMoodWithin()) {
             diagnosticLogger.info(
                 tag = "MoodGate",

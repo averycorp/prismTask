@@ -32,11 +32,14 @@ constructor(
     @Assisted params: WorkerParameters,
     private val api: PrismTaskApi,
     private val proFeatureGate: ProFeatureGate,
-    private val notificationPreferences: NotificationPreferences
+    private val notificationPreferences: NotificationPreferences,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_BRIEFING)) return Result.success()
         if (!notificationPreferences.dailyBriefingEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences the daily briefing.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
 
         return try {
             val response = api.getDailyBriefing(DailyBriefingRequest())

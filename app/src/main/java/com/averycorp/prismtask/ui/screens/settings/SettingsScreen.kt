@@ -287,6 +287,23 @@ fun SettingsScreen(
                             iconBgColor = ColWellbeing,
                             onClick = { navController.navigate("settings/wellbeing") }
                         )
+                        // G1 \u2014 Crisis resources entry. Surfaced inside the
+                        // Productivity / Wellness-adjacent group rather
+                        // than buried in About, so it's findable without
+                        // searching. The neutral title matches the screen
+                        // header so the cross-app reference (chat safety
+                        // reply, Mood & Energy footer) stays consistent.
+                        SettingsNavRow(
+                            title = "If You Need Help Now",
+                            subtitle = "Crisis hotlines, 24/7",
+                            iconEmoji = "\uD83E\uDD1D",
+                            iconBgColor = ColWellbeing,
+                            onClick = {
+                                navController.navigate(
+                                    PrismTaskRoute.CrisisResources.route
+                                )
+                            }
+                        )
                     }
                 }
 

@@ -53,6 +53,7 @@ constructor(
     private val habitRepository: HabitRepository,
     private val habitCompletionDao: HabitCompletionDao,
     private val productivityScoreCalculator: ProductivityScoreCalculator,
+    private val notificationPauseGate: NotificationPauseGate,
     private val clock: Clock = Clock.systemDefaultZone()
 ) : CoroutineWorker(appContext, params) {
 
@@ -60,6 +61,8 @@ constructor(
         if (!notificationPreferences.weeklyAnalyticsNotificationEnabled.first()) {
             return Result.success()
         }
+        // MH-first G4: pause-all silences weekly analytics summary.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
 
         val zone: ZoneId = clock.zone
         val today = LocalDate.now(clock)

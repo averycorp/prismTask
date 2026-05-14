@@ -46,11 +46,14 @@ constructor(
     private val habitDao: HabitDao,
     private val completionDao: HabitCompletionDao,
     private val proFeatureGate: ProFeatureGate,
-    private val notificationPreferences: NotificationPreferences
+    private val notificationPreferences: NotificationPreferences,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_EVENING_SUMMARY)) return Result.success()
         if (!notificationPreferences.eveningSummaryEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences the evening summary.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
 
         return try {
             val now = System.currentTimeMillis()

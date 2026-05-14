@@ -818,3 +818,67 @@ class TestChatContextBlock:
             # `tier` must NOT be forwarded to the service — it's been
             # removed from the function signature.
             assert "tier" not in mock_gen.call_args.kwargs
+
+
+class TestChatCrisisPreFilter:
+    """G2 — defense-in-depth crisis pre-filter on the chat router.
+
+    A high-confidence crisis term must short-circuit BEFORE the Anthropic
+    call, so productivity tool calls cannot leak out even if a future
+    prompt regression weakens the § "Safety" instructions.
+    """
+
+    @pytest.mark.asyncio
+    async def test_endpoint_short_circuits_crisis_message(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from app.routers.ai import chat_rate_limiter
+        from app.services.crisis_keywords import CRISIS_STATIC_REPLY
+
+        chat_rate_limiter._requests.clear()
+
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={
+                    "message": "i want to kill myself",
+                    "conversation_id": "chat_2026-05-14_safety01",
+                },
+                headers=pro_auth_headers,
+            )
+
+            assert resp.status_code == 200, resp.text
+            body = resp.json()
+            assert body["message"] == CRISIS_STATIC_REPLY
+            assert body["actions"] == []
+            # The Claude path must NOT have been called — the whole
+            # point of the pre-filter is defense in depth.
+            mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_endpoint_does_not_short_circuit_benign_message(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from app.routers.ai import chat_rate_limiter
+
+        chat_rate_limiter._requests.clear()
+
+        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+            mock_gen.return_value = {
+                "message": "Let's plan it out.",
+                "actions": [],
+                "tokens_used": {"input": 1, "output": 1},
+            }
+
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={
+                    "message": "I want to nail this presentation",
+                    "conversation_id": "chat_x",
+                },
+                headers=pro_auth_headers,
+            )
+
+            assert resp.status_code == 200, resp.text
+            # Regular path is taken — the model call is reached.
+            mock_gen.assert_called_once()

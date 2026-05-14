@@ -12,6 +12,7 @@ import com.averycorp.prismtask.ui.screens.batch.BatchPreviewScreen
 import com.averycorp.prismtask.ui.screens.briefing.DailyBriefingScreen
 import com.averycorp.prismtask.ui.screens.chat.ChatScreen
 import com.averycorp.prismtask.ui.screens.checkin.MorningCheckInScreen
+import com.averycorp.prismtask.ui.screens.crisis.CrisisResourcesScreen
 import com.averycorp.prismtask.ui.screens.eisenhower.EisenhowerScreen
 import com.averycorp.prismtask.ui.screens.extract.PasteConversationScreen
 import com.averycorp.prismtask.ui.screens.mood.MoodAnalyticsScreen
@@ -51,6 +52,10 @@ internal fun NavGraphBuilder.aiRoutes(
 
     composable(route = PrismTaskRoute.MoodAnalytics.route) {
         MoodAnalyticsScreen(navController)
+    }
+
+    horizontalSlideComposable(PrismTaskRoute.CrisisResources.route) {
+        CrisisResourcesScreen(navController)
     }
 
     composable(route = PrismTaskRoute.WeeklyBalanceReport.route) {

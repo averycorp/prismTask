@@ -49,11 +49,14 @@ constructor(
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val notificationPreferences: NotificationPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val notificationPauseGate: NotificationPauseGate,
     private val recentMoodSignal: RecentMoodSignal,
     private val diagnosticLogger: DiagnosticLogger
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!notificationPreferences.overloadAlertsEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences overload alerts. Medication exempt.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         // Mental-Health-First § G7 — suppress non-critical cadence after a
         // recent low-mood log (≤2/5 within 48h). Silent deferral by
         // design; the next periodic firing re-evaluates the gate.

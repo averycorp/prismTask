@@ -37,9 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.compose.material3.TextButton
 import com.averycorp.prismtask.domain.usecase.CorrelationResult
 import com.averycorp.prismtask.domain.usecase.CorrelationStrength
 import com.averycorp.prismtask.domain.usecase.MoodCorrelationEngine
+import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
 
 /**
@@ -181,6 +183,19 @@ fun MoodAnalyticsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            // G1 — Crisis resources footer. Surfaced here because mood
+            // tracking is the most likely surface to put a user in
+            // contact with hard feelings; the entry is small and quiet
+            // by design — not alarmist, not load-bearing on the screen.
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = {
+                    navController.navigate(PrismTaskRoute.CrisisResources.route)
+                }
+            ) {
+                Text("If You Need Help Now →")
             }
         }
     }

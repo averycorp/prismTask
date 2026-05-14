@@ -60,6 +60,7 @@ class ReengagementWorkerTest {
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var notificationPreferences: NotificationPreferences
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
+    private lateinit var notificationPauseGate: NotificationPauseGate
     private lateinit var recentMoodSignal: RecentMoodSignal
     private lateinit var diagnosticLogger: DiagnosticLogger
 
@@ -74,6 +75,7 @@ class ReengagementWorkerTest {
         proFeatureGate = mockk(relaxed = true)
         notificationPreferences = mockk(relaxed = true)
         advancedTuningPreferences = mockk(relaxed = true)
+        notificationPauseGate = mockk(relaxed = true)
         recentMoodSignal = mockk(relaxed = true)
         diagnosticLogger = mockk(relaxed = true)
 
@@ -83,7 +85,11 @@ class ReengagementWorkerTest {
         coEvery { taskDao.getLastCompletedTask() } returns null
         coEvery { taskDao.getIncompleteTaskCount() } returns 0
         coEvery { api.getReengagementNudge(any()) } returns ReengagementResponse(nudge = "Welcome back")
-        // Default: no recent low mood → existing behaviour preserved.
+        // MH-first G4: default to "not paused" so existing test cases
+        // (which pre-date the gate) keep their original semantics.
+        coEvery { notificationPauseGate.isPausedNow(any()) } returns false
+        // MH-first G7: default to "no recent low mood" so existing test
+        // cases keep their original semantics.
         coEvery { recentMoodSignal.isLowMoodWithin(any()) } returns false
     }
 
@@ -101,6 +107,7 @@ class ReengagementWorkerTest {
                 proFeatureGate = proFeatureGate,
                 notificationPreferences = notificationPreferences,
                 advancedTuningPreferences = advancedTuningPreferences,
+                notificationPauseGate = notificationPauseGate,
                 recentMoodSignal = recentMoodSignal,
                 diagnosticLogger = diagnosticLogger
             )
