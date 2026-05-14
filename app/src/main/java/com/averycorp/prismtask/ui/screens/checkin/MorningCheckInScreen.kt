@@ -759,10 +759,10 @@ private fun BalanceStep(
             if (state.isOverloaded) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "\u26A0\uFE0F Work ratio over target",
+                    text = "Work-dominant week",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = LifeCategoryColor.HEALTH
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

@@ -124,7 +124,7 @@ class ClinicalReportGenerator {
         val lines = listOf(
             "Reporting period: $dayCount days",
             "Data sources: tasks, habits, mood/energy, medication",
-            "Note: all values are self-reported and should be discussed with your healthcare provider."
+            "Note: all values are self-reported — share with a provider if you'd like to."
         )
         return ClinicalReportSectionBlock(ClinicalReportSection.OVERVIEW, "Overview", lines)
     }

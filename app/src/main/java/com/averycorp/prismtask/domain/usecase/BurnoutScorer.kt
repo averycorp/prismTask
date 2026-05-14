@@ -96,8 +96,9 @@ data class BurnoutResult(
  *  - 2-day rest deficit         → up to 10 points
  *
  * Total max = 100. The resulting [BurnoutBand] is `BALANCED` / `MONITOR` /
- * `CAUTION` / `HIGH_RISK`. The UI renders a gauge + a caption like
- * "Balanced ✨" or "High risk — consider blocking time for rest."
+ * `CAUTION` / `HIGH_RISK`. The UI renders a gauge + a descriptive caption
+ * like "Balanced" or "High risk" — no prescriptive advice ("consider doing
+ * X"), per WORK_PLAY_RELAX.md § "Descriptive, not prescriptive".
  */
 class BurnoutScorer(
     private val weights: BurnoutWeights = BurnoutWeights()

@@ -32,7 +32,7 @@ fun ClinicalReportSection(
     )
     Spacer(modifier = Modifier.height(4.dp))
     Text(
-        text = "Saved to Downloads. This data is self-reported and should be discussed with your provider.",
+        text = "Saved to Downloads. This is self-reported — share with a provider if you'd like to.",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
