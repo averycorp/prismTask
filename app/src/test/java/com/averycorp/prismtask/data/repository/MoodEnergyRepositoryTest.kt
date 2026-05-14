@@ -190,4 +190,9 @@ private class FakeMoodEnergyLogDao : MoodEnergyLogDao {
     override suspend fun deleteById(id: Long) {
         rows.removeAll { it.id == id }
     }
+
+    override suspend fun countLowMoodSinceOnce(
+        moodCeiling: Int,
+        sinceCreatedAtMillis: Long
+    ): Int = rows.count { it.mood <= moodCeiling && it.createdAt >= sinceCreatedAtMillis }
 }

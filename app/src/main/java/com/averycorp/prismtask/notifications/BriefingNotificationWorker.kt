@@ -34,11 +34,14 @@ constructor(
     private val api: PrismTaskApi,
     private val proFeatureGate: ProFeatureGate,
     private val notificationPreferences: NotificationPreferences,
+    private val notificationPauseGate: NotificationPauseGate,
     private val restDayRepository: RestDayRepository
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_BRIEFING)) return Result.success()
         if (!notificationPreferences.dailyBriefingEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences the daily briefing.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         // Rest-day suppression (MH-First audit § G3). Daily briefing /
         // digest is a non-medication notification — pause for the user's
         // logical rest day.

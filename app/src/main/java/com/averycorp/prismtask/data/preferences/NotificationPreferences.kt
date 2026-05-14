@@ -154,6 +154,13 @@ class NotificationPreferences(
         private val HAS_SEEDED_WEEKLY_TASK_SUMMARY_WORKER =
             booleanPreferencesKey("has_seeded_weekly_task_summary_worker_v1438")
 
+        // MH-first G4: ad-hoc pause-all expiry. 0 = not paused; any value
+        // > now() means notifications are silenced until that wall clock
+        // time. Medication reminders are exempt — see [NotificationPauseGate].
+        // Composes with scheduled quiet hours (both gates must pass).
+        private val PAUSE_NOTIFICATIONS_UNTIL_EPOCH_MS =
+            longPreferencesKey("pause_notifications_until_epoch_ms")
+
         const val IMPORTANCE_MINIMAL = "minimal"
         const val IMPORTANCE_STANDARD = "standard"
         const val IMPORTANCE_URGENT = "urgent"
@@ -671,6 +678,35 @@ class NotificationPreferences(
 
     suspend fun setWeeklyAnalyticsWorkerSeeded() {
         dataStore.edit { it[WEEKLY_ANALYTICS_WORKER_SEEDED] = true }
+    }
+
+    // endregion
+
+    // region Pause-all (MH-first G4)
+
+    /**
+     * Wall-clock epoch (ms) at which the current ad-hoc pause expires.
+     * Returns `0L` when no pause is active. Persists across app restarts.
+     *
+     * The pause is treated as **active** when this value is strictly
+     * greater than the current wall clock — schedulers/receivers consult
+     * the same instant they're about to post a notification, so a stale
+     * (expired) pause auto-clears in effect without needing a worker to
+     * zero it out. Medication reminders are exempt — see
+     * [com.averycorp.prismtask.notifications.NotificationPauseGate].
+     */
+    val pauseNotificationsUntilEpochMs: Flow<Long> = dataStore.data
+        .map { it[PAUSE_NOTIFICATIONS_UNTIL_EPOCH_MS] ?: 0L }
+
+    suspend fun setPauseNotificationsUntilEpochMs(epochMs: Long) {
+        dataStore.edit { it[PAUSE_NOTIFICATIONS_UNTIL_EPOCH_MS] = epochMs.coerceAtLeast(0L) }
+    }
+
+    suspend fun getPauseNotificationsUntilEpochMsOnce(): Long =
+        pauseNotificationsUntilEpochMs.first()
+
+    suspend fun clearPauseNotifications() {
+        dataStore.edit { it[PAUSE_NOTIFICATIONS_UNTIL_EPOCH_MS] = 0L }
     }
 
     // endregion

@@ -66,7 +66,6 @@ class NdPreferencesDataStoreTest {
         assertTrue(prefs.completionAnimations)
         assertTrue(prefs.streakCelebrations)
         assertTrue(prefs.showProgressBars)
-        assertTrue(prefs.forgivenessStreaks)
     }
 
     @Test
@@ -98,7 +97,6 @@ class NdPreferencesDataStoreTest {
         assertTrue(prefs.completionAnimations)
         assertTrue(prefs.streakCelebrations)
         assertTrue(prefs.showProgressBars)
-        assertTrue(prefs.forgivenessStreaks)
     }
 
     @Test
@@ -126,7 +124,6 @@ class NdPreferencesDataStoreTest {
         assertFalse(prefs.completionAnimations)
         assertFalse(prefs.streakCelebrations)
         assertFalse(prefs.showProgressBars)
-        assertFalse(prefs.forgivenessStreaks)
     }
 
     // endregion
@@ -157,7 +154,6 @@ class NdPreferencesDataStoreTest {
         assertFalse(prefs.completionAnimations)
         assertFalse(prefs.streakCelebrations)
         assertFalse(prefs.showProgressBars)
-        assertFalse(prefs.forgivenessStreaks)
     }
 
     @Test
@@ -321,6 +317,18 @@ class NdPreferencesDataStoreTest {
     @Test(expected = IllegalArgumentException::class)
     fun `updateNdPreference throws for unknown key`() = runTest {
         ndPrefs.updateNdPreference("unknown_key", true)
+    }
+
+    @Test
+    fun `updateNdPreference accepts legacy forgiveness_streaks key as no-op`() = runTest {
+        // The `forgivenessStreaks` field was removed in the mental-health-first
+        // audit § R6 (duplicate of the global ForgivenessPrefs.enabled). Old
+        // backups still carry the `forgiveness_streaks` key in the `nd` config
+        // block; we accept the key without throwing so legacy restores succeed.
+        ndPrefs.updateNdPreference("forgiveness_streaks", true)
+        ndPrefs.updateNdPreference("forgiveness_streaks", false)
+        // No assertion on field state — the field no longer exists; this test
+        // exists to assert the absence of `IllegalArgumentException`.
     }
 
     // endregion

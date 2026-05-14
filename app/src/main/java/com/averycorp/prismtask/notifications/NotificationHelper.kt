@@ -39,7 +39,20 @@ import kotlinx.coroutines.flow.first
 internal interface NotificationHelperEntryPoint {
     fun notificationProfileDao(): NotificationProfileDao
     fun notificationPreferences(): NotificationPreferences
+    fun notificationPauseGate(): NotificationPauseGate
 }
+
+/**
+ * Look up the singleton [NotificationPauseGate] from the
+ * [NotificationHelper] object context. Non-injectable callers (the
+ * static `show*` helpers) use this to honor the MH-first G4 pause-all
+ * toggle without needing Hilt construction. Medication call sites
+ * deliberately do NOT call this — medication reminders are exempt.
+ */
+private fun pauseGateOf(context: Context): NotificationPauseGate =
+    EntryPointAccessors
+        .fromApplication(context.applicationContext, NotificationHelperEntryPoint::class.java)
+        .notificationPauseGate()
 
 object NotificationHelper {
     private const val BASE_CHANNEL_ID = "prismtask_reminders"
@@ -295,6 +308,13 @@ object NotificationHelper {
         val enabled = prefs.taskRemindersEnabled.first()
         if (!enabled) {
             Log.d("NotificationHelper", "Task reminders disabled — skipping task=$taskId")
+            return
+        }
+        // MH-first G4 pause-all gate. Medication exempt — only fires on the
+        // task reminder path. Reads expiry at notify time so a stale (past)
+        // pause auto-clears in effect.
+        if (pauseGateOf(context).isPausedNow()) {
+            Log.d("NotificationHelper", "Pause-all active — skipping task=$taskId")
             return
         }
         // Rest-day suppression (MH-First audit § G3). Non-medication
@@ -726,6 +746,12 @@ object NotificationHelper {
         val enabled = prefs.taskRemindersEnabled.first()
         if (!enabled) {
             Log.d("NotificationHelper", "Task reminders disabled — skipping task=$taskId")
+            return
+        }
+        // MH-first G4 pause-all gate. Profile-aware path still routes
+        // through the same gate as the legacy [showTaskReminder].
+        if (pauseGateOf(context).isPausedNow()) {
+            Log.d("NotificationHelper", "Pause-all active — skipping task=$taskId")
             return
         }
         // Rest-day suppression (MH-First audit § G3). Profile-aware path

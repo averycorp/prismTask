@@ -4,10 +4,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.averycorp.prismtask.data.diagnostics.DiagnosticLogger
 import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
 import com.averycorp.prismtask.data.local.dao.MedicationSlotOverrideDao
+import com.averycorp.prismtask.data.seed.BuiltInHabitVersionRegistry
+import com.averycorp.prismtask.domain.usecase.RecentMoodSignal
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +72,10 @@ class MedicationReminderReceiver : BroadcastReceiver() {
         fun medicationSlotDao(): MedicationSlotDao
 
         fun medicationSlotOverrideDao(): MedicationSlotOverrideDao
+
+        fun recentMoodSignal(): RecentMoodSignal
+
+        fun diagnosticLogger(): DiagnosticLogger
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -178,13 +185,28 @@ class MedicationReminderReceiver : BroadcastReceiver() {
             }
         }
 
-        // Rest day → drop the habit nag (the re-register above already
-        // queued tomorrow). Medications never route through this branch
-        // (they use AlarmKind.Medication / SlotClock / etc.), so this
-        // never suppresses a real medication reminder.
+        // Rest day (MH-first § G3) → drop the habit nag (the
+        // re-register above already queued tomorrow). Medications never
+        // route through this branch (they use AlarmKind.Medication /
+        // SlotClock / etc.), so this never suppresses a real medication
+        // reminder.
         if (isRestDay) {
             Log.d("MedReminderReceiver", "Rest day — suppressing habit nag habitId=$habitId")
             return
+        }
+        // Mental-Health-First § G7 — suppress habit-reminder cadence when
+        // a low-mood log (≤2/5) lands within 48h. Medication-related
+        // habits are exempt even though we already reach this branch
+        // only for habit alarms: a Daily Essentials medication habit
+        // routes here, and we never want to gate its nag on mood.
+        if (habit != null && !isMedicationHabit(habit)) {
+            if (entryPoint.recentMoodSignal().isLowMoodWithin()) {
+                entryPoint.diagnosticLogger().info(
+                    tag = "MoodGate",
+                    message = "Habit reminder $habitId skipped — recent low mood within 48h"
+                )
+                return
+            }
         }
 
         // No suppression — fire the nag notification as normal
@@ -298,6 +320,14 @@ class MedicationReminderReceiver : BroadcastReceiver() {
             slotName = slot.name,
             idealTime = effectiveTime
         )
+    }
+
+    private fun isMedicationHabit(
+        habit: com.averycorp.prismtask.data.local.entity.HabitEntity
+    ): Boolean {
+        if (habit.templateKey == BuiltInHabitVersionRegistry.KEY_MEDICATION) return true
+        val cat = habit.category?.trim()?.lowercase()
+        return cat == "medication"
     }
 
     companion object {

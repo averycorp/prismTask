@@ -32,6 +32,7 @@ import androidx.navigation.NavController
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
 import com.averycorp.prismtask.ui.screens.settings.sections.BackupExportSection
 import com.averycorp.prismtask.ui.screens.settings.sections.DataSection
+import com.averycorp.prismtask.ui.screens.settings.sections.DeleteMentalHealthDataSection
 import com.averycorp.prismtask.ui.theme.ThemedSubScreenTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +46,7 @@ fun DataBackupScreen(
     val autoArchiveDays by viewModel.autoArchiveDays.collectAsStateWithLifecycle()
     val archivedCount by viewModel.archivedCount.collectAsStateWithLifecycle()
     val isResetting by viewModel.isResetting.collectAsStateWithLifecycle()
+    val isWipingMentalHealthData by viewModel.isWipingMentalHealthData.collectAsStateWithLifecycle()
     val duplicateCleanupState by viewModel.duplicateCleanupState.collectAsStateWithLifecycle()
     val pendingJson by viewModel.pendingJsonExport.collectAsStateWithLifecycle()
     val pendingCsv by viewModel.pendingCsvExport.collectAsStateWithLifecycle()
@@ -150,6 +152,16 @@ fun DataBackupScreen(
                 onExportJson = viewModel::onExportJson,
                 onExportCsv = viewModel::onExportCsv,
                 onImportJson = { importLauncher.launch(arrayOf("application/json", "*/*")) }
+            )
+
+            // Mental-Health-First Audit § G5: partial wipe of mood /
+            // check-in / weekly-review / boundary / focus-release data.
+            // Lives here in the Data hub rather than on Account & Sync
+            // because it's a data-management action — adjacent to Reset
+            // App Data, distinct from Delete Account.
+            DeleteMentalHealthDataSection(
+                isWiping = isWipingMentalHealthData,
+                onConfirmWipe = viewModel::wipeMentalHealthData
             )
             Spacer(modifier = Modifier.height(32.dp))
         }

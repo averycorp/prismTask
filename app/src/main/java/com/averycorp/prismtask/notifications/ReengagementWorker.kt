@@ -18,6 +18,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.R
+import com.averycorp.prismtask.data.diagnostics.DiagnosticLogger
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
@@ -25,6 +26,7 @@ import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.api.ReengagementRequest
 import com.averycorp.prismtask.data.repository.RestDayRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
+import com.averycorp.prismtask.domain.usecase.RecentMoodSignal
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -53,16 +55,36 @@ constructor(
     private val proFeatureGate: ProFeatureGate,
     private val notificationPreferences: NotificationPreferences,
     private val advancedTuningPreferences: AdvancedTuningPreferences,
-    private val restDayRepository: RestDayRepository
+    private val notificationPauseGate: NotificationPauseGate,
+    private val recentMoodSignal: RecentMoodSignal,
+    private val restDayRepository: RestDayRepository,
+    private val diagnosticLogger: DiagnosticLogger
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!proFeatureGate.hasAccess(ProFeatureGate.AI_REENGAGEMENT)) return Result.success()
         if (!notificationPreferences.reengagementEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences re-engagement nudges. The
+        // counter is intentionally NOT incremented while paused so the
+        // user doesn't burn their daily nudge quota during the pause.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         // Rest-day suppression (MH-First audit § G3). Reengagement nudges
         // are a non-medication notification — pause for the user's logical
         // rest day. The nudge counter is unchanged so the cadence picks up
         // tomorrow.
         if (restDayRepository.isRestDayToday()) return Result.success()
+        // Mental-Health-First § G7 — re-engagement is the textbook case
+        // the audit calls out: a user who logged a 1/5 mood yesterday
+        // does not need an "are you still there?" nudge. Silent
+        // deferral; the next periodic firing re-evaluates. Like the
+        // pause gate above, the daily quota counter is NOT incremented
+        // while gated so it isn't burned during a low-mood stretch.
+        if (recentMoodSignal.isLowMoodWithin()) {
+            diagnosticLogger.info(
+                tag = "MoodGate",
+                message = "ReengagementWorker skipped — recent low mood within 48h"
+            )
+            return Result.success()
+        }
 
         val config = advancedTuningPreferences.getReengagementConfig().first()
 

@@ -97,7 +97,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val TOTAL_PAGES = 14
+private const val TOTAL_PAGES = 15
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 
 @Composable
@@ -141,10 +141,11 @@ fun OnboardingScreen(
                 6 -> LifeModesPage(viewModel = viewModel)
                 7 -> TemplatesPage(viewModel = viewModel)
                 8 -> BrainModePage(viewModel = viewModel)
-                9 -> AccessibilityPage(viewModel = viewModel)
-                10 -> PrivacyPage(viewModel = viewModel)
-                11 -> NotificationsPage(viewModel = viewModel)
-                12 -> DaySetupPage(viewModel = viewModel)
+                9 -> TuningPage(viewModel = viewModel)
+                10 -> AccessibilityPage(viewModel = viewModel)
+                11 -> PrivacyPage(viewModel = viewModel)
+                12 -> NotificationsPage(viewModel = viewModel)
+                13 -> DaySetupPage(viewModel = viewModel)
                 LAST_PAGE_INDEX -> SetupPage(
                     viewModel = viewModel,
                     onComplete = {
@@ -985,6 +986,188 @@ private fun BrainModeCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ─── Tuning Page (Mental-Health-First § G6) ──────────────────────────────────
+//
+// Optional, skippable, multi-select. Frame is preferences, not diagnoses.
+// Hard rule per audit: NEVER use clinical labels ("ADHD", "depression",
+// "autism", "anxiety") in user-facing strings here. Each option's mapping
+// to defaults lives in [OnboardingPreferenceMapper] — the screen never
+// inlines the mapping.
+
+@Composable
+private fun TuningPage(viewModel: OnboardingViewModel) {
+    val selections by collectAsLocalState(
+        viewModel.tuningSelections,
+        initial = emptySet()
+    )
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { 30 }
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "🎛️", fontSize = 48.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "How Would You Like the App Tuned?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.asHeading()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Pick any that sometimes describe you — or skip if none fit. " +
+                        "These set sensible defaults; you stay in control.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        TuningOptionRow(
+            emoji = "📝",
+            label = "I Get Overwhelmed by Long Task Lists",
+            checked = OnboardingPreferenceMapper.TuningOption.OVERWHELMED_BY_LONG_LISTS in selections,
+            onToggle = {
+                viewModel.toggleTuningOption(
+                    OnboardingPreferenceMapper.TuningOption.OVERWHELMED_BY_LONG_LISTS
+                )
+            }
+        )
+        TuningOptionRow(
+            emoji = "⏱️",
+            label = "I Lose Track of Time Often",
+            checked = OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME in selections,
+            onToggle = {
+                viewModel.toggleTuningOption(
+                    OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME
+                )
+            }
+        )
+        TuningOptionRow(
+            emoji = "🌱",
+            label = "I Have Low-Energy Days Often",
+            checked = OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS in selections,
+            onToggle = {
+                viewModel.toggleTuningOption(
+                    OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS
+                )
+            }
+        )
+        TuningOptionRow(
+            emoji = "🌙",
+            label = "I Prefer Fewer Animations and Quieter Colors",
+            checked = OnboardingPreferenceMapper.TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS in selections,
+            onToggle = {
+                viewModel.toggleTuningOption(
+                    OnboardingPreferenceMapper.TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS
+                )
+            }
+        )
+        TuningOptionRow(
+            emoji = "🎯",
+            label = "I Tend to Over-Polish My Work",
+            checked = OnboardingPreferenceMapper.TuningOption.OVER_POLISH in selections,
+            onToggle = {
+                viewModel.toggleTuningOption(
+                    OnboardingPreferenceMapper.TuningOption.OVER_POLISH
+                )
+            }
+        )
+        TuningOptionRow(
+            emoji = "➖",
+            label = "None of These",
+            checked = OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE in selections,
+            onToggle = {
+                viewModel.toggleTuningOption(
+                    OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE
+                )
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        // Hard caption per audit § G6: the "preferences, not diagnoses" framing
+        // rule is non-negotiable. Do NOT remove without a corresponding audit
+        // update.
+        Text(
+            text = "You can change any of these in Settings anytime. " +
+                "These are preferences, not diagnoses.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun TuningOptionRow(
+    emoji: String,
+    label: String,
+    checked: Boolean,
+    onToggle: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clickable(onClick = onToggle),
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
+        ),
+        border = if (checked) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(emoji, fontSize = 24.sp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = if (checked) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.weight(1f)
+            )
+            if (checked) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }
