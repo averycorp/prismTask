@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/mood): port the mood/energy ↔ tasks/habits/self-care Pearson correlation engine (`web/src/utils/moodCorrelation.ts`) and surface a Correlations section on the Mood screen. Top-3 strongest correlations per axis once the user has 7+ mood-logged days; falls silent gracefully below that. Closes parity audit C.3.
 - **Leisure mode on Today + Settings entry (parity F.1c).** Added
   `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
   the daily leisure minimum as `% of target`; tapping routes to
