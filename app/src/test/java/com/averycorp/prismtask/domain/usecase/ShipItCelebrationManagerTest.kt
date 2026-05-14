@@ -10,7 +10,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShipItCelebrationManagerTest {
+    // Explicit ADHD + Calm = off so these F&R-celebration tests don't lean on
+    // the (now default-on) baseline that would force LOW intensity via
+    // `effectiveCelebrationIntensity` and bias other branches.
     private val frPrefs = NdPreferences(
+        adhdModeEnabled = false,
+        calmModeEnabled = false,
         focusReleaseModeEnabled = true,
         shipItCelebrationsEnabled = true,
         celebrationIntensity = CelebrationIntensity.MEDIUM

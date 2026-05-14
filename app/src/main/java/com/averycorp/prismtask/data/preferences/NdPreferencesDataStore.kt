@@ -68,21 +68,28 @@ class NdPreferencesDataStore(
 
     // region Flow ---------------------------------------------------------------
 
+    // Product framing (operator decision 2026-05-14): for an ADHD-focused
+    // app, the three ND modes default ON for first-time users. "Presume
+    // neurodivergent baseline; let users opt out." Cascading sub-settings
+    // mirror the `setAdhdMode(true)` / `setCalmMode(true)` cascade so a
+    // fresh install reads self-consistent state. Explicit-false stored by
+    // a returning user is preserved (the `?:` fallback only fires when the
+    // key is absent). See `docs/audits/BRAIN_MODE_PAGE_DEFAULT_ON_AUDIT.md`.
     val ndPreferencesFlow: Flow<NdPreferences> = dataStore.data.map { prefs ->
         NdPreferences(
-            adhdModeEnabled = prefs[KEY_ADHD_MODE] ?: false,
-            calmModeEnabled = prefs[KEY_CALM_MODE] ?: false,
-            focusReleaseModeEnabled = prefs[KEY_FOCUS_RELEASE_MODE] ?: false,
-            reduceAnimations = prefs[KEY_REDUCE_ANIMATIONS] ?: false,
-            mutedColorPalette = prefs[KEY_MUTED_COLOR_PALETTE] ?: false,
-            quietMode = prefs[KEY_QUIET_MODE] ?: false,
-            reduceHaptics = prefs[KEY_REDUCE_HAPTICS] ?: false,
-            softContrast = prefs[KEY_SOFT_CONTRAST] ?: false,
+            adhdModeEnabled = prefs[KEY_ADHD_MODE] ?: true,
+            calmModeEnabled = prefs[KEY_CALM_MODE] ?: true,
+            focusReleaseModeEnabled = prefs[KEY_FOCUS_RELEASE_MODE] ?: true,
+            reduceAnimations = prefs[KEY_REDUCE_ANIMATIONS] ?: true,
+            mutedColorPalette = prefs[KEY_MUTED_COLOR_PALETTE] ?: true,
+            quietMode = prefs[KEY_QUIET_MODE] ?: true,
+            reduceHaptics = prefs[KEY_REDUCE_HAPTICS] ?: true,
+            softContrast = prefs[KEY_SOFT_CONTRAST] ?: true,
             checkInIntervalMinutes = (prefs[KEY_CHECK_IN_INTERVAL] ?: 25).coerceIn(10, 60),
-            completionAnimations = prefs[KEY_COMPLETION_ANIMATIONS] ?: false,
-            streakCelebrations = prefs[KEY_STREAK_CELEBRATIONS] ?: false,
-            showProgressBars = prefs[KEY_SHOW_PROGRESS_BARS] ?: false,
-            forgivenessStreaks = prefs[KEY_FORGIVENESS_STREAKS] ?: false,
+            completionAnimations = prefs[KEY_COMPLETION_ANIMATIONS] ?: true,
+            streakCelebrations = prefs[KEY_STREAK_CELEBRATIONS] ?: true,
+            showProgressBars = prefs[KEY_SHOW_PROGRESS_BARS] ?: true,
+            forgivenessStreaks = prefs[KEY_FORGIVENESS_STREAKS] ?: true,
             goodEnoughTimersEnabled = prefs[KEY_GOOD_ENOUGH_TIMERS] ?: true,
             defaultGoodEnoughMinutes = (prefs[KEY_DEFAULT_GOOD_ENOUGH_MINUTES] ?: 30).coerceIn(5, 120),
             goodEnoughEscalation = prefs[KEY_GOOD_ENOUGH_ESCALATION]

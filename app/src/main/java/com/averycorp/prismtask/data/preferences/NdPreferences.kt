@@ -13,21 +13,25 @@ package com.averycorp.prismtask.data.preferences
  */
 data class NdPreferences(
     // --- Top-level mode toggles ---
-    val adhdModeEnabled: Boolean = false,
-    val calmModeEnabled: Boolean = false,
-    val focusReleaseModeEnabled: Boolean = false,
+    // Defaults match `NdPreferencesDataStore.ndPreferencesFlow` fallbacks
+    // (operator decision 2026-05-14: presume ND baseline; let users opt
+    // out). Cascade sub-settings mirror so a fresh install reads
+    // self-consistent state with `setX(true)` semantics.
+    val adhdModeEnabled: Boolean = true,
+    val calmModeEnabled: Boolean = true,
+    val focusReleaseModeEnabled: Boolean = true,
     // --- Calm Mode sub-settings (all flip ON when calmModeEnabled first enabled) ---
-    val reduceAnimations: Boolean = false,
-    val mutedColorPalette: Boolean = false,
-    val quietMode: Boolean = false,
-    val reduceHaptics: Boolean = false,
-    val softContrast: Boolean = false,
+    val reduceAnimations: Boolean = true,
+    val mutedColorPalette: Boolean = true,
+    val quietMode: Boolean = true,
+    val reduceHaptics: Boolean = true,
+    val softContrast: Boolean = true,
     // --- ADHD Mode sub-settings (all flip ON when adhdModeEnabled first enabled) ---
     val checkInIntervalMinutes: Int = 25,
-    val completionAnimations: Boolean = false,
-    val streakCelebrations: Boolean = false,
-    val showProgressBars: Boolean = false,
-    val forgivenessStreaks: Boolean = false,
+    val completionAnimations: Boolean = true,
+    val streakCelebrations: Boolean = true,
+    val showProgressBars: Boolean = true,
+    val forgivenessStreaks: Boolean = true,
     // --- Focus & Release Mode sub-settings ---
     // Good Enough Timers
     val goodEnoughTimersEnabled: Boolean = true,
