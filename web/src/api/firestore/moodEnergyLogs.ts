@@ -6,11 +6,11 @@ import {
   orderBy,
   query,
   setDoc,
-  updateDoc,
   where,
   type DocumentData,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 
 /**
  * Firestore-native mood & energy logs. Mirrors Android's
@@ -128,13 +128,19 @@ export async function updateLog(
   id: string,
   input: Partial<MoodEnergyLogInput>,
 ): Promise<void> {
-  const payload: Record<string, unknown> = { updatedAt: Date.now() };
+  // LWW guard — a same-slot edit from a sibling device shouldn't be
+  // overwritten by a stale web push. `createLog` keeps its current
+  // canonical-id merge semantics: it's the natural-key write path
+  // that intentionally collapses duplicate same-slot entries.
+  // Parity audit A.2.
+  const now = Date.now();
+  const payload: Record<string, unknown> = { updatedAt: now };
   if (input.date_iso !== undefined) payload.dateIso = input.date_iso;
   if (input.mood !== undefined) payload.mood = clampScale(input.mood);
   if (input.energy !== undefined) payload.energy = clampScale(input.energy);
   if (input.notes !== undefined) payload.notes = input.notes;
   if (input.time_of_day !== undefined) payload.timeOfDay = input.time_of_day;
-  await updateDoc(logDoc(uid, id), payload);
+  await lwwUpdate(logDoc(uid, id), payload as Parameters<typeof lwwUpdate>[1]);
 }
 
 export async function deleteLog(uid: string, id: string): Promise<void> {

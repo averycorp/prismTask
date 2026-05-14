@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
+- **Schoolwork class-row Today section (parity F.2).** Web port of
+  Android's PR #1314 `SchoolworkCard` (post the "Leisure + School as
+  modes" refactor). Each active course renders as a checkable row on
+  Today; toggling writes a `CourseCompletion` to Firestore keyed on the
+  logical-day midnight + course doc id. New modules:
+  `web/src/api/firestore/courses.ts`, `courseCompletions.ts`,
+  `web/src/stores/courseStore.ts`, and `SchoolworkTodayCard.tsx`. The
+  `subscribeToCourses` + `subscribeToCourseCompletions` listeners now
+  mount via `useFirestoreSync`. Tasks tagged to a course (best-effort
+  name/code substring match) group underneath their class as a
+  near-term substitute for the still-unwired `assignments` Firestore
+  collection — documented audit follow-up.
 - **Leisure mode on Today + Settings entry (parity F.1c).** Added
   `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
   the daily leisure minimum as `% of target`; tapping routes to
@@ -41,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(web/sync): LWW timestamp guard on `updateHabit` — extends the parity A.2 contract to habit edits so an in-flight Android booking-state toggle isn't clobbered by a web rename / color change.
 - feat(web/sync): LWW timestamp guard on `updateProject` — extends parity A.2 to project edits so Android-side lifecycle writes (start/end date, theme color, archived/completed timestamps) survive a concurrent web rename.
 - feat(web/sync): LWW timestamp guard on `updateSlotDef` (medication slot definitions) — extends parity A.2 so a web slot rename doesn't clobber an Android-side reminder-mode flip on the same slot.
+- feat(web/sync): LWW timestamp guard on the wellness-logs write paths (`setCheckIn`, `updateLog` for mood/energy, `updateRule` for boundaries) — extends parity A.2 so concurrent same-day edits from a sibling device aren't silently overwritten.
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage

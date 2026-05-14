@@ -24,6 +24,7 @@ import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
 import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
 import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow';
+import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
@@ -287,6 +288,7 @@ export function TodayScreen() {
       <SelfCareNudgeCard />
       <MorningCheckInCard />
       <TodayLeisureMinimumRow />
+      <SchoolworkTodayCard />
 
       {/* AI Briefing teaser — hidden by default respect setting */}
       {settingsShowBriefing && (
