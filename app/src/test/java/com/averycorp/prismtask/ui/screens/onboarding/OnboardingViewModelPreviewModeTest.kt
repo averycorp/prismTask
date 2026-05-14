@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -247,5 +248,169 @@ class OnboardingViewModelPreviewModeTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { themePreferences.setThemeMode("dark") }
+    }
+
+    // ── Mental-Health-First § G6 — tuning step ──────────────────────────────
+
+    @Test
+    fun `toggleTuningOption adds and removes selections`() {
+        val vm = newViewModel()
+        assertTrue(vm.tuningSelections.value.isEmpty())
+
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+        assertEquals(
+            setOf(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME),
+            vm.tuningSelections.value
+        )
+
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS)
+        assertEquals(
+            setOf(
+                OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME,
+                OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS
+            ),
+            vm.tuningSelections.value
+        )
+
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+        assertEquals(
+            setOf(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS),
+            vm.tuningSelections.value
+        )
+    }
+
+    @Test
+    fun `toggling NONE_OF_THESE clears the other selections`() {
+        val vm = newViewModel()
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVERWHELMED_BY_LONG_LISTS)
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+        assertEquals(2, vm.tuningSelections.value.size)
+
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE)
+        assertEquals(
+            setOf(OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE),
+            vm.tuningSelections.value
+        )
+    }
+
+    @Test
+    fun `toggling another option after NONE_OF_THESE clears NONE_OF_THESE`() {
+        val vm = newViewModel()
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE)
+        assertEquals(
+            setOf(OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE),
+            vm.tuningSelections.value
+        )
+
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVER_POLISH)
+        // NONE_OF_THESE should be gone; OVER_POLISH alone.
+        assertEquals(
+            setOf(OnboardingPreferenceMapper.TuningOption.OVER_POLISH),
+            vm.tuningSelections.value
+        )
+    }
+
+    @Test
+    fun `applyTuningSelections with skip true never writes`() = runTest(dispatcher) {
+        val vm = newViewModel()
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+
+        vm.applyTuningSelections(skip = true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        coVerify(exactly = 0) { ndPreferencesDataStore.setCheckInIntervalMinutes(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.setCompactMode(any()) }
+        coVerify(exactly = 0) { onboardingPreferences.setRestDayPrimed(any()) }
+    }
+
+    @Test
+    fun `applyTuningSelections with empty selection is a no-op`() = runTest(dispatcher) {
+        val vm = newViewModel()
+
+        vm.applyTuningSelections(skip = false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
+        coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.setCompactMode(any()) }
+        coVerify(exactly = 0) { onboardingPreferences.setRestDayPrimed(any()) }
+    }
+
+    @Test
+    fun `applyTuningSelections with NONE_OF_THESE is a no-op`() = runTest(dispatcher) {
+        val vm = newViewModel()
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE)
+
+        vm.applyTuningSelections(skip = false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.setCompactMode(any()) }
+        coVerify(exactly = 0) { onboardingPreferences.setRestDayPrimed(any()) }
+    }
+
+    @Test
+    fun `applyTuningSelections writes ND mode and check-in for lose-track-of-time`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { ndPreferencesDataStore.setAdhdMode(true) }
+            coVerify(exactly = 1) { ndPreferencesDataStore.setCheckInIntervalMinutes(25) }
+            // Untouched modes stay untouched.
+            coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
+            coVerify(exactly = 0) { userPreferencesDataStore.setCompactMode(any()) }
+        }
+
+    @Test
+    fun `applyTuningSelections writes forgiveness and rest-day priming for low-energy`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { ndPreferencesDataStore.setForgivenessStreaks(true) }
+            coVerify(exactly = 1) { userPreferencesDataStore.setForgivenessPrefs(any()) }
+            coVerify(exactly = 1) { onboardingPreferences.setRestDayPrimed(true) }
+        }
+
+    @Test
+    fun `applyTuningSelections writes compact mode for overwhelmed-by-long-lists`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVERWHELMED_BY_LONG_LISTS)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { userPreferencesDataStore.setCompactMode(true) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
+        }
+
+    @Test
+    fun `preview mode skips applyTuningSelections writes`() = runTest(dispatcher) {
+        val vm = newViewModel()
+        vm.setPreviewMode(true)
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+        vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS)
+
+        vm.applyTuningSelections(skip = false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        coVerify(exactly = 0) { ndPreferencesDataStore.setForgivenessStreaks(any()) }
+        coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
+        coVerify(exactly = 0) { onboardingPreferences.setRestDayPrimed(any()) }
     }
 }

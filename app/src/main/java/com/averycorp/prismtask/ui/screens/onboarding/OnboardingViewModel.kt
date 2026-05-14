@@ -89,6 +89,17 @@ constructor(
     private val _templateSelections = MutableStateFlow(TemplateSelections())
     val templateSelections: StateFlow<TemplateSelections> = _templateSelections.asStateFlow()
 
+    /**
+     * Mental-Health-First § G6: user's onboarding "tuning" picks. Multi-select.
+     * The set is the in-memory selection for the page; persistence happens in
+     * [applyTuningSelections], which is invoked from [completeOnboarding] (or
+     * explicitly by the page on apply). Selections are NOT pre-loaded from
+     * persisted state — the page is one-shot and skippable, and the user can
+     * always change the underlying prefs in Settings afterwards.
+     */
+    private val _tuningSelections = MutableStateFlow<Set<OnboardingPreferenceMapper.TuningOption>>(emptySet())
+    val tuningSelections: StateFlow<Set<OnboardingPreferenceMapper.TuningOption>> = _tuningSelections.asStateFlow()
+
     val selfCareEnabled: StateFlow<Boolean> = habitListPreferences
         .isSelfCareEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -348,6 +359,82 @@ constructor(
     }
 
     /**
+     * Mental-Health-First § G6: toggle one [OnboardingPreferenceMapper.TuningOption].
+     *
+     * Selection rules (mirrored in the mapper):
+     * - [OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE] is single-select. Toggling it on
+     *   clears the other selections; toggling it off leaves an empty set.
+     * - Picking any other option while NONE_OF_THESE is selected clears
+     *   NONE_OF_THESE first.
+     *
+     * The page is intentionally tolerant of taps even while previewing — this
+     * setter updates in-memory state only. Persistence happens via
+     * [applyTuningSelections], which IS gated by preview mode.
+     */
+    fun toggleTuningOption(option: OnboardingPreferenceMapper.TuningOption) {
+        val current = _tuningSelections.value
+        _tuningSelections.value = when {
+            option == OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE && option in current ->
+                emptySet()
+            option == OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE ->
+                setOf(OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE)
+            option in current ->
+                current - option
+            else ->
+                (current - OnboardingPreferenceMapper.TuningOption.NONE_OF_THESE) + option
+        }
+    }
+
+    /**
+     * Mental-Health-First § G6: resolve the user's tuning picks via
+     * [OnboardingPreferenceMapper] and persist the resulting defaults.
+     *
+     * Skip path: pass [skip] = true (or just don't call this method). The
+     * page's "Skip" button calls this with `skip = true` so we leave today's
+     * hardcoded defaults untouched. Per the audit hard rule: the user must
+     * NOT be forced to disclose anything.
+     *
+     * No-op when the resolved [OnboardingPreferenceMapper.Result] is empty
+     * (skip / "None of these" / empty pick), and a no-op in preview mode.
+     */
+    fun applyTuningSelections(skip: Boolean = false) {
+        if (skip) return
+        ifNotPreview {
+            val result = OnboardingPreferenceMapper.resolve(_tuningSelections.value)
+            if (result.isNoOp) return@ifNotPreview
+            viewModelScope.launch {
+                // ND-mode cascades: setAdhdMode(true) flips ADHD sub-flags ON
+                // wholesale, including check-in interval (default 25). We
+                // call the cascade first so the explicit sub-flag writes
+                // below land last and win if they disagree.
+                if (result.adhdMode) ndPreferencesDataStore.setAdhdMode(true)
+                if (result.calmMode) ndPreferencesDataStore.setCalmMode(true)
+                if (result.focusReleaseMode) ndPreferencesDataStore.setFocusReleaseMode(true)
+
+                // Explicit sub-flag overrides. These are written even if the
+                // parent cascade ran above, so a future mapping that only
+                // wants the sub-flag (no full cascade) still works.
+                if (result.reduceAnimations) ndPreferencesDataStore.setReduceAnimations(true)
+                if (result.mutedColorPalette) ndPreferencesDataStore.setMutedColorPalette(true)
+                if (result.goodEnoughTimers) ndPreferencesDataStore.setGoodEnoughTimersEnabled(true)
+                if (result.forgivenessStreaks) {
+                    ndPreferencesDataStore.setForgivenessStreaks(true)
+                    // Also flip the cross-feature ForgivenessPrefs gate so
+                    // streak calculation actually respects the choice. The
+                    // ND flag is for ND-mode aware UI; the user-prefs flag
+                    // is what `StreakCalculator` reads.
+                    userPreferencesDataStore.setForgivenessPrefs(ForgivenessPrefs(enabled = true))
+                }
+                result.checkInIntervalMinutes?.let {
+                    ndPreferencesDataStore.setCheckInIntervalMinutes(it)
+                }
+                if (result.compactMode) userPreferencesDataStore.setCompactMode(true)
+                if (result.primeRestDay) onboardingPreferences.setRestDayPrimed(true)
+            }
+        }
+    }
+
+    /**
      * Updates the in-memory template selection used by the UI to render which
      * templates the user picked. Intentionally NOT gated by preview mode —
      * the preview tutorial still shows selection state as the user clicks
@@ -528,6 +615,16 @@ constructor(
                 logger.info(operation = "onboarding.templates_applied", status = "success")
             } catch (e: Exception) {
                 logger.error(operation = "onboarding.templates_applied", throwable = e)
+            }
+            // Mental-Health-First § G6: persist any tuning-step picks that
+            // the user did not already commit via the page's "Apply" button.
+            // Safe to call regardless — `applyTuningSelections` is a no-op
+            // for an empty selection (skip path) and preview mode.
+            try {
+                applyTuningSelections(skip = false)
+                logger.info(operation = "onboarding.tuning_applied", status = "success")
+            } catch (e: Exception) {
+                logger.error(operation = "onboarding.tuning_applied", throwable = e)
             }
         }
     }
