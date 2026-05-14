@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **LogPastLeisure dialog on web (parity F.1b).** Web port of
+  `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
+  session for an arbitrary past datetime — pick an existing pool activity
+  OR enter free-text + auto-add it to the pool (Q2 lock). Launchable
+  from a new "Log Past" header button on `/leisure`. Custom categories
+  are filtered out of the picker — the underlying REST write would 422.
+  Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
