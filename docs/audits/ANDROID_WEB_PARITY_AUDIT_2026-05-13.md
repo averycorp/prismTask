@@ -317,3 +317,65 @@ Per CLAUDE.md "Audit doc length cap = ~500 lines, split into batched audits abov
 - **Two-source-of-truth on medication screen** (E.4): backend `daily_essential_slot_completions` + Firestore `medication_tier_states` writing similar data. Architectural smell; address when E.2/E.3 reconciliation lands.
 - **Onboarding completion at two Firestore paths historically** (#844 fixed) — flag-shape repeats if a future feature persists "completion" state in `users/{uid}.someField` on web and `users/{uid}/prefs/...` on Android. Pick one canonical path up-front.
 - **Dead REST modules** (`web/src/api/sync.ts`, possibly `web/src/api/tasks.ts`): grep before adding new REST sync helpers — Firestore-direct path is the convention.
+
+---
+
+## Phase 3 — Bundle summary (Batch 1)
+
+**Decision (operator, 2026-05-13):** Execute Batch 1 immediately ("complete parity" → all PROCEED items, batched). Batch 1 = quick wins ≤ 4h each, dispatched in parallel-worktree fan-out.
+
+**Outcome:** 5 implementation PRs + 1 audit-doc PR — 6 total. All merged within the same session window. Two of the five (A.5a) required a manual 2-step merge resolution because parallel-worktree fan-out introduced concurrent edits to `useFirestoreSync.ts` + `CHANGELOG.md` + `authStore.ts`; resolved with the keep-both pattern in both passes.
+
+### Per-item PR table
+
+| Item | Audit ref | Branch | PR | Final SHA on main | Premise-verification result |
+|------|-----------|--------|----|-------------------|------------------------------|
+| Audit doc | (this file) | `worktree-audit+android-web-parity-2026-05-13` | [#1336](https://github.com/averycorp/prismTask/pull/1336) | merged 02:19Z | n/a |
+| A.3 — delete dead `web/src/api/sync.ts` | A.3 | `chore/web-remove-dead-sync-ts` | [#1337](https://github.com/averycorp/prismTask/pull/1337) | merged | Verified: 0 callers. `tasks.ts` kept (real callers in Pomodoro/export/useCalendarTasks). |
+| G.7 — clear Firestore IndexedDB cache on logout | G.7 | `fix/web-logout-firestore-cache-clear` | [#1338](https://github.com/averycorp/prismTask/pull/1338) | merged | Verified: logout did not call `terminate`/`clearIndexedDbPersistence`. Fixed via async IIFE + page reload (option b). |
+| B.6 — task_completions write path | B.6 | `feat/web-task-completions-write-path` | [#1339](https://github.com/averycorp/prismTask/pull/1339) | merged | Verified: `taskCompletions.ts` didn't exist. Added with Pattern A canonical-row dedup. |
+| A.5a — sync `startOfDayHour` to Firestore | A.5a | `feat/web-sync-start-of-day-hour` | [#1340](https://github.com/averycorp/prismTask/pull/1340) | merged 02:41Z | Verified. Mirror module + listener wired. **Required 2 manual merge-resolutions** vs concurrent #1339/#1341. |
+| A.1a — wire 5 unmounted listeners | A.1a | `parity/sync-wire-remaining-listeners` | [#1341](https://github.com/averycorp/prismTask/pull/1341) | merged | Verified: 4 of 5 wired (dependencies, phases, risks, anchors). `subscribeToAiFeaturesEnabled` deliberately skipped to avoid double-read race with `settingsStore.loadAiFeaturesFromFirestore`. 4 new stores added. |
+
+### Wrong-premise reckonings (3 items moved from Phase 1 PROCEED → state-of-play GREEN with no work needed)
+
+1. **B.3a (habits hardcoded-false on write):** wrong premise. `habits.ts:118-160` already uses the omission-not-default pattern post-PR #840 — booking/logging/built-in fields are intentionally not written so Android-side state is preserved. **Already shipped.** No follow-on PR needed.
+2. **G.1 (RestorePendingGate scope):** wrong premise. The gate wraps the entire authed route surface at `routes/index.tsx`, covering both Google sign-in AND email/password sign-in. **Already shipped.** No follow-on PR needed.
+3. **G.2 / G.4 (fake change-password / fake delete-all-data):** wrong premise. Those buttons no longer exist in `web/src/features/settings/SettingsScreen.tsx` (verified via grep — only the unrelated "Delete All Completed Tasks" button remains). Cleanup presumably happened in or after PR #842. **Already shipped.**
+
+**Lesson:** the 2026-04-26 audit's findings drift fast — 3 of 8 nominally-quick-win items were already closed before Batch 1 started. Verifying premises before dispatch saved ~1.5h of redundant agent work.
+
+### Process notes
+
+- **Parallel-worktree fan-out worked again** — 5 agents, ~3 hours wall-clock vs. the audit's combined ~12h estimate.
+- **Repeat of the same-file CHANGELOG / `useFirestoreSync.ts` conflict pattern from the 2026-04-26 run.** Both passes resolved by `python3 -c` with regex keep-both. Validates the prior audit's memory-candidate #3: "Each PR adding to the same `### Fixed`/`### Added` subsection is the bug shape." Worth a permanent process note.
+- **Pre-existing `idb@^8.0.4` ETARGET regression** (introduced by PR #1239 on 2026-05-10) blocks `npm install` on clean checkouts → web-lint / web-unit-tests / web-build CI all red across every recent PR. Auto-merge succeeded anyway because web CI is not a required check. **Out of scope for this audit but worth filing separately** — fix is one-line: bump pin to `idb@^8.0.3` (or unbump to `idb@*`).
+
+### Items intentionally NOT in this batch (deferred to follow-on audit cycles per the batching plan in Phase 1 § "Phase 2 batching plan")
+
+Batch 2 — Wellness suite (C.1–C.7, ~2 weeks): Balance bar, Plan-For-Today, Burnout badge, Self-care nudge, full DashboardPreferences, LifeCategoryClassifier + BalanceTracker, Mood correlation engine, Weekly review persistence + auto-gen, full check-in step flow, full boundaries editor, ND-friendly modes.
+
+Batch 3 — AI Coach (D.1, ~1 week): Chat screen UI port, batch_command inline action wiring, Claude-backed Life Category auto-button.
+
+Batch 4 — Leisure + Schoolwork (F.1–F.2, ~1 week): full Leisure Budget v2.0 port, schoolwork class-row Today section.
+
+Batch 5 — Medication (E.1–E.4, ~2 weeks): full CRUD, refills UI, log/history view, clinical report, `medication_slots`↔`medication_slot_defs` collection reconciliation, `medication_tier_states` doc-id scheme reconciliation.
+
+Batch 6 — Cross-cutting sync hardening (A.2 + A.5b, ~1 week): LWW timestamp guards on web writes; extended settings sync (themeStore, a11yStore, dashboardPreferences).
+
+### Batch 1 readiness gate
+
+**Cross-cutting sync infrastructure** improved measurably:
+- ✅ Real-time listener coverage went from 7 → 12 entity types (PRs #1339, #1340, #1341).
+- ✅ Dead-code reduction (`web/src/api/sync.ts` deleted, PR #1337).
+- ✅ Cross-browser data-leak closed on logout (PR #1338).
+- ✅ `startOfDayHour` setting now round-trips Android↔web (PR #1340).
+- ✅ Task completion history is no longer split-brain between Android+web (PR #1339).
+
+**Web is still not at full parity** — the 6 deferred batches above represent ~7 weeks of focused work. But the data-integrity and cross-device-real-time floor is meaningfully higher than the 2026-04-26 baseline. Batches 2–6 are independent and can be dispatched in any order per operator priority.
+
+### Memory entry candidates (flag for operator; do NOT auto-add)
+
+1. **Premise verification before agent dispatch saves 1.5h+ per batch.** Prior-audit findings about quick-win items had ~38% rot (3 of 8) — verify by grep before sending an agent to fix something that's already shipped. Pattern: read the cited file, run a grep for the negative-claim, then decide. Same pattern as the existing `feedback_audit_drive_by_migration_fixes.md`.
+2. **The `idb@^8.0.4` pin** is a one-line repo-wide fix that's blocking every recent PR's web CI. Filing it as a separate single-PR fix (bump to `^8.0.3` or drop the upper bound) would unblock the whole web pipeline and surface real test failures hidden by the install failure today.
+3. **The keep-both regex resolver for concurrent same-file fan-out** (`python3 -c` script in this run's Phase 2 conflict-resolution step) is reusable. Could memorize as a script in `scripts/` to skip the manual python step in future fan-outs.
