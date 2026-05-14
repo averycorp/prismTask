@@ -92,6 +92,10 @@ constructor(
     private val templateSeeder: com.averycorp.prismtask.data.seed.TemplateSeeder,
     private val selfCareRepository: com.averycorp.prismtask.data.repository.SelfCareRepository,
     private val tourCardPreferences: TourCardPreferences,
+    // Mental-Health-First Audit § G5: partial wipe of mood / check-in /
+    // weekly-review / boundary / focus-release data. Distinct from the
+    // full account-delete path on [SyncSettingsViewModel].
+    private val mentalHealthDataWiper: com.averycorp.prismtask.data.privacy.MentalHealthDataWiper,
     // --- Sub-VMs extracted as part of T1.2 refactor ---
     private val themeSettings: ThemeSettingsViewModel,
     private val notificationSettings: NotificationSettingsViewModel,
@@ -967,6 +971,58 @@ constructor(
 
     private val _isResetting = MutableStateFlow(false)
     val isResetting: StateFlow<Boolean> = _isResetting
+
+    // --- Mental-Health-First Audit § G5 ---
+    // Partial-wipe state for the "Delete Mental Health Data" privacy
+    // action. Disambiguated from [isResetting] (which is the full
+    // app-data reset) and [isDeletingAccount] (which is the full
+    // account-delete path).
+    private val _isWipingMentalHealthData = MutableStateFlow(false)
+    val isWipingMentalHealthData: StateFlow<Boolean> = _isWipingMentalHealthData
+
+    /**
+     * Run the Mental-Health-First § G5 partial wipe — mood logs, check-ins,
+     * weekly reviews, boundary rules, focus-release logs (+ their cloud
+     * mirror). Local wipe is transactional and load-bearing; cloud wipe is
+     * best-effort. Surfaces a snackbar message with the outcome so the user
+     * knows whether the cloud copy was reached.
+     *
+     * Also clears [BackendSyncPreferences.lastSyncAtFlow] so the next
+     * incremental pull doesn't carry forward a high-water mark from before
+     * the wipe — re-syncing under the new mark won't try to re-download
+     * the rows the user just asked to delete (their cloud copies are gone
+     * too if the cloud step succeeded; if it didn't, the user is signed
+     * out or offline and there is nothing to re-pull from).
+     */
+    fun wipeMentalHealthData() {
+        if (_isWipingMentalHealthData.value) return
+        _isWipingMentalHealthData.value = true
+        viewModelScope.launch {
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    mentalHealthDataWiper.wipeMentalHealthData()
+                }
+                when (outcome) {
+                    is com.averycorp.prismtask.data.privacy.MentalHealthDataWiper.WipeResult.Success -> {
+                        backendSyncPreferences.clear()
+                        _messages.emit("Mental health data deleted.")
+                    }
+                    is com.averycorp.prismtask.data.privacy.MentalHealthDataWiper.WipeResult.LocalOnly -> {
+                        backendSyncPreferences.clear()
+                        _messages.emit(
+                            "Local data cleared; cloud data will sync when you reconnect."
+                        )
+                    }
+                    is com.averycorp.prismtask.data.privacy.MentalHealthDataWiper.WipeResult.Failed -> {
+                        Log.e("SettingsVM", "MH data wipe failed", outcome.cause)
+                        _messages.emit("Couldn't delete mental health data. Try again.")
+                    }
+                }
+            } finally {
+                _isWipingMentalHealthData.value = false
+            }
+        }
+    }
 
     /**
      * UI state for the "Clean Up Duplicates" flow. When the user taps the

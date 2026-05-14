@@ -43,6 +43,26 @@ interface SyncMetadataDao {
     suspend fun getLocalId(cloudId: String, entityType: String): Long?
 
     /**
+     * Returns every non-null `cloud_id` for a given `entity_type`. Used by
+     * [com.averycorp.prismtask.data.privacy.MentalHealthDataWiper] to find
+     * the Firestore docs that need deleting after a partial-table local wipe.
+     */
+    @Query(
+        "SELECT cloud_id FROM sync_metadata " +
+            "WHERE entity_type = :entityType AND cloud_id IS NOT NULL"
+    )
+    suspend fun getAllCloudIdsForType(entityType: String): List<String>
+
+    /**
+     * Drops every `sync_metadata` row of a given `entity_type` after its
+     * underlying local rows have been wiped. Keeps the metadata table from
+     * pointing at orphaned local IDs that a future sync would otherwise try
+     * to push or re-pull.
+     */
+    @Query("DELETE FROM sync_metadata WHERE entity_type = :entityType")
+    suspend fun deleteAllForType(entityType: String)
+
+    /**
      * Increments retry_count and, once it crosses [MAX_RETRIES], drops the
      * pending action so the queue cannot loop forever on a permanently
      * failing operation. The row is preserved so the dead-letter is visible

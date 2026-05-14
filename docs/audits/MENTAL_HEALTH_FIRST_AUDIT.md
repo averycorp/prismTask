@@ -542,7 +542,17 @@ table:
 - **Bundle B — Crisis safety (G1, G2, R5):** `CrisisResourcesScreen` +
   `_CHAT_SYSTEM_PROMPT_BASE` safety block + Free-tier chat-safety gate
   split. ~5-6 hours, single coherent PR. Highest-priority follow-up.
-- **G5** — Delete mental-health data action. ~3-4 hours.
+- **G5** — Delete mental-health data action. **SHIPPED** —
+  `MentalHealthDataWiper` (in `data/privacy/`) deletes mood / check-in /
+  weekly-review / boundary / focus-release rows inside a single Room
+  transaction, drops matching `sync_metadata`, and best-effort wipes
+  the corresponding Firestore subcollections under
+  `users/{uid}/`. UI surface is `DeleteMentalHealthDataSection` on the
+  Data & Backup screen — explicit category list, "I understand" gate,
+  destructive-coloured "Delete" button. Cross-table atomicity is pinned
+  by `MentalHealthDataWiperTest`, which seeds rows in every target
+  table AND in `tasks` / `habits` / `projects`, runs the wipe, and
+  asserts the non-MH tables are untouched.
 - **G4** — Pause-all quick toggle. ~3 hours.
 - **R6** — `NdPreferences.forgivenessStreaks` decision (rename or
   remove). ~2 hours.
@@ -606,7 +616,7 @@ on `main` as of 2026-05-14 (PR #1396 merged via squash to commit
 | G2 | AI chat lacks crisis-safety guidance | RED | `_CHAT_SYSTEM_PROMPT_BASE` instructs tone but has no self-harm / suicidality rules. |
 | G3 | No "Rest Day" / low-spoons action | RED | Users must break grace window or force completion. No deliberate-pause primitive. |
 | G4 | No pause-all quick toggle | YELLOW | Quiet hours are scheduled only; no ad-hoc silence affordance. |
-| G5 | No delete-mental-health-data UI | YELLOW | Atomic purge of mood/check-in/clinical data not exposed. |
+| G5 | No delete-mental-health-data UI | YELLOW → SHIPPED | Partial-wipe Privacy action lives on Data & Backup; backed by transactional `MentalHealthDataWiper` + cross-table atomicity test. |
 | G6 | Onboarding skips ND/MH disclosure | YELLOW | No preference question to pre-set forgiving defaults at first run. |
 | G7 | Mood-low does not gate notification cadence | YELLOW | `MoodCorrelationEngine` is read-only; signal not consumed by schedulers. |
 
