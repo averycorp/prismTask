@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen. Mirrors PR #1313 (taps switch tabs instead of overlaying) and
   PR #1314 (Leisure treated as a Today mode). Audit:
   `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
+- feat(web/today): port the Today-screen Work-Life Balance bar (`web/src/features/today/TodayBalanceBar.tsx`) — stacked-bar visualization over the past 7 days of categorized tasks, with overload badge and per-category legend. Reads from `BalanceTracker` + Firestore-synced `balancePreferences`. Closes parity audit C.1a.
+- refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
   `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
   session for an arbitrary past datetime — pick an existing pool activity
@@ -34,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are filtered out of the picker — the underlying REST write would 422.
   Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
+- feat(web/sync): LWW timestamp guard on `updateHabit` — extends the parity A.2 contract to habit edits so an in-flight Android booking-state toggle isn't clobbered by a web rename / color change.
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage

@@ -5,7 +5,6 @@ import {
   getDocs,
   addDoc,
   setDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
@@ -15,6 +14,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 import type { Habit, HabitCompletion } from '@/types/habit';
 import { timestampToIso, timestampToDateStr } from './converters';
 
@@ -159,8 +159,13 @@ function habitCreateToDoc(data: {
   };
 }
 
-function habitUpdateToDoc(data: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = { updatedAt: Date.now() };
+function habitUpdateToDoc(
+  data: Record<string, unknown>,
+  now: number = Date.now(),
+): Record<string, unknown> {
+  // Caller threads `now` so the patch's `updatedAt` matches what the
+  // LWW guard compared against. See `lww.ts` for the rationale.
+  const result: Record<string, unknown> = { updatedAt: now };
   if (data.name !== undefined) result.name = data.name;
   if (data.description !== undefined) result.description = data.description;
   if (data.icon !== undefined) result.icon = data.icon;
@@ -210,8 +215,13 @@ export async function updateHabit(
   habitId: string,
   data: Record<string, unknown>,
 ): Promise<Habit> {
-  const firestoreData = habitUpdateToDoc(data);
-  await updateDoc(habitDoc(uid, habitId), firestoreData);
+  // LWW guard: an in-flight Android booking toggle / streak update
+  // would otherwise silently overwrite the web edit (or vice versa).
+  // First-create wins on missing docs so habit creation flows are
+  // unaffected. Parity audit A.2.
+  const now = Date.now();
+  const firestoreData = habitUpdateToDoc(data, now);
+  await lwwUpdate(habitDoc(uid, habitId), firestoreData as Parameters<typeof lwwUpdate>[1]);
   const snap = await getDoc(habitDoc(uid, habitId));
   return docToHabit(snap.id, snap.data()!, uid);
 }
