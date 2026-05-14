@@ -151,6 +151,7 @@ vi.mock('@/api/firestore/taskBehaviorPreferences', async () => {
     typeof import('@/api/firestore/taskBehaviorPreferences')
   >('@/api/firestore/taskBehaviorPreferences');
   return { ...actual, subscribeToDayStartHour: subscribeToDayStartHourMock };
+});
 vi.mock('@/api/firestore/taskDependencies', async () => {
   const actual = await vi.importActual<
     typeof import('@/api/firestore/taskDependencies')
@@ -276,7 +277,6 @@ describe('useFirestoreSync', () => {
     resetStores();
   });
 
-  it('subscribes to all 8 entity types when uid is set', () => {
   it('subscribes to all 11 entity types when uid is set', () => {
     renderHook(() => useFirestoreSync('uid-A'));
 

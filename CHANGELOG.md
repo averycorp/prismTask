@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- fix(web/sync): repair `useFirestoreSync.ts` + matching test file syntax left broken by PR #1340's botched manual merge — restores the missing `)` after `subscribeToStartOfDayHour`, the missing `});` after the `taskBehaviorPreferences` mock, and the duplicate `it('subscribes to all 8 …')` line. Web CI was failing every PR since 2026-05-13.
+
 ### Removed
 
 - chore(web): remove dead web/src/api/sync.ts HTTP-sync stub — Firestore-direct path superseded it (parity audit A.3).
