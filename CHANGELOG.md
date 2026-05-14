@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Schoolwork class-row Today section (parity F.2).** Web port of
+  Android's PR #1314 `SchoolworkCard` (post the "Leisure + School as
+  modes" refactor). Each active course renders as a checkable row on
+  Today; toggling writes a `CourseCompletion` to Firestore keyed on the
+  logical-day midnight + course doc id. New modules:
+  `web/src/api/firestore/courses.ts`, `courseCompletions.ts`,
+  `web/src/stores/courseStore.ts`, and `SchoolworkTodayCard.tsx`. The
+  `subscribeToCourses` + `subscribeToCourseCompletions` listeners now
+  mount via `useFirestoreSync`. Tasks tagged to a course (best-effort
+  name/code substring match) group underneath their class as a
+  near-term substitute for the still-unwired `assignments` Firestore
+  collection — documented audit follow-up.
 - **Leisure mode on Today + Settings entry (parity F.1c).** Added
   `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
   the daily leisure minimum as `% of target`; tapping routes to
