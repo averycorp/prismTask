@@ -23,6 +23,7 @@ import { MedicationSlotList } from '@/features/daily-essentials/MedicationSlotLi
 import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
 import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
+import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
 import { useLogicalToday } from '@/utils/useLogicalToday';
@@ -281,6 +282,7 @@ export function TodayScreen() {
       </div>
 
       <BoundaryTodayBanner />
+      <TodayBalanceBar />
       <SelfCareNudgeCard />
       <MorningCheckInCard />
 
