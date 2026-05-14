@@ -1,6 +1,7 @@
 package com.averycorp.prismtask.ui.screens.tasklist
 
 import com.averycorp.prismtask.core.time.LocalDateFlow
+import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.SortPreferences
 import com.averycorp.prismtask.data.preferences.StartOfDay
@@ -243,6 +244,41 @@ class TaskListViewModelTest {
             "Timeless task at 00:00 with logical-date = today must bucket to Today. " +
                 "Found buckets: ${grouped.keys}, Today contents: ${grouped["Today"]?.map { it.id }}",
             grouped["Today"].orEmpty().any { it.id == 99L }
+        )
+    }
+
+    /**
+     * Archived projects must not appear in the top-of-screen [visibleProjects]
+     * chip row. The unfiltered [projects] flow still emits all projects so
+     * task-card name lookups for tasks belonging to an archived project keep
+     * working.
+     */
+    @Test
+    fun visibleProjects_excludesArchivedProjects() = runTest(dispatcher) {
+        val active = ProjectEntity(id = 1L, name = "Active Project", status = "ACTIVE")
+        val completed = ProjectEntity(id = 2L, name = "Completed Project", status = "COMPLETED")
+        val archived = ProjectEntity(id = 3L, name = "Archived Project", status = "ARCHIVED")
+        coEvery { projectRepository.getAllProjects() } returns
+            flowOf(listOf(active, completed, archived))
+
+        val vm = newViewModel()
+        val visibleEmissions = mutableListOf<List<ProjectEntity>>()
+        val allEmissions = mutableListOf<List<ProjectEntity>>()
+        backgroundScope.launch { vm.visibleProjects.collect { visibleEmissions.add(it) } }
+        backgroundScope.launch { vm.projects.collect { allEmissions.add(it) } }
+        advanceUntilIdle()
+
+        val visible = visibleEmissions.lastOrNull() ?: emptyList()
+        val all = allEmissions.lastOrNull() ?: emptyList()
+        assertEquals(
+            "visibleProjects must contain only non-archived projects",
+            listOf(1L, 2L),
+            visible.map { it.id }
+        )
+        assertEquals(
+            "projects must still expose all rows (incl. archived) for name lookups",
+            listOf(1L, 2L, 3L),
+            all.map { it.id }
         )
     }
 }

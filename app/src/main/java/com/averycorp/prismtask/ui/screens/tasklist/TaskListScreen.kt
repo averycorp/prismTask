@@ -135,6 +135,7 @@ fun TaskListScreen(
     val groupedTasks by viewModel.groupedTasks.collectAsStateWithLifecycle()
     val tasksByProject by viewModel.tasksByProject.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
+    val visibleProjects by viewModel.visibleProjects.collectAsStateWithLifecycle()
     val taskCountByProject by viewModel.taskCountByProject.collectAsStateWithLifecycle()
     val selectedProjectId by viewModel.selectedProjectId.collectAsStateWithLifecycle()
     val subtasksMap by viewModel.subtasksMap.collectAsStateWithLifecycle()
@@ -741,7 +742,7 @@ fun TaskListScreen(
                 return@Column
             }
             ProjectFilterRow(
-                projects = projects,
+                projects = visibleProjects,
                 selectedProjectId = selectedProjectId,
                 taskCountByProject = taskCountByProject,
                 onSelectProject = viewModel::onSelectProject,

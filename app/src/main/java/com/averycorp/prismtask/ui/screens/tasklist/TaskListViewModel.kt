@@ -189,6 +189,14 @@ constructor(
         .getAllProjects()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Projects rendered in the top-of-screen chip row. Archived projects are
+    // hidden so users don't see them mixed in with current work, but task
+    // cards / by-project headers still look names up against [projects] so
+    // tasks that belong to an archived project keep their label and color.
+    val visibleProjects: StateFlow<List<ProjectEntity>> = projects
+        .map { list -> list.filter { it.status != "ARCHIVED" } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     /**
      * Reactive task-count map (projectId -> active root-task count) backing
      * the move-to-project sheet. Counts only incomplete root tasks so the
