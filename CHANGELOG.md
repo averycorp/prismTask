@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/balance): port `LifeCategoryClassifier` + `BalanceTracker` engines to web (`web/src/utils/lifeCategoryClassifier.ts`, `web/src/utils/balanceTracker.ts`), add Firestore-synced balance preferences (`balancePreferences.ts`), and ship a Work-Life Balance settings section with target-ratio sliders, overload threshold, and balance-bar toggle — closes parity audit C.2a/b/d. Also fixes pre-existing parse errors in `useFirestoreSync.ts` and its test that were blocking lint/vitest from a prior bad merge between PR #1340 and #1341.
 - feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
 - feat(web/sync): write `task_completions` rows to Firestore so analytics history populates cross-device — closes parity audit B.6.
 - **Batch adjustments through AI Chat.** The Coach can now propose a
