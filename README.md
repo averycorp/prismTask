@@ -1,6 +1,6 @@
 # PrismTask
 
-[![Version](https://img.shields.io/badge/Version-1.6.0-success.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.9.24-success.svg)](CHANGELOG.md)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Min SDK](https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-orange.svg)]()
@@ -72,9 +72,10 @@ Native app built with Kotlin and Jetpack Compose. See the [Download](#download) 
 React + TypeScript + Vite web client with TailwindCSS, deployed at
 [`app.prismtask.app`](https://app.prismtask.app). Reads/writes the same
 Firestore subtree as the Android app for cross-device sync, and calls the
-FastAPI backend for AI features. As of v1.6.0 the web app reaches ~92%
-parity with Android across the full feature surface — see
-[`docs/WEB_PARITY_GAP_ANALYSIS.md`](docs/WEB_PARITY_GAP_ANALYSIS.md). See
+FastAPI backend for AI features. The web app is at broad feature parity
+with Android across the major surfaces, with remaining gaps tracked in
+[`docs/audits/ANDROID_WEB_PARITY_AUDIT_2026-05-13.md`](docs/audits/ANDROID_WEB_PARITY_AUDIT_2026-05-13.md)
+(see also the earlier [`docs/WEB_PARITY_GAP_ANALYSIS.md`](docs/WEB_PARITY_GAP_ANALYSIS.md)). See
 [`web/README.md`](web/README.md) for setup instructions.
 
 ### Backend
@@ -99,6 +100,24 @@ To build and run this project locally, ensure you are using Gradle 9.3.1. The mi
 Debug builds connect to a local Firebase Emulator Suite (Firestore + Auth) by default — not production Firestore. Start it with `firebase emulators:start --import=./firebase-emulator-data --export-on-exit=./firebase-emulator-data` before launching a debug APK, or you will see "no data syncing" because the app is talking to `10.0.2.2:8080`. See [`docs/FIREBASE_EMULATOR.md`](docs/FIREBASE_EMULATOR.md) for setup, two-device configs, and troubleshooting. To use production Firestore in a debug build, flip `USE_FIREBASE_EMULATOR` to `false` in `app/build.gradle.kts` before building.
 
 ## Roadmap
+
+### v1.7.x — v1.9.x — Shipped
+
+Cumulative since v1.6.0; detailed entries live in [`CHANGELOG.md`](CHANGELOG.md#unreleased) until the next versioned cut.
+
+| Area | Feature |
+|------|---------|
+| AI Chat (Coach) | Multi-turn memory + task-content forwarding to Claude, first-run disclosure V3, action-chip idempotency + per-item batch UX, snackbar Undo on destructive actions, full chat conversation persistence (Postgres + Room mirror), batch-command inline actions routed through the existing BatchPreviewScreen, Auto-button Life Category classification upgraded with a Claude fallback |
+| Time tracking analytics | `TaskTimingEntity` + `TaskTimingDao` + repository, manual "Logged Time" section in the Schedule tab, Pomodoro auto-log into `task_timings`, cross-device Firestore sync for timings, productivity score chart + time-tracking bar chart on `TaskAnalyticsScreen` (Pro-gated), summary tile row |
+| Today + recurrence | Tap a completed recurring task to choose Log Again or Mark Incomplete, "done" counter sheet listing today's completed tasks + habits, Leisure / School treated as modes with per-class checkable rows, Daily Essentials evolution (Leisure Minimum card removed; housework + schoolwork remain), Morning check-in banner now respects Start-of-Day end-to-end, next-occurrence anchored to completion time |
+| Editor + NLP | OrganizeTab Auto buttons always assign a chip and surface feedback, auto-classify task mode + cognitive load on every insert, urgency keyword inference in NLP, import preview shows due date / priority / tags / subtasks |
+| Projects + tasks | Archive / reopen surfaced from list screens, archived projects hidden from pickers and chip rows, archived projects moved behind a footer link, Tasks tab elevates project prominence |
+| Medications | Allow medications without a slot (as-needed / PRN), editor opens with fresh per-med settings + correct slot links, slot-level "Taken at" line dropped in favour of per-med times, Daily Essentials medication card removed from Today (start) |
+| Leisure | User-defined custom categories alongside the built-in four, built-in defaults are removable, duration dialog always shown so users can override default minutes, category enable/disable switches no longer hang |
+| Widgets | Timer can be started from the widget without opening the app |
+| Sync hardening | Web → Firestore writes for `task_completions`, `startOfDayHour` cross-device parity, IndexedDB cache cleared on logout, 5 additional real-time Firestore listeners wired (dependencies / phases / risks / external anchors / settings), web HTTP-sync stub removed |
+| Recurrence robustness | Toggle-uncomplete rolls back the spawned recurrence, Undo + redo no longer duplicates recurring tasks, Eisenhower / Pomodoro completion now spawns recurrences correctly |
+| Test infrastructure | `HiltTestRunner.isAndroidEmulator()` detects modern AVDs, cross-device-tests CI job drops shell-level retry, auto-update-branch workflow added |
 
 ### v1.6.0 — Shipped
 
@@ -130,10 +149,10 @@ Debug builds connect to a local Firebase Emulator Suite (Firestore + Auth) by de
 
 | Status | Area | Feature |
 |--------|------|---------|
-| 🔜 v1.7+ | Medication reminders | Web Push delivery so reminder settings sync to phone *and* fire on web |
-| 🔜 v1.7+ | Medication reminders | Per-medication reminder-mode override UI (touches multiple pickers/dialogs; Android-only landed in v1.6.0) |
-| 🔜 v1.7+ | Medication reminders | Web slot-editor per-slot reminder-mode picker (settable from Android only today) |
-| 🔜 v1.7+ | Sync test matrix | Tests 12 + 13 (sign-out/sign-in same user; sign-in different user) automated when the OAuth Custom Tab flow becomes UIAutomator-driveable |
+| 🔜 v1.10+ | Medication reminders | Web Push delivery so reminder settings sync to phone *and* fire on web |
+| 🔜 v1.10+ | Medication reminders | Web port of the per-medication reminder-mode override UI (Android shipped in v1.6.0; the web editor still defers to slot-level defaults) |
+| 🔜 v1.10+ | Medication reminders | Web slot-editor per-slot reminder-mode picker (settable from Android only today) |
+| 🔜 v1.10+ | Sync test matrix | Tests 12 + 13 (sign-out/sign-in same user; sign-in different user) automated when the OAuth Custom Tab flow becomes UIAutomator-driveable |
 | 🔜 v2.0+ | Phase G | Remaining web parity slices toward 100% feature equivalence with Android |
 | 🔜 v2.0+ | Calendar | Backend-mediated Google Calendar sync (see `docs/ADR-calendar-sync.md`) |
 | 🔜 v2.2+ | Widgets | Re-enable / refresh the eight Glance widgets after Phase G stabilizes |
