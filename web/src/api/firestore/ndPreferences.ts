@@ -159,20 +159,21 @@ function prefsDoc(uid: string) {
 function read(data: DocumentData | undefined): NdPreferences {
   if (!data) return DEFAULT_ND_PREFERENCES;
   const out: NdPreferences = { ...DEFAULT_ND_PREFERENCES };
+  const writable = out as unknown as Record<string, unknown>;
   for (const k of BOOL_KEYS) {
     const v = data[FIELD_MAP[k]];
-    if (typeof v === 'boolean') (out as Record<string, unknown>)[k] = v;
+    if (typeof v === 'boolean') writable[k] = v;
   }
   for (const k of INT_KEYS) {
     const v = data[FIELD_MAP[k]];
     if (typeof v === 'number' && Number.isFinite(v)) {
-      (out as Record<string, unknown>)[k] = Math.round(v);
+      writable[k] = Math.round(v);
     }
   }
   for (const { key, valid } of ENUM_KEYS) {
     const v = data[FIELD_MAP[key]];
     if (typeof v === 'string' && valid.includes(v)) {
-      (out as Record<string, unknown>)[key] = v;
+      writable[key] = v;
     }
   }
   return out;

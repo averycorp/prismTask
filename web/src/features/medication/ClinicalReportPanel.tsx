@@ -67,7 +67,7 @@ export function ClinicalReportPanel() {
   }, [fetchInputs]);
 
   const userName = useMemo(
-    () => user?.displayName ?? user?.email ?? null,
+    () => user?.display_name ?? user?.name ?? user?.email ?? null,
     [user],
   );
 
