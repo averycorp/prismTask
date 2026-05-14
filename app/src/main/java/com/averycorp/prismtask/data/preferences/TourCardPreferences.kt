@@ -122,8 +122,9 @@ constructor(
         }
     }
 
-    /** Debug-only: clear all tour flags so the card re-appears alongside
-     *  a re-run of onboarding. Wired into `SettingsViewModel.resetOnboarding`. */
+    /** Clears all tour flags so the card re-appears alongside a future
+     *  re-run of onboarding. Used by Settings → Reset App Data when the
+     *  user wipes preferences. */
     suspend fun resetTourCard() {
         context.tourCardDataStore.edit { prefs ->
             prefs.remove(TOUR_CARD_ELIGIBLE)

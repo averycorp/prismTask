@@ -408,10 +408,18 @@ fun SettingsScreen(
 
                         DebugOnboardingSection(
                             onShowTutorial = {
-                                viewModel.resetOnboarding {
-                                    navController.navigate(PrismTaskRoute.Onboarding.route) {
-                                        popUpTo(PrismTaskRoute.MainTabs.route) { inclusive = true }
-                                    }
+                                // Admin replay: render the full tutorial in
+                                // preview mode so no preferences, tasks, or
+                                // canonical Firestore fields change. Do NOT
+                                // call resetOnboarding() here — that would
+                                // wipe `hasCompletedOnboarding` + tour-card
+                                // state and effectively re-onboard the
+                                // account. See OnboardingViewModel preview
+                                // mode + the route's `preview` arg.
+                                navController.navigate(
+                                    PrismTaskRoute.Onboarding.createRoute(preview = true)
+                                ) {
+                                    popUpTo(PrismTaskRoute.MainTabs.route) { inclusive = true }
                                 }
                             }
                         )

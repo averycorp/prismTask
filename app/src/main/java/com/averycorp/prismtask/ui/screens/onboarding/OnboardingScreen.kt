@@ -103,10 +103,18 @@ private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 @Composable
 fun OnboardingScreen(
     viewModel: OnboardingViewModel,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    previewMode: Boolean = false
 ) {
     val pagerState = rememberPagerState(pageCount = { TOTAL_PAGES })
     val coroutineScope = rememberCoroutineScope()
+
+    // Push the route's preview flag into the ViewModel as soon as the screen
+    // mounts, before any user input can fire setters. This is what makes the
+    // admin "Show Tutorial" replay non-destructive — see [OnboardingViewModel].
+    LaunchedEffect(previewMode) {
+        viewModel.setPreviewMode(previewMode)
+    }
 
     // Navigate straight to the main app when sign-in detects an existing user
     // (from either the Welcome page sign-in link or the Setup page sign-in card).
