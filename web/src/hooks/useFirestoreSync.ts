@@ -13,6 +13,7 @@ import { useProjectRiskStore } from '@/stores/projectRiskStore';
 import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 import { useCourseStore } from '@/stores/courseStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useNdPreferencesStore } from '@/stores/ndPreferencesStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -70,6 +71,8 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   );
   const subscribeToCourses = useCourseStore((s) => s.subscribe);
   const subscribeToTheme = useThemeStore((s) => s.subscribeToFirestore);
+  const subscribeToNdPrefs = useNdPreferencesStore((s) => s.subscribeToPrefs);
+  const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
   const resetDependencies = useTaskDependencyStore((s) => s.reset);
@@ -88,6 +91,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetPhases();
       resetRisks();
       resetAnchors();
+      resetNdPrefs();
       return;
     }
 
@@ -119,6 +123,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToAnchors, 'external-anchors');
     safeSubscribe(subscribeToCourses, 'courses');
     safeSubscribe(subscribeToTheme, 'theme-preferences');
+    safeSubscribe(subscribeToNdPrefs, 'nd-preferences');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -148,11 +153,13 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToAnchors,
     subscribeToCourses,
     subscribeToTheme,
+    subscribeToNdPrefs,
     resetSlots,
     resetPrefs,
     resetDependencies,
     resetPhases,
     resetRisks,
     resetAnchors,
+    resetNdPrefs,
   ]);
 }
