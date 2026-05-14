@@ -352,6 +352,42 @@ class TaskRepositoryTest {
         )
     }
 
+    // Regression: an overdue recurring task must not spawn a still-overdue
+    // next instance. Before, the engine was anchored to fresh.dueDate, so a
+    // daily/interval=1 task with dueDate=last week spawned next=last-week+1
+    // — still in the past. Tapping the checkmark should *restart* the cycle
+    // from completion time so the next instance lands in the future.
+    @Test
+    fun completeTask_withOverdueRecurrence_anchorsNextOccurrenceToCompletionTime() = runBlocking {
+        // 30 days ago — well before "now". Daily/interval=1 anchored to the
+        // original due date would produce a next-due 29 days in the past.
+        val staleDueDate = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        val id = taskDao.insert(
+            taskFixture(
+                title = "Long-overdue stand-up",
+                dueDate = staleDueDate,
+                recurrenceRule = """{"type":"DAILY","interval":1}"""
+            )
+        )
+
+        val before = System.currentTimeMillis()
+        repo.completeTask(id)
+
+        val next = taskDao.tasks.single { it.title == "Long-overdue stand-up" && it.id != id }
+        val nextDue = next.dueDate ?: 0L
+        // Next due must be in the future (anchored to completion time, not
+        // staleDueDate). Allow generous slack for the day-start rounding
+        // performed inside RecurrenceEngine.
+        assertTrue(
+            "Next due date ($nextDue) should be at or after the completion call ($before)",
+            nextDue >= before - (24L * 60 * 60 * 1000)
+        )
+        assertTrue(
+            "Next due date should not remain anchored to the stale original due date",
+            nextDue > staleDueDate + (7L * 24 * 60 * 60 * 1000)
+        )
+    }
+
     @Test
     fun uncompleteTask_clearsCompletedState() = runBlocking {
         val id = taskDao.insert(taskFixture(title = "Rework", isCompleted = true, completedAt = 999L))
