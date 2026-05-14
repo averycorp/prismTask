@@ -16,9 +16,10 @@ three modules:
 - **Backend** — FastAPI + PostgreSQL service deployed on Railway, fronting
   Claude Haiku NLP, sync, integrations, and chat persistence
 
-**Pricing tiers:** Free / Pro ($3.99) / Premium ($7.99). Tier gating runs
-through `ProFeatureGate` on Android and the equivalent guard in the web app;
-the backend honours the same tier on protected endpoints.
+**Pricing tiers:** Free / Pro ($7.99/mo, or $5/mo billed annually at $59.99/yr
+with a 7-day free trial). Tier gating runs through `ProFeatureGate` on Android
+and the equivalent `useProFeature` hook in the web app; the backend honours the
+same tier on protected endpoints.
 
 **Release pipeline:** solo founder, every-merge ships. Every merge to `main`
 triggers the release workflow, which builds, tags, and publishes. There is no
