@@ -17,6 +17,7 @@ import com.averycorp.prismtask.MainActivity
 class TimerBuzzerDismissReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         VibrationAdapter.cancel(context)
+        TimerAlarmPlayer.stop()
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
         if (notificationId != -1) {
             context.getSystemService(NotificationManager::class.java)

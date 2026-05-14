@@ -36,6 +36,10 @@ constructor(
         private val BUZZ_UNTIL_DISMISSED = booleanPreferencesKey("timer_buzz_until_dismissed")
         private val OVERRIDE_VOLUME = booleanPreferencesKey("timer_override_volume")
         private val ALARM_VOLUME_PERCENT = intPreferencesKey("timer_alarm_volume_percent")
+        private val ALARM_SOUND_ID = stringPreferencesKey("timer_alarm_sound_id")
+        private val RING_DURATION_SECONDS = intPreferencesKey("timer_ring_duration_seconds")
+        private val VIBRATE_ENABLED = booleanPreferencesKey("timer_vibrate_enabled")
+        private val VIBRATION_DURATION_SECONDS = intPreferencesKey("timer_vibration_duration_seconds")
 
         // ---- A2 Pomodoro+ AI Coaching toggles ---------------------------
         // Distinct subsection so parallel Weekly Task Summary work doesn't
@@ -62,6 +66,18 @@ constructor(
         const val DEFAULT_ALARM_VOLUME_PERCENT = 80
         const val MIN_ALARM_VOLUME_PERCENT = 1
         const val MAX_ALARM_VOLUME_PERCENT = 100
+
+        const val DEFAULT_ALARM_SOUND_ID = "__system_default__"
+
+        const val DEFAULT_RING_DURATION_SECONDS = 10
+        const val MIN_RING_DURATION_SECONDS = 1
+        const val MAX_RING_DURATION_SECONDS = 60
+
+        const val DEFAULT_VIBRATE_ENABLED = true
+
+        const val DEFAULT_VIBRATION_DURATION_SECONDS = 3
+        const val MIN_VIBRATION_DURATION_SECONDS = 1
+        const val MAX_VIBRATION_DURATION_SECONDS = 60
     }
 
     fun getWorkDurationSeconds(): Flow<Int> = context.timerDataStore.data.map { prefs ->
@@ -192,6 +208,50 @@ constructor(
     suspend fun setAlarmVolumePercent(percent: Int) {
         context.timerDataStore.edit { prefs ->
             prefs[ALARM_VOLUME_PERCENT] = percent.coerceIn(MIN_ALARM_VOLUME_PERCENT, MAX_ALARM_VOLUME_PERCENT)
+        }
+    }
+
+    fun getAlarmSoundId(): Flow<String> = context.timerDataStore.data.map { prefs ->
+        prefs[ALARM_SOUND_ID] ?: DEFAULT_ALARM_SOUND_ID
+    }
+
+    suspend fun setAlarmSoundId(soundId: String) {
+        val sanitized = soundId.trim().ifEmpty { DEFAULT_ALARM_SOUND_ID }
+        context.timerDataStore.edit { prefs ->
+            prefs[ALARM_SOUND_ID] = sanitized
+        }
+    }
+
+    fun getRingDurationSeconds(): Flow<Int> = context.timerDataStore.data.map { prefs ->
+        prefs[RING_DURATION_SECONDS] ?: DEFAULT_RING_DURATION_SECONDS
+    }
+
+    suspend fun setRingDurationSeconds(seconds: Int) {
+        context.timerDataStore.edit { prefs ->
+            prefs[RING_DURATION_SECONDS] = seconds.coerceIn(MIN_RING_DURATION_SECONDS, MAX_RING_DURATION_SECONDS)
+        }
+    }
+
+    fun getVibrateEnabled(): Flow<Boolean> = context.timerDataStore.data.map { prefs ->
+        prefs[VIBRATE_ENABLED] ?: DEFAULT_VIBRATE_ENABLED
+    }
+
+    suspend fun setVibrateEnabled(enabled: Boolean) {
+        context.timerDataStore.edit { prefs ->
+            prefs[VIBRATE_ENABLED] = enabled
+        }
+    }
+
+    fun getVibrationDurationSeconds(): Flow<Int> = context.timerDataStore.data.map { prefs ->
+        prefs[VIBRATION_DURATION_SECONDS] ?: DEFAULT_VIBRATION_DURATION_SECONDS
+    }
+
+    suspend fun setVibrationDurationSeconds(seconds: Int) {
+        context.timerDataStore.edit { prefs ->
+            prefs[VIBRATION_DURATION_SECONDS] = seconds.coerceIn(
+                MIN_VIBRATION_DURATION_SECONDS,
+                MAX_VIBRATION_DURATION_SECONDS
+            )
         }
     }
 

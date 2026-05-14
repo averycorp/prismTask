@@ -26,10 +26,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.preferences.TimerPreferences
+import com.averycorp.prismtask.domain.model.notifications.BuiltInSound
+import com.averycorp.prismtask.domain.model.notifications.SoundCategory
 import com.averycorp.prismtask.ui.components.settings.DurationPickerDialog
 import com.averycorp.prismtask.ui.components.settings.SectionHeader
 import com.averycorp.prismtask.ui.components.settings.SettingsRowWithSubtitle
 import com.averycorp.prismtask.ui.components.settings.SettingsToggleRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.RadioButton
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -43,6 +49,10 @@ fun TimerSection(
     buzzUntilDismissed: Boolean,
     overrideVolume: Boolean,
     alarmVolumePercent: Int,
+    alarmSoundId: String,
+    ringDurationSeconds: Int,
+    vibrateEnabled: Boolean,
+    vibrationDurationSeconds: Int,
     // A2 Pomodoro+ AI Coaching — each surface has its own toggle, all default on.
     preSessionCoachingEnabled: Boolean,
     breakCoachingEnabled: Boolean,
@@ -56,6 +66,10 @@ fun TimerSection(
     onBuzzUntilDismissedChange: (Boolean) -> Unit,
     onOverrideVolumeChange: (Boolean) -> Unit,
     onAlarmVolumePercentChange: (Int) -> Unit,
+    onAlarmSoundIdChange: (String) -> Unit,
+    onRingDurationSecondsChange: (Int) -> Unit,
+    onVibrateEnabledChange: (Boolean) -> Unit,
+    onVibrationDurationSecondsChange: (Int) -> Unit,
     onPreSessionCoachingChange: (Boolean) -> Unit,
     onBreakCoachingChange: (Boolean) -> Unit,
     onRecapCoachingChange: (Boolean) -> Unit
@@ -67,6 +81,9 @@ fun TimerSection(
     var showAvailableTimeDialog by remember { mutableStateOf(false) }
     var showFocusDialog by remember { mutableStateOf(false) }
     var showAlarmVolumeDialog by remember { mutableStateOf(false) }
+    var showAlarmSoundDialog by remember { mutableStateOf(false) }
+    var showRingDurationDialog by remember { mutableStateOf(false) }
+    var showVibrationDurationDialog by remember { mutableStateOf(false) }
 
     if (showTimerWorkDialog) {
         DurationPickerDialog(
@@ -149,6 +166,45 @@ fun TimerSection(
         )
     }
 
+    if (showAlarmSoundDialog) {
+        AlarmSoundPickerDialog(
+            currentSoundId = alarmSoundId,
+            onConfirm = {
+                onAlarmSoundIdChange(it)
+                showAlarmSoundDialog = false
+            },
+            onDismiss = { showAlarmSoundDialog = false }
+        )
+    }
+
+    if (showRingDurationDialog) {
+        SecondsPickerDialog(
+            title = "Ring Duration",
+            currentSeconds = ringDurationSeconds,
+            minSeconds = TimerPreferences.MIN_RING_DURATION_SECONDS,
+            maxSeconds = TimerPreferences.MAX_RING_DURATION_SECONDS,
+            onConfirm = {
+                onRingDurationSecondsChange(it)
+                showRingDurationDialog = false
+            },
+            onDismiss = { showRingDurationDialog = false }
+        )
+    }
+
+    if (showVibrationDurationDialog) {
+        SecondsPickerDialog(
+            title = "Vibration Duration",
+            currentSeconds = vibrationDurationSeconds,
+            minSeconds = TimerPreferences.MIN_VIBRATION_DURATION_SECONDS,
+            maxSeconds = TimerPreferences.MAX_VIBRATION_DURATION_SECONDS,
+            onConfirm = {
+                onVibrationDurationSecondsChange(it)
+                showVibrationDurationDialog = false
+            },
+            onDismiss = { showVibrationDurationDialog = false }
+        )
+    }
+
     SectionHeader("Timer & Pomodoro")
 
     SettingsRowWithSubtitle(
@@ -181,12 +237,40 @@ fun TimerSection(
         subtitle = focusStyleLabel(pomodoroFocusPreference),
         onClick = { showFocusDialog = true }
     )
-    SettingsToggleRow(
-        title = "Buzz Until Dismissed",
-        subtitle = "Vibrate continuously when the timer ends until you tap or swipe the notification.",
-        checked = buzzUntilDismissed,
-        onCheckedChange = onBuzzUntilDismissedChange
+    SettingsRowWithSubtitle(
+        title = "Alarm Sound",
+        subtitle = alarmSoundLabel(alarmSoundId),
+        onClick = { showAlarmSoundDialog = true }
     )
+    val isSilent = alarmSoundId == BuiltInSound.SILENT_ID
+    if (!isSilent) {
+        SettingsRowWithSubtitle(
+            title = "Ring Duration",
+            subtitle = formatSeconds(ringDurationSeconds),
+            onClick = { showRingDurationDialog = true }
+        )
+    }
+    SettingsToggleRow(
+        title = "Vibrate When Timer Ends",
+        subtitle = "Vibrate the device when a focus session or break ends.",
+        checked = vibrateEnabled,
+        onCheckedChange = onVibrateEnabledChange
+    )
+    if (vibrateEnabled) {
+        SettingsToggleRow(
+            title = "Buzz Until Dismissed",
+            subtitle = "Vibrate continuously until you tap or swipe the notification.",
+            checked = buzzUntilDismissed,
+            onCheckedChange = onBuzzUntilDismissedChange
+        )
+        if (!buzzUntilDismissed) {
+            SettingsRowWithSubtitle(
+                title = "Vibration Duration",
+                subtitle = formatSeconds(vibrationDurationSeconds),
+                onClick = { showVibrationDurationDialog = true }
+            )
+        }
+    }
     SettingsToggleRow(
         title = "Override System Volume",
         subtitle = "Ring the timer at a fixed volume even if the alarm slider is low or muted.",
@@ -224,6 +308,14 @@ fun TimerSection(
     )
 
     HorizontalDivider()
+}
+
+private fun alarmSoundLabel(soundId: String): String {
+    return BuiltInSound.byId(soundId)?.displayName ?: "System default"
+}
+
+private fun formatSeconds(seconds: Int): String {
+    return if (seconds == 1) "1 second" else "$seconds seconds"
 }
 
 private fun formatAvailableMinutes(minutes: Int): String {
@@ -363,6 +455,150 @@ private fun AlarmVolumePickerDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun SecondsPickerDialog(
+    title: String,
+    currentSeconds: Int,
+    minSeconds: Int,
+    maxSeconds: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var seconds by remember(currentSeconds) {
+        mutableIntStateOf(currentSeconds.coerceIn(minSeconds, maxSeconds))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(
+                    text = formatSeconds(seconds),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+                Slider(
+                    value = seconds.toFloat(),
+                    onValueChange = {
+                        seconds = it.toInt().coerceIn(minSeconds, maxSeconds)
+                    },
+                    valueRange = minSeconds.toFloat()..maxSeconds.toFloat()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        formatSeconds(minSeconds),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        formatSeconds(maxSeconds),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(seconds) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun AlarmSoundPickerDialog(
+    currentSoundId: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selected by remember(currentSoundId) { mutableStateOf(currentSoundId) }
+    // Group the built-in catalog by category for easier scanning. Order
+    // matches [SoundCategory] declaration order; the system-default + silent
+    // sentinels are pinned to the top as their own group.
+    val sentinelIds = setOf(BuiltInSound.SYSTEM_DEFAULT_ID, BuiltInSound.SILENT_ID)
+    val sentinels = BuiltInSound.ALL.filter { it.id in sentinelIds }
+    val byCategory = SoundCategory.entries.associateWith { category ->
+        BuiltInSound.ALL.filter { it.category == category && it.id !in sentinelIds }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Alarm Sound") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                sentinels.forEach { sound ->
+                    SoundOptionRow(
+                        sound = sound,
+                        selected = selected == sound.id,
+                        onClick = { selected = sound.id }
+                    )
+                }
+                byCategory.forEach { (category, sounds) ->
+                    if (sounds.isEmpty()) return@forEach
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = category.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    sounds.forEach { sound ->
+                        SoundOptionRow(
+                            sound = sound,
+                            selected = selected == sound.id,
+                            onClick = { selected = sound.id }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selected) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun SoundOptionRow(
+    sound: BuiltInSound,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Spacer(Modifier.height(0.dp))
+        Text(
+            text = sound.displayName,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp)
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
