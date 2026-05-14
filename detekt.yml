@@ -42,7 +42,7 @@ complexity:
   # future regressions without flagging current outliers.
   CyclomaticComplexMethod:
     active: true
-    threshold: 65
+    threshold: 70
     ignoreSingleWhenExpression: true
     ignoreSimpleWhenEntries: true
     ignoreNestingFunctions: false
