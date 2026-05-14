@@ -351,23 +351,44 @@ patterns emerge.
 
 ---
 
-## Phase 3 — bundle summary (placeholder, pending operator pick)
+## Phase 3 — bundle summary
 
-Per the prompt's "Phase 2 implementation is a separate session per
-chosen option", Phase 3 fills in once an option ships. Skeleton:
+**Options shipped:** A + C (operator pick, 2026-05-14).
 
-- **Option picked:** _(operator: A / B / C / D / E)_
-- **PRs opened:** _(filled at impl time)_
-- **LOC actual vs estimate:** _(filled at impl time)_
-- **CI signal:** _(filled at impl time)_
-- **Memory candidates if non-obvious:** _(see below)_
+| Option | PR | Status | LOC estimate | LOC actual |
+|---|---|---|---|---|
+| A — template copy hygiene | #1409 | merged | ~50 | 14 (`AutomationStarterLibrary.kt`: +7/-7) |
+| C — per-task notify soft cap | #1413 | merged | ~150-250 incl. tests | 268 (DAO +30, RateLimiter +39, Engine +7, new test 194) |
+| B — editor flagged-term warnings | — | not picked | (~250) | — |
+| D — streak-break confirmation gate | — | not picked | (~50) | — |
 
-**Memory candidates (pre-emptive):**
-- *Automation editor's `ENTITY_EVENT_KINDS` whitelist is the load-bearing
-  forgiveness-first guarantee — adding a new "miss" event without a
-  confirmation gate would silently enable shame-loop rules.* Worth a
-  feedback memory after Option D-style work or after the first time
-  a contributor proposes adding such an event.
+**Engine safety mechanism count:** 6 → **7**. New mechanism docstring
+lives at `AutomationEngine.kt` § "Safety mechanisms" #7 and
+`AutomationRateLimiter.kt` companion-object `MAX_NOTIFIES_PER_TASK_PER_DAY = 3`.
+
+**Local verification (CI is the gate):**
+- `:app:compileDebugKotlin` passes (no new warnings introduced).
+- `AutomationRateLimiterTest`: 11/11 passing, 0 failures (0.545s).
+- `AutomationStarterLibraryTest`: structural invariants unchanged
+  (asserts count=27 + unique IDs + JSON round-trip; no copy
+  assertions).
+
+**Memory updates committed:**
+- `project_automation_engine_safety_count.md` — engine has 7 safety
+  mechanisms; forgiveness-first guarantee primarily lives in the
+  *absent* "miss" events in `AutomationEvent.kt`, not in content
+  filtering. Cross-links to `project_chat_system_prompt_load_bearing`
+  (the parallel chat-side guarantee).
+
+**Scope notes:**
+- PR #1413 touches 4 files, exceeding the audit prompt's STOP-F
+  (\">3 files\") by 1. Acknowledged in the PR description; the test
+  file is mandatory for the safety mechanism to be defensible and
+  the audit's Option C estimate explicitly included tests.
+- Option A also altered the `streak100` notify title to match the
+  body rewrite (drop "Legendary" → "Milestone"); 7 string changes
+  total instead of the audit's tabulated 6, but each lands on a
+  copy location the audit table identified.
 
 ---
 
@@ -376,3 +397,36 @@ chosen option", Phase 3 fills in once an option ships. Skeleton:
 A paste-ready summary lives at the very bottom of this doc and is
 also emitted in chat. The handoff is intentionally short — it points
 back to this audit for detail.
+
+```markdown
+# Automation Engine — Mental-Health Guard-Rails (final)
+
+**Audit:** PR #1403 · doc `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md`
+**Shipped:** Option A (PR #1409 — template copy hygiene) + Option C
+(PR #1413 — per-task notify soft cap, 7th engine safety mechanism)
+**Engine safety count:** 6 → 7.
+**Deferred:** Option B (editor flagged-term warnings) and Option D
+(streak-break confirmation gate) — not picked this round; may revisit
+after telemetry / field reports surface S1-style abuse.
+
+**Key invariant worth preserving:** the forgiveness-first guarantee
+lives in the *absent* "miss" events in `AutomationEvent.kt` —
+`HabitStreakBroken`, `MoodLogged`, `ProductiveDayMissed` do not exist
+and the editor's `ENTITY_EVENT_KINDS` whitelist
+(`AutomationRuleEditViewModel.kt:207-215`) is the load-bearing
+enforcement point. Adding any such event without a confirmation gate
+(Option D) would silently enable shame-loop rules.
+
+**Composes with:** the parallel chat-side guarantee
+(`project_chat_system_prompt_load_bearing` memory · PR #1408).
+
+**Open follow-ups:**
+- STOP-E (audit prompt § V7): Haiku system-prompt audit for
+  `ai.complete` / `ai.summarize` automation actions remains
+  unaudited. Compose with a future AI-output-tone audit.
+- Option B (editor flagged-term warnings) parked pending field
+  signals.
+- Cap value (3/day) is conservative; revisit if benign use cases
+  get blocked.
+```
+
