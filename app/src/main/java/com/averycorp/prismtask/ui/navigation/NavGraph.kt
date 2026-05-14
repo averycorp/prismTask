@@ -243,6 +243,9 @@ sealed class PrismTaskRoute(
 
     data object MoodAnalytics : PrismTaskRoute("mood_analytics")
 
+    /** G1 — Crisis resources surface ("If you need help now"). */
+    data object CrisisResources : PrismTaskRoute("crisis_resources")
+
     data object WeeklyBalanceReport : PrismTaskRoute("weekly_balance_report")
 
     data object BuiltInUpdates : PrismTaskRoute("builtin_updates")

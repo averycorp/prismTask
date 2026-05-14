@@ -28,6 +28,10 @@ from app.schemas.ai import (
     ChatTokensUsed,
 )
 from app.services.beta_codes import resolve_effective_tier
+from app.services.crisis_keywords import (
+    contains_crisis_signal,
+    crisis_safety_response,
+)
 
 from .memory import (
     _apply_preference_diff,
@@ -74,25 +78,35 @@ async def chat(
         {"id": p.id, "text": p.preference_text} for p in existing_prefs
     ]
 
-    try:
-        from app.services.ai_productivity import generate_chat_response
+    # G2 — defense-in-depth crisis pre-filter. A high-confidence crisis
+    # term short-circuits to a static reply that points the user to the
+    # in-app crisis resources surface (G1). The model never sees the
+    # message, so a productivity tool call cannot leak out even if a
+    # future prompt regression weakens § "Safety". The static reply
+    # follows the same persistence + response shape as a normal turn so
+    # the cross-device chat history reads coherently.
+    if contains_crisis_signal(data.message):
+        result = crisis_safety_response()
+    else:
+        try:
+            from app.services.ai_productivity import generate_chat_response
 
-        result = generate_chat_response(
-            message=data.message,
-            conversation_id=data.conversation_id,
-            task_context_id=data.task_context_id,
-            task_context=(
-                data.task_context.model_dump(exclude_none=True)
-                if data.task_context is not None
-                else None
-            ),
-            history=[h.model_dump() for h in data.history],
-            user_preferences=prefs_for_prompt,
-        )
-    except RuntimeError:
-        raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
-    except ValueError:
-        raise HTTPException(status_code=500, detail="AI returned an invalid response")
+            result = generate_chat_response(
+                message=data.message,
+                conversation_id=data.conversation_id,
+                task_context_id=data.task_context_id,
+                task_context=(
+                    data.task_context.model_dump(exclude_none=True)
+                    if data.task_context is not None
+                    else None
+                ),
+                history=[h.model_dump() for h in data.history],
+                user_preferences=prefs_for_prompt,
+            )
+        except RuntimeError:
+            raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
+        except ValueError:
+            raise HTTPException(status_code=500, detail="AI returned an invalid response")
 
     # Validate AI-proposed actions against ChatActionPayload and drop
     # any that don't conform (Claude occasionally invents fields).
