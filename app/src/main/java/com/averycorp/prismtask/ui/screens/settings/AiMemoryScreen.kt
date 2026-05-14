@@ -121,7 +121,8 @@ fun AiMemoryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Nothing remembered yet. The AI Executive Assistant will pick up preferences as you chat — or tap + to add one yourself.",
+                        text = "Nothing remembered yet. The AI Executive Assistant will pick up preferences " +
+                            "as you chat — or tap + to add one yourself.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -173,7 +173,7 @@ constructor(
         medCloudId: String,
         logDate: String,
         slotCloudId: String
-    ): String = "${medCloudId}__${logDate}__${slotCloudId}"
+    ): String = "${medCloudId}__${logDate}__$slotCloudId"
 
     suspend fun initialUpload() {
         if (authManager.userId == null) return

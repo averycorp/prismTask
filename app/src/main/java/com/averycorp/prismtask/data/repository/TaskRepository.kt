@@ -7,6 +7,7 @@ import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.database.DatabaseTransactionRunner
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
+import com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords
 import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.EisenhowerClassifier
 import com.averycorp.prismtask.data.remote.SyncTracker
@@ -70,8 +71,8 @@ constructor(
         com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords()
 
     @Volatile
-    private var latestCognitiveLoadCustomKeywords: com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords =
-        com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords()
+    private var latestCognitiveLoadCustomKeywords: CognitiveLoadCustomKeywords =
+        CognitiveLoadCustomKeywords()
 
     private fun lifeCategoryClassifier(): LifeCategoryClassifier =
         LifeCategoryClassifier.withCustomKeywords(latestLifeCategoryCustomKeywords)

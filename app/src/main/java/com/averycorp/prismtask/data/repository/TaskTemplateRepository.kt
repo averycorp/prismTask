@@ -6,6 +6,7 @@ import com.averycorp.prismtask.data.local.dao.TaskTemplateDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTagCrossRef
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
+import com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.usecase.CognitiveLoadClassifier
 import com.averycorp.prismtask.domain.usecase.DateShortcuts
@@ -36,8 +37,8 @@ constructor(
         com.averycorp.prismtask.data.preferences.TaskModeCustomKeywords()
 
     @Volatile
-    private var latestCognitiveLoadCustomKeywords: com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords =
-        com.averycorp.prismtask.data.preferences.CognitiveLoadCustomKeywords()
+    private var latestCognitiveLoadCustomKeywords: CognitiveLoadCustomKeywords =
+        CognitiveLoadCustomKeywords()
 
     private val keywordScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob()
