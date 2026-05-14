@@ -82,13 +82,26 @@ object VibrationAdapter {
         resolveVibrator(context)?.cancel()
     }
 
+    /**
+     * Always resolves the system vibrator through [Context.getApplicationContext]
+     * so every call site (Service that starts the buzz, BroadcastReceiver that
+     * dismisses it, settings UI that previews patterns) lands on the same
+     * `SystemVibratorManager` wrapper. Each per-Context wrapper instance carries
+     * its own `IBinder` token, and the platform scopes [Vibrator.cancel] to the
+     * calling instance's token — so resolving from a different Context cancels a
+     * token that never registered the in-flight vibration. That was the
+     * "Buzz Until Dismissed" bug: `PomodoroTimerService` started the loop via
+     * its Service context, `TimerBuzzerDismissReceiver` resolved a fresh
+     * wrapper from the receiver context, and the cancel silently no-op'd.
+     */
     private fun resolveVibrator(context: Context): Vibrator? {
+        val appContext = context.applicationContext ?: context
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = context.getSystemService(VibratorManager::class.java)
+            val manager = appContext.getSystemService(VibratorManager::class.java)
             manager?.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
-            context.getSystemService(Vibrator::class.java)
+            appContext.getSystemService(Vibrator::class.java)
         }
     }
 }
