@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -33,6 +34,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -331,12 +333,11 @@ internal fun SwipeableTaskItem(
 
 /**
  * Minimal task row shown inside the "Completed" section on the Today
- * screen — title with line-through and a filled checkbox that toggles
- * back to incomplete. When the underlying task is a recurring,
- * non-habit-backed task, an extra "Log Again" icon button surfaces so
- * the user can record another completion at the current time without
- * un-checking the row (which would also roll back the spawned next
- * instance).
+ * screen — title with line-through and a filled checkbox. For
+ * recurring, non-habit-backed tasks the row taps into a small choice
+ * dialog so the user can either log another completion or roll the
+ * task back to incomplete; for one-off tasks the tap goes straight to
+ * uncomplete.
  */
 @Composable
 internal fun CompletedTaskItem(
@@ -347,10 +348,14 @@ internal fun CompletedTaskItem(
 ) {
     val colors = LocalPrismColors.current
     val fonts = LocalPrismFonts.current.body
+    var showChoiceDialog by remember { mutableStateOf(false) }
+    val handleTap: () -> Unit = {
+        if (canLogAgain) showChoiceDialog = true else onUncomplete()
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onUncomplete() }
+            .clickable { handleTap() }
             .border(
                 width = 1.dp,
                 color = colors.border,
@@ -367,7 +372,7 @@ internal fun CompletedTaskItem(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CircularCheckbox(checked = true, onCheckedChange = { onUncomplete() })
+            CircularCheckbox(checked = true, onCheckedChange = { handleTap() })
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = task.title,
@@ -393,5 +398,30 @@ internal fun CompletedTaskItem(
                 }
             }
         }
+    }
+    if (showChoiceDialog) {
+        AlertDialog(
+            onDismissRequest = { showChoiceDialog = false },
+            title = { Text("Already Completed") },
+            text = {
+                Text("\"${task.title}\" is already checked off for today. Log another completion or mark it incomplete?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showChoiceDialog = false
+                    onLogAgain()
+                }) {
+                    Text("Log Again")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showChoiceDialog = false
+                    onUncomplete()
+                }) {
+                    Text("Mark Incomplete")
+                }
+            }
+        )
     }
 }
