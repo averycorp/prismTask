@@ -169,5 +169,35 @@ export function subscribeToAnchors(
   });
 }
 
+/**
+ * User-wide listener over every anchor in `users/{uid}/external_anchors`.
+ *
+ * Mirrors the at-sign-in sync shape used by `subscribeToTasks` /
+ * `subscribeToProjects` so `useFirestoreSync` can mount it without a
+ * `projectId`. Each emitted anchor carries its own `project_id` decoded
+ * from the `projectCloudId` field on the Firestore doc, and `docToAnchor`
+ * already drops malformed JSON payloads — same hardening as
+ * `subscribeToAnchors`. Skips docs missing `projectCloudId`.
+ */
+export function subscribeToAllAnchors(
+  uid: string,
+  callback: (anchors: ExternalAnchorRecord[]) => void,
+): Unsubscribe {
+  const q = query(anchorsCol(uid), orderBy('createdAt', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(
+      snap.docs
+        .map((d) => {
+          const data = d.data();
+          const projectId =
+            typeof data.projectCloudId === 'string' ? data.projectCloudId : '';
+          if (!projectId) return null;
+          return docToAnchor(d.id, data, projectId);
+        })
+        .filter((a): a is ExternalAnchorRecord => a !== null),
+    );
+  });
+}
+
 // Re-export for convenience
 export type { ExternalAnchor };
