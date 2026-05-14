@@ -24,6 +24,7 @@ import {
   Info,
   Pill,
   Wrench,
+  Scale,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useThemeStore } from '@/stores/themeStore';
@@ -39,6 +40,7 @@ import { BatchHistorySection } from '@/features/settings/sections/BatchHistorySe
 import { MedicationSlotEditor } from '@/features/medication/MedicationSlotEditor';
 import { MedicationReminderModeSection } from '@/features/settings/sections/MedicationReminderModeSection';
 import { BoundariesSection } from '@/features/settings/sections/BoundariesSection';
+import { WorkLifeBalanceSection } from '@/features/settings/sections/WorkLifeBalanceSection';
 import { AboutSection } from '@/features/settings/sections/AboutSection';
 import { HelpFeedbackSection } from '@/features/settings/sections/HelpFeedbackSection';
 import { AccessibilitySection } from '@/features/settings/sections/AccessibilitySection';
@@ -504,6 +506,14 @@ export function SettingsScreen() {
         title="Boundaries"
       >
         <BoundariesSection />
+      </SettingsSection>
+
+      {/* Work-Life Balance — parity audit C.2d */}
+      <SettingsSection
+        icon={<Scale className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Work-Life Balance"
+      >
+        <WorkLifeBalanceSection />
       </SettingsSection>
 
       {/* Accessibility */}
