@@ -18,8 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
+- **Leisure mode on Today + Settings entry (parity F.1c).** Added
+  `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
+  the daily leisure minimum as `% of target`; tapping routes to
+  `/leisure`. Hidden when no target is set. Also added a
+  `LeisureBudgetSection` to Settings showing daily/weekend targets +
+  enabled-category count + pool size, with shortcut buttons to the full
+  screen. Mirrors PR #1313 (taps switch tabs instead of overlaying) and
+  PR #1314 (Leisure treated as a Today mode). Audit:
+  `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/today): port the Today-screen Work-Life Balance bar (`web/src/features/today/TodayBalanceBar.tsx`) — stacked-bar visualization over the past 7 days of categorized tasks, with overload badge and per-category legend. Reads from `BalanceTracker` + Firestore-synced `balancePreferences`. Closes parity audit C.1a.
 - refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
+- **Claude-backed Life Category Auto button on web TaskEditor (parity Batch 3 D.1c).** Adds an "Auto" pill button next to the Life Category select on the Organize tab. Tapping fires `/ai/life-category/classify_text` against the task's title + description and writes the result back through the same `handleLifeCategoryChange` path the manual select uses. Failure-soft: AI-off, empty title, network error, 429/451/5xx, or an `UNCATEGORIZED` result all keep the current selection — never blanks a real chip. Mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude` (`app/.../AddEditTaskViewModel.kt:714-738`).
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
   `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
   session for an arbitrary past datetime — pick an existing pool activity
@@ -29,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
 - feat(web/sync): LWW timestamp guard on `updateHabit` — extends the parity A.2 contract to habit edits so an in-flight Android booking-state toggle isn't clobbered by a web rename / color change.
+- feat(web/sync): LWW timestamp guard on `updateProject` — extends parity A.2 to project edits so Android-side lifecycle writes (start/end date, theme color, archived/completed timestamps) survive a concurrent web rename.
+- feat(web/sync): LWW timestamp guard on `updateSlotDef` (medication slot definitions) — extends parity A.2 so a web slot rename doesn't clobber an Android-side reminder-mode flip on the same slot.
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage

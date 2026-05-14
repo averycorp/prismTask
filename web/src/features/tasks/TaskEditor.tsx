@@ -11,6 +11,7 @@ import {
   GripVertical,
   X,
   Save,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Drawer } from '@/components/ui/Drawer';
@@ -21,6 +22,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { aiLifeCategoryClassifyText } from '@/api/ai/chat';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { formatRelative } from '@/utils/dates';
 import type {
@@ -161,6 +164,10 @@ export default function TaskEditor({
   const [deleting, setDeleting] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateSubtasks, setDuplicateSubtasks] = useState(true);
+  // Claude-backed Life Category auto-classify (parity Batch 3 D.1c —
+  // mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude`).
+  const [lifeCategoryAutoBusy, setLifeCategoryAutoBusy] = useState(false);
+  const aiFeaturesEnabled = useSettingsStore((s) => s.aiFeaturesEnabled);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -383,6 +390,63 @@ export default function TaskEditor({
     // `null` so the Android-side classifier can take over again.
     autoSave({ lifeCategory: v === '' ? null : v });
   };
+
+  // Parity Batch 3 D.1c. Mirrors Android
+  // `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude`
+  // (`app/.../AddEditTaskViewModel.kt:714-738`). Fire-and-forget call to
+  // `/ai/life-category/classify_text`. On any failure (AI off, network,
+  // 429, 451, 5xx, garbage response, UNCATEGORIZED result) the current
+  // chip stays — Auto never blanks a real selection.
+  const handleLifeCategoryAutoClick = useCallback(async () => {
+    if (!title.trim()) {
+      toast.error('Enter a title before auto-classifying');
+      return;
+    }
+    if (!aiFeaturesEnabled) {
+      toast.error('AI Features are off — enable them in Settings to auto-classify');
+      return;
+    }
+    if (lifeCategoryAutoBusy) return;
+    setLifeCategoryAutoBusy(true);
+    const titleSnapshot = title;
+    const descriptionSnapshot = description;
+    try {
+      const result = await aiLifeCategoryClassifyText({
+        title: titleSnapshot,
+        description: descriptionSnapshot.trim() || undefined,
+      });
+      // Race-guard: if the user kept typing during the call, don't
+      // overwrite stale input. Matches Android's snapshot check.
+      if (title !== titleSnapshot || description !== descriptionSnapshot) {
+        return;
+      }
+      const next = result.category as LifeCategory | 'UNCATEGORIZED';
+      if (next === 'UNCATEGORIZED' || !next) {
+        toast.success("AI couldn't pick — keeping your current choice");
+        return;
+      }
+      if (next === lifeCategory) {
+        toast.success('Already a match');
+        return;
+      }
+      handleLifeCategoryChange(next as LifeCategory);
+      toast.success(`Set Life Category: ${next.replace('_', '-')}`);
+    } catch {
+      toast.error('Auto-classify failed — try again later');
+    } finally {
+      setLifeCategoryAutoBusy(false);
+    }
+    // handleLifeCategoryChange + setLifeCategory are stable closures over
+    // setState — intentionally omitted from deps to avoid re-creating this
+    // callback on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    title,
+    description,
+    aiFeaturesEnabled,
+    lifeCategoryAutoBusy,
+    lifeCategory,
+  ]);
 
   const handleCognitiveLoadChange = (v: CognitiveLoad | '') => {
     setCognitiveLoad(v);
@@ -990,9 +1054,36 @@ export default function TaskEditor({
 
                 {/* Life Category (Work-Life Balance) */}
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Life Category
-                  </label>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+                      Life Category
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void handleLifeCategoryAutoClick()}
+                      disabled={
+                        lifeCategoryAutoBusy ||
+                        !aiFeaturesEnabled ||
+                        !title.trim()
+                      }
+                      aria-label="Auto-classify Life Category with AI"
+                      title={
+                        !aiFeaturesEnabled
+                          ? 'AI Features are off — enable them in Settings'
+                          : !title.trim()
+                          ? 'Enter a title first'
+                          : 'Auto-classify with AI'
+                      }
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {lifeCategoryAutoBusy ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      Auto
+                    </button>
+                  </div>
                   <select
                     value={lifeCategory}
                     onChange={(e) =>
@@ -1009,8 +1100,8 @@ export default function TaskEditor({
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    Powers the Work-Life Balance dashboard. Leave as
-                    Uncategorized to let Android auto-classify.
+                    Powers the Work-Life Balance dashboard. Tap Auto to let
+                    Claude classify the task from its title + description.
                   </p>
                 </div>
 

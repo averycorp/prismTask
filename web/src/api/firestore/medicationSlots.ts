@@ -9,13 +9,13 @@ import {
   orderBy,
   query,
   setDoc,
-  updateDoc,
   where,
   writeBatch,
   type DocumentData,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 
 /**
  * Web-native medication slot definitions + daily tier states. These
@@ -194,7 +194,10 @@ export async function updateSlotDef(
     reminder_interval_minutes?: number | null;
   },
 ): Promise<void> {
-  const payload: Record<string, unknown> = { updatedAt: Date.now() };
+  // LWW guard — Android-side reminder-mode flips shouldn't be
+  // overwritten by a web slot rename. Parity audit A.2.
+  const now = Date.now();
+  const payload: Record<string, unknown> = { updatedAt: now };
   if (updates.slot_key !== undefined) payload.slotKey = updates.slot_key;
   if (updates.display_name !== undefined) payload.displayName = updates.display_name;
   if (updates.sort_order !== undefined) payload.sortOrder = updates.sort_order;
@@ -202,7 +205,7 @@ export async function updateSlotDef(
   if (updates.reminder_interval_minutes !== undefined) {
     payload.reminderIntervalMinutes = updates.reminder_interval_minutes;
   }
-  await updateDoc(slotDefDoc(uid, id), payload);
+  await lwwUpdate(slotDefDoc(uid, id), payload as Parameters<typeof lwwUpdate>[1]);
 }
 
 export async function deleteSlotDef(uid: string, id: string): Promise<void> {
