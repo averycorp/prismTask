@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
 - feat(web/ai): add typed `aiChat` / `aiChatHistory` / `aiLifeCategoryClassifyText` REST helpers + Chat-related TypeScript types (parity Batch 3 D.1 PR-1; foundation for web AI Coach chat).
 - **Leisure REST client + types on web (parity F.1d).** Added `web/src/api/leisure.ts` mirroring the Android `LeisureSyncService` request shape: activities (list/create/update/delete), sessions (list/create), and singleton settings (get/patch). Custom-category-tagged rows are filtered out at the network boundary before any write so they don't 422 against the backend's `LeisureCategoryT` CHECK constraint — they stay device-local just like on Android. No UI yet; this is foundation for the LeisurePoolScreen port and the Today leisure-minimum row. Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
