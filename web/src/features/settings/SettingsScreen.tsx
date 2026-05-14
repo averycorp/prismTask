@@ -25,6 +25,7 @@ import {
   Pill,
   Wrench,
   Scale,
+  Coffee,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useThemeStore } from '@/stores/themeStore';
@@ -41,6 +42,7 @@ import { MedicationSlotEditor } from '@/features/medication/MedicationSlotEditor
 import { MedicationReminderModeSection } from '@/features/settings/sections/MedicationReminderModeSection';
 import { BoundariesSection } from '@/features/settings/sections/BoundariesSection';
 import { WorkLifeBalanceSection } from '@/features/settings/sections/WorkLifeBalanceSection';
+import { LeisureBudgetSection } from '@/features/settings/sections/LeisureBudgetSection';
 import { AboutSection } from '@/features/settings/sections/AboutSection';
 import { HelpFeedbackSection } from '@/features/settings/sections/HelpFeedbackSection';
 import { AccessibilitySection } from '@/features/settings/sections/AccessibilitySection';
@@ -514,6 +516,14 @@ export function SettingsScreen() {
         title="Work-Life Balance"
       >
         <WorkLifeBalanceSection />
+      </SettingsSection>
+
+      {/* Leisure Budget — parity audit F.1c */}
+      <SettingsSection
+        icon={<Coffee className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Leisure Minimum"
+      >
+        <LeisureBudgetSection />
       </SettingsSection>
 
       {/* Accessibility */}

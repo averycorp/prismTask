@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Leisure mode on Today + Settings entry (parity F.1c).** Added
+  `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
+  the daily leisure minimum as `% of target`; tapping routes to
+  `/leisure`. Hidden when no target is set. Also added a
+  `LeisureBudgetSection` to Settings showing daily/weekend targets +
+  enabled-category count + pool size, with shortcut buttons to the full
+  screen. Mirrors PR #1313 (taps switch tabs instead of overlaying) and
+  PR #1314 (Leisure treated as a Today mode). Audit:
+  `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/today): port the Today-screen Work-Life Balance bar (`web/src/features/today/TodayBalanceBar.tsx`) — stacked-bar visualization over the past 7 days of categorized tasks, with overload badge and per-category legend. Reads from `BalanceTracker` + Firestore-synced `balancePreferences`. Closes parity audit C.1a.
 - refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
