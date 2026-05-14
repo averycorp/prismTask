@@ -5,7 +5,10 @@ const {
   signOutMock,
   onAuthStateChangedMock,
   firebaseAuthMock,
+  firestoreMock,
   googleProviderMock,
+  terminateMock,
+  clearIndexedDbPersistenceMock,
   setFirebaseUidMock,
   authApiMock,
   getAiFeaturesEnabledMock,
@@ -15,7 +18,10 @@ const {
   signOutMock: vi.fn(),
   onAuthStateChangedMock: vi.fn(),
   firebaseAuthMock: { authStateReady: vi.fn().mockResolvedValue(undefined) },
+  firestoreMock: { __mock: 'firestore' },
   googleProviderMock: {},
+  terminateMock: vi.fn().mockResolvedValue(undefined),
+  clearIndexedDbPersistenceMock: vi.fn().mockResolvedValue(undefined),
   setFirebaseUidMock: vi.fn(),
   getAiFeaturesEnabledMock: vi.fn(),
   setAiFeaturesEnabledMock: vi.fn(),
@@ -38,8 +44,14 @@ vi.mock('firebase/auth', () => ({
   onAuthStateChanged: onAuthStateChangedMock,
 }));
 
+vi.mock('firebase/firestore', () => ({
+  terminate: terminateMock,
+  clearIndexedDbPersistence: clearIndexedDbPersistenceMock,
+}));
+
 vi.mock('@/lib/firebase', () => ({
   firebaseAuth: firebaseAuthMock,
+  firestore: firestoreMock,
   googleProvider: googleProviderMock,
 }));
 
