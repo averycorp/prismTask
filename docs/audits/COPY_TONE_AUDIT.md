@@ -339,3 +339,72 @@ Onboarding can stay hardcoded — it ships once per install, low recurrence.
 - **String-extraction pass — notifications package**: prerequisite to future copy hygiene work, surfaced here as the load-bearing finding.
 
 Do NOT bundle these — one surface per PR per the prompt's locked constraint.
+
+---
+
+## Phase 3 — Bundle summary
+
+**Audit-only PR shipped:** [#1401](https://github.com/averycorp/prismTask/pull/1401) — `docs(audits): copy/tone audit — user-facing strings vs forgiveness-first`. Merged 2026-05-14 from `worktree-audit+copy-tone-pass`; squash-merge SHA `ae22cac8`.
+
+**Phase 2 status:** **operator-gated, not yet fired.** The audit prompt's locked constraint #3 ("audit-only by default — each rewrite candidate gets 2-3 variants in the audit doc; operator picks before any code lands") overrides the audit-first skill's auto-fire default. No Phase 2 PRs exist yet.
+
+**LOC actual vs estimate:** 341 lines (estimate 300–500). Comfortably under the CLAUDE.md 500-line cap; no STOP-B needed despite the 99-string surface area.
+
+**Re-baselined PR-cost estimate for Phase 2:**
+- Notifications surface (4 RED + S2 "!" sweep): ~1 hr inc. CI watch.
+- Today / Balance surface (1 RED + 2 YELLOW): ~30 min.
+- Streak/habit copy sweep (1 RED + S3 "missed" → "off"): ~45 min.
+- "Worst" / "Lowest" + trend chip rename: ~20 min.
+- String-extraction pass (notifications): ~3 hr — high upfront cost, unblocks all future copy hygiene.
+
+**Memory entry candidates:**
+- *"Channel labels can be renamed without changing the channel id, but changing the id orphans existing user-configured channel settings under 'Other'."* — non-obvious Android gotcha, worth banking for any future notification-channel work.
+- *"`docs/FORGIVENESS_FIRST.md:85` and `docs/WORK_PLAY_RELAX.md:71-76` are the load-bearing copy rubrics — cite by file:line when rejecting prescriptive notification copy."* — turns these two docs into review-time refs rather than re-discoverable lore.
+
+**Schedule for next audit:** none auto-scheduled. Re-trigger criteria (per the audit prompt's "Re-trigger criteria for follow-on work" section):
+- Any single surface accumulates ≥3 RED → that surface's Phase 2.
+- Productive-day threshold copy flagged jointly with `FORGIVENESS_FIRST.md` V8 verdict if that audit fires.
+- Cross-surface pattern recurs after Phase 2 ships → cross-surface rewrite sweep.
+
+## Phase 4 — Claude Chat handoff
+
+See the chat reply for the paste-ready handoff block. The handoff content is reproduced here for the record:
+
+```markdown
+# PrismTask copy/tone audit — handoff
+
+## Scope
+Audited 99 user-facing strings across notifications, Today banners, streak/habit copy, analytics, chat AI, errors, onboarding, and settings against six anti-shame principles drawn from `docs/FORGIVENESS_FIRST.md` and `docs/WORK_PLAY_RELAX.md`. Audit-only — no string changes shipped. App is at versionName 1.9.26.
+
+## Verdicts (74 GREEN · 17 YELLOW · 8 RED)
+| Surface | G | Y | R |
+|---|---:|---:|---:|
+| Notifications (title+body, 22) | 13 | 5 | 4 |
+| Notification channel names (9) | 8 | 1 | 0 |
+| Today banners + headers (9) | 6 | 2 | 1 |
+| Streak / habit (7) | 6 | 0 | 1 |
+| Analytics (8) | 4 | 3 | 1 |
+| Chat AI (9) | 8 | 1 | 0 |
+| Error / snackbar (11) | 10 | 1 | 0 |
+| Settings forgiveness + tuning (6) | 3 | 2 | 1 |
+| Onboarding sampled (18) | 16 | 2 | 0 |
+
+## Shipped
+- PR #1401 (merged, SHA ae22cac8): `docs/audits/COPY_TONE_AUDIT.md` — full per-string verdicts, 2-3 rewrite variants per RED, ranked recommendation table, anti-pattern list.
+
+## Deferred / stopped
+- All Phase 2 (string remediation) PRs — operator-gated per audit prompt lock #3. Each rewrite needs operator pick from variants A/B/C before code lands.
+- STOP-C fired: 877 hardcoded `Text("…")` strings vs 15 `strings.xml` entries (all widget descriptions). String-extraction pass is the load-bearing prerequisite to all future copy work; defer until operator decides whether to extract first or rewrite-in-place.
+
+## Non-obvious findings
+- The strongest copy in the app — `BriefingNotificationWorker:81-90` (*"You've got one thing today. Start whenever you're ready."*) — sets a clear house voice that the prescriptive overload notifications (`OverloadCheckWorker:82`, `TodayBalanceBar:263`) actively violate. The model voice is already shipped; bringing the violators in line is small.
+- `ForgivenessStreakSection.kt:37` reads *"Don't break a streak for a single missed day"* — the verbatim banned phrase from `FORGIVENESS_FIRST.md:85`. The setting *enables* forgiveness, so the intent is benign, but the surface copy contradicts the doc the feature implements. Among the smallest-effort RED fixes.
+- Channel labels for "Overload Alerts" / "Load Balance Alerts" can be relabeled to "Balance Nudges" / "Load Balance Nudges" *without* changing the channel id — keeps user-configured per-channel settings intact. Changing the id would orphan them under "Other" in OS settings.
+
+## Open questions for operator
+1. Phase 2 ordering: notifications first (highest stakes, smallest blast radius) or string-extraction first (unblocks all future copy work but is ~3 hr upfront)?
+2. Project CLAUDE.md says Title Case for user-facing strings; mid-sentence validation captions (`AdvancedTuningViewModel.kt:241` *"Invalid Cutoff — Must Come After Start-of-Day."*) read awkwardly Title-Cased. Does the convention apply to captions or only labels/headers?
+3. Trend chips *"Improving"* / *"Declining"* — accurate language, but asymmetric tone weight. Worth softening to *"Up"* / *"Down"* / *"Flat"*, or accept as fine?
+4. Starter prompt 2 (*"Help me reschedule overdue tasks"*) — rewriting to *"…tasks from earlier"* requires verifying the backend `/api/v1/ai/chat` router doesn't parse "overdue" as a routing keyword.
+```
+
