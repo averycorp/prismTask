@@ -43,7 +43,12 @@ class NdPreferencesDataStore(
         val KEY_COMPLETION_ANIMATIONS = booleanPreferencesKey("nd_completion_animations")
         val KEY_STREAK_CELEBRATIONS = booleanPreferencesKey("nd_streak_celebrations")
         val KEY_SHOW_PROGRESS_BARS = booleanPreferencesKey("nd_show_progress_bars")
-        val KEY_FORGIVENESS_STREAKS = booleanPreferencesKey("nd_forgiveness_streaks")
+        // The `nd_forgiveness_streaks` boolean key used to live here and was
+        // removed in the mental-health-first audit § R6. Any existing
+        // installs carry an orphaned value at that key; DataStore reads it
+        // as part of the proto but no codepath consumes it, so it has no
+        // effect. Forgiveness-first streak behavior is owned by the global
+        // `UserPreferencesDataStore.ForgivenessPrefs.enabled` (default true).
 
         // Focus & Release Mode toggle
         val KEY_FOCUS_RELEASE_MODE = booleanPreferencesKey("nd_focus_release_mode_enabled")
@@ -89,7 +94,6 @@ class NdPreferencesDataStore(
             completionAnimations = prefs[KEY_COMPLETION_ANIMATIONS] ?: true,
             streakCelebrations = prefs[KEY_STREAK_CELEBRATIONS] ?: true,
             showProgressBars = prefs[KEY_SHOW_PROGRESS_BARS] ?: true,
-            forgivenessStreaks = prefs[KEY_FORGIVENESS_STREAKS] ?: true,
             goodEnoughTimersEnabled = prefs[KEY_GOOD_ENOUGH_TIMERS] ?: true,
             defaultGoodEnoughMinutes = (prefs[KEY_DEFAULT_GOOD_ENOUGH_MINUTES] ?: 30).coerceIn(5, 120),
             goodEnoughEscalation = prefs[KEY_GOOD_ENOUGH_ESCALATION]
@@ -123,7 +127,9 @@ class NdPreferencesDataStore(
             prefs[KEY_COMPLETION_ANIMATIONS] = enabled
             prefs[KEY_STREAK_CELEBRATIONS] = enabled
             prefs[KEY_SHOW_PROGRESS_BARS] = enabled
-            prefs[KEY_FORGIVENESS_STREAKS] = enabled
+            // (forgiveness-first streak behavior is owned by the global
+            // ForgivenessPrefs.enabled; the duplicate ND field was removed in
+            // the mental-health-first audit § R6.)
         }
     }
 
@@ -198,10 +204,6 @@ class NdPreferencesDataStore(
 
     suspend fun setShowProgressBars(enabled: Boolean) {
         dataStore.edit { it[KEY_SHOW_PROGRESS_BARS] = enabled }
-    }
-
-    suspend fun setForgivenessStreaks(enabled: Boolean) {
-        dataStore.edit { it[KEY_FORGIVENESS_STREAKS] = enabled }
     }
 
     // Focus & Release Mode individual sub-setting setters
@@ -281,7 +283,11 @@ class NdPreferencesDataStore(
             "completion_animations" -> bool()?.let { setCompletionAnimations(it) }
             "streak_celebrations" -> bool()?.let { setStreakCelebrations(it) }
             "show_progress_bars" -> bool()?.let { setShowProgressBars(it) }
-            "forgiveness_streaks" -> bool()?.let { setForgivenessStreaks(it) }
+            // Legacy key from pre-R6 backups. The underlying field was removed
+            // in the mental-health-first audit § R6 (it duplicated the global
+            // ForgivenessPrefs.enabled). Accepted as a no-op so old config
+            // imports don't throw IllegalArgumentException.
+            "forgiveness_streaks" -> { /* no-op: removed in audit § R6 */ }
             "good_enough_timers_enabled" -> bool()?.let { setGoodEnoughTimersEnabled(it) }
             "default_good_enough_minutes" -> int()?.let { setDefaultGoodEnoughMinutes(it) }
             "good_enough_escalation" -> str()?.let { name ->

@@ -238,6 +238,8 @@ rename to clarify what additional behavior it gates (`extendedGraceWindow`?).
 Read `BrainModeScreen.kt` and the streak code paths first to decide
 which; the work is the rename + default flip + migration.
 
+**Resolved 2026-05-14 — Option A (remove).** Investigation confirmed the field is a dead phantom: not read by `StreakCalculator`, `DailyForgivenessStreakCore`, `ProjectRepository`, `LeisureScoreSectionViewModel`, or `WidgetDataProvider`, and not surfaced in `BrainModeSection.kt`. Removed from `NdPreferences`/`NdPreferencesDataStore`; orphan DataStore key `nd_forgiveness_streaks` is left unread (DataStore-safe); legacy `forgiveness_streaks` import key accepted as a no-op.
+
 ---
 
 ### R7 — `ReengagementWorker` empathic copy (GREEN — keep as template)
