@@ -954,6 +954,24 @@ constructor(
         }
     }
 
+    fun onRecheckRecurring(taskId: Long) {
+        viewModelScope.launch {
+            try {
+                val completionId = taskRepository.logAdditionalCompletion(taskId) ?: return@launch
+                val result = snackbarHostState.showSnackbar(
+                    message = "Logged Another Completion",
+                    actionLabel = "UNDO",
+                    duration = SnackbarDuration.Short
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    taskRepository.undoAdditionalCompletion(completionId)
+                }
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to log additional completion", e)
+            }
+        }
+    }
+
     fun onCompleteWithUndo(taskId: Long) {
         viewModelScope.launch {
             try {

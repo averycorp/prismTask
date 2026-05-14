@@ -663,6 +663,42 @@ constructor(
         }
     }
 
+    /**
+     * Records another completion entry for a recurring task that has
+     * already been completed for the current cycle. This is the "recheck"
+     * path — the user did the activity again today and wants the log to
+     * reflect the more recent time without flipping the row back to
+     * incomplete or re-spawning a next-instance (that already happened on
+     * the first [completeTask]).
+     *
+     * Returns the id of the inserted completion row (or null when the
+     * task is missing, not recurring, not yet completed, or linked to a
+     * habit — habit-backed tasks are re-logged via the habit's own
+     * bookable Log button to keep habit_completions in sync). Callers
+     * driving an Undo snackbar pass the id back to
+     * [undoAdditionalCompletion].
+     */
+    suspend fun logAdditionalCompletion(id: Long): Long? {
+        val task = taskDao.getTaskByIdOnce(id) ?: return null
+        if (task.recurrenceRule == null) return null
+        if (!task.isCompleted) return null
+        if (task.sourceHabitId != null) return null
+        val tags = tagDao.getTagsForTask(id).first()
+        val completionId = taskCompletionRepository.recordCompletion(
+            task = task,
+            tags = tags,
+            spawnedRecurrenceId = null
+        )
+        widgetUpdateManager.updateTaskWidgets()
+        return completionId
+    }
+
+    /** Undoes [logAdditionalCompletion] by removing the inserted completion row. */
+    suspend fun undoAdditionalCompletion(completionId: Long) {
+        taskCompletionRepository.deleteCompletionById(completionId)
+        widgetUpdateManager.updateTaskWidgets()
+    }
+
     suspend fun deleteTask(id: Long) {
         // Cancel pending reminder alarm; the child task_tag / subtask rows
         // are wiped by the ON DELETE CASCADE foreign keys, but AlarmManager

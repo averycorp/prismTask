@@ -876,7 +876,9 @@ fun TodayScreen(
                                     completedToday.forEach { task ->
                                         CompletedTaskItem(
                                             task = task,
-                                            onUncomplete = { viewModel.onToggleComplete(task.id, true) }
+                                            onUncomplete = { viewModel.onToggleComplete(task.id, true) },
+                                            canLogAgain = task.recurrenceRule != null && task.sourceHabitId == null,
+                                            onLogAgain = { viewModel.onRecheckRecurring(task.id) }
                                         )
                                     }
                                 }

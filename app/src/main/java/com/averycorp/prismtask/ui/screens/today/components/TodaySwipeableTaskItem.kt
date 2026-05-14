@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -330,11 +331,20 @@ internal fun SwipeableTaskItem(
 
 /**
  * Minimal task row shown inside the "Completed" section on the Today
- * screen — just the title with line-through and a filled checkbox that
- * toggles the task back to incomplete when tapped.
+ * screen — title with line-through and a filled checkbox that toggles
+ * back to incomplete. When the underlying task is a recurring,
+ * non-habit-backed task, an extra "Log Again" icon button surfaces so
+ * the user can record another completion at the current time without
+ * un-checking the row (which would also roll back the spawned next
+ * instance).
  */
 @Composable
-internal fun CompletedTaskItem(task: TaskEntity, onUncomplete: () -> Unit) {
+internal fun CompletedTaskItem(
+    task: TaskEntity,
+    onUncomplete: () -> Unit,
+    canLogAgain: Boolean = false,
+    onLogAgain: () -> Unit = {}
+) {
     val colors = LocalPrismColors.current
     val fonts = LocalPrismFonts.current.body
     Card(
@@ -361,6 +371,7 @@ internal fun CompletedTaskItem(task: TaskEntity, onUncomplete: () -> Unit) {
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = task.title,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = fonts,
                 textDecoration = TextDecoration.LineThrough,
@@ -368,6 +379,19 @@ internal fun CompletedTaskItem(task: TaskEntity, onUncomplete: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (canLogAgain) {
+                IconButton(
+                    onClick = onLogAgain,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Replay,
+                        contentDescription = "Log Again",
+                        modifier = Modifier.size(18.dp),
+                        tint = colors.primary
+                    )
+                }
+            }
         }
     }
 }
