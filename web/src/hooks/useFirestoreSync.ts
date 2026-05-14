@@ -6,6 +6,7 @@ import { useTagStore } from '@/stores/tagStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useMedicationSlotsStore } from '@/stores/medicationSlotsStore';
 import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskDependencyStore } from '@/stores/taskDependencyStore';
 import { useProjectPhaseStore } from '@/stores/projectPhaseStore';
 import { useProjectRiskStore } from '@/stores/projectRiskStore';
@@ -54,6 +55,8 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToPreferences = useMedicationPreferencesStore(
     (s) => s.subscribeToPreferences,
   );
+  const subscribeToStartOfDayHour = useSettingsStore(
+    (s) => s.subscribeToStartOfDayHour,
   const subscribeToDependencies = useTaskDependencyStore(
     (s) => s.subscribeToDependencies,
   );
@@ -104,6 +107,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToCompletions, 'habit-completions');
     safeSubscribe(subscribeToSlotDefs, 'medication-slot-defs');
     safeSubscribe(subscribeToPreferences, 'medication-preferences');
+    safeSubscribe(subscribeToStartOfDayHour, 'start-of-day-hour');
     safeSubscribe(subscribeToDependencies, 'task-dependencies');
     safeSubscribe(subscribeToPhases, 'project-phases');
     safeSubscribe(subscribeToRisks, 'project-risks');
@@ -130,6 +134,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToCompletions,
     subscribeToSlotDefs,
     subscribeToPreferences,
+    subscribeToStartOfDayHour,
     subscribeToDependencies,
     subscribeToPhases,
     subscribeToRisks,

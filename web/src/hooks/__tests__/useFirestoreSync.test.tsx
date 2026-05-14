@@ -15,6 +15,7 @@ const {
   subscribeToCompletionsMock,
   subscribeToSlotDefsMock,
   subscribeToReminderModePreferencesMock,
+  subscribeToDayStartHourMock,
   subscribeToDependenciesMock,
   subscribeToAllPhasesMock,
   subscribeToAllRisksMock,
@@ -26,6 +27,7 @@ const {
   unsubCompletions,
   unsubSlotDefs,
   unsubPrefs,
+  unsubStartOfDay,
   unsubDependencies,
   unsubPhases,
   unsubRisks,
@@ -38,6 +40,7 @@ const {
   const unsubCompletions = vi.fn();
   const unsubSlotDefs = vi.fn();
   const unsubPrefs = vi.fn();
+  const unsubStartOfDay = vi.fn();
   const unsubDependencies = vi.fn();
   const unsubPhases = vi.fn();
   const unsubRisks = vi.fn();
@@ -64,6 +67,9 @@ const {
     subscribeToReminderModePreferencesMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubPrefs),
+    subscribeToDayStartHourMock: vi.fn<
+      (uid: string, cb: (hour: number) => void) => () => void
+    >(() => unsubStartOfDay),
     subscribeToDependenciesMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubDependencies),
@@ -83,6 +89,7 @@ const {
     unsubCompletions,
     unsubSlotDefs,
     unsubPrefs,
+    unsubStartOfDay,
     unsubDependencies,
     unsubPhases,
     unsubRisks,
@@ -139,6 +146,11 @@ vi.mock('@/api/firestore/medicationPreferences', async () => {
       subscribeToReminderModePreferencesMock,
   };
 });
+vi.mock('@/api/firestore/taskBehaviorPreferences', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/taskBehaviorPreferences')
+  >('@/api/firestore/taskBehaviorPreferences');
+  return { ...actual, subscribeToDayStartHour: subscribeToDayStartHourMock };
 vi.mock('@/api/firestore/taskDependencies', async () => {
   const actual = await vi.importActual<
     typeof import('@/api/firestore/taskDependencies')
@@ -199,6 +211,7 @@ const ALL_SUBSCRIBES = [
   subscribeToCompletionsMock,
   subscribeToSlotDefsMock,
   subscribeToReminderModePreferencesMock,
+  subscribeToDayStartHourMock,
   subscribeToDependenciesMock,
   subscribeToAllPhasesMock,
   subscribeToAllRisksMock,
@@ -213,6 +226,7 @@ const ALL_UNSUBS = [
   unsubCompletions,
   unsubSlotDefs,
   unsubPrefs,
+  unsubStartOfDay,
   unsubDependencies,
   unsubPhases,
   unsubRisks,
@@ -229,6 +243,7 @@ function resetAllMocks() {
   subscribeToCompletionsMock.mockReturnValue(unsubCompletions);
   subscribeToSlotDefsMock.mockReturnValue(unsubSlotDefs);
   subscribeToReminderModePreferencesMock.mockReturnValue(unsubPrefs);
+  subscribeToDayStartHourMock.mockReturnValue(unsubStartOfDay);
   subscribeToDependenciesMock.mockReturnValue(unsubDependencies);
   subscribeToAllPhasesMock.mockReturnValue(unsubPhases);
   subscribeToAllRisksMock.mockReturnValue(unsubRisks);
@@ -261,6 +276,7 @@ describe('useFirestoreSync', () => {
     resetStores();
   });
 
+  it('subscribes to all 8 entity types when uid is set', () => {
   it('subscribes to all 11 entity types when uid is set', () => {
     renderHook(() => useFirestoreSync('uid-A'));
 
@@ -503,6 +519,7 @@ describe('useFirestoreSync', () => {
 
     renderHook(() => useFirestoreSync('uid-A'));
 
+    // Tasks throw; the other seven still subscribe
     // Tasks throw; the other ten still subscribe
     expect(subscribeToProjectsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToTagsMock).toHaveBeenCalledTimes(1);
@@ -510,6 +527,7 @@ describe('useFirestoreSync', () => {
     expect(subscribeToCompletionsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToSlotDefsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToReminderModePreferencesMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToDayStartHourMock).toHaveBeenCalledTimes(1);
     expect(subscribeToDependenciesMock).toHaveBeenCalledTimes(1);
     expect(subscribeToAllPhasesMock).toHaveBeenCalledTimes(1);
     expect(subscribeToAllRisksMock).toHaveBeenCalledTimes(1);
