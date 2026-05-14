@@ -164,3 +164,33 @@ export function subscribeToPhases(
     callback(snap.docs.map((d) => docToPhase(d.id, d.data(), projectId)));
   });
 }
+
+/**
+ * User-wide listener over every phase in `users/{uid}/project_phases`.
+ *
+ * Mirrors the at-sign-in sync shape used by `subscribeToTasks` /
+ * `subscribeToProjects` so `useFirestoreSync` can mount it without a
+ * `projectId`. Each emitted phase carries its own `project_id` decoded
+ * from the `projectCloudId` field on the Firestore doc, so consumers
+ * downstream can re-group by project. Skips docs missing
+ * `projectCloudId` rather than emitting blank-id rows.
+ */
+export function subscribeToAllPhases(
+  uid: string,
+  callback: (phases: ProjectPhase[]) => void,
+): Unsubscribe {
+  const q = query(phasesCol(uid), orderBy('orderIndex', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(
+      snap.docs
+        .map((d) => {
+          const data = d.data();
+          const projectId =
+            typeof data.projectCloudId === 'string' ? data.projectCloudId : '';
+          if (!projectId) return null;
+          return docToPhase(d.id, data, projectId);
+        })
+        .filter((p): p is ProjectPhase => p !== null),
+    );
+  });
+}
