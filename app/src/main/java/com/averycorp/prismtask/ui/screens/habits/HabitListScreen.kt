@@ -272,6 +272,7 @@ fun HabitListScreen(
                                                 )
                                             },
                                             onDelete = { habitToDelete = listItem.habitWithStatus },
+                                            onLog = { loggingHabit = listItem.habitWithStatus },
                                             modifier = Modifier
                                                 .shadow(elevation, MaterialTheme.shapes.medium)
                                                 .longPressDraggableHandle()
