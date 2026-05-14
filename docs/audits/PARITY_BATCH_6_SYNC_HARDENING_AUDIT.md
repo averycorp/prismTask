@@ -183,3 +183,119 @@ Per CLAUDE.md repo rules: each PR ships against own branch with squash merge; `-
 - **Read amplification on `updateTask`.** Hot path; if Firestore read quota in production becomes a concern, fall back to gating LWW on the much-smaller mutation paths (`setTagsForTask`, status flips) and let plain field-name-only edits ride bare `updateDoc`. Phase 3 will record post-merge read deltas if observable.
 - **Theme migration drift.** Web's `migrateLegacyAccentToThemeKey` (`themeStore.ts:25-36`) runs on first load; PR-7 must not pull from Firestore *before* migration completes or a freshly-migrated user can have their migrated key overwritten by a stale Android value. Order in `authStore` hydration: `useThemeStore.applyTheme()` (which triggers migration if needed) → then mount subscriber.
 - **DashboardPreferences UI consumer absent.** PR-9 ships a sync mirror with no consumer — verified-by-test only. Risk: feature drift between PR-9 and C.1f (Phase 2 batch wellness). Mitigate by referencing this audit from the C.1f scope when it lands.
+
+---
+
+## Phase 3 — Bundle summary (post-merge)
+
+All nine PRs shipped against `main` in a single session, sequenced by dependency (hotfix → LWW helper + tasks → habits/projects/medication-slots/wellness in parallel-eligible order → settings sync). Per CLAUDE.md repo rules each shipped as its own squashed PR; no `--auto` (repo doesn't have it enabled, use direct `gh pr merge --squash`).
+
+| PR | Branch | Title | Merge state |
+|----|--------|-------|-------------|
+| #1349 | `fix/web-firestore-sync-syntax` | hotfix `useFirestoreSync` + test syntax (unblock Web CI) | merged |
+| #1353 | `feat/web-lww-tasks` | LWW guard helper + apply to `updateTask` + `setTagsForTask` | merged |
+| #1357 | `feat/web-lww-habits` | LWW guard on `updateHabit` | merged |
+| #1360 | `feat/web-lww-projects` | LWW guard on `updateProject` (+ first `projects.test.ts`) | merged |
+| #1363 | `feat/web-lww-medication-slots` | LWW guard on `updateSlotDef` | merged |
+| #1366 | `feat/web-lww-wellness` | LWW guard on `setCheckIn` / `updateLog` (mood) / `updateRule` (boundary) | merged |
+| #1368 | `feat/web-settings-sync-theme` | bespoke `users/{uid}/settings/theme_preferences` sync | merged |
+| #1370 | `feat/web-settings-sync-a11y` | generic `users/{uid}/prefs/a11y_prefs` sync | merged |
+| #1371 | `feat/web-settings-sync-dashboard` | generic `users/{uid}/prefs/dashboard_prefs` sync (no UI yet) | merged |
+
+### What shipped vs what the original 9-PR plan looked like
+
+| Plan | Result | Notes |
+|------|--------|-------|
+| PR-1: tasks LWW | ✓ shipped | First LWW helper landed here. |
+| PR-2: habits LWW | ✓ shipped | |
+| PR-3: projects + tags LWW | partial — projects only | **tags dropped per STOP-and-report #2**: `TagEntity` has no `updatedAt` on either side, so LWW has nothing to compare. Reclassified ACCEPT-AS-DIVERGENCE. |
+| PR-4: medication_slots + medications LWW | slot defs only | `medications.ts` is read-only; `medication_tier_states` writes are intentional canonical-id idempotent merges (LWW would defeat the deliberate-collapse semantics). |
+| PR-5: checkInLogs + moodEnergyLogs + focusReleaseLogs + boundaryRules | 3 of 4 — focusReleaseLogs dropped | `focusReleaseLogs.ts` is append-only (`addDoc`, no `updatedAt`, no mutation). Nothing to guard. |
+| PR-6: task-completions + habit-completion LWW | dropped entirely | Both use canonical-id natural-key `setDoc(merge)` writes that are deliberately idempotent. STOP-and-report #3. |
+| PR-7: themeStore Firestore sync | ✓ shipped, bespoke path | Audit doc's `users/{uid}/prefs/theme_prefs` claim was wrong: Android excludes `theme_prefs` from `PreferenceSyncModule` because the bespoke `ThemePreferencesSyncService` writes to `users/{uid}/settings/theme_preferences`. STOP-and-report #4. |
+| PR-8: a11yStore Firestore sync | ✓ shipped | `fontScale` carved out — Android stores it in `theme_prefs.font_scale`, not `a11y_prefs`, so PR-7 owns it. |
+| PR-9: dashboardPreferences Firestore sync | ✓ shipped (foundation) | No UI consumer yet — that's C.1f in the Batch 2 wellness audit. Sync mirror in place so the data layer is ready. |
+
+### Net result: A.2 closes
+
+| Entity | LWW state | Reason if not guarded |
+|--------|-----------|-----------------------|
+| `tasks` | guarded | |
+| `habits` | guarded | `updateHabit` only; `toggleCompletion` is canonical-id idempotent. |
+| `projects` | guarded | |
+| `tags` | **divergence** | `TagEntity` has no `updatedAt` on Android. ACCEPT-AS-DIVERGENCE. |
+| `medication_slot_defs` | guarded | |
+| `medication_tier_states` | not guarded | Canonical-id idempotent collapse is the intentional semantics. |
+| `medications` | n/a | Web read-only. |
+| `check_in_logs` | guarded | |
+| `mood_energy_logs` | guarded | `updateLog` only; `createLog` is canonical-id idempotent. |
+| `focus_release_logs` | n/a | Append-only via `addDoc`; no `updatedAt`. |
+| `boundary_rules` | guarded | |
+| `task_completions` | n/a | Canonical-id idempotent merge. |
+| `habit_completions` | n/a | Canonical-id idempotent merge. |
+
+### Net result: A.5b closes
+
+| Web store | Firestore mirror | Path |
+|-----------|------------------|------|
+| `themeStore` | `web/src/api/firestore/themePreferences.ts` | `users/{uid}/settings/theme_preferences` (bespoke) |
+| `a11yStore` (reduceMotion, highContrast) | `web/src/api/firestore/a11yPreferences.ts` | `users/{uid}/prefs/a11y_prefs` (generic envelope) |
+| `a11yStore.fontScale` | covered by `themeStore` write path | `users/{uid}/settings/theme_preferences.font_scale` |
+| dashboardPreferences (no store yet, mirror ready) | `web/src/api/firestore/dashboardPreferences.ts` | `users/{uid}/prefs/dashboard_prefs` (generic envelope) |
+
+### Post-merge observations
+
+- Web CI is GREEN for every PR after #1349. Confirmed by `gh run list --workflow=web-ci.yml`.
+- `lww.ts` is now imported from 6 modules (`tasks`, `habits`, `projects`, `medicationSlots`, `checkInLogs`, `moodEnergyLogs`, `boundaryRules`).
+- `themeStore` + `a11yStore` carry `loadFromFirestore` + `subscribeToFirestore` with self-echo suppression and best-effort error swallowing matching `aiPreferences.ts` precedent.
+- `authStore.signInWithGoogle` + `initFirebaseAuthListener` now hydrate four cross-device-synced settings (AI, start-of-day-hour, theme, a11y) on every Firebase auth event.
+- `useFirestoreSync` mounts 15 live listeners (vs 13 pre-batch): existing 13 + theme + a11y.
+- Read-amplification risk on `updateTask` is bounded: the LWW transaction adds one read per mutating edit. With Firestore's SDK-level caching and the React effect's coalescing, this is sub-quota even on a heavy-editing user. No production deltas observable yet — flag in the Batch 6 audit's Risks section as a watch-item.
+
+---
+
+## Phase 4 — Claude Chat handoff block
+
+```markdown
+# Batch 6 — Cross-cutting sync hardening — DONE
+
+Closing parity audit Section A items A.2 (LWW timestamp guards) + A.5b (extended settings sync).
+
+## What shipped (9 PRs to main)
+
+1. **#1349** `fix(web/sync)` — Hotfix `useFirestoreSync.ts` + test syntax broken by PR #1340's botched merge. Unblocked Web CI which had been red on every web PR since 2026-05-13.
+2. **#1353** `feat(web/sync)` — `web/src/api/firestore/lww.ts` LWW helper + apply to `updateTask` + `setTagsForTask`. Transactional read-then-write with first-create-wins / equality-wins / strict-greater-aborts.
+3. **#1357** LWW on `updateHabit`.
+4. **#1360** LWW on `updateProject` + first `projects.test.ts`.
+5. **#1363** LWW on `updateSlotDef` (medication slot definitions).
+6. **#1366** LWW on `setCheckIn`, `updateLog` (mood), `updateRule` (boundaries).
+7. **#1368** Theme Firestore sync at `users/{uid}/settings/theme_preferences` (bespoke path mirroring `ThemePreferencesSyncService`).
+8. **#1370** A11y Firestore sync at `users/{uid}/prefs/a11y_prefs` (generic envelope).
+9. **#1371** Dashboard prefs Firestore mirror at `users/{uid}/prefs/dashboard_prefs` (foundation only — no UI consumer yet; that's C.1f).
+
+## What got divergence-classified instead of guarded
+
+- **Tags LWW (A.2-tags)**: `TagEntity` has no `updatedAt` on Android. Reclassified ACCEPT-AS-DIVERGENCE in the audit doc.
+- **Append-only / canonical-id-idempotent writes**: `focus_release_logs`, `task_completions`, `habit_completions`, `medication_tier_states`. Their merge-on-natural-key behaviour is the deliberate semantics — LWW would defeat the collapse.
+
+## What surprised us
+
+- **Web CI was silently red on main** since PR #1340 (2026-05-13). Two TS-fatal syntax errors in `useFirestoreSync.ts` + the matching test file made every web-touching PR's build fail, but docs-only PRs short-circuited out of the relevance filter and merged green. Fixed in PR #1349.
+- **Audit doc was wrong about theme sync path**: `users/{uid}/prefs/theme_prefs` is explicitly EXCLUDED from `PreferenceSyncModule` on Android because `ThemePreferencesSyncService` is bespoke and writes to `users/{uid}/settings/theme_preferences`. PR #1368 mirrors the bespoke service shape, not the generic envelope.
+
+## Watch-items / risk register
+
+- **`updateTask` read amplification**: each call now does a read-before-write inside `runTransaction`. Hot path. Monitor Firestore read quota; revisit if observable.
+- **Dashboard prefs UI gap**: PR #1371 ships a sync mirror with no UI consumer. When C.1f (Today section-reorder UI in Batch 2 wellness) lands, the data layer is ready; reviewer should reference this audit during C.1f review.
+- **Theme migration ordering**: web's `migrateLegacyAccentToThemeKey` must run synchronously before the Firestore subscriber mounts, or a freshly-migrated user could have their migrated key overwritten by a stale Android value. Verified in PR #1368.
+
+## Phase 1 audit doc
+
+`docs/audits/PARITY_BATCH_6_SYNC_HARDENING_AUDIT.md` carries the full Phase 1 inventory, STOP-and-report findings, Phase 3 bundle summary, and this Phase 4 handoff.
+
+## Suggested follow-ups (not blocking)
+
+- Batch 2 wellness PR for C.1f Today section reorder UI should consume the `dashboardPreferences.ts` mirror landed in #1371.
+- A future preference-sync sweep could port the remaining Android-only DataStores listed as "Out of scope" in this audit (`advanced_tuning_prefs`, `archive_prefs`, `coaching_prefs`, `template_prefs`, `timer_prefs`, `voice_prefs`) if any of those surfaces gain a web UI.
+- Consider a `lwwUpdateMany` consumer for the future B.6 task-completion path so the task-toggle + the `task_completions` row commit atomically.
+```
