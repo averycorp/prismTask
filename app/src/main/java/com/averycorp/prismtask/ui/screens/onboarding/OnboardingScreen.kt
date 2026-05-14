@@ -787,10 +787,11 @@ private fun BrainModePage(viewModel: OnboardingViewModel) {
     // F8 idiom drift fix: read persisted state via the standard
     // collectAsLocalState helper instead of `var ... by remember`. The
     // setters now write through the ViewModel; backing up to this page
-    // shows the persisted selection.
-    val adhdSelected by collectAsLocalState(viewModel.adhdMode, initial = false)
-    val calmSelected by collectAsLocalState(viewModel.calmMode, initial = false)
-    val focusReleaseSelected by collectAsLocalState(viewModel.focusReleaseMode, initial = false)
+    // shows the persisted selection. Initial values match the default-on
+    // baseline so the pre-emission frame doesn't flash OFF on fresh installs.
+    val adhdSelected by collectAsLocalState(viewModel.adhdMode, initial = true)
+    val calmSelected by collectAsLocalState(viewModel.calmMode, initial = true)
+    val focusReleaseSelected by collectAsLocalState(viewModel.focusReleaseMode, initial = true)
     var expandedCard by remember { mutableIntStateOf(-1) }
 
     var visible by remember { mutableStateOf(false) }

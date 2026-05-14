@@ -122,18 +122,20 @@ constructor(
     // BrainModePage state flows. Replace per-page `var ... by remember`
     // local state with reactive prefs (F8 idiom drift fix). Also lets the
     // page reflect the persisted state if the user backs up to it.
+    // `stateIn` initial value matches the default-on DataStore fallback so
+    // the pre-emission frame doesn't flash OFF for fresh installs.
     val adhdMode: StateFlow<Boolean> = ndPreferencesDataStore
         .ndPreferencesFlow
         .map { it.adhdModeEnabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val calmMode: StateFlow<Boolean> = ndPreferencesDataStore
         .ndPreferencesFlow
         .map { it.calmModeEnabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val focusReleaseMode: StateFlow<Boolean> = ndPreferencesDataStore
         .ndPreferencesFlow
         .map { it.focusReleaseModeEnabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val aiFeaturesEnabled: StateFlow<Boolean> = userPreferencesDataStore
         .aiFeaturePrefsFlow
         .map { it.enabled }

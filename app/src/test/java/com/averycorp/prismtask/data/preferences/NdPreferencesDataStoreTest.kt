@@ -47,21 +47,43 @@ class NdPreferencesDataStoreTest {
     // region Defaults
 
     @Test
-    fun `defaults have all three modes off and all sub-settings off`() = runTest {
+    fun `defaults have all three modes on and cascade sub-settings on`() = runTest {
+        // Operator product decision 2026-05-14: presume ND baseline for
+        // first-time users. Fresh DataStore (no keys written) reads all
+        // three top-level modes ON and their cascade sub-settings ON to
+        // match `setX(true)` semantics. See
+        // `docs/audits/BRAIN_MODE_PAGE_DEFAULT_ON_AUDIT.md`.
+        val prefs = ndPrefs.ndPreferencesFlow.first()
+        assertTrue(prefs.adhdModeEnabled)
+        assertTrue(prefs.calmModeEnabled)
+        assertTrue(prefs.focusReleaseModeEnabled)
+        assertTrue(prefs.reduceAnimations)
+        assertTrue(prefs.mutedColorPalette)
+        assertTrue(prefs.quietMode)
+        assertTrue(prefs.reduceHaptics)
+        assertTrue(prefs.softContrast)
+        assertEquals(25, prefs.checkInIntervalMinutes)
+        assertTrue(prefs.completionAnimations)
+        assertTrue(prefs.streakCelebrations)
+        assertTrue(prefs.showProgressBars)
+        assertTrue(prefs.forgivenessStreaks)
+    }
+
+    @Test
+    fun `returning user explicit-false is preserved across the default-on flip`() = runTest {
+        // Migration safety: a v1.x user who explicitly turned a mode OFF
+        // (via the BrainModePage toggle) wrote `false` to the key. After
+        // the default flip, the explicit-false must still read as false —
+        // the `?: true` fallback only fires for absent keys.
+        ndPrefs.setAdhdMode(false)
+        ndPrefs.setCalmMode(false)
+        ndPrefs.setFocusReleaseMode(false)
         val prefs = ndPrefs.ndPreferencesFlow.first()
         assertFalse(prefs.adhdModeEnabled)
         assertFalse(prefs.calmModeEnabled)
         assertFalse(prefs.focusReleaseModeEnabled)
         assertFalse(prefs.reduceAnimations)
-        assertFalse(prefs.mutedColorPalette)
-        assertFalse(prefs.quietMode)
-        assertFalse(prefs.reduceHaptics)
-        assertFalse(prefs.softContrast)
-        assertEquals(25, prefs.checkInIntervalMinutes)
         assertFalse(prefs.completionAnimations)
-        assertFalse(prefs.streakCelebrations)
-        assertFalse(prefs.showProgressBars)
-        assertFalse(prefs.forgivenessStreaks)
     }
 
     // endregion
@@ -81,6 +103,10 @@ class NdPreferencesDataStoreTest {
 
     @Test
     fun `enabling ADHD mode does not affect Calm sub-settings`() = runTest {
+        // Explicitly write Calm to a known-off baseline first so the
+        // independence assertion doesn't lean on the (now default-on)
+        // fallback for absent Calm keys.
+        ndPrefs.setCalmMode(false)
         ndPrefs.setAdhdMode(true)
         val prefs = ndPrefs.ndPreferencesFlow.first()
         assertFalse(prefs.calmModeEnabled)
@@ -121,6 +147,10 @@ class NdPreferencesDataStoreTest {
 
     @Test
     fun `enabling Calm mode does not affect ADHD sub-settings`() = runTest {
+        // Explicitly write ADHD to a known-off baseline first so the
+        // independence assertion doesn't lean on the (now default-on)
+        // fallback for absent ADHD keys.
+        ndPrefs.setAdhdMode(false)
         ndPrefs.setCalmMode(true)
         val prefs = ndPrefs.ndPreferencesFlow.first()
         assertFalse(prefs.adhdModeEnabled)
