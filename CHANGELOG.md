@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/medication): refill management screen (parity Batch 5 PR-4).
+  New `/medication/refills` route with `MedicationRefillScreen.tsx` lists
+  every `users/{uid}/medication_refills` row with a Tier-coloured
+  urgency card (HEALTHY / UPCOMING / URGENT / OUT_OF_STOCK), days
+  remaining, projected refill date, and pharmacy info. Add/edit/delete
+  dialogs + a one-tap "Refilled" top-up. New
+  `web/src/api/firestore/medicationRefills.ts` mirrors Android
+  `MedicationRefillEntity` schema + `RefillCalculator.forecast`.
 - feat(web/medication): derive virtual slots from medication schedule
   (parity Batch 5 PR-3). New `web/src/features/medication/virtualSlots.ts`
   buckets each medication into slots by `scheduleMode` / `timesOfDay` /
