@@ -2,8 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pill } from 'lucide-react';
 import { toast } from 'sonner';
 import { dailyEssentialsApi } from '@/api/dailyEssentials';
+import { getMedications } from '@/api/firestore/medications';
+import { getFirebaseUid } from '@/stores/firebaseUid';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  deriveVirtualSlots,
+  mergeVirtualWithMaterialized,
+} from '@/features/medication/virtualSlots';
 import type {
   MedicationSlot,
   MedicationSlotCompletion,
@@ -67,10 +73,13 @@ function todayIso(): string {
 }
 
 /**
- * Renders the materialized medication slot completions for today, one row
- * per slot. Web does not derive virtual slots the way Android does; slots
- * appear here once they've been materialized (typically by Android toggling
- * a slot and syncing the row up to the backend).
+ * Renders today's medication slot rows. Materialized backend rows (from
+ * `dailyEssentialsApi.listSlots`) win on the (slotKey) natural key —
+ * they hold the canonical taken-state. Web also derives **virtual
+ * slots** from each medication's `scheduleMode` / `timesOfDay` /
+ * `specificTimes` so the user sees their full schedule even before any
+ * toggles land (parity Batch 5 PR-3). See
+ * `features/medication/virtualSlots.ts` for the bucketing rules.
  */
 export function MedicationSlotList() {
   const date = useMemo(() => todayIso(), []);
@@ -80,11 +89,16 @@ export function MedicationSlotList() {
 
   const loadSlots = useCallback(async () => {
     try {
-      const rows = await dailyEssentialsApi.listSlots(date);
-      const mapped = rows
+      const [rows, meds] = await Promise.all([
+        dailyEssentialsApi.listSlots(date),
+        getMedications(getFirebaseUid()).catch(() => []),
+      ]);
+      const materialized = rows
         .map(toSlot)
         .sort((a, b) => slotKeyComparator(a.slotKey, b.slotKey));
-      setSlots(mapped);
+      const virtual = deriveVirtualSlots(meds);
+      const merged = mergeVirtualWithMaterialized(materialized, virtual);
+      setSlots(merged);
     } catch {
       // Network errors already surface a toast via the axios interceptor;
       // keep the list empty so the caller falls back to the empty state.
@@ -131,7 +145,7 @@ export function MedicationSlotList() {
       <EmptyState
         icon={<Pill className="h-6 w-6" />}
         title="No Medications Scheduled"
-        description="Materialized medication slots sync here from mobile. Use the phone app to set up a medication schedule."
+        description="Add a medication on the Medication screen to start tracking it here."
       />
     );
   }

@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/medication): derive virtual slots from medication schedule
+  (parity Batch 5 PR-3). New `web/src/features/medication/virtualSlots.ts`
+  buckets each medication into slots by `scheduleMode` / `timesOfDay` /
+  `specificTimes`. Today `MedicationSlotList` and the dedicated
+  Medication screen now merge derived rows with the materialized
+  backend rows (materialized wins on slot-key collision). Replaces the
+  "set up on Android" empty-state copy so web users see their schedule
+  immediately after adding a medication.
 - feat(web/medication): per-med dose toggle on slot cards (parity Batch
   5 PR-2). New `web/src/api/firestore/medicationDoses.ts` with
   `logDose`/`deleteDose`/`getDosesForDay` using deterministic doc id
