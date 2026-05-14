@@ -5,11 +5,11 @@ import {
   getDocs,
   orderBy,
   query,
-  setDoc,
   deleteDoc,
   type DocumentData,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 
 /**
  * Firestore-native morning check-in logs. Mirrors Android's
@@ -69,6 +69,11 @@ export async function setCheckIn(
   uid: string,
   input: CheckInInput,
 ): Promise<CheckInLog> {
+  // LWW guard — two devices submitting a same-day check-in in
+  // quick succession should not silently overwrite each other's
+  // step-set. The doc id is the ISO date, so first-create wins on
+  // missing-doc; subsequent setCheckIn calls compare `updatedAt`.
+  // Parity audit A.2.
   const now = Date.now();
   const payload = {
     dateIso: input.date_iso,
@@ -79,7 +84,7 @@ export async function setCheckIn(
     createdAt: now,
     updatedAt: now,
   };
-  await setDoc(logDoc(uid, input.date_iso), payload, { merge: true });
+  await lwwUpdate(logDoc(uid, input.date_iso), payload);
   return docToLog(input.date_iso, payload);
 }
 
