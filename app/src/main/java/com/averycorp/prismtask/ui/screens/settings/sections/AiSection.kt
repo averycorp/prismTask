@@ -78,8 +78,8 @@ fun AiSection(
     // associated UI surface when off; the master toggle above is still
     // the only switch that affects backend egress (PII privacy gate).
     SettingsToggleRow(
-        title = "AI Coach Chat",
-        subtitle = "Conversational coaching with starter prompts and action chips.",
+        title = "AI Executive Assistant Chat",
+        subtitle = "Conversational assistance with starter prompts and action chips.",
         checked = aiChatFeatureEnabled,
         onCheckedChange = onAiChatFeatureEnabledChanged
     )
@@ -169,8 +169,8 @@ fun AiSection(
     )
 
     SettingsRowWithSubtitle(
-        title = "AI Coach Chat",
-        subtitle = "Conversational task planning and coaching (Pro)",
+        title = "AI Executive Assistant Chat",
+        subtitle = "Conversational task planning and assistance (Pro)",
         onClick = onNavigateToAiChat
     )
 

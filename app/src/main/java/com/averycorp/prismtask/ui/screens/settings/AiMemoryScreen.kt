@@ -100,7 +100,7 @@ fun AiMemoryScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(
-                    text = "The AI Coach quietly remembers up to $cap things you tell it about how " +
+                    text = "The AI Executive Assistant quietly remembers up to $cap things you tell it about how " +
                         "you work. Edit or delete anything you'd rather it forgot.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -121,7 +121,7 @@ fun AiMemoryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Nothing remembered yet. The AI Coach will pick up preferences as you chat — or tap + to add one yourself.",
+                        text = "Nothing remembered yet. The AI Executive Assistant will pick up preferences as you chat — or tap + to add one yourself.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -179,7 +179,7 @@ fun AiMemoryScreen(
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text("Forget this preference?") },
-            text = { Text("The AI Coach will stop using \"${current.text}\" in future replies.") },
+            text = { Text("The AI Executive Assistant will stop using \"${current.text}\" in future replies.") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deletePreference(current.id)

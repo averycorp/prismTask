@@ -293,7 +293,7 @@ fun TodayScreen(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Chat,
-                            contentDescription = "AI Coach",
+                            contentDescription = "AI Executive Assistant",
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1053,7 +1053,7 @@ fun TodayScreen(
         ) {
             UpgradePrompt(
                 currentTier = coachingUserTier,
-                feature = "AI Coaching",
+                feature = "AI Executive Assistant",
                 description = "Get personalized help when you're stuck on a task, plus energy-adaptive daily planning",
                 onUpgrade = { _ ->
                     coachingViewModel.dismissUpgradePrompt()
