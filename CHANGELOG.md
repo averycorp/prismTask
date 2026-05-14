@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - feat(web/weekly-review): persist weekly reviews to Firestore so cross-device users see the same week breakdown without re-running the aggregator. New `web/src/api/firestore/weeklyReviews.ts` mapper using Pattern A canonical-row id (`{YYYY-MM-DD-of-Monday}`); `WeeklyReviewScreen` upserts both Free-tier local-only and Pro-tier AI-augmented reviews. Closes parity audit C.4a (the backend auto-gen cron half is C.4b, deferred to a backend-batch follow-up).
+- feat(web/mood): port the mood/energy ↔ tasks/habits/self-care Pearson correlation engine (`web/src/utils/moodCorrelation.ts`) and surface a Correlations section on the Mood screen. Top-3 strongest correlations per axis once the user has 7+ mood-logged days; falls silent gracefully below that. Closes parity audit C.3.
+- feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
 - **Schoolwork class-row Today section (parity F.2).** Web port of
   Android's PR #1314 `SchoolworkCard` (post the "Leisure + School as
   modes" refactor). Each active course renders as a checkable row on
@@ -54,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(web/sync): LWW timestamp guard on `updateProject` — extends parity A.2 to project edits so Android-side lifecycle writes (start/end date, theme color, archived/completed timestamps) survive a concurrent web rename.
 - feat(web/sync): LWW timestamp guard on `updateSlotDef` (medication slot definitions) — extends parity A.2 so a web slot rename doesn't clobber an Android-side reminder-mode flip on the same slot.
 - feat(web/sync): LWW timestamp guard on the wellness-logs write paths (`setCheckIn`, `updateLog` for mood/energy, `updateRule` for boundaries) — extends parity A.2 so concurrent same-day edits from a sibling device aren't silently overwritten.
+- feat(web/settings): sync theme cross-device via Firestore at `users/{uid}/settings/theme_preferences` — mirrors Android's bespoke `ThemePreferencesSyncService` shape (`prism_theme`, `font_scale`, `updated_at`) so a theme pick on Android propagates to web on the next snapshot. Closes parity audit A.5b (theme slice).
+- feat(web/settings): sync `reduceMotion` + `highContrast` cross-device via Firestore at `users/{uid}/prefs/a11y_prefs` (generic `__pref_types` envelope) — mirrors Android's `A11yPreferences` so an accessibility toggle on either device propagates immediately. Closes parity audit A.5b (a11y slice). `fontScale` continues to live in `theme_prefs` per Android's split.
+- feat(web/settings): add `dashboard_prefs` Firestore mirror (`web/src/api/firestore/dashboardPreferences.ts`) — write/read/subscribe helpers for `section_order` (string CSV), `hidden_sections` (stringSet), `progress_style` (string), `collapsed_sections` (stringSet). Mirrors Android's `DashboardPreferences` with the generic `__pref_types` envelope at `users/{uid}/prefs/dashboard_prefs`. No web UI consumer this PR — pure sync foundation for the upcoming C.1f Today section-reorder UI. Parity audit A.5b (dashboard slice).
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage

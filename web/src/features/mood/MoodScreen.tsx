@@ -24,6 +24,7 @@ import {
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { computeStats, rollupByDay } from '@/utils/moodAnalytics';
 import { MoodLogModal } from '@/features/mood/MoodLogModal';
+import { MoodCorrelationsSection } from '@/features/mood/MoodCorrelationsSection';
 
 type RangeOption = '7d' | '30d' | '90d';
 
@@ -293,6 +294,8 @@ export function MoodScreen() {
               </ResponsiveContainer>
             </div>
           </section>
+
+          <MoodCorrelationsSection logs={logs} />
 
           <section>
             <h2 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">
