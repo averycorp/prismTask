@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/sync): write `task_completions` rows to Firestore so analytics history populates cross-device — closes parity audit B.6.
 - **Batch adjustments through AI Chat.** The Coach can now propose a
   `batch_command` inline action when a user asks for multi-entity
   changes that go beyond the existing single-task / `reschedule_batch`

@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import type { Task, TaskCreate, TaskUpdate, SubtaskCreate } from '@/types/task';
 import * as firestoreTasks from '@/api/firestore/tasks';
 import {
+  recordTaskCompletion,
+  removeTaskCompletion,
+  subscribeToTaskCompletions,
+  type TaskCompletion,
+} from '@/api/firestore/taskCompletions';
+import { logicalToday } from '@/utils/dayBoundary';
+import {
   calculateNextOccurrence,
   parseRecurrenceRule,
 } from '@/utils/recurrence';
@@ -48,6 +55,10 @@ interface TaskState {
 
   // Real-time
   subscribeToTasks: (uid: string) => Unsubscribe;
+  subscribeToTaskCompletions: (uid: string) => Unsubscribe;
+
+  // Analytics history mirror (`task_completions`, parity audit B.6)
+  taskCompletions: TaskCompletion[];
 
   // Local
   setSelectedTask: (task: Task | null) => void;
@@ -70,6 +81,82 @@ function removeFromArray(arr: Task[], id: string): Task[] {
   return arr.filter((t) => t.id !== id);
 }
 
+/**
+ * Push a `task_completions` history row to Firestore so analytics
+ * (completion grid, on-time rate, day-of-week distribution, etc.)
+ * picks up the web toggle the same way it picks up Android toggles.
+ *
+ * Failures are swallowed because the user-visible `tasks.status`
+ * update already succeeded; an analytics-history miss must not flip
+ * the toggle back. Parity audit B.6.
+ */
+async function writeTaskCompletionRow(uid: string, task: Task): Promise<void> {
+  try {
+    const completedAt = Date.now();
+    const completedDateLocal = logicalToday(completedAt, 0);
+    const wasOverdue = computeWasOverdue(task, completedDateLocal);
+    const daysToComplete = computeDaysToComplete(task.created_at, completedAt);
+    const tagNames = (task.tags ?? [])
+      .map((t) => t.name)
+      .filter((n): n is string => typeof n === 'string' && n.length > 0);
+    await recordTaskCompletion(uid, {
+      taskCloudId: task.id,
+      completedDateLocal,
+      completedAt,
+      priority: task.priority,
+      wasOverdue,
+      daysToComplete: daysToComplete ?? undefined,
+      tags: tagNames.length > 0 ? tagNames.join(',') : undefined,
+    });
+  } catch {
+    // Silently fail — analytics-history row is best-effort.
+  }
+}
+
+/** Mirror of Android's `TaskCompletionRepository.wasOverdue` check. */
+function computeWasOverdue(task: Task, completedDateLocal: string): boolean {
+  if (!task.due_date) return false;
+  return task.due_date < completedDateLocal;
+}
+
+/** Mirror of Android's `TaskCompletionRepository.computeDaysToComplete`. */
+function computeDaysToComplete(
+  createdAtIso: string,
+  completedAtMs: number,
+): number | null {
+  const createdMs = Date.parse(createdAtIso);
+  if (!Number.isFinite(createdMs)) return null;
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.floor((completedAtMs - createdMs) / dayMs));
+}
+
+async function deleteTaskCompletionRow(
+  uid: string,
+  taskId: string,
+): Promise<void> {
+  try {
+    // We only know the task id, not which logical day the prior
+    // completion was filed under. Sweep today + the previous 2 days
+    // since the toggle-off UX is "I just toggled it off, undo me" —
+    // a completion filed yesterday or earlier by the same user is
+    // either the row we want to remove (same task) or stale enough
+    // that retaining it is the wrong answer anyway. Bound the sweep
+    // so a single uncomplete doesn't paginate the whole collection.
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const dates = [
+      logicalToday(now, 0),
+      logicalToday(now - dayMs, 0),
+      logicalToday(now - 2 * dayMs, 0),
+    ];
+    await Promise.all(
+      dates.map((d) => removeTaskCompletion(uid, taskId, d)),
+    );
+  } catch {
+    // Silently fail — uncomplete UX already succeeded on the task row.
+  }
+}
+
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   todayTasks: [],
@@ -79,6 +166,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   isLoading: false,
   error: null,
   selectedTaskIds: new Set(),
+  taskCompletions: [],
 
   toggleTaskSelection: (id) =>
     set((state) => {
@@ -180,6 +268,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const updated = await firestoreTasks.updateTask(uid, taskId, { status: 'done' });
     get().updateTaskInLists(updated);
 
+    // Parity audit B.6: write a `task_completions` history row so the
+    // analytics chart (completion grid, day-of-week distribution,
+    // on-time rate) picks up web-completed tasks. Android writes this
+    // row in `TaskCompletionRepository.recordCompletion`; web was
+    // skipping it, leaving the analytics chart blank for web toggles.
+    void writeTaskCompletionRow(uid, updated);
+
     // Handle recurrence: create next occurrence if applicable
     if (existingTask?.recurrence_json && existingTask.due_date) {
       const rule = parseRecurrenceRule(existingTask.recurrence_json);
@@ -214,6 +309,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const uid = getUid();
     const updated = await firestoreTasks.updateTask(uid, taskId, { status: 'todo' });
     get().updateTaskInLists(updated);
+    // Parity audit B.6: roll back the `task_completions` history row
+    // so the analytics surface stays in sync with the toggle.
+    void deleteTaskCompletionRow(uid, taskId);
     return updated;
   },
 
@@ -231,7 +329,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   bulkComplete: async (ids) => {
     const uid = getUid();
-    await Promise.all(ids.map((id) => firestoreTasks.updateTask(uid, id, { status: 'done' })));
+    const completedTasks = await Promise.all(
+      ids.map((id) => firestoreTasks.updateTask(uid, id, { status: 'done' })),
+    );
+    // Parity audit B.6: write history rows for each completed task.
+    for (const t of completedTasks) {
+      void writeTaskCompletionRow(uid, t);
+    }
     set((state) => ({
       tasks: state.tasks.map((t) =>
         ids.includes(t.id) ? { ...t, status: 'done' as const } : t,
@@ -306,6 +410,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       upcomingTasks: updateDue(state.upcomingTasks),
       selectedTaskIds: new Set(),
     }));
+  },
+
+  subscribeToTaskCompletions: (uid: string) => {
+    return subscribeToTaskCompletions(uid, (taskCompletions) => {
+      set({ taskCompletions });
+    });
   },
 
   subscribeToTasks: (uid: string) => {
