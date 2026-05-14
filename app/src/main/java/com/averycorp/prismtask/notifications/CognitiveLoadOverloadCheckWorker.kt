@@ -83,13 +83,11 @@ constructor(
         if (!tooEasy && !tooHard) return Result.success()
 
         val (title, body) = if (tooEasy) {
-            "Easy tasks dominated this week" to
-                "${(easy * 100).toInt()}% Easy. " +
-                "Open the Balance report to scan your harder items."
+            "Easy tasks were ${(easy * 100).toInt()}% of this week" to
+                "Tap to see the breakdown across cognitive load tiers."
         } else {
-            "Hard tasks dominated this week" to
-                "${(hard * 100).toInt()}% Hard. " +
-                "Open the Balance report to plan some recovery wins."
+            "Hard tasks were ${(hard * 100).toInt()}% of this week" to
+                "Tap to see the breakdown across cognitive load tiers."
         }
 
         ensureChannel(applicationContext)
