@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
 - **Schoolwork class-row Today section (parity F.2).** Web port of
   Android's PR #1314 `SchoolworkCard` (post the "Leisure + School as
   modes" refactor). Each active course renders as a checkable row on
