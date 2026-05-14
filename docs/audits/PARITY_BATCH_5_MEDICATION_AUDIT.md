@@ -372,3 +372,77 @@ start PR-1. PR-1 is foundational — every other E.1.x PR depends on
 medications-write-path being live on web.
 ```
 
+---
+
+## Batch 5.x execution log (2026-05-13)
+
+All 9 enumerated PRs shipped + squash-merged this session. Phase 3
+bundle summary and Phase 4 handoff block updated below to reflect the
+actual landed state.
+
+| # | PR | Branch | Status | Scope deviation |
+|---|----|--------|--------|-----------------|
+| 1 | #1376 | `feat/web-medication-crud-baseline` | Shipped & merged | None |
+| 2 | #1377 | `feat/web-medication-dose-toggle` | Shipped & merged | None |
+| 3 | #1378 | `feat/web-virtual-slot-derivation` | Shipped & merged | None |
+| 4 | #1379 | `feat/web-medication-refills` | Shipped & merged | None |
+| 5 | #1380 | `feat/web-medication-log-history` | Shipped & merged | None |
+| 6 | #1381 | `feat/web-medication-clinical-report` | Shipped & merged | **Backend endpoint deferred** — client-side markdown + plain-text generation only. PDF emission and backend reuse-of-Android-domain skipped. Tracked as 5.y follow-up. |
+| 7 | #1382 | `refactor/medication-slots-collection-rename` | Shipped & merged | None — web-only schema-merge per D-E2. **No Android Room touch.** |
+| 8 | #1384 | `refactor/medication-tier-state-deterministic-doc-ids` | Shipped & merged | None — Android-only push helper + backfill per D-E3. **No Room migration.** |
+| 9 | #1385 | `refactor/medication-slot-completions-backend-authoritative` | Shipped & merged | None — subtractive per D-E4. |
+
+**Notable implementation details**
+- PR-7 backfill flag stored in `localStorage` (`prismtask.med_slots_backfill_v1.<uid>`) rather than a Firestore preference — keeps the migration per-device and zero-risk for SSR / private-browsing.
+- PR-8 backfill flag added to existing `MedicationMigrationPreferences` (`tier_state_doc_id_backfill_done`) so the medication-prefs DataStore stays the single owner of medication-migration one-shot flags.
+- PR-9 retained the pull-side `processRemoteDeletions` arm for `daily_essential_slot_completion` — defensive cleanup for any in-flight listener emits from older clients before the listener de-wires.
+
+**Deferred follow-ups (Batch 5.y)**
+- Backend `/api/v1/medications/clinical-report` endpoint with reportlab PDF emission. Client-side markdown covers the patient-portal-paste workflow today; the PDF path remains nice-to-have.
+- Firestore `firestore.rules` update to allow read on the legacy `medication_slot_defs` collection during the 60-day dual-read window — only needed if existing rules tightened access. Spot-check before web v1.7.0 ships.
+
+---
+
+## Phase 4 — Claude Chat handoff block (refresh, 2026-05-13)
+
+```
+Batch 5 Medication — full 9-PR fan-out shipped + merged.
+
+Closed this session (#1376 → #1385):
+- PR-1 feat/web-medication-crud-baseline                     (#1376)
+- PR-2 feat/web-medication-dose-toggle                       (#1377)
+- PR-3 feat/web-virtual-slot-derivation                      (#1378)
+- PR-4 feat/web-medication-refills                           (#1379)
+- PR-5 feat/web-medication-log-history                       (#1380)
+- PR-6 feat/web-medication-clinical-report                   (#1381)
+- PR-7 refactor/medication-slots-collection-rename           (#1382)
+- PR-8 refactor/medication-tier-state-deterministic-doc-ids  (#1384)
+- PR-9 refactor/medication-slot-completions-backend-authoritative
+                                                              (#1385)
+
+All architectural decisions D-E2 / D-E3 / D-E4 honored — no Room
+migrations landed, no DROP COLUMN, backfills are idempotent + flag-
+gated.
+
+Deferred to Batch 5.y:
+- Backend /api/v1/medications/clinical-report endpoint + reportlab PDF
+  emission (PR-6 shipped client-side only).
+- firestore.rules cleanup if needed for the medication_slot_defs
+  60-day dual-read window (PR-7).
+
+Premise verification along the way:
+- PR-3: MedicationSlotList.tsx:71-73 still carried the "Web does not
+  derive virtual slots" copy from the audit, premise OK.
+- PR-7: medication_slot_defs was still the active write target before
+  the rename, premise OK.
+- PR-8: medication_tier_states still used collection.document() auto-ids
+  pre-PR-8, premise OK.
+- PR-9: SyncService.kt:1359 + :1555 + :2011 (D-E4 sites) all still had
+  Firestore-writing code, premise OK.
+
+Web idb@^8.0.4 pin is still broken — symlink + manual fake-indexeddb
+install was the workaround during this session.
+
+No further parity Batch 5 work needed. Batch 6 (sync hardening) has
+its own audit and is unchanged by this batch.
+```
