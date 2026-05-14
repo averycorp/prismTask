@@ -27,6 +27,9 @@ import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesSto
  */
 export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToTasks = useTaskStore((s) => s.subscribeToTasks);
+  const subscribeToTaskCompletions = useTaskStore(
+    (s) => s.subscribeToTaskCompletions,
+  );
   const subscribeToProjects = useProjectStore((s) => s.subscribeToProjects);
   const subscribeToTags = useTagStore((s) => s.subscribeToTags);
   const subscribeToHabits = useHabitStore((s) => s.subscribeToHabits);
@@ -64,6 +67,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     };
 
     safeSubscribe(subscribeToTasks, 'tasks');
+    safeSubscribe(subscribeToTaskCompletions, 'task-completions');
     safeSubscribe(subscribeToProjects, 'projects');
     safeSubscribe(subscribeToTags, 'tags');
     safeSubscribe(subscribeToHabits, 'habits');
@@ -85,6 +89,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   }, [
     uid,
     subscribeToTasks,
+    subscribeToTaskCompletions,
     subscribeToProjects,
     subscribeToTags,
     subscribeToHabits,
