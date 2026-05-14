@@ -57,6 +57,24 @@ constructor(
         .hasCompletedOnboarding()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    /**
+     * Preview mode — admin replay of the tutorial. When true, every mutating
+     * method (preference setters, task creation, sign-in, template seeding,
+     * and `completeOnboarding()`) short-circuits so the visual flow runs end
+     * to end without changing the account. The screen sets this once via
+     * [setPreviewMode] from the route's `preview` arg.
+     */
+    private val _isPreviewMode = MutableStateFlow(false)
+    val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
+
+    fun setPreviewMode(enabled: Boolean) {
+        _isPreviewMode.value = enabled
+    }
+
+    private inline fun ifNotPreview(block: () -> Unit) {
+        if (!_isPreviewMode.value) block()
+    }
+
     private val _signInState = MutableStateFlow<SignInState>(SignInState.NotSignedIn)
     val signInState: StateFlow<SignInState> = _signInState.asStateFlow()
 
@@ -189,59 +207,65 @@ constructor(
     }
 
     fun onGoogleSignIn(idToken: String) {
-        viewModelScope.launch {
-            _signInState.value = SignInState.Loading
-            val result = authManager.signInWithGoogle(idToken)
-            result.fold(
-                onSuccess = { user ->
-                    _signInState.value = SignInState.SignedIn(user.email ?: "")
-                    syncService.startAutoSync()
-                    checkExistingUserAndMaybeSkip()
-                },
-                onFailure = {
-                    _signInState.value = SignInState.Error("Sign-in failed")
-                }
-            )
+        ifNotPreview {
+            viewModelScope.launch {
+                _signInState.value = SignInState.Loading
+                val result = authManager.signInWithGoogle(idToken)
+                result.fold(
+                    onSuccess = { user ->
+                        _signInState.value = SignInState.SignedIn(user.email ?: "")
+                        syncService.startAutoSync()
+                        checkExistingUserAndMaybeSkip()
+                    },
+                    onFailure = {
+                        _signInState.value = SignInState.Error("Sign-in failed")
+                    }
+                )
+            }
         }
     }
 
     fun onEmailSignUp(email: String, password: String) {
         // TODO(email-verification): call user.sendEmailVerification() and
         // gate sync until verified once the verification flow lands.
-        viewModelScope.launch {
-            _signInState.value = SignInState.Loading
-            val result = authManager.signUpWithEmail(email, password)
-            result.fold(
-                onSuccess = { user ->
-                    _signInState.value = SignInState.SignedIn(user.email ?: email)
-                    syncService.startAutoSync()
-                    checkExistingUserAndMaybeSkip()
-                },
-                onFailure = {
-                    _signInState.value = SignInState.Error(
-                        it.localizedMessage ?: "Sign-up failed"
-                    )
-                }
-            )
+        ifNotPreview {
+            viewModelScope.launch {
+                _signInState.value = SignInState.Loading
+                val result = authManager.signUpWithEmail(email, password)
+                result.fold(
+                    onSuccess = { user ->
+                        _signInState.value = SignInState.SignedIn(user.email ?: email)
+                        syncService.startAutoSync()
+                        checkExistingUserAndMaybeSkip()
+                    },
+                    onFailure = {
+                        _signInState.value = SignInState.Error(
+                            it.localizedMessage ?: "Sign-up failed"
+                        )
+                    }
+                )
+            }
         }
     }
 
     fun onEmailSignIn(email: String, password: String) {
-        viewModelScope.launch {
-            _signInState.value = SignInState.Loading
-            val result = authManager.signInWithEmail(email, password)
-            result.fold(
-                onSuccess = { user ->
-                    _signInState.value = SignInState.SignedIn(user.email ?: email)
-                    syncService.startAutoSync()
-                    checkExistingUserAndMaybeSkip()
-                },
-                onFailure = {
-                    _signInState.value = SignInState.Error(
-                        it.localizedMessage ?: "Sign-in failed"
-                    )
-                }
-            )
+        ifNotPreview {
+            viewModelScope.launch {
+                _signInState.value = SignInState.Loading
+                val result = authManager.signInWithEmail(email, password)
+                result.fold(
+                    onSuccess = { user ->
+                        _signInState.value = SignInState.SignedIn(user.email ?: email)
+                        syncService.startAutoSync()
+                        checkExistingUserAndMaybeSkip()
+                    },
+                    onFailure = {
+                        _signInState.value = SignInState.Error(
+                            it.localizedMessage ?: "Sign-in failed"
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -293,92 +317,103 @@ constructor(
     }
 
     fun setThemeMode(mode: String) {
-        viewModelScope.launch { themePreferences.setThemeMode(mode) }
+        ifNotPreview { viewModelScope.launch { themePreferences.setThemeMode(mode) } }
     }
 
     fun setAccentColor(hex: String) {
-        viewModelScope.launch { themePreferences.setAccentColor(hex) }
+        ifNotPreview { viewModelScope.launch { themePreferences.setAccentColor(hex) } }
     }
 
     fun createQuickTask(title: String) {
         if (title.isBlank()) return
-        viewModelScope.launch {
-            taskRepository.addTask(title = title)
+        ifNotPreview {
+            viewModelScope.launch {
+                taskRepository.addTask(title = title)
+            }
         }
     }
 
     fun setAdhdMode(enabled: Boolean) {
-        viewModelScope.launch { ndPreferencesDataStore.setAdhdMode(enabled) }
+        ifNotPreview { viewModelScope.launch { ndPreferencesDataStore.setAdhdMode(enabled) } }
     }
 
     fun setCalmMode(enabled: Boolean) {
-        viewModelScope.launch { ndPreferencesDataStore.setCalmMode(enabled) }
+        ifNotPreview { viewModelScope.launch { ndPreferencesDataStore.setCalmMode(enabled) } }
     }
 
     fun setFocusReleaseMode(enabled: Boolean) {
-        viewModelScope.launch { ndPreferencesDataStore.setFocusReleaseMode(enabled) }
+        ifNotPreview { viewModelScope.launch { ndPreferencesDataStore.setFocusReleaseMode(enabled) } }
     }
 
+    /**
+     * Updates the in-memory template selection used by the UI to render which
+     * templates the user picked. Intentionally NOT gated by preview mode —
+     * the preview tutorial still shows selection state as the user clicks
+     * through. Persistence happens in [applyTemplateSelections] (called from
+     * [completeOnboarding]) which IS gated.
+     */
     fun updateTemplateSelections(selections: TemplateSelections) {
         _templateSelections.value = selections
     }
 
     fun setSelfCareEnabled(enabled: Boolean) {
-        viewModelScope.launch { habitListPreferences.setSelfCareEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { habitListPreferences.setSelfCareEnabled(enabled) } }
     }
 
     fun setMedicationEnabled(enabled: Boolean) {
-        viewModelScope.launch { habitListPreferences.setMedicationEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { habitListPreferences.setMedicationEnabled(enabled) } }
     }
 
     fun setSchoolEnabled(enabled: Boolean) {
-        viewModelScope.launch { habitListPreferences.setSchoolEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { habitListPreferences.setSchoolEnabled(enabled) } }
     }
 
     fun setHouseworkEnabled(enabled: Boolean) {
-        viewModelScope.launch { habitListPreferences.setHouseworkEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { habitListPreferences.setHouseworkEnabled(enabled) } }
     }
 
     fun setLeisureEnabled(enabled: Boolean) {
-        viewModelScope.launch { habitListPreferences.setLeisureEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { habitListPreferences.setLeisureEnabled(enabled) } }
     }
 
     fun setReduceMotion(enabled: Boolean) {
-        viewModelScope.launch { a11yPreferences.setReduceMotion(enabled) }
+        ifNotPreview { viewModelScope.launch { a11yPreferences.setReduceMotion(enabled) } }
     }
 
     fun setHighContrast(enabled: Boolean) {
-        viewModelScope.launch { a11yPreferences.setHighContrast(enabled) }
+        ifNotPreview { viewModelScope.launch { a11yPreferences.setHighContrast(enabled) } }
     }
 
     fun setLargeTouchTargets(enabled: Boolean) {
-        viewModelScope.launch { a11yPreferences.setLargeTouchTargets(enabled) }
+        ifNotPreview { viewModelScope.launch { a11yPreferences.setLargeTouchTargets(enabled) } }
     }
 
     fun setVoiceInputEnabled(enabled: Boolean) {
-        viewModelScope.launch { voicePreferences.setVoiceInputEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { voicePreferences.setVoiceInputEnabled(enabled) } }
     }
 
     fun setAiFeaturesEnabled(enabled: Boolean) {
-        viewModelScope.launch { userPreferencesDataStore.setAiFeaturesEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { userPreferencesDataStore.setAiFeaturesEnabled(enabled) } }
     }
 
     fun setForgivenessStreaksEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            userPreferencesDataStore.setForgivenessPrefs(ForgivenessPrefs(enabled = enabled))
+        ifNotPreview {
+            viewModelScope.launch {
+                userPreferencesDataStore.setForgivenessPrefs(ForgivenessPrefs(enabled = enabled))
+            }
         }
     }
 
     fun setStreakMaxMissedDays(days: Int) {
-        viewModelScope.launch { habitListPreferences.setStreakMaxMissedDays(days) }
+        ifNotPreview { viewModelScope.launch { habitListPreferences.setStreakMaxMissedDays(days) } }
     }
 
     fun setDailyBriefingEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setDailyBriefingEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setDailyBriefingEnabled(enabled) } }
     }
 
     fun setEveningSummaryEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setEveningSummaryEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setEveningSummaryEnabled(enabled) } }
     }
 
     /**
@@ -388,34 +423,36 @@ constructor(
      * exposes the two flags separately for fine-grained control.
      */
     fun setWeeklySummaryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            notificationPreferences.setWeeklySummaryEnabled(enabled)
-            notificationPreferences.setWeeklyTaskSummaryEnabled(enabled)
+        ifNotPreview {
+            viewModelScope.launch {
+                notificationPreferences.setWeeklySummaryEnabled(enabled)
+                notificationPreferences.setWeeklyTaskSummaryEnabled(enabled)
+            }
         }
     }
 
     fun setOverloadAlertsEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setOverloadAlertsEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setOverloadAlertsEnabled(enabled) } }
     }
 
     fun setStreakAlertsEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setStreakAlertsEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setStreakAlertsEnabled(enabled) } }
     }
 
     fun setReengagementEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setReengagementEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setReengagementEnabled(enabled) } }
     }
 
     fun setTaskRemindersEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setTaskRemindersEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setTaskRemindersEnabled(enabled) } }
     }
 
     fun setTimerAlertsEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setTimerAlertsEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setTimerAlertsEnabled(enabled) } }
     }
 
     fun setMedicationRemindersEnabled(enabled: Boolean) {
-        viewModelScope.launch { notificationPreferences.setMedicationRemindersEnabled(enabled) }
+        ifNotPreview { viewModelScope.launch { notificationPreferences.setMedicationRemindersEnabled(enabled) } }
     }
 
     /**
@@ -424,8 +461,10 @@ constructor(
      * theme in Settings → Appearance. Onboarding only exposes the toggle.
      */
     fun setWidgetThemeFollowsApp(follow: Boolean) {
-        viewModelScope.launch {
-            themePreferences.setWidgetThemeOverride(if (follow) null else "custom")
+        ifNotPreview {
+            viewModelScope.launch {
+                themePreferences.setWidgetThemeOverride(if (follow) null else "custom")
+            }
         }
     }
 
@@ -437,10 +476,15 @@ constructor(
      * installs that completed onboarding before this page existed.
      */
     fun setStartOfDay(hour: Int, minute: Int) {
-        viewModelScope.launch { taskBehaviorPreferences.setStartOfDay(hour, minute) }
+        ifNotPreview { viewModelScope.launch { taskBehaviorPreferences.setStartOfDay(hour, minute) } }
     }
 
     fun completeOnboarding() {
+        // Preview replay (admin "Show Tutorial") must not re-write the
+        // completion flag, re-mark tour eligibility, re-sync canonical
+        // Firestore, or re-seed templates. The screen still calls onComplete()
+        // independently, so navigation back to MainTabs is unaffected.
+        if (_isPreviewMode.value) return
         viewModelScope.launch {
             // Write the flag first so it is durable before viewModelScope is
             // cancelled by the navigation that fires immediately after this call.

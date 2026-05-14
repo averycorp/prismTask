@@ -1195,26 +1195,4 @@ constructor(
         billingManager.clearDebugTier()
     }
 
-    /**
-     * Debug-only: reset the onboarding flag so the tutorial will be shown
-     * again as if the app was just installed. The caller is responsible for
-     * navigating to the Onboarding route after this completes.
-     */
-    fun resetOnboarding(onDone: () -> Unit = {}) {
-        viewModelScope.launch {
-            try {
-                onboardingPreferences.resetOnboarding()
-                // Also wipe the post-onboarding Guided Tour state so the
-                // card re-runs alongside the replayed tutorial. Without
-                // this, a debug reset replays onboarding but skips the
-                // tour because `tour_card_dismissed` was already set
-                // from the prior session.
-                tourCardPreferences.resetTourCard()
-                _messages.emit("Tutorial Reset — Showing Now")
-                onDone()
-            } catch (e: Exception) {
-                _messages.emit("Couldn't reset tutorial")
-            }
-        }
-    }
 }

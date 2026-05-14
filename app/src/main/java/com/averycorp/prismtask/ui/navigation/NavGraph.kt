@@ -198,7 +198,19 @@ sealed class PrismTaskRoute(
 
     data object MainTabs : PrismTaskRoute("main_tabs")
 
-    data object Onboarding : PrismTaskRoute("onboarding")
+    /**
+     * Onboarding flow. The optional `preview` arg lets admins replay the
+     * tutorial visually without mutating any account state — every
+     * `OnboardingViewModel` setter and the final `completeOnboarding()` no-op
+     * when this flag is true. See [SettingsScreen]'s admin "Show Tutorial"
+     * entry point.
+     */
+    data object Onboarding : PrismTaskRoute("onboarding?preview={preview}") {
+        const val ARG_PREVIEW = "preview"
+
+        fun createRoute(preview: Boolean = false): String =
+            "onboarding?preview=$preview"
+    }
 
     data object MorningCheckIn : PrismTaskRoute("morning_check_in")
 
@@ -615,12 +627,22 @@ fun PrismTaskNavGraph(
             // Onboarding screen
             composable(
                 route = PrismTaskRoute.Onboarding.route,
+                arguments = listOf(
+                    navArgument(PrismTaskRoute.Onboarding.ARG_PREVIEW) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                ),
                 enterTransition = { fadeIn(animationSpec = tween(NAV_ANIM_DURATION)) },
                 exitTransition = { fadeOut(animationSpec = tween(NAV_ANIM_DURATION)) }
-            ) {
+            ) { backStackEntry ->
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+                val previewMode = backStackEntry.arguments
+                    ?.getBoolean(PrismTaskRoute.Onboarding.ARG_PREVIEW)
+                    ?: false
                 OnboardingScreen(
                     viewModel = onboardingViewModel,
+                    previewMode = previewMode,
                     onComplete = {
                         navController.navigate(PrismTaskRoute.MainTabs.route) {
                             popUpTo(PrismTaskRoute.Onboarding.route) { inclusive = true }
