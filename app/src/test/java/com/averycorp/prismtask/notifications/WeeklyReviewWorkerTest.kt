@@ -38,15 +38,20 @@ class WeeklyReviewWorkerTest {
     private lateinit var context: Context
     private lateinit var notificationPreferences: NotificationPreferences
     private lateinit var generator: WeeklyReviewGenerator
+    private lateinit var notificationPauseGate: NotificationPauseGate
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         notificationPreferences = mockk(relaxed = true)
         generator = mockk(relaxed = true)
+        notificationPauseGate = mockk(relaxed = true)
         // Default: both toggles on. Individual tests override as needed.
         coEvery { notificationPreferences.weeklyReviewAutoGenerateEnabled } returns flowOf(true)
         coEvery { notificationPreferences.weeklyReviewNotificationEnabled } returns flowOf(true)
+        // MH-first G4: default to "not paused" so existing test cases
+        // keep their pre-gate semantics.
+        coEvery { notificationPauseGate.isPausedNow(any()) } returns false
     }
 
     private fun buildWorker(): WeeklyReviewWorker {
@@ -59,7 +64,8 @@ class WeeklyReviewWorkerTest {
                 context = appContext,
                 params = workerParameters,
                 notificationPreferences = notificationPreferences,
-                weeklyReviewGenerator = generator
+                weeklyReviewGenerator = generator,
+                notificationPauseGate = notificationPauseGate
             )
         }
         return TestListenableWorkerBuilder

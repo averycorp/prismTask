@@ -54,11 +54,14 @@ constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val taskDao: TaskDao,
-    private val notificationPreferences: NotificationPreferences
+    private val notificationPreferences: NotificationPreferences,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = try {
         if (!notificationPreferences.weeklyTaskSummaryEnabled.first()) return Result.success()
+        // MH-first G4: pause-all silences weekly task summary.
+        if (notificationPauseGate.isPausedNow()) return Result.success()
         val data = WeeklyTaskSummaryCalculator.generateWeeklySummary(taskDao)
         showNotification(applicationContext, data)
         Result.success()

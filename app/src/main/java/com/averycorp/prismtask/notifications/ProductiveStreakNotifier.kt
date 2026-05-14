@@ -21,10 +21,15 @@ import javax.inject.Singleton
 class ProductiveStreakNotifier
 @Inject
 constructor(
-    @ApplicationContext private val appContext: Context
+    @ApplicationContext private val appContext: Context,
+    private val notificationPauseGate: NotificationPauseGate
 ) {
-    fun notifyBrokenStreak(brokenLength: Int) {
+    suspend fun notifyBrokenStreak(brokenLength: Int) {
         if (brokenLength <= 0) return
+        // MH-first G4: pause-all silences broken-streak nudges. The
+        // streak state itself isn't touched — only the empathetic
+        // notification is suppressed for the pause window.
+        if (notificationPauseGate.isPausedNow()) return
         ensureChannel()
         val title = ProductiveStreakPreferences.BROKEN_STREAK_NOTIFICATION_TITLE
         val body = ProductiveStreakPreferences.BROKEN_STREAK_NOTIFICATION_BODY

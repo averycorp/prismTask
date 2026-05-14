@@ -40,7 +40,8 @@ constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val notificationPreferences: NotificationPreferences,
-    private val weeklyReviewGenerator: WeeklyReviewGenerator
+    private val weeklyReviewGenerator: WeeklyReviewGenerator,
+    private val notificationPauseGate: NotificationPauseGate
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -50,7 +51,12 @@ constructor(
 
         return when (val outcome = weeklyReviewGenerator.generateReview()) {
             is WeeklyReviewGenerationOutcome.Generated -> {
-                if (notificationPreferences.weeklyReviewNotificationEnabled.first()) {
+                // MH-first G4: pause-all silences the weekly review nudge,
+                // but the review itself is still generated and persisted so
+                // the user can read it whenever they un-pause.
+                if (notificationPreferences.weeklyReviewNotificationEnabled.first() &&
+                    !notificationPauseGate.isPausedNow()
+                ) {
                     postNotification(applicationContext)
                 }
                 Result.success()

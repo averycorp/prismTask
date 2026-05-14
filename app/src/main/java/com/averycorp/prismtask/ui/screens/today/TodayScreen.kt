@@ -81,6 +81,8 @@ import com.averycorp.prismtask.ui.screens.today.components.GUIDED_TOUR_STEPS
 import com.averycorp.prismtask.ui.screens.today.components.GuidedTourCard
 import com.averycorp.prismtask.ui.screens.today.components.MorningCheckInBanner
 import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
+import com.averycorp.prismtask.ui.screens.today.components.PauseAllNotificationsControl
+import com.averycorp.prismtask.ui.screens.today.components.PauseStatusPill
 import com.averycorp.prismtask.ui.screens.today.components.PlanForTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.ProductivityScoreBadge
 import com.averycorp.prismtask.ui.screens.today.components.SelfCareNudgeCard
@@ -250,7 +252,10 @@ fun TodayScreen(
                         onClick = { navController.navigate(PrismTaskRoute.TaskAnalytics.createRoute()) }
                     )
                 },
-                trailingActions = { SyncIndicatorHost() }
+                trailingActions = {
+                    PauseAllNotificationsControl()
+                    SyncIndicatorHost()
+                }
             )
         },
         bottomBar = {
@@ -336,6 +341,13 @@ fun TodayScreen(
                         .expandedWidthCap(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // MH-first G4: descriptive status pill, only renders
+                    // when an ad-hoc pause is active. Composes with the
+                    // bell-with-slash icon in the header.
+                    item(key = "pause_status_pill") {
+                        PauseStatusPill()
+                    }
+
                     if (nothingToday && !allTodayDone) {
                         item(key = "day_clear") {
                             RichEmptyState(

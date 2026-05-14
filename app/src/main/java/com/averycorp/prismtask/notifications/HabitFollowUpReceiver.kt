@@ -9,6 +9,10 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,6 +27,12 @@ import kotlinx.coroutines.launch
  * cancelled if the habit is completed before the follow-up fires.
  */
 class HabitFollowUpReceiver : BroadcastReceiver() {
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    internal interface PauseEntryPoint {
+        fun notificationPauseGate(): NotificationPauseGate
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val habitId = intent.getLongExtra(EXTRA_HABIT_ID, -1L)
         if (habitId == -1L) return
@@ -38,6 +48,18 @@ class HabitFollowUpReceiver : BroadcastReceiver() {
                 val prefs = NotificationPreferences.from(context)
                 val enabled = prefs.medicationRemindersEnabled.first()
                 if (!enabled) return@launch
+                // MH-first G4: habit follow-ups are habit-class notifications
+                // (they piggyback on the medication channel for delivery, but
+                // they are NOT medication reminders). Gate via the pause-all
+                // toggle — medication reminders proper are exempt and route
+                // through MedicationReminderReceiver instead.
+                val pauseGate = EntryPointAccessors
+                    .fromApplication(context.applicationContext, PauseEntryPoint::class.java)
+                    .notificationPauseGate()
+                if (pauseGate.isPausedNow()) {
+                    Log.d("HabitFollowUp", "Pause-all active — skipping habit=$habitId")
+                    return@launch
+                }
 
                 // Reuse the medication channel via the public importance-based API
                 NotificationHelper.createNotificationChannel(context)

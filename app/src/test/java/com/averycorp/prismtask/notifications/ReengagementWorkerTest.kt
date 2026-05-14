@@ -58,6 +58,7 @@ class ReengagementWorkerTest {
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var notificationPreferences: NotificationPreferences
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
+    private lateinit var notificationPauseGate: NotificationPauseGate
 
     private val keySentCount = intPreferencesKey("reengagement_sent_count")
     private val keyLastOpenTime = longPreferencesKey("last_open_time")
@@ -70,6 +71,7 @@ class ReengagementWorkerTest {
         proFeatureGate = mockk(relaxed = true)
         notificationPreferences = mockk(relaxed = true)
         advancedTuningPreferences = mockk(relaxed = true)
+        notificationPauseGate = mockk(relaxed = true)
 
         coEvery { proFeatureGate.hasAccess(ProFeatureGate.AI_REENGAGEMENT) } returns true
         coEvery { notificationPreferences.reengagementEnabled } returns flowOf(true)
@@ -77,6 +79,9 @@ class ReengagementWorkerTest {
         coEvery { taskDao.getLastCompletedTask() } returns null
         coEvery { taskDao.getIncompleteTaskCount() } returns 0
         coEvery { api.getReengagementNudge(any()) } returns ReengagementResponse(nudge = "Welcome back")
+        // MH-first G4: default to "not paused" so existing test cases
+        // (which pre-date the gate) keep their original semantics.
+        coEvery { notificationPauseGate.isPausedNow(any()) } returns false
     }
 
     private fun buildWorker(): ReengagementWorker {
@@ -92,7 +97,8 @@ class ReengagementWorkerTest {
                 taskDao = taskDao,
                 proFeatureGate = proFeatureGate,
                 notificationPreferences = notificationPreferences,
-                advancedTuningPreferences = advancedTuningPreferences
+                advancedTuningPreferences = advancedTuningPreferences,
+                notificationPauseGate = notificationPauseGate
             )
         }
         return TestListenableWorkerBuilder
