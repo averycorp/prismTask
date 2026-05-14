@@ -6,6 +6,7 @@ import { useTagStore } from '@/stores/tagStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useMedicationSlotsStore } from '@/stores/medicationSlotsStore';
 import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -36,6 +37,9 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   );
   const subscribeToPreferences = useMedicationPreferencesStore(
     (s) => s.subscribeToPreferences,
+  );
+  const subscribeToStartOfDayHour = useSettingsStore(
+    (s) => s.subscribeToStartOfDayHour,
   );
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
@@ -70,6 +74,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToCompletions, 'habit-completions');
     safeSubscribe(subscribeToSlotDefs, 'medication-slot-defs');
     safeSubscribe(subscribeToPreferences, 'medication-preferences');
+    safeSubscribe(subscribeToStartOfDayHour, 'start-of-day-hour');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -91,6 +96,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToCompletions,
     subscribeToSlotDefs,
     subscribeToPreferences,
+    subscribeToStartOfDayHour,
     resetSlots,
     resetPrefs,
   ]);

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
 - **Batch adjustments through AI Chat.** The Coach can now propose a
   `batch_command` inline action when a user asks for multi-entity
   changes that go beyond the existing single-task / `reschedule_batch`
