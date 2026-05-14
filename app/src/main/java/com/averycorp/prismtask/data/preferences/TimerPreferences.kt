@@ -34,6 +34,8 @@ constructor(
         private val POMODORO_AVAILABLE_MINUTES = intPreferencesKey("pomodoro_available_minutes")
         private val POMODORO_FOCUS_PREFERENCE = stringPreferencesKey("pomodoro_focus_preference")
         private val BUZZ_UNTIL_DISMISSED = booleanPreferencesKey("timer_buzz_until_dismissed")
+        private val OVERRIDE_VOLUME = booleanPreferencesKey("timer_override_volume")
+        private val ALARM_VOLUME_PERCENT = intPreferencesKey("timer_alarm_volume_percent")
 
         // ---- A2 Pomodoro+ AI Coaching toggles ---------------------------
         // Distinct subsection so parallel Weekly Task Summary work doesn't
@@ -56,6 +58,10 @@ constructor(
 
         const val DEFAULT_FOCUS_PREFERENCE = "balanced"
         val VALID_FOCUS_PREFERENCES = setOf("deep_work", "quick_wins", "balanced", "deadline_driven")
+
+        const val DEFAULT_ALARM_VOLUME_PERCENT = 80
+        const val MIN_ALARM_VOLUME_PERCENT = 1
+        const val MAX_ALARM_VOLUME_PERCENT = 100
     }
 
     fun getWorkDurationSeconds(): Flow<Int> = context.timerDataStore.data.map { prefs ->
@@ -166,6 +172,26 @@ constructor(
     suspend fun setBuzzUntilDismissed(enabled: Boolean) {
         context.timerDataStore.edit { prefs ->
             prefs[BUZZ_UNTIL_DISMISSED] = enabled
+        }
+    }
+
+    fun getOverrideVolume(): Flow<Boolean> = context.timerDataStore.data.map { prefs ->
+        prefs[OVERRIDE_VOLUME] ?: false
+    }
+
+    suspend fun setOverrideVolume(enabled: Boolean) {
+        context.timerDataStore.edit { prefs ->
+            prefs[OVERRIDE_VOLUME] = enabled
+        }
+    }
+
+    fun getAlarmVolumePercent(): Flow<Int> = context.timerDataStore.data.map { prefs ->
+        prefs[ALARM_VOLUME_PERCENT] ?: DEFAULT_ALARM_VOLUME_PERCENT
+    }
+
+    suspend fun setAlarmVolumePercent(percent: Int) {
+        context.timerDataStore.edit { prefs ->
+            prefs[ALARM_VOLUME_PERCENT] = percent.coerceIn(MIN_ALARM_VOLUME_PERCENT, MAX_ALARM_VOLUME_PERCENT)
         }
     }
 

@@ -41,6 +41,8 @@ fun TimerSection(
     pomodoroAvailableMinutes: Int,
     pomodoroFocusPreference: String,
     buzzUntilDismissed: Boolean,
+    overrideVolume: Boolean,
+    alarmVolumePercent: Int,
     // A2 Pomodoro+ AI Coaching — each surface has its own toggle, all default on.
     preSessionCoachingEnabled: Boolean,
     breakCoachingEnabled: Boolean,
@@ -52,6 +54,8 @@ fun TimerSection(
     onPomodoroAvailableMinutesChange: (Int) -> Unit,
     onPomodoroFocusPreferenceChange: (String) -> Unit,
     onBuzzUntilDismissedChange: (Boolean) -> Unit,
+    onOverrideVolumeChange: (Boolean) -> Unit,
+    onAlarmVolumePercentChange: (Int) -> Unit,
     onPreSessionCoachingChange: (Boolean) -> Unit,
     onBreakCoachingChange: (Boolean) -> Unit,
     onRecapCoachingChange: (Boolean) -> Unit
@@ -62,6 +66,7 @@ fun TimerSection(
     var showTimerCustomDialog by remember { mutableStateOf(false) }
     var showAvailableTimeDialog by remember { mutableStateOf(false) }
     var showFocusDialog by remember { mutableStateOf(false) }
+    var showAlarmVolumeDialog by remember { mutableStateOf(false) }
 
     if (showTimerWorkDialog) {
         DurationPickerDialog(
@@ -133,6 +138,17 @@ fun TimerSection(
         )
     }
 
+    if (showAlarmVolumeDialog) {
+        AlarmVolumePickerDialog(
+            currentPercent = alarmVolumePercent,
+            onConfirm = {
+                onAlarmVolumePercentChange(it)
+                showAlarmVolumeDialog = false
+            },
+            onDismiss = { showAlarmVolumeDialog = false }
+        )
+    }
+
     SectionHeader("Timer & Pomodoro")
 
     SettingsRowWithSubtitle(
@@ -171,6 +187,19 @@ fun TimerSection(
         checked = buzzUntilDismissed,
         onCheckedChange = onBuzzUntilDismissedChange
     )
+    SettingsToggleRow(
+        title = "Override System Volume",
+        subtitle = "Ring the timer at a fixed volume even if the alarm slider is low or muted.",
+        checked = overrideVolume,
+        onCheckedChange = onOverrideVolumeChange
+    )
+    if (overrideVolume) {
+        SettingsRowWithSubtitle(
+            title = "Alarm Volume",
+            subtitle = "$alarmVolumePercent%",
+            onClick = { showAlarmVolumeDialog = true }
+        )
+    }
 
     // ---- A2 Pomodoro+ AI Coaching toggles ---------------------------
     // Grouped with the other Pomodoro controls. Toggles are independent —
@@ -270,6 +299,65 @@ private fun AvailableTimePickerDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(minutes) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun AlarmVolumePickerDialog(
+    currentPercent: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val minPercent = TimerPreferences.MIN_ALARM_VOLUME_PERCENT
+    val maxPercent = TimerPreferences.MAX_ALARM_VOLUME_PERCENT
+    var percent by remember(currentPercent) {
+        mutableIntStateOf(currentPercent.coerceIn(minPercent, maxPercent))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Alarm Volume") },
+        text = {
+            Column {
+                Text(
+                    text = "$percent%",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+                Slider(
+                    value = percent.toFloat(),
+                    onValueChange = {
+                        percent = it.toInt().coerceIn(minPercent, maxPercent)
+                    },
+                    valueRange = minPercent.toFloat()..maxPercent.toFloat()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "$minPercent%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "$maxPercent%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(percent) }) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

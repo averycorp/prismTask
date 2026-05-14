@@ -219,11 +219,21 @@ class PomodoroTimerService : Service() {
         // (notification must post BEFORE startContinuousBuzz arms its
         // dismiss path).
         serviceScope.launch {
-            val buzzUntilDismissed = TimerPreferences(this@PomodoroTimerService)
-                .getBuzzUntilDismissed()
-                .first()
-            val completion = buildCompletionNotification(buzzUntilDismissed)
+            val timerPrefs = TimerPreferences(this@PomodoroTimerService)
+            val buzzUntilDismissed = timerPrefs.getBuzzUntilDismissed().first()
+            val overrideVolume = timerPrefs.getOverrideVolume().first()
+            val volumePercent = timerPrefs.getAlarmVolumePercent().first()
+            val completion = buildCompletionNotification(
+                buzzUntilDismissed = buzzUntilDismissed,
+                silenceChannelSound = overrideVolume
+            )
             manager?.notify(NOTIFICATION_ID_COMPLETE, completion)
+
+            if (overrideVolume) {
+                // Play the alarm ourselves so we control the stream volume.
+                // Channel-played sound is suppressed via setDefaults(0) above.
+                TimerAlarmPlayer.play(this@PomodoroTimerService, volumePercent)
+            }
 
             if (buzzUntilDismissed) {
                 NotificationHelper.startContinuousBuzz(this@PomodoroTimerService)
@@ -366,7 +376,10 @@ class PomodoroTimerService : Service() {
             ).build()
     }
 
-    private fun buildCompletionNotification(buzzUntilDismissed: Boolean): Notification {
+    private fun buildCompletionNotification(
+        buzzUntilDismissed: Boolean,
+        silenceChannelSound: Boolean = false
+    ): Notification {
         val tapIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -410,7 +423,16 @@ class PomodoroTimerService : Service() {
             )
         } else {
             builder.setContentIntent(tapPending)
-            builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            if (silenceChannelSound) {
+                // TimerAlarmPlayer handles sound at the user-pinned volume,
+                // so suppress the channel's default sound to avoid a double
+                // ring. Keep vibration off too — channel-level vibration is
+                // a separate user choice (Buzz Until Dismissed).
+                builder.setDefaults(0)
+                builder.setSilent(true)
+            } else {
+                builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            }
         }
 
         return builder.build()
