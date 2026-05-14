@@ -186,6 +186,13 @@ object TestDatabaseModule {
     fun provideUserAiPreferenceDao(database: PrismTaskDatabase) =
         database.userAiPreferenceDao()
 
+    // PR #1421 (Rest Day primitive, G3) added `restDayDao()` to
+    // PrismTaskDatabase and `provideRestDayDao` to the production
+    // DatabaseModule. Mirror it here so the androidTest Hilt graph still
+    // resolves RestDayRepository (consumed via RestDayGateEntryPoint).
+    @Provides
+    fun provideRestDayDao(database: PrismTaskDatabase) = database.restDayDao()
+
     @Provides
     @Singleton
     fun provideGson(): com.google.gson.Gson = com.google.gson.Gson()
