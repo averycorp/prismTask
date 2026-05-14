@@ -113,7 +113,7 @@ fun AddEditCourseScreen(
                 actions = {
                     TextButton(
                         onClick = { viewModel.save { navController.popBackStack() } },
-                        enabled = name.isNotBlank() && code.isNotBlank()
+                        enabled = name.isNotBlank()
                     ) {
                         Text("Save", fontWeight = FontWeight.Bold)
                     }
@@ -136,7 +136,7 @@ fun AddEditCourseScreen(
             OutlinedTextField(
                 value = code,
                 onValueChange = viewModel::onCodeChange,
-                label = { Text("Course Code") },
+                label = { Text("Course Code (Optional)") },
                 placeholder = { Text("e.g. CSCI 5622") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true

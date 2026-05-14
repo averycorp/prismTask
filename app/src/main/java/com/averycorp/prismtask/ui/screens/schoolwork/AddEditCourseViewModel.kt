@@ -73,7 +73,7 @@ constructor(
     }
 
     fun save(onDone: () -> Unit) {
-        if (_name.value.isBlank() || _code.value.isBlank()) return
+        if (_name.value.isBlank()) return
         viewModelScope.launch {
             val name = _name.value.trim()
             val code = _code.value.trim()

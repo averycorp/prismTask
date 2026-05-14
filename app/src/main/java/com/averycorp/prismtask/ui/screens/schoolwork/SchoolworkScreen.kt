@@ -398,8 +398,11 @@ fun SchoolworkScreen(
             onDismissRequest = { deletingCourse = null },
             title = { Text("Delete Course") },
             text = {
+                val label = listOf(course.code, course.name)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ")
                 Text(
-                    "Delete \"${course.code} ${course.name}\"? Its assignments and " +
+                    "Delete \"$label\"? Its assignments and " +
                         "today's completion will also be removed."
                 )
             },
@@ -547,8 +550,10 @@ private fun CourseCheckItem(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
+                val hasCode = course.code.isNotBlank()
+                val primary = if (hasCode) "${course.icon} ${course.code}" else "${course.icon} ${course.name}"
                 Text(
-                    "${course.icon} ${course.code}",
+                    primary,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = if (done) {
@@ -558,13 +563,15 @@ private fun CourseCheckItem(
                     },
                     textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None
                 )
-                Text(
-                    course.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (hasCode) {
+                    Text(
+                        course.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             // Trailing remove affordance — opens a confirm dialog at screen
             // level so accidental taps on the row's clickable surface don't
@@ -572,7 +579,7 @@ private fun CourseCheckItem(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Remove ${course.code}",
+                    contentDescription = "Remove ${course.code.ifBlank { course.name }}",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -615,18 +622,21 @@ private fun CourseCard(
                 Text(course.icon, fontSize = 20.sp)
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
+                    val hasCode = course.code.isNotBlank()
                     Text(
-                        course.code,
+                        if (hasCode) course.code else course.name,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        course.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    if (hasCode) {
+                        Text(
+                            course.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 if (activeCount > 0) {
                     Box(
