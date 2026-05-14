@@ -146,8 +146,9 @@ constructor(
 
         val subtaskCount = result.tasks.sumOf { countSubtasks(it) }
         val tagCount = result.tags.size
+        val importLabel = result.course.code.ifBlank { result.course.name }
         _snackbar.emit(
-            "Imported ${result.course.code}: $taskCount tasks" +
+            "Imported $importLabel: $taskCount tasks" +
                 (if (subtaskCount > 0) ", $subtaskCount subtasks" else "") +
                 (if (tagCount > 0) ", $tagCount tags" else "") +
                 " + project"

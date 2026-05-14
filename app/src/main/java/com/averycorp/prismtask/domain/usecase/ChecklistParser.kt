@@ -144,7 +144,7 @@ constructor(
         return ComprehensiveImportResult(
             course = course,
             project = ParsedProject(
-                name = "${course.code} — ${course.name}",
+                name = if (course.code.isBlank()) course.name else "${course.code} — ${course.name}",
                 color = "#4A90D9",
                 icon = "\uD83D\uDCDA"
             ),
