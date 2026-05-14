@@ -6,6 +6,11 @@ import { useTagStore } from '@/stores/tagStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useMedicationSlotsStore } from '@/stores/medicationSlotsStore';
 import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useTaskDependencyStore } from '@/stores/taskDependencyStore';
+import { useProjectPhaseStore } from '@/stores/projectPhaseStore';
+import { useProjectRiskStore } from '@/stores/projectRiskStore';
+import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -20,6 +25,16 @@ import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesSto
  * from any component, so cross-device changes only landed after a
  * manual page refresh.
  *
+ * Parity audit A.1a (2026-05-13) extends this to 11 listeners — adds
+ * task_dependencies, project_phases, project_risks, external_anchors.
+ * `subscribeToAiFeaturesEnabled` is intentionally NOT wired here: the
+ * AI-features flag is already pulled imperatively via
+ * `settingsStore.loadAiFeaturesFromFirestore` on auth bootstrap, and
+ * adding an `onSnapshot` here would double-read the same doc plus race
+ * with the localStorage-backed `setSetting` write-back inside the
+ * store. Real-time AI-prefs sync is tracked separately so it can be
+ * addressed alongside the broader settings persistence work (A.5b).
+ *
  * Conflict resolution at apply time is intentionally last-write-wins:
  * Firestore is the source of truth on web, optimistic local state is
  * overwritten by the remote snapshot. LWW timestamp guards and
@@ -27,6 +42,9 @@ import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesSto
  */
 export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToTasks = useTaskStore((s) => s.subscribeToTasks);
+  const subscribeToTaskCompletions = useTaskStore(
+    (s) => s.subscribeToTaskCompletions,
+  );
   const subscribeToProjects = useProjectStore((s) => s.subscribeToProjects);
   const subscribeToTags = useTagStore((s) => s.subscribeToTags);
   const subscribeToHabits = useHabitStore((s) => s.subscribeToHabits);
@@ -37,8 +55,22 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToPreferences = useMedicationPreferencesStore(
     (s) => s.subscribeToPreferences,
   );
+  const subscribeToStartOfDayHour = useSettingsStore(
+    (s) => s.subscribeToStartOfDayHour,
+  const subscribeToDependencies = useTaskDependencyStore(
+    (s) => s.subscribeToDependencies,
+  );
+  const subscribeToPhases = useProjectPhaseStore((s) => s.subscribeToPhases);
+  const subscribeToRisks = useProjectRiskStore((s) => s.subscribeToRisks);
+  const subscribeToAnchors = useExternalAnchorStore(
+    (s) => s.subscribeToAnchors,
+  );
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
+  const resetDependencies = useTaskDependencyStore((s) => s.reset);
+  const resetPhases = useProjectPhaseStore((s) => s.reset);
+  const resetRisks = useProjectRiskStore((s) => s.reset);
+  const resetAnchors = useExternalAnchorStore((s) => s.reset);
 
   useEffect(() => {
     if (!uid) {
@@ -47,6 +79,10 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       // first snapshot lands.
       resetSlots();
       resetPrefs();
+      resetDependencies();
+      resetPhases();
+      resetRisks();
+      resetAnchors();
       return;
     }
 
@@ -64,12 +100,18 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     };
 
     safeSubscribe(subscribeToTasks, 'tasks');
+    safeSubscribe(subscribeToTaskCompletions, 'task-completions');
     safeSubscribe(subscribeToProjects, 'projects');
     safeSubscribe(subscribeToTags, 'tags');
     safeSubscribe(subscribeToHabits, 'habits');
     safeSubscribe(subscribeToCompletions, 'habit-completions');
     safeSubscribe(subscribeToSlotDefs, 'medication-slot-defs');
     safeSubscribe(subscribeToPreferences, 'medication-preferences');
+    safeSubscribe(subscribeToStartOfDayHour, 'start-of-day-hour');
+    safeSubscribe(subscribeToDependencies, 'task-dependencies');
+    safeSubscribe(subscribeToPhases, 'project-phases');
+    safeSubscribe(subscribeToRisks, 'project-risks');
+    safeSubscribe(subscribeToAnchors, 'external-anchors');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -85,13 +127,23 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   }, [
     uid,
     subscribeToTasks,
+    subscribeToTaskCompletions,
     subscribeToProjects,
     subscribeToTags,
     subscribeToHabits,
     subscribeToCompletions,
     subscribeToSlotDefs,
     subscribeToPreferences,
+    subscribeToStartOfDayHour,
+    subscribeToDependencies,
+    subscribeToPhases,
+    subscribeToRisks,
+    subscribeToAnchors,
     resetSlots,
     resetPrefs,
+    resetDependencies,
+    resetPhases,
+    resetRisks,
+    resetAnchors,
   ]);
 }

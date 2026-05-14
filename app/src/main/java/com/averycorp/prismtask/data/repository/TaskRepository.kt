@@ -512,7 +512,19 @@ constructor(
 
             val nextId = if (fresh.recurrenceRule != null && fresh.dueDate != null) {
                 val rule = RecurrenceConverter.fromJson(fresh.recurrenceRule)
-                val nextDueDate = rule?.let { RecurrenceEngine.calculateNextDueDate(fresh.dueDate, it) }
+                // Anchor the next occurrence to completion time, not the original
+                // due date. Otherwise an overdue recurring task spawns a still-
+                // overdue child (e.g. daily/interval=1 + dueDate=last week →
+                // next=last-week+1=still in the past), and the user has to
+                // re-check the task repeatedly to catch up. Passing `now` also
+                // wires AFTER_COMPLETION rules through their intended basis.
+                val nextDueDate = rule?.let {
+                    RecurrenceEngine.calculateNextDueDate(
+                        currentDueDate = now,
+                        rule = it,
+                        completedAt = now
+                    )
+                }
                 if (rule != null && nextDueDate != null) {
                     val updatedRule = rule.copy(occurrenceCount = rule.occurrenceCount + 1)
                     val nextDraft = fresh.copy(

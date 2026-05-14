@@ -209,8 +209,11 @@ constructor(
             if (!activity.enabled) return@filter false
             val builtIn = com.averycorp.prismtask.domain.model.LeisureCategory
                 .fromStringOrNull(activity.category)
-            if (builtIn != null) builtIn in snap.enabledCategories
-            else activity.category in customIds
+            if (builtIn != null) {
+                builtIn in snap.enabledCategories
+            } else {
+                activity.category in customIds
+            }
         }
         val suggestion = enabledPool.firstOrNull() // ViewModel resamples lazily via repository
         LeisureBudgetCardState(

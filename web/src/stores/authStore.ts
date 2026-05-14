@@ -5,7 +5,8 @@ import {
   onAuthStateChanged,
   type User as FbUser,
 } from 'firebase/auth';
-import { firebaseAuth, googleProvider } from '@/lib/firebase';
+import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
+import { firebaseAuth, firestore, googleProvider } from '@/lib/firebase';
 import type { User, FirebaseUser } from '@/types/auth';
 import { authApi } from '@/api/auth';
 import { setFirebaseUid } from '@/stores/firebaseUid';
@@ -171,9 +172,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
     });
 
-    // Pull cross-device synced settings (e.g. AI-features opt-out) from
-    // Firestore so Android's value propagates immediately. Best-effort.
+    // Pull cross-device synced settings (e.g. AI-features opt-out,
+    // Start-of-Day hour) from Firestore so Android's values propagate
+    // immediately. Best-effort.
     void useSettingsStore.getState().loadAiFeaturesFromFirestore(fbUser.uid);
+    void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
 
     // Link with FastAPI backend for NLP/AI features
     await ensureBackendAccount(fbUser);
@@ -208,9 +211,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
         });
 
-        // Pull cross-device synced settings (e.g. AI-features opt-out) from
-        // Firestore so Android's value propagates on session restore.
+        // Pull cross-device synced settings (e.g. AI-features opt-out,
+        // Start-of-Day hour) from Firestore so Android's values
+        // propagate on session restore.
         void useSettingsStore.getState().loadAiFeaturesFromFirestore(fbUser.uid);
+        void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
 
         // Restore JWT tokens from localStorage
         const accessToken = localStorage.getItem('prismtask_access_token');
@@ -280,6 +285,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    // Synchronous teardown first — keeps existing callers' assumption
+    // that the auth state flips immediately on `logout()`.
     signOut(firebaseAuth).catch(() => {});
     setFirebaseUid(null);
     localStorage.removeItem('prismtask_access_token');
@@ -294,6 +301,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       deletionStatus: 'unknown',
       deletionScheduledFor: null,
     });
+
+    // Parity audit item G.7: clear the Firestore offline IndexedDB
+    // cache so a different user signing in on this browser can't see
+    // the previous user's stale docs before their own snapshots arrive.
+    // terminate() must run BEFORE clearIndexedDbPersistence(); after
+    // terminate() the firestore handle is unusable, so we force a page
+    // reload to /login at the end so the next sign-in gets a fresh
+    // firestore instance rather than the dead handle.
+    void (async () => {
+      try {
+        await terminate(firestore);
+      } catch (err) {
+        console.warn('Firestore terminate() during logout failed:', err);
+      }
+      try {
+        await clearIndexedDbPersistence(firestore);
+      } catch (err) {
+        // Expected to fail when other tabs hold the firestore open. Log
+        // and move on — the reload below still flushes our handle.
+        console.warn(
+          'Firestore clearIndexedDbPersistence() during logout failed:',
+          err,
+        );
+      }
+      // Force a clean reload so the firestore handle (now terminated)
+      // is rebuilt from scratch for whoever signs in next. Guarded so
+      // unit tests (no jsdom location, or location stubbed) don't blow
+      // up.
+      if (typeof window !== 'undefined' && window.location?.assign) {
+        window.location.assign('/login');
+      }
+    })();
   },
 
   refreshAccessToken: async () => {
