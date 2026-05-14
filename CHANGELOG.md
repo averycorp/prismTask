@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Removed
+
+- chore(web): remove dead web/src/api/sync.ts HTTP-sync stub — Firestore-direct path superseded it (parity audit A.3).
+
 ### Added
 
 - **Batch adjustments through AI Chat.** The Coach can now propose a
