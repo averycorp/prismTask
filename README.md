@@ -12,7 +12,6 @@
 [![Android Integration CI](https://github.com/averycorp/prismTask/actions/workflows/android-integration.yml/badge.svg?branch=main)](https://github.com/averycorp/prismTask/actions/workflows/android-integration.yml)
 [![Backend CI](https://github.com/averycorp/prismTask/actions/workflows/backend-ci.yml/badge.svg?branch=main)](https://github.com/averycorp/prismTask/actions/workflows/backend-ci.yml)
 [![Web CI](https://github.com/averycorp/prismTask/actions/workflows/web-ci.yml/badge.svg?branch=main)](https://github.com/averycorp/prismTask/actions/workflows/web-ci.yml)
-[![Release](https://github.com/averycorp/prismTask/actions/workflows/release.yml/badge.svg)](https://github.com/averycorp/prismTask/actions/workflows/release.yml)
 
 A cross-platform task manager and wellness-aware productivity layer.
 Features AI-powered NLP and batch ops, voice input, full accessibility,
