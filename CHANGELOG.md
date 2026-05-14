@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(web/build): bump `idb` pin from `^8.0.4` to `^8.0.3` — `8.0.4` was never published to npm so every clean `npm install` since PR #1239 (2026-05-10) failed with `ETARGET`, silently turning web CI red across the repo. Also cleans up 3 pre-existing lint errors (`no-useless-assignment` in `batchHistoryStore.ts` + `batchStore.ts`; `react-hooks/set-state-in-effect` in `WorkLifeBalanceSection.tsx`) plus 1 tautology test (`endsWith(slice(0,0))` always true) in `chatStore.test.ts`. Web suite now lint + tsc + vitest clean: 72/72 files, 679/679 tests.
 - fix(web/sync): repair `useFirestoreSync.ts` + matching test file syntax left broken by PR #1340's botched manual merge — restores the missing `)` after `subscribeToStartOfDayHour`, the missing `});` after the `taskBehaviorPreferences` mock, and the duplicate `it('subscribes to all 8 …')` line. Web CI was failing every PR since 2026-05-13.
 
 ### Removed
