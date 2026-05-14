@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **LeisurePoolScreen on web (parity F.1a).** Web port of
+  `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
+  Quick-Log category tiles + Recent Activity day-grouped list + Manage
+  section (daily/weekend target sliders, category enable toggles,
+  activity-pool editor). Reachable at `/leisure`. Wired through a new
+  `web/src/stores/leisureStore.ts` Zustand store that mirrors
+  `LeisurePoolViewModel.UiState`. Custom categories surface visually but
+  remain device-local — the backend's `LeisureCategoryT` CHECK constraint
+  pins synced rows to the four built-in buckets, matching Android's
+  behavior. Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - **Leisure REST client + types on web (parity F.1d).** Added `web/src/api/leisure.ts` mirroring the Android `LeisureSyncService` request shape: activities (list/create/update/delete), sessions (list/create), and singleton settings (get/patch). Custom-category-tagged rows are filtered out at the network boundary before any write so they don't 422 against the backend's `LeisureCategoryT` CHECK constraint — they stay device-local just like on Android. No UI yet; this is foundation for the LeisurePoolScreen port and the Today leisure-minimum row. Audit: `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/settings): sync `startOfDayHour` cross-device via Firestore (`users/{uid}/prefs/task_behavior_prefs.day_start_hour`) — closes parity audit A.5a.
 - feat(web/sync): write `task_completions` rows to Firestore so analytics history populates cross-device — closes parity audit B.6.
