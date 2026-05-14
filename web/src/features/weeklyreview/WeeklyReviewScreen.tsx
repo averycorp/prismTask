@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/authStore';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import * as firestoreTasks from '@/api/firestore/tasks';
+import { upsertWeeklyReview } from '@/api/firestore/weeklyReviews';
 import { aiApi, type WeeklyReviewResponse } from '@/api/ai';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -40,6 +41,36 @@ type UiState =
     }
   | { kind: 'empty'; local: WeeklyReviewLocal }
   | { kind: 'error'; local: WeeklyReviewLocal; message: string };
+
+/**
+ * Persist the computed review to Firestore so it shows up cross-device.
+ * Best-effort — a transient Firestore failure is logged but doesn't
+ * block the UI. Parity audit C.4a.
+ */
+async function persistWeeklyReview(
+  weekWindow: WeeklyWindow,
+  local: WeeklyReviewLocal,
+  backend: WeeklyReviewResponse | null,
+): Promise<void> {
+  try {
+    const uid = getFirebaseUid();
+    const metrics = {
+      completed_count: local.completedCount,
+      slipped_count: local.slippedCount,
+      wins: local.narrative.wins,
+      slips: local.narrative.slips,
+      suggestions: local.narrative.suggestions,
+      week_end_iso: weekWindow.weekEndIso,
+    };
+    await upsertWeeklyReview(uid, {
+      weekStart: weekWindow.weekStartIso,
+      metricsJson: JSON.stringify(metrics),
+      aiInsightsJson: backend ? JSON.stringify(backend) : null,
+    });
+  } catch (err) {
+    console.warn('Failed to persist weekly review to Firestore', err);
+  }
+}
 
 function formatWeekLabel(window: WeeklyWindow): string {
   const start = new Date(window.weekStartMs);
@@ -107,6 +138,9 @@ export function WeeklyReviewScreen() {
         setUiState({ kind: 'empty', local });
       } else {
         setUiState({ kind: 'success', local, backend: null });
+        // Persist Free-tier reviews too — Android picks them up on next
+        // pull and renders the same metrics breakdown.
+        void persistWeeklyReview(weekWindow, local, null);
       }
       return;
     }
@@ -147,6 +181,9 @@ export function WeeklyReviewScreen() {
         setUiState({ kind: 'empty', local });
       } else {
         setUiState({ kind: 'success', local, backend: response });
+        // Fire-and-forget persistence to Firestore so Android picks up
+        // the review on next pull. Parity audit C.4a.
+        void persistWeeklyReview(weekWindow, local, response);
       }
     } catch (err) {
       console.warn('AI weekly review fell back to local summary', err);
@@ -155,6 +192,9 @@ export function WeeklyReviewScreen() {
         local,
         message: 'AI review unavailable — showing local summary.',
       });
+      // Still persist the local-only review so cross-device users see
+      // the same week breakdown without re-running the aggregator.
+      void persistWeeklyReview(weekWindow, local, null);
     }
   }, [allTasks, weekWindow, isPro]);
 
