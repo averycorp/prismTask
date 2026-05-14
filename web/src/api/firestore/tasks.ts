@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
@@ -14,6 +13,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { lwwUpdate } from './lww';
 import type { CognitiveLoad, LifeCategory, Task, TaskMode, TaskStatus } from '@/types/task';
 import {
   timestampToDateStr,
@@ -223,14 +223,22 @@ function taskCreateToDoc(
   return doc;
 }
 
-function taskUpdateToDoc(data: Record<string, unknown>): Record<string, unknown> {
+function taskUpdateToDoc(
+  data: Record<string, unknown>,
+  now: number = Date.now(),
+): Record<string, unknown> {
   // Merge-mode write: include ONLY the fields the caller actually changed.
   // Anything not present here Firestore leaves untouched — protecting
   // Android-only fields like `isFlagged`, `lifeCategory`, `eisenhowerReason`,
   // `userOverrodeQuadrant`, all Focus-Release fields, `archived_at`,
   // `source_habit_id`, `scheduled_start_time`, `reminder_offset` from being
   // clobbered on every web edit (parity audit PR #836 § Surface 3, T-S2).
-  const doc: Record<string, unknown> = { updatedAt: Date.now() };
+  //
+  // The caller threads `now` through so the same wall-clock value lands on
+  // both the doc's `updatedAt` and the LWW guard's comparison — see
+  // `lww.ts` for why a fresh `Date.now()` inside the transaction would
+  // race.
+  const doc: Record<string, unknown> = { updatedAt: now };
   if (data.title !== undefined) doc.title = data.title;
   if (data.description !== undefined) doc.description = data.description;
   if (data.notes !== undefined) doc.notes = data.notes;
@@ -238,7 +246,7 @@ function taskUpdateToDoc(data: Record<string, unknown>): Record<string, unknown>
   if (data.status !== undefined) {
     doc.isCompleted = data.status === 'done';
     doc.webStatus = data.status;
-    if (data.status === 'done') doc.completedAt = Date.now();
+    if (data.status === 'done') doc.completedAt = now;
   }
   if (data.project_id !== undefined) doc.projectId = data.project_id;
   if (data.parent_id !== undefined) doc.parentTaskId = data.parent_id;
@@ -292,15 +300,20 @@ function taskUpdateToDoc(data: Record<string, unknown>): Record<string, unknown>
  * Replace the task's tag ID list outright. Used by the batch applier's
  * TAG_CHANGE path (slice 15) and by any future UI that edits tag chips
  * directly on a task.
+ *
+ * Guarded by [lwwUpdate]: an in-flight Android task edit with a newer
+ * `updatedAt` would otherwise have its non-tag fields silently
+ * clobbered by Firestore's merge semantics. See parity audit A.2.
  */
 export async function setTagsForTask(
   uid: string,
   taskId: string,
   tagIds: string[],
 ): Promise<void> {
-  await updateDoc(taskDoc(uid, taskId), {
+  const now = Date.now();
+  await lwwUpdate(taskDoc(uid, taskId), {
     tagIds: tagIds.filter((x) => typeof x === 'string'),
-    updatedAt: Date.now(),
+    updatedAt: now,
   });
 }
 
@@ -381,8 +394,16 @@ export async function updateTask(
   taskId: string,
   data: Record<string, unknown>,
 ): Promise<Task> {
-  const firestoreData = taskUpdateToDoc(data);
-  await updateDoc(taskDoc(uid, taskId), firestoreData);
+  // LWW guard. We stamp `now` once and thread it into both the patch
+  // payload and the guard's comparison so a Firestore-side race can't
+  // see one timestamp on the doc and a different one on the precondition
+  // (parity audit A.2). On stale-abort we still re-read the doc and
+  // return the remote state — the caller's reducer applies the same
+  // state as the snapshot listener will, so the optimistic UI doesn't
+  // diverge from the eventual Firestore state.
+  const now = Date.now();
+  const firestoreData = taskUpdateToDoc(data, now);
+  await lwwUpdate(taskDoc(uid, taskId), firestoreData as Parameters<typeof lwwUpdate>[1]);
   // Re-read the full document to return updated task
   const snap = await getDoc(taskDoc(uid, taskId));
   return docToTask(snap.id, snap.data()!, uid);

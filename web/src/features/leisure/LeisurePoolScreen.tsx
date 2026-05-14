@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  ChevronDown,
+  ChevronRight,
+  History,
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useLeisureStore, type LeisureCategoryRef } from '@/stores/leisureStore';
 import {
@@ -7,6 +16,7 @@ import {
   LEISURE_CATEGORY_DISPLAY,
   type LeisureActivity,
 } from '@/types/leisure';
+import { LogPastLeisureDialog } from './LogPastLeisureDialog';
 
 /**
  * Web port of `app/.../ui/screens/leisure/LeisurePoolScreen.kt`. Lean
@@ -66,6 +76,7 @@ export function LeisurePoolScreen() {
   const [quickLogCategory, setQuickLogCategory] = useState<LeisureCategoryRef | null>(null);
   const [addCustomOpen, setAddCustomOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [logPastOpen, setLogPastOpen] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -102,20 +113,29 @@ export function LeisurePoolScreen() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
           Leisure Minimum
         </h1>
-        <button
-          type="button"
-          onClick={() => {
-            setAddInitialCategoryId(visibleRefs[0]?.id ?? LEISURE_CATEGORIES[0]);
-            setAddOpen(true);
-          }}
-          className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" /> Activity
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLogPastOpen(true)}
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]"
+          >
+            <History className="h-4 w-4" /> Log Past
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAddInitialCategoryId(visibleRefs[0]?.id ?? LEISURE_CATEGORIES[0]);
+              setAddOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" /> Activity
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -530,6 +550,8 @@ export function LeisurePoolScreen() {
           onClose={() => setAddCustomOpen(false)}
         />
       )}
+
+      <LogPastLeisureDialog open={logPastOpen} onClose={() => setLogPastOpen(false)} />
     </div>
   );
 }
