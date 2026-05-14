@@ -418,11 +418,11 @@ constructor(
                 if (result.mutedColorPalette) ndPreferencesDataStore.setMutedColorPalette(true)
                 if (result.goodEnoughTimers) ndPreferencesDataStore.setGoodEnoughTimersEnabled(true)
                 if (result.forgivenessStreaks) {
-                    ndPreferencesDataStore.setForgivenessStreaks(true)
-                    // Also flip the cross-feature ForgivenessPrefs gate so
-                    // streak calculation actually respects the choice. The
-                    // ND flag is for ND-mode aware UI; the user-prefs flag
-                    // is what `StreakCalculator` reads.
+                    // Forgiveness-first streak behavior is owned by the global
+                    // `ForgivenessPrefs.enabled` — the ND-side mirror was
+                    // removed in PR #1415 as a dead phantom (audit R6).
+                    // Flipping the global pref is the only write the streak
+                    // calculators react to.
                     userPreferencesDataStore.setForgivenessPrefs(ForgivenessPrefs(enabled = true))
                 }
                 result.checkInIntervalMinutes?.let {
