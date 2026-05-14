@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
 import {
+  Archive,
+  ArchiveRestore,
   ChevronLeft,
   ChevronRight,
   Clock,
   ListChecks,
+  Pencil,
   Pill,
+  Plus,
   PlusCircle,
   Undo2,
 } from 'lucide-react';
@@ -20,11 +24,18 @@ import {
   type MedicationTier,
   type MedicationTierState,
 } from '@/api/firestore/medicationSlots';
+import {
+  archiveMedication,
+  getAllMedications,
+  unarchiveMedication,
+  type MedicationDoc,
+} from '@/api/firestore/medications';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MedicationSlotDetailModal } from '@/features/daily-essentials/MedicationSlotDetailModal';
 import { BulkMarkDialog } from '@/features/medication/BulkMarkDialog';
+import { MedicationEditorDialog } from '@/features/medication/MedicationEditorDialog';
 import { MedicationTierPicker } from '@/features/medication/MedicationTierPicker';
 import { MedicationTimeEditModal } from '@/features/medication/MedicationTimeEditModal';
 import { isBacklogged } from '@/features/medication/backloggedHelpers';
@@ -90,6 +101,31 @@ export function MedicationScreen() {
     null,
   );
   const [bulkMarkOpen, setBulkMarkOpen] = useState(false);
+  // Medication library (parity Batch 5 PR-1): full add / edit / archive
+  // surface backed by `users/{uid}/medications` Firestore writes.
+  const [medications, setMedications] = useState<MedicationDoc[]>([]);
+  const [medsLoading, setMedsLoading] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingMed, setEditingMed] = useState<MedicationDoc | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const reloadMedications = useCallback(async () => {
+    setMedsLoading(true);
+    try {
+      const uid = getFirebaseUid();
+      const list = await getAllMedications(uid);
+      setMedications(list);
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to load medications');
+    } finally {
+      setMedsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only data fetch
+    reloadMedications();
+  }, [reloadMedications]);
 
   const load = useCallback(
     async (iso: string) => {
@@ -232,6 +268,45 @@ export function MedicationScreen() {
     const next = format(addDays(parseISO(dateIso), days), 'yyyy-MM-dd');
     setDateIso(next);
   };
+
+  const handleAddMedication = () => {
+    setEditingMed(null);
+    setEditorOpen(true);
+  };
+
+  const handleEditMedication = (med: MedicationDoc) => {
+    setEditingMed(med);
+    setEditorOpen(true);
+  };
+
+  const handleArchiveToggle = async (med: MedicationDoc) => {
+    try {
+      const uid = getFirebaseUid();
+      if (med.is_archived) {
+        await unarchiveMedication(uid, med.id);
+        toast.success(`Restored ${med.name}`);
+      } else {
+        await archiveMedication(uid, med.id);
+        toast.success(`Archived ${med.name}`);
+      }
+      await reloadMedications();
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to update medication');
+    }
+  };
+
+  const handleEditorSaved = async () => {
+    await reloadMedications();
+  };
+
+  const visibleMedications = useMemo(
+    () =>
+      showArchived
+        ? medications
+        : medications.filter((m) => !m.is_archived),
+    [medications, showArchived],
+  );
+  const archivedCount = medications.filter((m) => m.is_archived).length;
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
@@ -433,8 +508,153 @@ export function MedicationScreen() {
           }
         />
       )}
+
+      {/*
+       * Medication library (parity Batch 5 PR-1). Sits below the per-day
+       * tier-state grid so the day-focused workflow stays the primary
+       * surface; this section is for adding, editing, and archiving the
+       * underlying medication records that feed Android slot linking.
+       */}
+      <section className="mt-10 border-t border-[var(--color-border)] pt-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              My Medications
+            </h2>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Add and edit the medications that show up in slot toggles.
+              Android handles dose-history projection and slot linking.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {archivedCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowArchived((v) => !v)}
+              >
+                {showArchived
+                  ? 'Hide archived'
+                  : `Show archived (${archivedCount})`}
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={handleAddMedication}>
+              <Plus className="mr-1 h-4 w-4" /> Add
+            </Button>
+          </div>
+        </div>
+        {medsLoading && medications.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--color-text-secondary)]">
+            Loading medications…
+          </p>
+        ) : visibleMedications.length === 0 ? (
+          <EmptyState
+            icon={<Pill className="h-8 w-8" />}
+            title="No medications yet"
+            description="Add a medication to start tracking it on the daily slot grid."
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {visibleMedications.map((med) => (
+              <li
+                key={med.id}
+                className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${
+                  med.is_archived
+                    ? 'border-dashed border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 opacity-70'
+                    : 'border-[var(--color-border)] bg-[var(--color-bg-card)]'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-[var(--color-text-primary)]">
+                      {med.display_label ?? med.name}
+                    </span>
+                    {med.display_label && med.display_label !== med.name && (
+                      <span className="text-xs text-[var(--color-text-secondary)]">
+                        ({med.name})
+                      </span>
+                    )}
+                    {med.is_archived && (
+                      <span className="rounded bg-[var(--color-bg-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                        Archived
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                    {summariseSchedule(med)}
+                  </p>
+                  {med.notes && (
+                    <p className="mt-1 text-xs text-[var(--color-text-secondary)] line-clamp-2">
+                      {med.notes}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditMedication(med)}
+                    aria-label={`Edit ${med.name}`}
+                    title="Edit"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleArchiveToggle(med)}
+                    aria-label={
+                      med.is_archived
+                        ? `Restore ${med.name}`
+                        : `Archive ${med.name}`
+                    }
+                    title={med.is_archived ? 'Restore' : 'Archive'}
+                  >
+                    {med.is_archived ? (
+                      <ArchiveRestore className="h-4 w-4" />
+                    ) : (
+                      <Archive className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <MedicationEditorDialog
+        isOpen={editorOpen}
+        uid={getFirebaseUid()}
+        initial={editingMed}
+        onClose={() => setEditorOpen(false)}
+        onSaved={handleEditorSaved}
+      />
     </div>
   );
+}
+
+function summariseSchedule(med: MedicationDoc): string {
+  switch (med.schedule_mode) {
+    case 'TIMES_OF_DAY':
+      return med.times_of_day
+        ? `Times of day: ${med.times_of_day.split(',').join(', ')}`
+        : 'Times of day';
+    case 'SPECIFIC_TIMES':
+      return med.specific_times
+        ? `Specific times: ${med.specific_times.split(',').join(', ')}`
+        : 'Specific times';
+    case 'INTERVAL': {
+      if (med.interval_millis === null) return 'Interval';
+      const hours = med.interval_millis / (60 * 60 * 1000);
+      const rounded = Math.round(hours * 10) / 10;
+      return `Every ${rounded} hr`;
+    }
+    case 'AS_NEEDED':
+      return 'As needed (PRN)';
+    default:
+      return med.schedule_mode;
+  }
 }
 
 /**
