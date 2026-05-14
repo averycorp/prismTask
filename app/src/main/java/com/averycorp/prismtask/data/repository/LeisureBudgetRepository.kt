@@ -259,8 +259,11 @@ constructor(
         val score = scorer.scoreDay(sessions, target, currentStreakDays = 0)
         val allowedIds = allowedCategoryIds(snapshot)
         val candidates = activityDao.getEnabledInCategoriesOnce(allowedIds.toList())
-        val suggestion = if (candidates.isEmpty()) null
-            else sampler.pickByCategoryIds(candidates, allowedIds)
+        val suggestion = if (candidates.isEmpty()) {
+            null
+        } else {
+            sampler.pickByCategoryIds(candidates, allowedIds)
+        }
         return TodayProgress(
             minutesLogged = minutesLogged,
             targetMinutes = target,
@@ -277,8 +280,11 @@ constructor(
         val snapshot = preferences.observeSnapshot().first()
         val allowedIds = allowedCategoryIds(snapshot)
         val candidates = activityDao.getEnabledInCategoriesOnce(allowedIds.toList())
-        return if (candidates.isEmpty()) null
-            else sampler.pickByCategoryIds(candidates, allowedIds)
+        return if (candidates.isEmpty()) {
+            null
+        } else {
+            sampler.pickByCategoryIds(candidates, allowedIds)
+        }
     }
 
     private fun allowedCategoryIds(snapshot: LeisureBudgetSnapshot): Set<String> =
