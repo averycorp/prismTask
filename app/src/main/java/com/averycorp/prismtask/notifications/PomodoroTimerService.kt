@@ -17,6 +17,8 @@ import androidx.glance.appwidget.updateAll
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.data.preferences.TimerPreferences
+import com.averycorp.prismtask.domain.model.notifications.BuiltInSound
+import com.averycorp.prismtask.domain.model.notifications.VibrationIntensity
 import com.averycorp.prismtask.widget.TimerStateDataStore
 import com.averycorp.prismtask.widget.TimerWidget
 import kotlinx.coroutines.CoroutineScope
@@ -223,20 +225,45 @@ class PomodoroTimerService : Service() {
             val buzzUntilDismissed = timerPrefs.getBuzzUntilDismissed().first()
             val overrideVolume = timerPrefs.getOverrideVolume().first()
             val volumePercent = timerPrefs.getAlarmVolumePercent().first()
+            val soundId = timerPrefs.getAlarmSoundId().first()
+            val ringSeconds = timerPrefs.getRingDurationSeconds().first()
+            val vibrateEnabled = timerPrefs.getVibrateEnabled().first()
+            val vibrationSeconds = timerPrefs.getVibrationDurationSeconds().first()
+            val isSilentSound = soundId == BuiltInSound.SILENT_ID
+
+            // We drive sound and vibration ourselves now that both are
+            // user-configurable, so the channel never fires either — this
+            // keeps the chosen ring/vibration duration authoritative and
+            // avoids a double ring with the channel default sound.
             val completion = buildCompletionNotification(
                 buzzUntilDismissed = buzzUntilDismissed,
-                silenceChannelSound = overrideVolume
+                silenceChannelSound = true
             )
             manager?.notify(NOTIFICATION_ID_COMPLETE, completion)
 
-            if (overrideVolume) {
-                // Play the alarm ourselves so we control the stream volume.
-                // Channel-played sound is suppressed via setDefaults(0) above.
-                TimerAlarmPlayer.play(this@PomodoroTimerService, volumePercent)
+            if (!isSilentSound) {
+                val resolved = SoundResolver.resolve(this@PomodoroTimerService, soundId)
+                val uri = when (resolved) {
+                    is SoundResolver.UriChoice -> resolved.uri
+                    SoundResolver.SilentChoice -> null
+                }
+                if (uri != null) {
+                    TimerAlarmPlayer.play(
+                        context = this@PomodoroTimerService,
+                        soundUri = uri,
+                        ringSeconds = ringSeconds,
+                        targetPercent = volumePercent,
+                        pinVolume = overrideVolume
+                    )
+                }
             }
 
-            if (buzzUntilDismissed) {
-                NotificationHelper.startContinuousBuzz(this@PomodoroTimerService)
+            if (vibrateEnabled) {
+                if (buzzUntilDismissed) {
+                    NotificationHelper.startContinuousBuzz(this@PomodoroTimerService)
+                } else {
+                    startFiniteVibration(vibrationSeconds)
+                }
             }
 
             sendBroadcast(
@@ -251,6 +278,26 @@ class PomodoroTimerService : Service() {
 
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
+        }
+    }
+
+    /**
+     * Vibrates the device for [seconds], looping the continuous-buzz
+     * pattern and cancelling on the configured deadline. Launched on
+     * [serviceScope] so the service can finish its tear-down sequence
+     * immediately — the cancel still runs after the service stops because
+     * the supervisor scope is cancelled only in [onDestroy].
+     */
+    private fun startFiniteVibration(seconds: Int) {
+        VibrationAdapter.playNow(
+            context = this,
+            pattern = NotificationHelper.CONTINUOUS_BUZZ_PATTERN,
+            intensity = VibrationIntensity.STRONG,
+            continuous = true
+        )
+        serviceScope.launch {
+            delay(seconds.coerceAtLeast(1) * 1000L)
+            VibrationAdapter.cancel(this@PomodoroTimerService)
         }
     }
 
@@ -380,16 +427,6 @@ class PomodoroTimerService : Service() {
         buzzUntilDismissed: Boolean,
         silenceChannelSound: Boolean = false
     ): Notification {
-        val tapIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val tapPending = PendingIntent.getActivity(
-            this,
-            2,
-            tapIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val title = when (sessionType) {
             SESSION_TYPE_BREAK, SESSION_TYPE_LONG_BREAK -> "Break Complete!"
             else -> "Session Complete!"
@@ -409,30 +446,33 @@ class PomodoroTimerService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
 
+        if (silenceChannelSound) {
+            // TimerAlarmPlayer + VibrationAdapter drive sound and vibration
+            // directly so they honor the chosen tone, ring duration, and
+            // vibration duration. Suppress the channel's own defaults to
+            // avoid a double ring or an extra vibration burst.
+            builder.setDefaults(0)
+            builder.setSilent(true)
+        } else {
+            builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+        }
+
+        // Always route dismissal through TimerBuzzerDismissReceiver so any
+        // active alarm sound / vibration is cancelled when the user taps,
+        // swipes, or hits Stop — even for a finite ring duration. The
+        // receiver is a cheap no-op when nothing is active.
+        val tapDismissPending = TimerBuzzerDismissReceiver
+            .pendingIntent(this, NOTIFICATION_ID_COMPLETE, launchApp = true)
+        val swipeDismissPending = TimerBuzzerDismissReceiver
+            .pendingIntent(this, NOTIFICATION_ID_COMPLETE, launchApp = false)
+        builder.setContentIntent(tapDismissPending)
+        builder.setDeleteIntent(swipeDismissPending)
         if (buzzUntilDismissed) {
-            val tapDismissPending = TimerBuzzerDismissReceiver
-                .pendingIntent(this, NOTIFICATION_ID_COMPLETE, launchApp = true)
-            val swipeDismissPending = TimerBuzzerDismissReceiver
-                .pendingIntent(this, NOTIFICATION_ID_COMPLETE, launchApp = false)
-            builder.setContentIntent(tapDismissPending)
-            builder.setDeleteIntent(swipeDismissPending)
             builder.addAction(
                 android.R.drawable.ic_lock_silent_mode,
                 "Stop",
                 swipeDismissPending
             )
-        } else {
-            builder.setContentIntent(tapPending)
-            if (silenceChannelSound) {
-                // TimerAlarmPlayer handles sound at the user-pinned volume,
-                // so suppress the channel's default sound to avoid a double
-                // ring. Keep vibration off too — channel-level vibration is
-                // a separate user choice (Buzz Until Dismissed).
-                builder.setDefaults(0)
-                builder.setSilent(true)
-            } else {
-                builder.setDefaults(NotificationCompat.DEFAULT_ALL)
-            }
         }
 
         return builder.build()

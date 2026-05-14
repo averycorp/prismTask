@@ -630,6 +630,38 @@ constructor(
             TimerPreferences.DEFAULT_ALARM_VOLUME_PERCENT
         )
 
+    val timerAlarmSoundId: StateFlow<String> = timerPreferences
+        .getAlarmSoundId()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            TimerPreferences.DEFAULT_ALARM_SOUND_ID
+        )
+
+    val timerRingDurationSeconds: StateFlow<Int> = timerPreferences
+        .getRingDurationSeconds()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            TimerPreferences.DEFAULT_RING_DURATION_SECONDS
+        )
+
+    val timerVibrateEnabled: StateFlow<Boolean> = timerPreferences
+        .getVibrateEnabled()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            TimerPreferences.DEFAULT_VIBRATE_ENABLED
+        )
+
+    val timerVibrationDurationSeconds: StateFlow<Int> = timerPreferences
+        .getVibrationDurationSeconds()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            TimerPreferences.DEFAULT_VIBRATION_DURATION_SECONDS
+        )
+
     // ---- A2 Pomodoro+ AI Coaching toggles ---------------------------
     // All three default true — UI reflects that via the initial value.
     val pomodoroPreSessionCoachingEnabled: StateFlow<Boolean> = timerPreferences
@@ -678,6 +710,22 @@ constructor(
 
     fun setTimerAlarmVolumePercent(percent: Int) {
         viewModelScope.launch { timerPreferences.setAlarmVolumePercent(percent) }
+    }
+
+    fun setTimerAlarmSoundId(soundId: String) {
+        viewModelScope.launch { timerPreferences.setAlarmSoundId(soundId) }
+    }
+
+    fun setTimerRingDurationSeconds(seconds: Int) {
+        viewModelScope.launch { timerPreferences.setRingDurationSeconds(seconds) }
+    }
+
+    fun setTimerVibrateEnabled(enabled: Boolean) {
+        viewModelScope.launch { timerPreferences.setVibrateEnabled(enabled) }
+    }
+
+    fun setTimerVibrationDurationSeconds(seconds: Int) {
+        viewModelScope.launch { timerPreferences.setVibrationDurationSeconds(seconds) }
     }
 
     fun setPomodoroPreSessionCoachingEnabled(enabled: Boolean) {

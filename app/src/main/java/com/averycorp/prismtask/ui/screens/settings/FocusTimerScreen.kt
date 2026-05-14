@@ -39,6 +39,10 @@ fun FocusTimerScreen(
     val timerBuzzUntilDismissed by viewModel.timerBuzzUntilDismissed.collectAsStateWithLifecycle()
     val timerOverrideVolume by viewModel.timerOverrideVolume.collectAsStateWithLifecycle()
     val timerAlarmVolumePercent by viewModel.timerAlarmVolumePercent.collectAsStateWithLifecycle()
+    val timerAlarmSoundId by viewModel.timerAlarmSoundId.collectAsStateWithLifecycle()
+    val timerRingDurationSeconds by viewModel.timerRingDurationSeconds.collectAsStateWithLifecycle()
+    val timerVibrateEnabled by viewModel.timerVibrateEnabled.collectAsStateWithLifecycle()
+    val timerVibrationDurationSeconds by viewModel.timerVibrationDurationSeconds.collectAsStateWithLifecycle()
     val preSessionCoaching by viewModel.pomodoroPreSessionCoachingEnabled.collectAsStateWithLifecycle()
     val breakCoaching by viewModel.pomodoroBreakCoachingEnabled.collectAsStateWithLifecycle()
     val recapCoaching by viewModel.pomodoroRecapCoachingEnabled.collectAsStateWithLifecycle()
@@ -72,6 +76,10 @@ fun FocusTimerScreen(
                 buzzUntilDismissed = timerBuzzUntilDismissed,
                 overrideVolume = timerOverrideVolume,
                 alarmVolumePercent = timerAlarmVolumePercent,
+                alarmSoundId = timerAlarmSoundId,
+                ringDurationSeconds = timerRingDurationSeconds,
+                vibrateEnabled = timerVibrateEnabled,
+                vibrationDurationSeconds = timerVibrationDurationSeconds,
                 preSessionCoachingEnabled = preSessionCoaching,
                 breakCoachingEnabled = breakCoaching,
                 recapCoachingEnabled = recapCoaching,
@@ -84,6 +92,10 @@ fun FocusTimerScreen(
                 onBuzzUntilDismissedChange = viewModel::setTimerBuzzUntilDismissed,
                 onOverrideVolumeChange = viewModel::setTimerOverrideVolume,
                 onAlarmVolumePercentChange = viewModel::setTimerAlarmVolumePercent,
+                onAlarmSoundIdChange = viewModel::setTimerAlarmSoundId,
+                onRingDurationSecondsChange = viewModel::setTimerRingDurationSeconds,
+                onVibrateEnabledChange = viewModel::setTimerVibrateEnabled,
+                onVibrationDurationSecondsChange = viewModel::setTimerVibrationDurationSeconds,
                 onPreSessionCoachingChange = viewModel::setPomodoroPreSessionCoachingEnabled,
                 onBreakCoachingChange = viewModel::setPomodoroBreakCoachingEnabled,
                 onRecapCoachingChange = viewModel::setPomodoroRecapCoachingEnabled
