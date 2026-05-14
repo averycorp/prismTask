@@ -58,7 +58,13 @@ constructor(
             "habit_templates", "project_templates", "boundary_rules",
             "automation_rules",
             "check_in_logs", "mood_energy_logs", "focus_release_logs",
-            "medication_refills", "weekly_reviews", "daily_essential_slot_completions",
+            "medication_refills", "weekly_reviews",
+            // `daily_essential_slot_completions` Firestore listener
+            // removed in parity Batch 5 PR-9 (decision D-E4).
+            // BackendSyncService now mirrors this entity into Room
+            // directly via `BackendSyncMappers.kt:170`; old clients may
+            // still write to the legacy Firestore collection but those
+            // rows are now read-noise that doesn't trigger a pull.
             "assignments", "attachments", "study_logs"
         )
     }

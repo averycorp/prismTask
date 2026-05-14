@@ -700,13 +700,10 @@ constructor(
             rowId = { it.id },
             toMap = { SyncMapper.weeklyReviewToMap(it) }
         )
-        uploadRoomConfigFamily(
-            entityType = "daily_essential_slot_completion",
-            collection = "daily_essential_slot_completions",
-            rows = dailyEssentialSlotCompletionDao.getAllOnce(),
-            rowId = { it.id },
-            toMap = { SyncMapper.dailyEssentialSlotCompletionToMap(it) }
-        )
+        // `daily_essential_slot_completion` Firestore upload removed in
+        // parity Batch 5 PR-9 (decision D-E4). `BackendSyncService` is
+        // now the single authoritative writer; the row continues to
+        // mirror into Room via `BackendSyncMappers.kt:170` on pull.
 
         // --- v1.4.38 content families (FK-bearing) ---
         // focus_release_log.taskId, assignment.courseId, attachment.taskId,
@@ -1487,10 +1484,9 @@ constructor(
                 val review = weeklyReviewDao.getByIdOnce(meta.localId) ?: return
                 SyncMapper.weeklyReviewToMap(review)
             }
-            "daily_essential_slot_completion" -> {
-                val row = dailyEssentialSlotCompletionDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.dailyEssentialSlotCompletionToMap(row)
-            }
+            // `daily_essential_slot_completion` Firestore push removed
+            // in parity Batch 5 PR-9 (decision D-E4). BackendSyncService
+            // is authoritative.
             "assignment" -> {
                 val assignment = schoolworkDao.getAssignmentById(meta.localId) ?: return
                 val courseCloudId = syncMetadataDao.getCloudId(assignment.courseId, "course")
@@ -1683,10 +1679,9 @@ constructor(
                 val review = weeklyReviewDao.getByIdOnce(meta.localId) ?: return
                 SyncMapper.weeklyReviewToMap(review)
             }
-            "daily_essential_slot_completion" -> {
-                val row = dailyEssentialSlotCompletionDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.dailyEssentialSlotCompletionToMap(row)
-            }
+            // `daily_essential_slot_completion` Firestore push removed
+            // in parity Batch 5 PR-9 (decision D-E4). BackendSyncService
+            // is authoritative.
             "assignment" -> {
                 val assignment = schoolworkDao.getAssignmentById(meta.localId) ?: return
                 val courseCloudId = syncMetadataDao.getCloudId(assignment.courseId, "course")

@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- refactor(android/medication): drop legacy Firestore writes for
+  `daily_essential_slot_completions` (parity Batch 5 PR-9, decision
+  D-E4). `BackendSyncService` is now the single authoritative writer;
+  the row continues to mirror into Room via `BackendSyncMappers.kt:170`
+  on pull. SyncService no longer pushes / pulls / listens to the
+  legacy Firestore collection. Room table + DAO retained — backend
+  fills them. **No Room migration; subtractive change only.**
 - refactor(android/medication): tier-state Firestore doc-ids become
   deterministic (parity Batch 5 PR-8, decision D-E3). New push path in
   `SyncService.kt` writes `medication_tier_states/${medCloudId}__${logDate}__${slotCloudId}`

@@ -46,7 +46,13 @@ internal object SyncDispatchTables {
         "focus_release_log" -> "focus_release_logs"
         "medication_refill" -> "medication_refills"
         "weekly_review" -> "weekly_reviews"
-        "daily_essential_slot_completion" -> "daily_essential_slot_completions"
+        // `daily_essential_slot_completion` Firestore mapping removed in
+        // parity Batch 5 PR-9 (decision D-E4) — `BackendSyncService` /
+        // `BackendSyncMappers.kt:170` is now the single authoritative
+        // writer for this entity. Old clients may still write to the
+        // legacy `daily_essential_slot_completions` Firestore
+        // collection; those rows become read-noise and don't pull back
+        // into Room.
         "assignment" -> "assignments"
         "attachment" -> "attachments"
         "study_log" -> "study_logs"
@@ -91,7 +97,9 @@ internal object SyncDispatchTables {
         "focus_release_logs" -> "focus_release_log"
         "medication_refills" -> "medication_refill"
         "weekly_reviews" -> "weekly_review"
-        "daily_essential_slot_completions" -> "daily_essential_slot_completion"
+        // See `collectionNameFor` for the D-E4 rationale — reverse
+        // lookup also drops because `daily_essential_slot_completions`
+        // is no longer a Firestore-mirrored entity from Android's side.
         "assignments" -> "assignment"
         "attachments" -> "attachment"
         "study_logs" -> "study_log"
