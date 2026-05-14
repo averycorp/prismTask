@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
   `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
   session for an arbitrary past datetime — pick an existing pool activity
