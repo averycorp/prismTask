@@ -220,7 +220,7 @@ internal fun DetailsTabContent(
             message = stuckMessage,
             isLoading = stuckLoading,
             onDismiss = { coachingViewModel.dismissStuckMessage() },
-            title = "AI Coach"
+            title = "AI Executive Assistant"
         )
 
         // Perfectionism detection card
@@ -261,8 +261,8 @@ internal fun DetailsTabContent(
     if (coachingUpgradePrompt) {
         UpgradePrompt(
             currentTier = coachingUserTier,
-            feature = "AI Coaching",
-            description = "Unlimited AI task coaching, task breakdown, and energy-adaptive daily planning",
+            feature = "AI Executive Assistant",
+            description = "Unlimited AI task assistance, task breakdown, and energy-adaptive daily planning",
             onUpgrade = { _ -> coachingViewModel.dismissUpgradePrompt() },
             onDismiss = { coachingViewModel.dismissUpgradePrompt() }
         )

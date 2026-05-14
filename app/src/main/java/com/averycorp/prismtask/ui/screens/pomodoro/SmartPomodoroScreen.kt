@@ -220,7 +220,7 @@ private fun PreSessionCoachingModal(
         PreSessionCoachingUiState.Hidden -> Unit
         PreSessionCoachingUiState.Loading -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Getting Your Coach's Take…") },
+            title = { Text("Getting Your Assistant's Take…") },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(
@@ -709,7 +709,7 @@ private fun BreakView(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        "Coach Suggests",
+                        "Assistant Suggests",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -778,7 +778,7 @@ private fun CompletionView(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        "Coach's Recap",
+                        "Assistant's Recap",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer

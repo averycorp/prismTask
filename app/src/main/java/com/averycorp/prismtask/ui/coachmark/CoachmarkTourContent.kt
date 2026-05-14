@@ -99,7 +99,7 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
     CoachmarkStep(
         anchorId = CoachmarkAnchors.TODAY_AI_TOOLS_CHIP,
         title = "AI helpers — optional",
-        body = "Priority sort, daily briefing, weekly review. Off by default. Turn on what helps in Settings → AI Coach.",
+        body = "Priority sort, daily briefing, weekly review. Off by default. Turn on what helps in Settings → AI Executive Assistant.",
         requiresPro = false
     ),
     CoachmarkStep(
@@ -135,7 +135,7 @@ val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
     ),
     CoachmarkStep(
         anchorId = CoachmarkAnchors.AI_COACH_FAB,
-        title = "AI Coach",
+        title = "AI Executive Assistant",
         body = "Chat when you want a nudge. Starter prompts and action chips help you get unstuck — history stays private to you."
     ),
     CoachmarkStep(

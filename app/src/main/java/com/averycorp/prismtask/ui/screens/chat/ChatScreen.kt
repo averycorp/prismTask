@@ -188,7 +188,7 @@ fun ChatScreen(
             title = { Text("AI Chat") },
             text = {
                 Text(
-                    "Your messages are processed by AI to provide coaching, " +
+                    "Your messages are processed by AI to provide assistance, " +
                         "along with the last few turns of conversation for context. " +
                         "When chat is opened from a task, the AI also sees that " +
                         "task's title, description, due date, priority, project " +
@@ -251,7 +251,7 @@ fun ChatScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("AI Coach", style = MaterialTheme.typography.titleMedium)
+                        Text("AI Executive Assistant", style = MaterialTheme.typography.titleMedium)
                         val currentContextTask = contextTask
                         val subtitle = if (currentContextTask != null) {
                             "Talking About: ${currentContextTask.title}"

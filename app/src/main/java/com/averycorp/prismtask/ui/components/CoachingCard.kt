@@ -41,7 +41,7 @@ fun CoachingCard(
     isLoading: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    title: String = "AI Coach"
+    title: String = "AI Executive Assistant"
 ) {
     AnimatedVisibility(
         visible = message != null || isLoading,

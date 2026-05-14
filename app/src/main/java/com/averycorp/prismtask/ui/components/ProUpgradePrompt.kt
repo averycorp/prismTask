@@ -129,7 +129,7 @@ private fun ProFeatureBullets() {
         ProBullet("Cloud sync across all devices")
         ProBullet("AI productivity tools (Eisenhower, Pomodoro, Briefing)")
         ProBullet("AI Weekly Planner powered by Claude Sonnet")
-        ProBullet("AI Coach and Task Breakdown")
+        ProBullet("AI Executive Assistant and Task Breakdown")
         ProBullet("Syllabus Import for Schoolwork")
     }
 }
@@ -184,6 +184,6 @@ enum class ProFeature(
 ) {
     AI_BRIEFING("AI Briefing", "Get AI-powered daily briefings and task prioritization"),
     AI_WEEKLY_PLAN("AI Weekly Planner", "Let AI plan your week for optimal productivity"),
-    AI_CHAT("AI Coach", "Get personalized coaching and task help through natural conversation"),
+    AI_CHAT("AI Executive Assistant", "Get personalized assistance and task help through natural conversation"),
     SYLLABUS_IMPORT("Syllabus Import", "Import your course syllabus and auto-create tasks, events, and schedules")
 }

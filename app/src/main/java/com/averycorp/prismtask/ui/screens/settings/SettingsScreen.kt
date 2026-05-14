@@ -268,7 +268,7 @@ fun SettingsScreen(
                         // (docs/audits/AI_FEATURES_TO_TODAY_RELOCATION_AUDIT.md).
                         SettingsNavRow(
                             title = "AI Memory",
-                            subtitle = "What the AI Coach remembers about you",
+                            subtitle = "What the AI Executive Assistant remembers about you",
                             iconEmoji = "\uD83D\uDCAD",
                             iconBgColor = ColAi,
                             onClick = { navController.navigate("settings/ai_memory") }

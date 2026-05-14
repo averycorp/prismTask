@@ -28,8 +28,8 @@ enum class ProGatedFeature(
     val description: String
 ) {
     AI_CHAT(
-        label = "AI Coach",
-        description = "Get personalized coaching and task help through natural conversation"
+        label = "AI Executive Assistant",
+        description = "Get personalized assistance and task help through natural conversation"
     ),
     AI_BRIEFING(
         label = "Daily Briefing",
