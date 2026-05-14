@@ -141,3 +141,32 @@ export function subscribeToRisks(
     callback(snap.docs.map((d) => docToRisk(d.id, d.data(), projectId)));
   });
 }
+
+/**
+ * User-wide listener over every risk in `users/{uid}/project_risks`.
+ *
+ * Mirrors the at-sign-in sync shape used by `subscribeToTasks` /
+ * `subscribeToProjects` so `useFirestoreSync` can mount it without a
+ * `projectId`. Each emitted risk carries its own `project_id` decoded
+ * from the `projectCloudId` field on the Firestore doc. Skips docs
+ * missing `projectCloudId` rather than emitting blank-id rows.
+ */
+export function subscribeToAllRisks(
+  uid: string,
+  callback: (risks: ProjectRisk[]) => void,
+): Unsubscribe {
+  const q = query(risksCol(uid), orderBy('createdAt', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(
+      snap.docs
+        .map((d) => {
+          const data = d.data();
+          const projectId =
+            typeof data.projectCloudId === 'string' ? data.projectCloudId : '';
+          if (!projectId) return null;
+          return docToRisk(d.id, data, projectId);
+        })
+        .filter((r): r is ProjectRisk => r !== null),
+    );
+  });
+}

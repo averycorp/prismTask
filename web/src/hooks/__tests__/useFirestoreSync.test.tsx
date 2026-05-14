@@ -15,6 +15,10 @@ const {
   subscribeToCompletionsMock,
   subscribeToSlotDefsMock,
   subscribeToReminderModePreferencesMock,
+  subscribeToDependenciesMock,
+  subscribeToAllPhasesMock,
+  subscribeToAllRisksMock,
+  subscribeToAllAnchorsMock,
   unsubTasks,
   unsubProjects,
   unsubTags,
@@ -22,6 +26,10 @@ const {
   unsubCompletions,
   unsubSlotDefs,
   unsubPrefs,
+  unsubDependencies,
+  unsubPhases,
+  unsubRisks,
+  unsubAnchors,
 } = vi.hoisted(() => {
   const unsubTasks = vi.fn();
   const unsubProjects = vi.fn();
@@ -30,6 +38,10 @@ const {
   const unsubCompletions = vi.fn();
   const unsubSlotDefs = vi.fn();
   const unsubPrefs = vi.fn();
+  const unsubDependencies = vi.fn();
+  const unsubPhases = vi.fn();
+  const unsubRisks = vi.fn();
+  const unsubAnchors = vi.fn();
   return {
     subscribeToTasksMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
@@ -52,6 +64,18 @@ const {
     subscribeToReminderModePreferencesMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubPrefs),
+    subscribeToDependenciesMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubDependencies),
+    subscribeToAllPhasesMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubPhases),
+    subscribeToAllRisksMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubRisks),
+    subscribeToAllAnchorsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubAnchors),
     unsubTasks,
     unsubProjects,
     unsubTags,
@@ -59,6 +83,10 @@ const {
     unsubCompletions,
     unsubSlotDefs,
     unsubPrefs,
+    unsubDependencies,
+    unsubPhases,
+    unsubRisks,
+    unsubAnchors,
   };
 });
 
@@ -111,6 +139,30 @@ vi.mock('@/api/firestore/medicationPreferences', async () => {
       subscribeToReminderModePreferencesMock,
   };
 });
+vi.mock('@/api/firestore/taskDependencies', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/taskDependencies')
+  >('@/api/firestore/taskDependencies');
+  return { ...actual, subscribeToDependencies: subscribeToDependenciesMock };
+});
+vi.mock('@/api/firestore/projectPhases', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/projectPhases')
+  >('@/api/firestore/projectPhases');
+  return { ...actual, subscribeToAllPhases: subscribeToAllPhasesMock };
+});
+vi.mock('@/api/firestore/projectRisks', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/projectRisks')
+  >('@/api/firestore/projectRisks');
+  return { ...actual, subscribeToAllRisks: subscribeToAllRisksMock };
+});
+vi.mock('@/api/firestore/externalAnchors', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/externalAnchors')
+  >('@/api/firestore/externalAnchors');
+  return { ...actual, subscribeToAllAnchors: subscribeToAllAnchorsMock };
+});
 vi.mock('@/lib/firebase', () => ({ firestore: { __mock: true } }));
 
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
@@ -124,12 +176,20 @@ import {
 import {
   useMedicationPreferencesStore,
 } from '@/stores/medicationPreferencesStore';
+import { useTaskDependencyStore } from '@/stores/taskDependencyStore';
+import { useProjectPhaseStore } from '@/stores/projectPhaseStore';
+import { useProjectRiskStore } from '@/stores/projectRiskStore';
+import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 import {
   DEFAULT_REMINDER_MODE_PREFERENCES,
   type MedicationReminderModePreferences,
 } from '@/api/firestore/medicationPreferences';
 import type { MedicationSlotDef } from '@/api/firestore/medicationSlots';
 import type { Task } from '@/types/task';
+import type { TaskDependency } from '@/types/taskDependency';
+import type { ProjectPhase } from '@/types/projectPhase';
+import type { ProjectRisk } from '@/types/projectRisk';
+import type { ExternalAnchorRecord } from '@/types/externalAnchor';
 
 const ALL_SUBSCRIBES = [
   subscribeToTasksMock,
@@ -139,6 +199,10 @@ const ALL_SUBSCRIBES = [
   subscribeToCompletionsMock,
   subscribeToSlotDefsMock,
   subscribeToReminderModePreferencesMock,
+  subscribeToDependenciesMock,
+  subscribeToAllPhasesMock,
+  subscribeToAllRisksMock,
+  subscribeToAllAnchorsMock,
 ] as const;
 
 const ALL_UNSUBS = [
@@ -149,6 +213,10 @@ const ALL_UNSUBS = [
   unsubCompletions,
   unsubSlotDefs,
   unsubPrefs,
+  unsubDependencies,
+  unsubPhases,
+  unsubRisks,
+  unsubAnchors,
 ] as const;
 
 function resetAllMocks() {
@@ -161,6 +229,10 @@ function resetAllMocks() {
   subscribeToCompletionsMock.mockReturnValue(unsubCompletions);
   subscribeToSlotDefsMock.mockReturnValue(unsubSlotDefs);
   subscribeToReminderModePreferencesMock.mockReturnValue(unsubPrefs);
+  subscribeToDependenciesMock.mockReturnValue(unsubDependencies);
+  subscribeToAllPhasesMock.mockReturnValue(unsubPhases);
+  subscribeToAllRisksMock.mockReturnValue(unsubRisks);
+  subscribeToAllAnchorsMock.mockReturnValue(unsubAnchors);
 }
 
 function resetStores() {
@@ -177,6 +249,10 @@ function resetStores() {
   useMedicationPreferencesStore.setState({
     prefs: DEFAULT_REMINDER_MODE_PREFERENCES,
   });
+  useTaskDependencyStore.setState({ dependencies: [] });
+  useProjectPhaseStore.setState({ phases: [] });
+  useProjectRiskStore.setState({ risks: [] });
+  useExternalAnchorStore.setState({ anchors: [] });
 }
 
 describe('useFirestoreSync', () => {
@@ -185,7 +261,7 @@ describe('useFirestoreSync', () => {
     resetStores();
   });
 
-  it('subscribes to all 7 entity types when uid is set', () => {
+  it('subscribes to all 11 entity types when uid is set', () => {
     renderHook(() => useFirestoreSync('uid-A'));
 
     for (const m of ALL_SUBSCRIBES) {
@@ -247,7 +323,7 @@ describe('useFirestoreSync', () => {
     for (const u of ALL_UNSUBS) expect(u).toHaveBeenCalledTimes(1);
   });
 
-  it('resets medication caches on sign-out so the next user does not see stale data', () => {
+  it('resets per-user caches on sign-out so the next user does not see stale data', () => {
     useMedicationSlotsStore.setState({
       slotDefs: [
         {
@@ -265,6 +341,25 @@ describe('useFirestoreSync', () => {
     useMedicationPreferencesStore.setState({
       prefs: { mode: 'INTERVAL', interval_default_minutes: 360 },
     });
+    useTaskDependencyStore.setState({
+      dependencies: [
+        {
+          id: 'd1',
+          blocker_task_id: 'a',
+          blocked_task_id: 'b',
+          created_at: 0,
+        },
+      ],
+    });
+    useProjectPhaseStore.setState({
+      phases: [{ id: 'ph1' } as unknown as ProjectPhase],
+    });
+    useProjectRiskStore.setState({
+      risks: [{ id: 'r1' } as unknown as ProjectRisk],
+    });
+    useExternalAnchorStore.setState({
+      anchors: [{ id: 'a1' } as unknown as ExternalAnchorRecord],
+    });
 
     renderHook(() => useFirestoreSync(null));
 
@@ -272,6 +367,10 @@ describe('useFirestoreSync', () => {
     expect(useMedicationPreferencesStore.getState().prefs).toEqual(
       DEFAULT_REMINDER_MODE_PREFERENCES,
     );
+    expect(useTaskDependencyStore.getState().dependencies).toEqual([]);
+    expect(useProjectPhaseStore.getState().phases).toEqual([]);
+    expect(useProjectRiskStore.getState().risks).toEqual([]);
+    expect(useExternalAnchorStore.getState().anchors).toEqual([]);
   });
 
   it('a remote tasks snapshot updates the task store', () => {
@@ -342,6 +441,60 @@ describe('useFirestoreSync', () => {
     expect(useMedicationPreferencesStore.getState().prefs).toEqual(next);
   });
 
+  it('a remote dependencies snapshot updates the dependency store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToDependenciesMock.mock
+      .calls[0]?.[1] as unknown as (deps: TaskDependency[]) => void;
+    const dep: TaskDependency = {
+      id: 'd9',
+      blocker_task_id: 'tA',
+      blocked_task_id: 'tB',
+      created_at: 0,
+    };
+    callback([dep]);
+
+    expect(useTaskDependencyStore.getState().dependencies).toEqual([dep]);
+  });
+
+  it('a remote phases snapshot updates the phase store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToAllPhasesMock.mock.calls[0]?.[1] as unknown as (
+      phases: ProjectPhase[],
+    ) => void;
+    const phase = { id: 'ph9', project_id: 'p1' } as unknown as ProjectPhase;
+    callback([phase]);
+
+    expect(useProjectPhaseStore.getState().phases).toEqual([phase]);
+  });
+
+  it('a remote risks snapshot updates the risk store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToAllRisksMock.mock.calls[0]?.[1] as unknown as (
+      risks: ProjectRisk[],
+    ) => void;
+    const risk = { id: 'r9', project_id: 'p1' } as unknown as ProjectRisk;
+    callback([risk]);
+
+    expect(useProjectRiskStore.getState().risks).toEqual([risk]);
+  });
+
+  it('a remote anchors snapshot updates the anchor store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToAllAnchorsMock.mock
+      .calls[0]?.[1] as unknown as (anchors: ExternalAnchorRecord[]) => void;
+    const anchor = {
+      id: 'a9',
+      project_id: 'p1',
+    } as unknown as ExternalAnchorRecord;
+    callback([anchor]);
+
+    expect(useExternalAnchorStore.getState().anchors).toEqual([anchor]);
+  });
+
   it('a failed subscription does not block the remaining listeners', () => {
     subscribeToTasksMock.mockImplementationOnce(() => {
       throw new Error('permission-denied');
@@ -350,13 +503,17 @@ describe('useFirestoreSync', () => {
 
     renderHook(() => useFirestoreSync('uid-A'));
 
-    // Tasks throw; the other six still subscribe
+    // Tasks throw; the other ten still subscribe
     expect(subscribeToProjectsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToTagsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToHabitsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToCompletionsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToSlotDefsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToReminderModePreferencesMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToDependenciesMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToAllPhasesMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToAllRisksMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToAllAnchorsMock).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();
