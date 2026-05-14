@@ -78,8 +78,8 @@ constructor(
         val notification = NotificationCompat
             .Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Work-life balance is skewing")
-            .setContentText("$workPct% work this week — consider blocking time for self-care.")
+            .setContentTitle("Work was $workPct% of this week")
+            .setContentText("Tap to see the breakdown across all life categories.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()

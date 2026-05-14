@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.averycorp.prismtask.domain.model.CognitiveLoad
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.usecase.BalanceState
@@ -92,10 +91,10 @@ internal fun TodayBalanceSection(
             }
             if (state.isOverloaded) {
                 Text(
-                    text = "\u26A0 Work high",
+                    text = "Work-dominant",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = LifeCategoryColor.HEALTH
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else if (hasBalanceData) {
                 val dominantLabel = LifeCategory.label(state.dominantCategory)
@@ -247,20 +246,15 @@ internal fun OverloadBanner(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "\u26A0",
-                fontSize = 20.sp
-            )
-            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Work is $workPct% of your week",
+                    text = "Work was $workPct% of your week",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "That's above your $targetPct% target. Consider blocking time for self-care.",
+                    text = "Your target is $targetPct%.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

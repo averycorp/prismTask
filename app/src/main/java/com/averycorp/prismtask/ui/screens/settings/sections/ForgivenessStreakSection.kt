@@ -34,7 +34,7 @@ fun ForgivenessStreakSection(
 
     SettingsToggleRow(
         title = "Forgive the Occasional Miss",
-        subtitle = "Don't break a streak for a single missed day",
+        subtitle = "One missed day still counts as part of the streak",
         checked = prefs.enabled,
         onCheckedChange = { onPrefsChange(prefs.copy(enabled = it)) }
     )

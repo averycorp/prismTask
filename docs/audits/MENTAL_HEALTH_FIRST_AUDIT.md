@@ -505,3 +505,166 @@ philosophy doc:
 
 Voice exemplar to point reviewers at: R7
 (`"Take care of yourself today — start fresh tomorrow."`).
+
+---
+
+## Phase 3 — Bundle summary
+
+Phase 2 fan-out is in flight as of 2026-05-14. Phase 3 is appended
+pre-merge per the project's CLAUDE.md "Audit-first Phase 3 + 4 fire
+pre-merge" override — Bundle A is the implementation PR opened
+immediately after Phase 1 merged.
+
+### Bundle A — Copy fixes (R1, R2, R3, R4)
+
+**Status:** open in this PR (the one you're reading).
+
+Single-PR shape; the four RED items co-locate by file and share the
+philosophical justification (FORGIVENESS_FIRST + WORK_PLAY_RELAX). All
+seven affected files touched in one commit; no behavior change beyond
+visible copy and one warning glyph removed.
+
+Verified post-edit (via grep on this branch's tree):
+
+```
+grep -rn "Don't break\|consider blocking\|Work high\|Work ratio over\|should be discussed" app/src/ backend/
+```
+
+returns zero matches. Detekt-clean: orphaned `androidx.compose.ui.unit.sp`
+import removed from `TodayBalanceBar.kt` after the `⚠` glyph was deleted.
+
+### Items remaining for follow-up Phase 2 PRs
+
+The audit identified 13 items; this bundle ships 4 (the RED-tagged copy
+violations). Remaining work, in the order recommended by the ranked
+table:
+
+- **Bundle B — Crisis safety (G1, G2, R5):** `CrisisResourcesScreen` +
+  `_CHAT_SYSTEM_PROMPT_BASE` safety block + Free-tier chat-safety gate
+  split. ~5-6 hours, single coherent PR. Highest-priority follow-up.
+- **G5** — Delete mental-health data action. ~3-4 hours.
+- **G4** — Pause-all quick toggle. ~3 hours.
+- **R6** — `NdPreferences.forgivenessStreaks` decision (rename or
+  remove). ~2 hours.
+- **G7** — Mood-low → nudge-cadence gate. ~4 hours.
+- **G6** — Onboarding ND/MH disclosure step. ~4 hours.
+- **G3** — Rest Day / low-spoons action + `REST_DAY.md`. ~1-2 days.
+
+### Memory candidates (only the non-obvious)
+
+- **Copy-fix audits compose with doctrine docs.** When an audit cites a
+  published philosophy doc by name (here: `FORGIVENESS_FIRST.md` line
+  85-87 banning "Don't break your streak!"), the highest-impact PRs
+  are the ones that resolve a *named contradiction* — they cost
+  minutes and resolve a doctrine drift that, left alone, signals to
+  the next reader that the doctrine isn't load-bearing. Worth a memory
+  if not already captured.
+- **Removing a warning glyph orphans a `sp` import.** Detekt-tripping
+  follow-on edits from removing a single Text("⚠") + fontSize line.
+  Not generally memorable, but worth flagging that copy fixes
+  sometimes carry detekt-level follow-ons.
+
+### Schedule for next audit
+
+Re-audit after Bundle B + G5 land. The next sweep should focus on:
+- AI Coach rename completion ("Executive Assistant").
+- Empty-state copy across all screens (not exhausted here).
+- Pomodoro forgiving-pause premise re-verification (G3 may obsolete
+  this).
+- Whether `OverloadCheckWorker` should still fire on a fixed 4 PM
+  schedule once G7 (mood-low → cadence) is live.
+
+---
+
+## Phase 4 — Claude Chat handoff
+
+Paste-ready block for a fresh Claude.ai conversation:
+
+```markdown
+# PrismTask Mental-Health-First Audit — handoff for a fresh thread
+
+## Scope
+Audited PrismTask (Android Kotlin + Compose + FastAPI backend) for
+alignment with its published mental-health-first philosophy
+(`docs/FORGIVENESS_FIRST.md`, `docs/WORK_PLAY_RELAX.md`,
+`docs/COGNITIVE_LOAD.md`). Output is `docs/audits/MENTAL_HEALTH_FIRST_AUDIT.md`
+on `main` as of 2026-05-14 (PR #1396 merged via squash to commit
+`eff8ce49`).
+
+## Verdicts table
+
+| # | Item | Verdict | One-line finding |
+|---|------|---------|------------------|
+| R1 | "Don't break a streak" subtitle | RED → SHIPPED | Direct doctrine violation; rewritten to descriptive in Bundle A. |
+| R2 | "Consider blocking time for self-care" (3 sites) | RED → SHIPPED | Prescriptive nudges in TodayBalanceBar / OverloadCheckWorker / BurnoutScorer docstring. |
+| R3 | "⚠ Work high" / "⚠️ Work ratio over target" | RED → SHIPPED | Evaluative labels with warning glyphs; replaced with descriptive ones. |
+| R4 | "Should be discussed with your provider" (2 sites) | RED → SHIPPED | Prescriptive medical instruction in clinical report; reframed agency-respecting. |
+| R5 | AI Coaching Pro-gated | YELLOW | Free-tier users have no fallback if they try to chat in crisis. Couples to G1+G2. |
+| R6 | `NdPreferences.forgivenessStreaks` default=false | YELLOW | Confusing relative to global `ForgivenessPrefs.enabled=true`. Rename or remove. |
+| R7 | `ReengagementWorker` empathic copy | GREEN | "Take care of yourself today — start fresh tomorrow." — gold-standard exemplar. |
+| G1 | No crisis-resources surface | RED | Zero references to 988 / Crisis Text Line / Samaritans / Lifeline anywhere in source. |
+| G2 | AI chat lacks crisis-safety guidance | RED | `_CHAT_SYSTEM_PROMPT_BASE` instructs tone but has no self-harm / suicidality rules. |
+| G3 | No "Rest Day" / low-spoons action | RED | Users must break grace window or force completion. No deliberate-pause primitive. |
+| G4 | No pause-all quick toggle | YELLOW | Quiet hours are scheduled only; no ad-hoc silence affordance. |
+| G5 | No delete-mental-health-data UI | YELLOW | Atomic purge of mood/check-in/clinical data not exposed. |
+| G6 | Onboarding skips ND/MH disclosure | YELLOW | No preference question to pre-set forgiving defaults at first run. |
+| G7 | Mood-low does not gate notification cadence | YELLOW | `MoodCorrelationEngine` is read-only; signal not consumed by schedulers. |
+
+## Shipped
+
+- **PR #1396** — audit doc itself (Phase 1).
+- **Bundle A copy fixes** — R1, R2, R3, R4 (PR being opened concurrent
+  with this handoff; will receive its own number). Re-aligns
+  user-facing copy with `FORGIVENESS_FIRST.md` and
+  `WORK_PLAY_RELAX.md`. Touches:
+  `ForgivenessStreakSection.kt:37`,
+  `TodayBalanceBar.kt:95+263`,
+  `OverloadCheckWorker.kt:82`,
+  `BurnoutScorer.kt:100`,
+  `MorningCheckInScreen.kt:762`,
+  `ClinicalReportSection.kt:35`,
+  `ClinicalReportGenerator.kt:127`.
+
+## Not yet shipped (PROCEED with documented path)
+
+- **Bundle B (G1+G2+R5)** — crisis-resources surface, AI chat safety
+  prompt, Free-tier chat safety gate. Highest-priority follow-up.
+- **G3** — Rest Day primitive + `REST_DAY.md`. Largest item, 1-2 days.
+- **G4-G7** — pause-all, MH data deletion, ND onboarding, mood-cadence
+  gate. ~3-4 hours each, standalone PRs.
+- **R6** — `NdPreferences.forgivenessStreaks` rename or remove. Read
+  `BrainModeScreen.kt` first to decide.
+
+## Non-obvious findings
+
+- The chat system prompt is already pretty good ("warm, never preachy,
+  avoid moralizing"). The gap isn't tone — it's the absence of a
+  *safety* branch for self-harm / suicidality inputs.
+- `DailyForgivenessStreakCore` is shared by habits, projects, daily
+  essentials, AND the ND-friendly Forgiveness-Streak mode. Single
+  implementation; the global `ForgivenessPrefs.enabled` defaults
+  `true`. But `NdPreferences.forgivenessStreaks` (a separate ADHD
+  Mode sub-setting) defaults `false` — wrong mental model.
+- The `ReengagementWorker` notification copy is already MH-first ideal
+  ("Take care of yourself today — start fresh tomorrow."). It exists
+  as a voice exemplar; future implementers should reference it.
+- A worktree exists for renaming "AI Coach" → "Executive Assistant".
+  Worth completing before next MH audit since the framing matters.
+- `OverloadCheckWorker` defaults to firing at 4 PM — statistically the
+  energy trough for depressive populations. G7 (mood-low → cadence)
+  may obsolete the fixed-time choice.
+
+## Open questions for the operator
+
+- Should crisis-resources v1 ship US-only with a "tap for other
+  regions" link out, or should v1 already include an international
+  resource list (UK 116 123, AU 13 11 14, CA 988, etc.)?
+- Should G7 use a 48h mood window and ≤2/5 floor, or should the
+  thresholds be user-configurable from the start?
+- For G3 (Rest Day): does marking a day as rest also defer
+  medication reminders, or only non-medication notifications?
+- For R6: is `NdPreferences.forgivenessStreaks` an extended grace
+  window (rename it), or a redundant duplicate of `ForgivenessPrefs`
+  (delete it)? Needs a read of `BrainModeScreen.kt` to confirm.
+```
+
