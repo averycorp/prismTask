@@ -115,4 +115,56 @@ Ordered smallest-leverage-multiplier first per the parent audit's wallclock-÷-c
 
 ## Phase 2 — implementation PRs
 
-(Populated as PRs land)
+| # | PR | Audit items | Status |
+|---|------|---------|--------|
+| 1 | [#1343](https://github.com/averycorp/prismTask/pull/1343) — docs(audits): Batch 2 audit | (this doc) | merged |
+| 2 | [#1350](https://github.com/averycorp/prismTask/pull/1350) — LifeCategoryClassifier + BalanceTracker engines + WLB settings | C.2a / C.2b / C.2d | merged |
+| 3 | [#1354](https://github.com/averycorp/prismTask/pull/1354) — TodayBalanceBar component | C.1a | merged |
+| 4 | [#1358](https://github.com/averycorp/prismTask/pull/1358) — SelfCareNudgeCard | C.1e | merged |
+| 5 | [#1364](https://github.com/averycorp/prismTask/pull/1364) — Mood Pearson correlation engine + UI | C.3 | merged |
+| 6 | [#1369](https://github.com/averycorp/prismTask/pull/1369) — Weekly review Firestore persistence | C.4a | merged |
+| 7 | [#1372](https://github.com/averycorp/prismTask/pull/1372) — NdPreferences Firestore-synced store + hook | C.7a / C.7b | open (CI pending) |
+
+**Drive-by fix landed in PR #1349** (out-of-band from this batch): repaired pre-existing parse errors in `useFirestoreSync.ts` and its test that were blocking lint + vitest from a bad merge between PRs #1340 and #1341. The original drive-by ride-along was bundled into the #1350 commit but was then split out as a clean fix on main by another author (#1349) before #1350 landed — the fix now appears in both places and is harmless on either side.
+
+---
+
+## Phase 3 — Bundle summary
+
+### Items shipped this session
+- **C.1a** Today Balance bar (PR #1354)
+- **C.1e** Self-Care Nudge engine + card on Today (PR #1358)
+- **C.2a / C.2b / C.2d** LifeCategoryClassifier, BalanceTracker, WorkLifeBalance settings (PR #1350)
+- **C.3** Mood ↔ task/habit Pearson correlation engine + MoodScreen surface (PR #1364)
+- **C.4a** Weekly review Firestore persistence (PR #1369)
+- **C.7a / C.7b** NdPreferences Firestore store + `useNdPreferences` hook (PR #1372)
+
+### Items confirmed already shipped (wrong-premise from parent audit)
+- **C.1c** Habits-on-Today section — already shipped as a "Today's Habits" chip row in `TodayScreen.tsx:387-468`. Visual layout differs from Android's PR #1297 card-row layout but functionality matches. Filed as ACCEPT-AS-DIVERGENCE.
+- **C.6** Boundaries enforcement UI — already shipped via `BoundariesSection.tsx` (270 LOC) for the three core rule types (`daily_task_cap`, `work_hours_window`, `weekly_hour_budget`). Android supports additional rule types (e.g. `category_limits`, `daily_focus_minutes`) which are filed as a B-tier follow-up.
+
+### Items punted to Batch 2.1 (out of session capacity)
+- **C.1b** Plan-For-Today sheet (~300 LOC, ~3h)
+- **C.1d** Schoolwork-by-class Today section — turns out shipped concurrently as **F.2** by another author while this batch ran. No longer punted.
+- **C.1f** DashboardPreferences store + section reorder UI (~400 LOC, ~3h)
+- **C.2c** WeeklyBalanceReportScreen (~400 LOC, ~3h)
+- **C.4b** Weekly review backend auto-generation cron (~280 LOC backend + ~80 LOC web subscriber). Tracked separately as a backend batch — APScheduler config + new endpoint needs a backend deployment cycle.
+- **C.5a** Morning check-in MOOD_ENERGY/BALANCE/CALENDAR step flow refactor (~500 LOC, ~4h)
+- **C.5b** 11am auto-prompt — **WRONG PREMISE on Android side**: grep returned zero hits for that promptHour behavior in Android. Filed as ACCEPT-AS-DIVERGENCE pending re-spec; re-open with operator if intentional.
+- **C.5c** 90-day check-in history view (~200 LOC, ~1.5h)
+- **C.7c** UI Complexity + Brain Mode settings sections (~180 LOC, ~1.5h) — depends on #1372 being merged; queued for Batch 2.1.
+- **C.7d** GoodEnoughTimerManager / ShipItCelebrationManager / EnergyAwarePomodoro integrations (~300 LOC, ~3h)
+
+### Observations (out of scope but worth filing)
+- **`idb@^8.0.4` pin in `web/package.json` is unresolvable on npm.** Latest published version is `8.0.3`. Any clean `npm install` errors out with `ETARGET — No matching version found for idb@^8.0.4`. Carried over from a prior session (parent audit flagged it). Worktree workaround was to copy node_modules from the main checkout + manually install `fake-indexeddb` via `npm pack`. Should be fixed in a one-line bump to `^8.0.3` or pin to a published version.
+- **Pre-existing flaky test** in `web/src/stores/__tests__/chatStore.test.ts:33` (`expect(...endsWith('')).toBe(false)` — universally true substring asserted as false). Introduced by PR #1352 (#1352 era AI Chat port). One-line fix; not in scope here.
+
+### Net delivered
+6 shipped wellness-suite PRs in one session, closing audit items **C.1a, C.1e, C.2a–d, C.3, C.4a, C.7a/b**, plus 1 audit doc PR. **2 wrong-premise items** (C.1c, C.6) reduced Batch 2 scope by ~600 LOC of unnecessary work.
+
+---
+
+## Phase 4 — Claude Chat handoff block
+
+(emitted in the agent's final report, not appended here to keep the audit doc self-contained.)
+
