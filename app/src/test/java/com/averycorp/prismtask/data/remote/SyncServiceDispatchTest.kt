@@ -355,9 +355,13 @@ class SyncServiceDispatchTest {
             SyncService.entityTypeForCollectionName("weekly_reviews")
         )
 
-    @Test fun entityTypeForCollectionName_dailyEssentialSlotCompletions() =
+    // `daily_essential_slot_completions` reverse mapping was removed in
+    // parity Batch 5 PR-9 (D-E4) — the Firestore listener no longer
+    // observes this collection. The forward mapping still works via
+    // the default `entityType + "s"` fallback in `collectionNameFor`.
+    @Test fun entityTypeForCollectionName_dailyEssentialSlotCompletions_returnsNull() =
         assertEquals(
-            "daily_essential_slot_completion",
+            null,
             SyncService.entityTypeForCollectionName("daily_essential_slot_completions")
         )
 
@@ -407,7 +411,12 @@ class SyncServiceDispatchTest {
             "task_dependency", "boundary_rule", "automation_rule",
             "check_in_log", "mood_energy_log", "focus_release_log",
             "medication_refill", "weekly_review",
-            "daily_essential_slot_completion", "assignment", "attachment",
+            // `daily_essential_slot_completion` excluded: parity Batch 5
+            // PR-9 (D-E4) removed its reverse mapping so the Firestore
+            // listener no longer observes that collection. The forward
+            // mapping still works via the default fallback, but the
+            // bidirectional contract is intentionally relaxed.
+            "assignment", "attachment",
             "study_log"
         )
         for (entity in explicitEntries) {

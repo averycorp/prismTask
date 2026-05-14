@@ -1334,36 +1334,12 @@ constructor(
         skipped += weeklyReviewsResult.skipped
         skippedPermanent += weeklyReviewsResult.skippedPermanent
 
-        val dailyEssentialSlotResult = pullRoomConfigFamily(
-            collection = "daily_essential_slot_completions",
-            entityType = "daily_essential_slot_completion",
-            getLocalUpdatedAt = { dailyEssentialSlotCompletionDao.getByIdOnce(it)?.updatedAt },
-            insert = { data, cloudId ->
-                dailyEssentialSlotCompletionDao.upsert(
-                    SyncMapper.mapToDailyEssentialSlotCompletion(data, cloudId = cloudId)
-                )
-            },
-            update = { data, localId, cloudId ->
-                dailyEssentialSlotCompletionDao.upsert(
-                    SyncMapper.mapToDailyEssentialSlotCompletion(data, localId, cloudId)
-                )
-            },
-            // P0 sync audit PR-C: daily_essential_slot_completions
-            // (date, slot_key) is UNIQUE; same slot completions toggled on
-            // both devices offline must dedup on pull.
-            naturalKeyLookup = { data ->
-                val date = (data["date"] as? Number)?.toLong()
-                val slotKey = data["slotKey"] as? String
-                if (date != null && slotKey != null) {
-                    dailyEssentialSlotCompletionDao.getBySlotOnce(date, slotKey)?.id
-                } else {
-                    null
-                }
-            }
-        )
-        applied += dailyEssentialSlotResult.applied
-        skipped += dailyEssentialSlotResult.skipped
-        skippedPermanent += dailyEssentialSlotResult.skippedPermanent
+        // `daily_essential_slot_completions` Firestore pull removed in
+        // parity Batch 5 PR-9 (decision D-E4). BackendSyncService now
+        // mirrors this entity into Room directly via
+        // `BackendSyncMappers.kt:170`. Old clients may still write to
+        // the legacy Firestore collection — those rows are now read-
+        // noise and don't pull into Room here.
 
         // v1.4.38 content families with FK translation.
         val focusReleaseLogsResult = pullCollection("focus_release_logs") { data, cloudId ->
