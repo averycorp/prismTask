@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +65,7 @@ import com.averycorp.prismtask.ui.screens.medication.components.MedicationEditor
 import com.averycorp.prismtask.ui.screens.medication.components.MedicationSlotSelection
 import com.averycorp.prismtask.ui.screens.medication.components.MedicationTimeEditSheet
 import com.averycorp.prismtask.ui.theme.LocalPrismColors
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -100,8 +102,11 @@ fun MedicationScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showBulkMarkDialog by remember { mutableStateOf(false) }
-    var editingMed by remember { mutableStateOf<MedicationEntity?>(null) }
-    var editingSelections by remember { mutableStateOf<List<MedicationSlotSelection>>(emptyList()) }
+    // Editor opens only once both the medication AND its slot selections
+    // are loaded, so the dialog never enters composition with a stale
+    // `initialSelections` value — see [EditingMedicationState] doc.
+    var editingState by remember { mutableStateOf<EditingMedicationState?>(null) }
+    val coroutineScope = rememberCoroutineScope()
     var archivingMed by remember { mutableStateOf<MedicationEntity?>(null) }
     // Slot whose intended_time is being edited (long-press → time sheet).
     var timeEditingSlotState by remember { mutableStateOf<MedicationSlotTodayState?>(null) }
@@ -111,14 +116,6 @@ fun MedicationScreen(
     var doseDialogTarget by remember { mutableStateOf<DoseDialogTarget?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // Editor dialog opens as soon as editingMed is set; selections load
-    // asynchronously via the suspend helper on the viewmodel.
-    LaunchedEffect(editingMed) {
-        editingMed?.let { med ->
-            editingSelections = viewModel.selectionsForMedication(med.id)
-        }
-    }
 
     // Surface viewmodel error messages (e.g. duplicate medication name) via
     // a Snackbar. Without this collector, errors emitted from
@@ -257,7 +254,17 @@ fun MedicationScreen(
                         items(medications, key = { "edit_${it.id}" }) { med ->
                             MedicationEditRow(
                                 medication = med,
-                                onEdit = { editingMed = med },
+                                onEdit = {
+                                    // Load selections first, then open — guarantees
+                                    // the dialog sees its final initialSelections on
+                                    // first composition (vs. an async update that
+                                    // wouldn't reach the dialog's remember-without-key
+                                    // state).
+                                    coroutineScope.launch {
+                                        val sels = viewModel.selectionsForMedication(med.id)
+                                        editingState = EditingMedicationState(med, sels)
+                                    }
+                                },
                                 onArchive = { archivingMed = med }
                             )
                         }
@@ -289,18 +296,19 @@ fun MedicationScreen(
         )
     }
 
-    editingMed?.let { med ->
+    editingState?.let { state ->
+        val med = state.medication
         MedicationEditorDialog(
             title = "Edit Medication",
             initialName = med.name,
             initialTier = MedicationTier.fromStorage(med.tier),
             initialNotes = med.notes,
-            initialSelections = editingSelections,
+            initialSelections = state.selections,
             initialReminderMode = med.reminderMode,
             initialReminderIntervalMinutes = med.reminderIntervalMinutes,
             initialPromptDoseAtLog = med.promptDoseAtLog,
             activeSlots = slots,
-            onDismiss = { editingMed = null },
+            onDismiss = { editingState = null },
             onConfirm = { name, tier, notes, selections, reminderMode, intervalMinutes, promptDose ->
                 viewModel.updateMedication(
                     medication = med,
@@ -312,7 +320,7 @@ fun MedicationScreen(
                     reminderIntervalMinutes = intervalMinutes,
                     promptDoseAtLog = promptDose
                 )
-                editingMed = null
+                editingState = null
             },
             onCreateNewSlot = { navController.navigate("settings/medication_slots") }
         )
@@ -738,6 +746,18 @@ private fun UnslottedMedicationCard(
 private data class DoseDialogTarget(
     val medication: MedicationEntity,
     val slot: com.averycorp.prismtask.data.local.entity.MedicationSlotEntity?
+)
+
+/**
+ * Coupled (med, selections) state set atomically before the editor opens.
+ * [MedicationEditorDialog]'s selections list lives in unkeyed `remember`,
+ * so it captures `initialSelections` on first composition and won't
+ * re-seed when an async load completes — rendering with stale data would
+ * wipe slot links on Save and drop the med into Unscheduled.
+ */
+private data class EditingMedicationState(
+    val medication: MedicationEntity,
+    val selections: List<MedicationSlotSelection>
 )
 
 /**
