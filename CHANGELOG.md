@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/today): port the Today-screen Work-Life Balance bar (`web/src/features/today/TodayBalanceBar.tsx`) — stacked-bar visualization over the past 7 days of categorized tasks, with overload badge and per-category legend. Reads from `BalanceTracker` + Firestore-synced `balancePreferences`. Closes parity audit C.1a.
 - refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
+- **Claude-backed Life Category Auto button on web TaskEditor (parity Batch 3 D.1c).** Adds an "Auto" pill button next to the Life Category select on the Organize tab. Tapping fires `/ai/life-category/classify_text` against the task's title + description and writes the result back through the same `handleLifeCategoryChange` path the manual select uses. Failure-soft: AI-off, empty title, network error, 429/451/5xx, or an `UNCATEGORIZED` result all keep the current selection — never blanks a real chip. Mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude` (`app/.../AddEditTaskViewModel.kt:714-738`).
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
   `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
   session for an arbitrary past datetime — pick an existing pool activity
