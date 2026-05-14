@@ -82,3 +82,91 @@ Web mints `chat_${ISO_DATE}_${UUID8}` on first send of the day, same as Android 
 ## Phase 3 + 4
 
 Per CLAUDE.md repo conventions: **append Phase 3 (bundle summary) + emit Phase 4 (Claude Chat handoff block) as soon as PR-1 through PR-4 are opened** — do not wait for CI green or merge.
+
+---
+
+## Phase 3 — bundle summary (post-fan-out)
+
+All 4 planned PRs opened and squash-merged in the same session (CI green is the gate; this section is appended pre-merge to honor the CLAUDE.md "fire pre-merge" override).
+
+| PR | Branch | Status | LOC | Notes |
+|----|--------|--------|-----|-------|
+| #1346 | `feat/web-chat-api-helpers` | merged | ~415 | Foundation: `aiChat` / `aiChatHistory` / `aiLifeCategoryClassifyText` + types + audit doc. |
+| #1352 | `feat/web-chat-screen-core` | merged | ~1064 | ChatScreen + chatStore + sidebar entry + route. Closes D.1a. |
+| #1356 | `feat/web-chat-batch-action-test` | merged | ~455 | Extracted `chatActions.ts` dispatcher + 18 unit-test cases. Pins D.1b. |
+| #1361 | `feat/web-life-category-auto-button` | merged | ~97 | Closes D.1c. Race-guarded against typing during request. |
+
+**Shipped (in this batch):**
+- Full AI Coach chat surface on web — sidebar entry "AI Coach", `/chat` route, message list, composer (Enter-to-send), welcome card with 4 starter prompts, V3 retention disclosure (one-time, localStorage flag), Clear-Chat confirm with don't-ask-again pref.
+- 7 of 8 action chip types wired through `taskStore` mutations + navigation:
+  - `complete` → `completeTask(id)` + "Task Completed" toast.
+  - `reschedule` → `updateTask(id, { due_date })` + "Task Rescheduled" toast.
+  - `reschedule_batch` → looped `updateTask` with per-id failure tally; mixed-success message.
+  - `archive` → `deleteTask(id)` (web has no `archived_at` flag; deletion is the equivalent outcome).
+  - `start_timer` → navigate to `/pomodoro` + minutes-aware toast.
+  - `batch_command` → `batchStore.setPendingCommand(text)` + navigate to `/batch/preview`, reusing the existing BatchPreviewScreen unchanged.
+  - `create_task`, `breakdown` → toast-only acknowledgment (full wiring deferred).
+- Conversation IDs minted client-side as `chat_${ISO_DATE}_${UUID8}` against `startOfDayHour`; daily rollover is a UI filter.
+- History reconciliation via `GET /api/v1/ai/chat/history` on screen mount.
+- Claude-backed Life Category Auto button on `TaskEditor.tsx` Organize tab — failure-soft behavior identical to Android's.
+- Server-authoritative model with **no Firestore mirror**, matching CLAUDE.md § "Chat Persistence (D11 E.3)".
+
+**Deferred to Batch 6 (or follow-up):**
+- SSE token-by-token streaming (`chat_stream.py` backend exists; web shows typing-dot instead).
+- `task_context_id` / `task_context` "coach this task" entry point from TaskEditor → ChatScreen.
+- Conversation history sidebar (cross-day picker; today rolls over via `startOfDayHour` already).
+- Full `create_task` + `breakdown` wiring (requires a no-project createTask path + parent project resolution).
+- AI-memory `user_preferences` mirror on `/chat` response.
+
+**Verification status:** lint + tsc clean on every PR's touched files. Vitest run blocked locally by the pre-existing `idb@^8.0.4` install failure (also fails on stock `main` — confirmed by stashing changes and re-running). CI on each PR runs in a clean env and is the source of truth for green test status.
+
+---
+
+## Phase 4 — Claude Chat handoff block
+
+```text
+Context handoff — PrismTask parity Batch 3 (AI Chat) — 2026-05-13
+
+What shipped (4 PRs, all squash-merged):
+- #1346 feat(web/ai): chat REST helpers (aiChat / aiChatHistory /
+  aiLifeCategoryClassifyText) + types + Phase-1 audit doc at
+  docs/audits/PARITY_BATCH_3_AI_CHAT_AUDIT.md.
+- #1352 feat(web/chat): full ChatScreen + chatStore + sidebar entry +
+  /chat route. Welcome card, V3 disclosure, clear-confirm with skip pref.
+- #1356 refactor(web/chat): extract chatActions.ts dispatcher + 18 test
+  cases. Pins batch_command → BatchPreviewScreen wiring.
+- #1361 feat(web/tasks): Life Category Auto button on TaskEditor
+  Organize tab (Claude Haiku via /ai/life-category/classify_text).
+
+Architecture decisions baked in:
+- Server-authoritative chat. No Firestore mirror. REST-only via
+  /api/v1/ai/chat (POST one-shot reply + actions) and
+  /api/v1/ai/chat/history (GET reconciliation on mount).
+- Conversation IDs follow chat_{ISO_DATE}_{UUID8} pattern; daily
+  rollover keys off startOfDayHour (already synced cross-device).
+- Disclosure flag (V3) + clear-skip flag local-only via localStorage —
+  matches Android's local-only DataStore for these.
+- Action dispatcher extracted to web/src/features/chat/chatActions.ts;
+  reusable from any future chat surface.
+
+Deferred (next batch / Batch 6):
+- SSE streaming (typing dot for now; backend chat_stream.py exists).
+- Coach-from-task entry point + task_context plumbing.
+- Conversation history sidebar (cross-day picker).
+- Full create_task + breakdown wiring through taskStore (currently
+  toast-only acknowledgments — no taskStore.createTask path that lacks
+  a project_id today).
+- AI-memory user_preferences mirror on /chat response.
+
+Known follow-up: archive action on web routes through deleteTask
+because web has no archived_at flag — documented as a divergence in
+the audit doc and the in-code comment. If web adds an archive flag in
+the future, swap dispatcher line in chatActions.ts.
+
+Audit doc: docs/audits/PARITY_BATCH_3_AI_CHAT_AUDIT.md (now includes
+Phase 3 bundle summary + this handoff block).
+
+Open the audit doc and read the "Deferred to Batch 6" list before
+starting any chat-related follow-up — it pins the exact follow-up
+shape so you don't re-spec.
+```

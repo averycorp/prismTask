@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - feat(web/mood): port the mood/energy ↔ tasks/habits/self-care Pearson correlation engine (`web/src/utils/moodCorrelation.ts`) and surface a Correlations section on the Mood screen. Top-3 strongest correlations per axis once the user has 7+ mood-logged days; falls silent gracefully below that. Closes parity audit C.3.
+- feat(web/today): port the Self-Care Nudge Card to Today (`web/src/utils/selfCareNudgeEngine.ts`, `web/src/features/today/SelfCareNudgeCard.tsx`) — rotates between rest-break / movement / wind-down / burnout-warning suggestions when the user's self-care ratio is below target OR burnout is elevated. Dismissable for the day. Closes parity audit C.1e (the burnout-badge half is already covered by the existing `BoundaryTodayBanner`).
+- **Schoolwork class-row Today section (parity F.2).** Web port of
+  Android's PR #1314 `SchoolworkCard` (post the "Leisure + School as
+  modes" refactor). Each active course renders as a checkable row on
+  Today; toggling writes a `CourseCompletion` to Firestore keyed on the
+  logical-day midnight + course doc id. New modules:
+  `web/src/api/firestore/courses.ts`, `courseCompletions.ts`,
+  `web/src/stores/courseStore.ts`, and `SchoolworkTodayCard.tsx`. The
+  `subscribeToCourses` + `subscribeToCourseCompletions` listeners now
+  mount via `useFirestoreSync`. Tasks tagged to a course (best-effort
+  name/code substring match) group underneath their class as a
+  near-term substitute for the still-unwired `assignments` Firestore
+  collection — documented audit follow-up.
 - **Leisure mode on Today + Settings entry (parity F.1c).** Added
   `TodayLeisureMinimumRow.tsx` — a compact progress card that surfaces
   the daily leisure minimum as `% of target`; tapping routes to
@@ -29,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/audits/PARITY_BATCH_4_LEISURE_SCHOOLWORK_AUDIT.md`.
 - feat(web/today): port the Today-screen Work-Life Balance bar (`web/src/features/today/TodayBalanceBar.tsx`) — stacked-bar visualization over the past 7 days of categorized tasks, with overload badge and per-category legend. Reads from `BalanceTracker` + Firestore-synced `balancePreferences`. Closes parity audit C.1a.
 - refactor(web/chat): extract chat action-chip dispatcher into reusable `chatActions.ts` module + add `executeChatAction` unit-test coverage (parity Batch 3 PR-3). Confirms `batch_command` → `BatchPreviewScreen` wiring is production-ready; no behavior change.
+- **Claude-backed Life Category Auto button on web TaskEditor (parity Batch 3 D.1c).** Adds an "Auto" pill button next to the Life Category select on the Organize tab. Tapping fires `/ai/life-category/classify_text` against the task's title + description and writes the result back through the same `handleLifeCategoryChange` path the manual select uses. Failure-soft: AI-off, empty title, network error, 429/451/5xx, or an `UNCATEGORIZED` result all keep the current selection — never blanks a real chip. Mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude` (`app/.../AddEditTaskViewModel.kt:714-738`).
 - **LogPastLeisure dialog on web (parity F.1b).** Web port of
   `app/.../ui/screens/leisure/LogPastLeisureSheet.kt`. Backfill a leisure
   session for an arbitrary past datetime — pick an existing pool activity
@@ -39,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(web/sync): LWW timestamp guard on `updateTask` + `setTagsForTask` (`web/src/api/firestore/lww.ts`) — an Android-side task edit with a newer `updatedAt` is no longer silently overwritten by an out-of-order web push. First-create wins; equality wins for the local write; stale writes log + return without throwing so the snapshot listener reconciles. Parity audit A.2 (tasks slice).
 - feat(web/sync): LWW timestamp guard on `updateHabit` — extends the parity A.2 contract to habit edits so an in-flight Android booking-state toggle isn't clobbered by a web rename / color change.
 - feat(web/sync): LWW timestamp guard on `updateProject` — extends parity A.2 to project edits so Android-side lifecycle writes (start/end date, theme color, archived/completed timestamps) survive a concurrent web rename.
+- feat(web/sync): LWW timestamp guard on `updateSlotDef` (medication slot definitions) — extends parity A.2 so a web slot rename doesn't clobber an Android-side reminder-mode flip on the same slot.
+- feat(web/sync): LWW timestamp guard on the wellness-logs write paths (`setCheckIn`, `updateLog` for mood/energy, `updateRule` for boundaries) — extends parity A.2 so concurrent same-day edits from a sibling device aren't silently overwritten.
+- feat(web/settings): sync theme cross-device via Firestore at `users/{uid}/settings/theme_preferences` — mirrors Android's bespoke `ThemePreferencesSyncService` shape (`prism_theme`, `font_scale`, `updated_at`) so a theme pick on Android propagates to web on the next snapshot. Closes parity audit A.5b (theme slice).
 - **LeisurePoolScreen on web (parity F.1a).** Web port of
   `app/.../ui/screens/leisure/LeisurePoolScreen.kt` with TodayHero card +
   Quick-Log category tiles + Recent Activity day-grouped list + Manage
