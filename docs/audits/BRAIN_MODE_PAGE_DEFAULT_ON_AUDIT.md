@@ -277,3 +277,58 @@ is "before the user opens either client's settings."
 - **Do NOT touch sibling code paths** (BrainModeSection, BatchPreviewViewModel,
   use cases) — they observe the flow and shift correctly without code
   changes.
+
+## Phase 3 — bundle summary
+
+**PR shipped.**
+
+| PR | Commit | Merged | Title |
+|---|---|---|---|
+| [#1406](https://github.com/averycorp/prismTask/pull/1406) | `11afdf7b` | 2026-05-14T05:59:48Z | `feat(onboarding/nd): default ND modes ON for first-time users + F.8 audit closure` |
+
+**Per-improvement outcome:**
+
+| # | Improvement | Status | Site(s) |
+|---|---|---|---|
+| 1 | Flip top-level + ADHD/Calm cascade defaults to `?: true` | Shipped | `NdPreferencesDataStore.kt:73-85`, `NdPreferences.kt:14-30` |
+| 2 | Flip `stateIn(... false)` → `true` for the three onboarding flows | Shipped | `OnboardingViewModel.kt:128,132,136` |
+| 3 | Flip `collectAsLocalState(..., initial = false)` → `true` | Shipped | `OnboardingScreen.kt:791-793` |
+| 4 | Update `NdPreferencesDataStoreTest` defaults assertion + add returning-user preservation test | Shipped | `NdPreferencesDataStoreTest.kt:49-90` |
+| 4b | Explicit `adhdModeEnabled = false`, `calmModeEnabled = false` in `ShipItCelebrationManagerTest` baseline (mode-independence pivot) | Shipped (scope addition surfaced by local test run) | `ShipItCelebrationManagerTest.kt:13-20` |
+| 4c | Reframe two `NdPreferencesDataStoreTest` cross-mode independence tests to set explicit baseline before activation | Shipped (scope addition surfaced by local test run) | `NdPreferencesDataStoreTest.kt:96-110, 138-152` |
+| 5 | Close PR #1123 OB-2 F.8 item via this audit | Shipped | This doc |
+| 6 | Web parity (`DEFAULT_ND_PREFERENCES` flip) | **Deferred** | Web follow-up — see V8 |
+
+**Measured impact (where measurable post-merge):**
+
+- Code diff: +89 / -40 across 6 files (within the ~30–60 LOC code + ~100–150
+  LOC tests estimate).
+- Audit doc: 279 lines (within the 500-line cap).
+- Local `:app:compileDebugKotlin` clean; `:app:compileDebugUnitTestKotlin`
+  clean; `:app:compileDebugAndroidTestKotlin` clean. `:app:testDebugUnitTest`
+  reports 2531/2532 pass; the single failure is in
+  `util/ScreenshotEncoderTest` (Robolectric URI quirk, file untouched by this
+  PR, preexisting on `main`). CI is the canonical gate.
+
+**Re-baselined wall-clock estimate**: this kind of "operator product decision
++ surface-level idiom fix" rolls up to ~1 session for a code+tests+audit-doc
+bundle when the recon-first phase surfaces that most of the technical work is
+already shipped (here, the idiom was already in place; only defaults needed
+to flip).
+
+**Memory entry candidates** (only if surprising / non-obvious):
+
+- *Maybe*: "Audit-first premise verification can resolve to **premise wrong
+  in a good way** — the targeted bug is already fixed in current `main`, so
+  Phase 2 scope shrinks rather than expanding into recovery work." This is a
+  recurring shape; could be worth capturing if it happens again.
+- *No memory* on the `?:` vs explicit-false migration safety — already
+  well-covered by Kotlin idiom and existing tests.
+
+**Schedule for next audit**: Web BrainModePage parity (re-trigger from V8).
+No date locked.
+
+## Phase 4 — Claude Chat handoff summary
+
+See the fenced block printed at the end of the session for a paste-ready
+summary suitable for a fresh Claude.ai thread.
