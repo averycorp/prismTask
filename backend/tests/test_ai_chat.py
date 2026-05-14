@@ -565,6 +565,48 @@ class TestChatEndpoint:
             assert mock_gen.call_args.kwargs["task_context_id"] == 9876
 
 
+class TestChatSystemPromptFramingCanary:
+    """Regression guard for the chat system prompt's mental-health framing.
+
+    Per ``docs/audits/CHAT_SYSTEM_PROMPT_AUDIT.md`` (variant B). The audit
+    rewrote ``_CHAT_SYSTEM_PROMPT_BASE`` to add forgiveness-first posture
+    and explicit anti-shame / anti-comparison rules. These checks fail
+    loudly if a future edit dilutes the framing back toward
+    productivity-as-virtue language. Update intentionally — re-run the
+    audit if you're changing what these strings assert.
+    """
+
+    def test_prompt_carries_forgiveness_first_posture(self):
+        from app.services.ai_productivity import _CHAT_SYSTEM_PROMPT_BASE
+
+        assert "forgiveness-first design" in _CHAT_SYSTEM_PROMPT_BASE
+        assert "rest is a peer to work" in _CHAT_SYSTEM_PROMPT_BASE
+        assert "not in deficit" in _CHAT_SYSTEM_PROMPT_BASE
+
+    def test_prompt_forbids_behind_and_catch_up_framing(self):
+        from app.services.ai_productivity import _CHAT_SYSTEM_PROMPT_BASE
+
+        assert '"behind"' in _CHAT_SYSTEM_PROMPT_BASE
+        assert '"catch up"' in _CHAT_SYSTEM_PROMPT_BASE
+        assert "not in debt to their list" in _CHAT_SYSTEM_PROMPT_BASE
+
+    def test_prompt_treats_rest_as_peer_state(self):
+        from app.services.ai_productivity import _CHAT_SYSTEM_PROMPT_BASE
+
+        assert "peer states to work" in _CHAT_SYSTEM_PROMPT_BASE
+        assert "without pushback" in _CHAT_SYSTEM_PROMPT_BASE
+
+    def test_prompt_drops_productivity_coach_role_label(self):
+        from app.services.ai_productivity import _CHAT_SYSTEM_PROMPT_BASE
+
+        # Variant B kept the "AI Executive Assistant" brand but dropped
+        # the "conversational productivity coach/partner" framing that
+        # centered productivity as the unit of value.
+        assert "productivity coach" not in _CHAT_SYSTEM_PROMPT_BASE
+        assert "productivity partner" not in _CHAT_SYSTEM_PROMPT_BASE
+        assert "AI Executive Assistant" in _CHAT_SYSTEM_PROMPT_BASE
+
+
 class TestChatContextBlock:
     """Phase 2 fix #1 (audit Axes A.1 + E.1): the backend now forwards
     rolling user/assistant history and a task_context snapshot to Anthropic
