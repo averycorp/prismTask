@@ -32,16 +32,31 @@ object DailyForgivenessStreakCore {
      * @param config Forgiveness window + allowed misses. When disabled the
      *   result collapses to a strict streak in both slots and no forgiven
      *   dates are returned.
+     * @param restDays Days the user explicitly marked as a rest day
+     *   (Mental-Health-First audit § G3). Rest days are treated as "kept"
+     *   by definition — they do NOT consume the grace window and do NOT
+     *   count as misses. Empty by default so existing callers behave
+     *   identically; callers that thread the user's rest-day set get
+     *   the audit-spec rest-day semantics without re-implementing the
+     *   walk. See `docs/REST_DAY.md` for the philosophy.
      */
     fun calculate(
         activityDates: Set<LocalDate>,
         today: LocalDate = LocalDate.now(),
-        config: ForgivenessConfig = ForgivenessConfig.DEFAULT
+        config: ForgivenessConfig = ForgivenessConfig.DEFAULT,
+        restDays: Set<LocalDate> = emptySet()
     ): StreakResult {
+        // Rest days are "kept" by definition. Folding them into the
+        // activity set is the cleanest seam — the existing walk then
+        // treats a rest day exactly the same as a real activity day, so
+        // it never burns grace and never breaks the run. Strict-walk
+        // also sees rest days as met, which is the intended UX
+        // ("resting still counts").
+        val effectiveActivity = if (restDays.isEmpty()) activityDates else activityDates + restDays
         // No activity at all → no streak, no grace to spend. Short-circuit to
         // the canonical empty result so callers can compare with StreakResult.EMPTY.
-        if (activityDates.isEmpty()) return StreakResult.EMPTY
-        val strict = strictWalk(activityDates, today)
+        if (effectiveActivity.isEmpty()) return StreakResult.EMPTY
+        val strict = strictWalk(effectiveActivity, today)
         if (!config.enabled) {
             return StreakResult(
                 strictStreak = strict,
@@ -57,12 +72,12 @@ object DailyForgivenessStreakCore {
 
         // Mid-day rule: don't penalize the user for not logging yet today.
         // If today isn't met, drop the cursor to yesterday before starting.
-        val start = if (today in activityDates) today else today.minusDays(1)
+        val start = if (today in effectiveActivity) today else today.minusDays(1)
 
         // Hard reset: if the starting cursor itself is a miss (today AND
         // yesterday both missed), the current run has already broken.
         // Return resilient=0 regardless of how long the historical run was.
-        if (start !in activityDates) {
+        if (start !in effectiveActivity) {
             return StreakResult(
                 strictStreak = strict,
                 resilientStreak = 0,
@@ -74,15 +89,17 @@ object DailyForgivenessStreakCore {
 
         // Don't walk past the earliest known activity — counting pre-history
         // days as "misses" would penalize the user for before the entity
-        // existed.
-        val earliest = activityDates.minOrNull()
+        // existed. Rest days are folded in too: a rest day before the
+        // first real activity is still "earliest known", which is the
+        // intended UX (resting still counts as being there).
+        val earliest = effectiveActivity.minOrNull()
 
         var cursor = start
         var metDays = 0
         val missDates = mutableListOf<LocalDate>()
 
         while (true) {
-            if (cursor in activityDates) {
+            if (cursor in effectiveActivity) {
                 metDays++
             } else {
                 // A miss is tolerable iff the rolling window (anchored at

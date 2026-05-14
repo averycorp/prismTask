@@ -2614,7 +2614,45 @@ val MIGRATION_81_82 = object : Migration(81, 82) {
     }
 }
 
-const val CURRENT_DB_VERSION = 82
+/**
+ * v83: Rest Day primitive (Mental-Health-First audit § G3).
+ *
+ * One row per calendar date the user has marked as a rest day. Date is
+ * stored as the ISO `yyyy-MM-dd` string of the user's logical
+ * (Start-of-Day-aware) day; callers must compute the key via
+ * `DayBoundary.currentLocalDateString`. Unique index on `date` enforces
+ * idempotency — `RestDayDao.upsert` uses `OnConflictStrategy.IGNORE` so
+ * re-marking today is a no-op rather than spawning a duplicate row.
+ *
+ * No backfill: prior versions had no rest-day concept. Cloud-sync columns
+ * (`cloud_id`, `updated_at`) shadow the [CheckInLogEntity] shape so a
+ * later additive migration can mirror this into Firestore.
+ */
+val MIGRATION_82_83 = object : Migration(82, 83) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `rest_days` (
+                `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                `date` TEXT NOT NULL,
+                `created_at` INTEGER NOT NULL,
+                `cloud_id` TEXT,
+                `updated_at` INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_rest_days_date` " +
+                "ON `rest_days` (`date`)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_rest_days_cloud_id` " +
+                "ON `rest_days` (`cloud_id`)"
+        )
+    }
+}
+
+const val CURRENT_DB_VERSION = 83
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2697,5 +2735,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_78_79,
     MIGRATION_79_80,
     MIGRATION_80_81,
-    MIGRATION_81_82
+    MIGRATION_81_82,
+    MIGRATION_82_83
 )

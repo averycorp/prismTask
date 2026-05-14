@@ -6,6 +6,10 @@ import android.content.Intent
 import android.util.Log
 import com.averycorp.prismtask.domain.model.notifications.EscalationStepAction
 import com.averycorp.prismtask.domain.model.notifications.UrgencyTier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Fires each queued step of an escalation chain. Completely stateless —
@@ -32,15 +36,30 @@ class EscalationBroadcastReceiver : BroadcastReceiver() {
             "Escalation step $stepIndex fired for task=$taskId action=${action.key} tier=${tier.key}"
         )
 
-        NotificationHelper.showEscalatedTaskReminder(
-            context = context,
-            taskId = taskId,
-            taskTitle = title,
-            taskDescription = description,
-            stepAction = action,
-            tier = tier,
-            stepIndex = stepIndex
-        )
+        // Rest-day suppression (MH-First audit § G3). Escalation steps
+        // walk a task reminder up in urgency — but the whole reminder
+        // pause applies to the underlying task path. goAsync() keeps the
+        // receiver alive while the suspend gate check runs.
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            try {
+                if (RestDayGate.shouldSuppress(context)) {
+                    Log.d(TAG, "Rest day — suppressing escalation step taskId=$taskId step=$stepIndex")
+                    return@launch
+                }
+                NotificationHelper.showEscalatedTaskReminder(
+                    context = context,
+                    taskId = taskId,
+                    taskTitle = title,
+                    taskDescription = description,
+                    stepAction = action,
+                    tier = tier,
+                    stepIndex = stepIndex
+                )
+            } finally {
+                pendingResult.finish()
+            }
+        }
     }
 
     companion object {

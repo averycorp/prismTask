@@ -143,6 +143,13 @@ class MedicationReminderReceiver : BroadcastReceiver() {
         val totalDoses = intent.getIntExtra("totalDoses", 1)
         val alarmKind = intent.getStringExtra(HabitReminderScheduler.EXTRA_ALARM_KIND)
 
+        // Rest-day suppression (MH-First audit § G3). Habit alarms route
+        // through this branch — including the daily-time path — and the
+        // audit specifies non-medication notifications pause. The
+        // re-register-tomorrow step below still runs so the chain
+        // resumes naturally on the next logical day.
+        val isRestDay = RestDayGate.shouldSuppress(context)
+
         val scheduler = entryPoint.habitReminderScheduler()
         val habit = entryPoint.habitDao().getHabitByIdOnce(habitId)
 
@@ -169,6 +176,15 @@ class MedicationReminderReceiver : BroadcastReceiver() {
                 scheduler.scheduleDelayedHabitFollowUp(habitId, name, followUpTime)
                 return
             }
+        }
+
+        // Rest day → drop the habit nag (the re-register above already
+        // queued tomorrow). Medications never route through this branch
+        // (they use AlarmKind.Medication / SlotClock / etc.), so this
+        // never suppresses a real medication reminder.
+        if (isRestDay) {
+            Log.d("MedReminderReceiver", "Rest day — suppressing habit nag habitId=$habitId")
+            return
         }
 
         // No suppression — fire the nag notification as normal

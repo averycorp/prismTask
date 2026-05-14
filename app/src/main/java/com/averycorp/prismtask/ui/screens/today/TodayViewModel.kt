@@ -26,6 +26,7 @@ import com.averycorp.prismtask.data.repository.HabitWithStatus
 import com.averycorp.prismtask.data.repository.LeisureBudgetRepository
 import com.averycorp.prismtask.data.repository.MedicationRefillRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
+import com.averycorp.prismtask.data.repository.RestDayRepository
 import com.averycorp.prismtask.data.repository.SchoolworkRepository
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.averycorp.prismtask.data.repository.TagRepository
@@ -94,8 +95,42 @@ constructor(
     private val localDateFlow: LocalDateFlow,
     private val tourCardPreferences: TourCardPreferences,
     private val coachmarkController: CoachmarkController,
-    private val habitDailyTaskGenerator: HabitDailyTaskGenerator
+    private val habitDailyTaskGenerator: HabitDailyTaskGenerator,
+    private val restDayRepository: RestDayRepository
 ) : ViewModel() {
+    /**
+     * True when the user has marked today (logical, SoD-aware) as a rest
+     * day. Drives the soft "Resting today" header on the Today screen and
+     * keys the Today-screen action icon between mark/unmark. Composes
+     * with the forgiveness-first streak core (rest days are "kept" by
+     * definition) and gates non-medication notifications.
+     *
+     * Mental-Health-First audit § G3.
+     */
+    val isRestDayToday: StateFlow<Boolean> = restDayRepository.observeIsRestDayToday()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Mark today (logical, SoD-aware) as a rest day. */
+    fun markRestDayToday() {
+        viewModelScope.launch {
+            try {
+                restDayRepository.markTodayAsRestDay()
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to mark rest day", e)
+            }
+        }
+    }
+
+    /** Unmark today as a rest day. */
+    fun unmarkRestDayToday() {
+        viewModelScope.launch {
+            try {
+                restDayRepository.unmarkTodayAsRestDay()
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to unmark rest day", e)
+            }
+        }
+    }
     /**
      * True when the morning check-in banner should render on the Today
      * screen. Derived reactively from three signals (so it flips off the

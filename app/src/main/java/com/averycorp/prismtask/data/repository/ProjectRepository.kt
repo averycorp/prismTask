@@ -108,7 +108,8 @@ constructor(
     fun observeProjectsWithProgress(
         status: ProjectStatus? = ProjectStatus.ACTIVE,
         today: LocalDate = LocalDate.now(),
-        forgiveness: ForgivenessConfig = ForgivenessConfig.DEFAULT
+        forgiveness: ForgivenessConfig = ForgivenessConfig.DEFAULT,
+        restDays: Set<LocalDate> = emptySet()
     ): Flow<List<ProjectWithProgress>> =
         observeProjects(status).map { projects ->
             // Can't use List.map here: computeProgress is a suspend fun and
@@ -116,7 +117,7 @@ constructor(
             // inside the suspending Flow.map block.
             val out = ArrayList<ProjectWithProgress>(projects.size)
             for (project in projects) {
-                out.add(computeProgress(project, today, forgiveness))
+                out.add(computeProgress(project, today, forgiveness, restDays))
             }
             out
         }
@@ -129,14 +130,15 @@ constructor(
     fun observeProject(
         id: Long,
         today: LocalDate = LocalDate.now(),
-        forgiveness: ForgivenessConfig = ForgivenessConfig.DEFAULT
+        forgiveness: ForgivenessConfig = ForgivenessConfig.DEFAULT,
+        restDays: Set<LocalDate> = emptySet()
     ): Flow<ProjectDetail?> =
         projectDao.getProjectById(id).flatMapLatest { project ->
             if (project == null) {
                 flowOf(null)
             } else {
                 milestoneDao.observeMilestones(id).map { milestones ->
-                    buildDetail(project, milestones, today, forgiveness)
+                    buildDetail(project, milestones, today, forgiveness, restDays)
                 }
             }
         }
@@ -281,13 +283,14 @@ constructor(
     private suspend fun computeProgress(
         project: ProjectEntity,
         today: LocalDate,
-        forgiveness: ForgivenessConfig
+        forgiveness: ForgivenessConfig,
+        restDays: Set<LocalDate> = emptySet()
     ): ProjectWithProgress {
         val aggregate = projectDao.getAggregateRow(project.id)
         val milestoneDates = milestoneDao.getCompletedTimestamps(project.id)
         val taskActivityMillis = projectDao.getTaskActivityDates(project.id)
         val activityDates = toLocalDateSet(taskActivityMillis + milestoneDates)
-        val streak = DailyForgivenessStreakCore.calculate(activityDates, today, forgiveness)
+        val streak = DailyForgivenessStreakCore.calculate(activityDates, today, forgiveness, restDays)
         val lastActivity = (taskActivityMillis + milestoneDates).maxOrNull()
         return ProjectWithProgress(
             project = project,
@@ -306,13 +309,14 @@ constructor(
         project: ProjectEntity,
         milestones: List<MilestoneEntity>,
         today: LocalDate,
-        forgiveness: ForgivenessConfig
+        forgiveness: ForgivenessConfig,
+        restDays: Set<LocalDate> = emptySet()
     ): ProjectDetail {
         val aggregate = projectDao.getAggregateRow(project.id)
         val taskActivityMillis = projectDao.getTaskActivityDates(project.id)
         val milestoneTimestamps = milestones.mapNotNull { it.completedAt }
         val activityDates = toLocalDateSet(taskActivityMillis + milestoneTimestamps)
-        val streak = DailyForgivenessStreakCore.calculate(activityDates, today, forgiveness)
+        val streak = DailyForgivenessStreakCore.calculate(activityDates, today, forgiveness, restDays)
         val lastActivity = (taskActivityMillis + milestoneTimestamps).maxOrNull()
         return ProjectDetail(
             project = project,

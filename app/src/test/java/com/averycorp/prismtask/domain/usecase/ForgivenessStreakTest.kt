@@ -230,4 +230,57 @@ class ForgivenessStreakTest {
         assertEquals(2, result.strictStreak)
         assertEquals(2, result.resilientStreak)
     }
+
+    // -------------------------------------------------------------------
+    // Rest Day (Mental-Health-First audit § G3)
+    // -------------------------------------------------------------------
+
+    @Test
+    fun `rest day mid run preserves streak without consuming grace`() {
+        // Days -4, -3, -1, 0 completed. Day -2 is a rest day, not a miss.
+        // Without rest-day semantics this would burn the single grace
+        // slot on day -2 and still count to 5 — but rest-day semantics
+        // mean grace is fully intact afterward.
+        val completions = listOf(
+            completion(today.minusDays(4)),
+            completion(today.minusDays(3)),
+            completion(today.minusDays(1)),
+            completion(today)
+        )
+        val restDays = setOf(today.minusDays(2))
+        val result = StreakCalculator.calculateResilientDailyStreak(
+            completions,
+            dailyHabit(),
+            today,
+            ForgivenessConfig.DEFAULT,
+            restDays
+        )
+        assertEquals(5, result.resilientStreak)
+        assertEquals(0, result.missesInWindow)
+        assertEquals(1, result.gracePeriodRemaining)
+    }
+
+    @Test
+    fun `rest day on today and yesterday avoids hard reset`() {
+        // Without rest-day support: today + yesterday both unlogged →
+        // resilient hard-reset to 0. With rest-day on yesterday only,
+        // mid-day rule drops cursor to yesterday (kept via rest-day) so
+        // the run from day -2 survives.
+        val completions = listOf(
+            completion(today.minusDays(5)),
+            completion(today.minusDays(4)),
+            completion(today.minusDays(3)),
+            completion(today.minusDays(2))
+        )
+        val restDays = setOf(today.minusDays(1))
+        val result = StreakCalculator.calculateResilientDailyStreak(
+            completions,
+            dailyHabit(),
+            today,
+            ForgivenessConfig.DEFAULT,
+            restDays
+        )
+        // 5-day run: rest -1 + activity -2 through -5.
+        assertEquals(5, result.resilientStreak)
+    }
 }
