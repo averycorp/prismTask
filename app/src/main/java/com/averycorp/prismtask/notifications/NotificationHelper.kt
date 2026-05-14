@@ -806,8 +806,8 @@ object NotificationHelper {
         val headline = when (stepAction) {
             EscalationStepAction.GENTLE_PING -> "Gentle nudge"
             EscalationStepAction.STANDARD_ALERT -> "Still pending"
-            EscalationStepAction.LOUD_VIBRATE -> "Action needed"
-            EscalationStepAction.FULL_SCREEN -> "Critical"
+            EscalationStepAction.LOUD_VIBRATE -> "Reminder"
+            EscalationStepAction.FULL_SCREEN -> "Final reminder"
         }
 
         val builder = NotificationCompat
