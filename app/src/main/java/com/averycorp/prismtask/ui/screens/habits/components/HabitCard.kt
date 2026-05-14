@@ -72,6 +72,7 @@ internal fun HabitItem(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onLog: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val habit = habitWithStatus.habit
@@ -183,15 +184,6 @@ internal fun HabitItem(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    if (habit.hasLogging) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.EditNote,
-                            contentDescription = "Logging enabled",
-                            modifier = Modifier.size(16.dp),
-                            tint = colors.muted
-                        )
-                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val periodLabel = when (habit.frequencyPeriod) {
@@ -288,6 +280,17 @@ internal fun HabitItem(
             }
 
             Spacer(modifier = Modifier.width(4.dp))
+
+            if (habit.hasLogging) {
+                IconButton(onClick = onLog, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.EditNote,
+                        contentDescription = "Log activity",
+                        modifier = Modifier.size(20.dp),
+                        tint = habitColor
+                    )
+                }
+            }
 
             IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
