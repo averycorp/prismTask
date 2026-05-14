@@ -252,7 +252,7 @@ private fun BestWorstRow(best: BestWorstDay?, worst: BestWorstDay?) {
         best?.let {
             BestWorstTile(
                 modifier = Modifier.weight(1f),
-                label = "Best",
+                label = "Highest",
                 date = it.date.format(fmt),
                 score = it.score.roundToInt(),
                 tint = Color(0xFF2E7D32)
@@ -261,7 +261,7 @@ private fun BestWorstRow(best: BestWorstDay?, worst: BestWorstDay?) {
         worst?.let {
             BestWorstTile(
                 modifier = Modifier.weight(1f),
-                label = "Worst",
+                label = "Lowest",
                 date = it.date.format(fmt),
                 score = it.score.roundToInt(),
                 tint = Color(0xFFC62828)
