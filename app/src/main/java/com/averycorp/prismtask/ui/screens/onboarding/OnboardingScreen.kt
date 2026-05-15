@@ -101,7 +101,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
-private const val TOTAL_PAGES = 15
+private const val TOTAL_PAGES = 16
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 
 @Composable
@@ -137,19 +137,20 @@ fun OnboardingScreen(
         ) { page ->
             when (page) {
                 0 -> WelcomePage(viewModel = viewModel)
-                1 -> ThemePickerPage(viewModel = viewModel)
-                2 -> SmartTasksPage()
-                3 -> ProjectsPage()
-                4 -> NaturalLanguagePage()
-                5 -> HabitsPage(viewModel = viewModel)
-                6 -> LifeModesPage(viewModel = viewModel)
-                7 -> TemplatesPage(viewModel = viewModel)
-                8 -> BrainModePage(viewModel = viewModel)
-                9 -> TuningPage(viewModel = viewModel)
-                10 -> AccessibilityPage(viewModel = viewModel)
-                11 -> PrivacyPage(viewModel = viewModel)
-                12 -> NotificationsPage(viewModel = viewModel)
-                13 -> DaySetupPage(viewModel = viewModel)
+                1 -> HowWeThinkPage()
+                2 -> ThemePickerPage(viewModel = viewModel)
+                3 -> SmartTasksPage()
+                4 -> ProjectsPage()
+                5 -> NaturalLanguagePage()
+                6 -> HabitsPage(viewModel = viewModel)
+                7 -> LifeModesPage(viewModel = viewModel)
+                8 -> TemplatesPage(viewModel = viewModel)
+                9 -> BrainModePage(viewModel = viewModel)
+                10 -> TuningPage(viewModel = viewModel)
+                11 -> AccessibilityPage(viewModel = viewModel)
+                12 -> PrivacyPage(viewModel = viewModel)
+                13 -> NotificationsPage(viewModel = viewModel)
+                14 -> DaySetupPage(viewModel = viewModel)
                 LAST_PAGE_INDEX -> SetupPage(
                     viewModel = viewModel,
                     onComplete = {
@@ -413,6 +414,55 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HowWeThinkPage() {
+    OnboardingPageLayout(
+        emoji = "\ud83e\udde0",
+        headline = "Built for every kind of mind",
+        body = "",
+        illustration = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                PhilosophyLine(
+                    title = "Forgiveness over punishment",
+                    body = "A missed day doesn't break your streak. There's always a way back."
+                )
+                PhilosophyLine(
+                    title = "Reflects the day you had",
+                    body = "Not the day you wish you had. Rest, play, and low-output days count."
+                )
+                PhilosophyLine(
+                    title = "Honest about what we do",
+                    body = "Every AI feature, every paid limit, every data choice \u2014 disclosed in plain language."
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun PhilosophyLine(title: String, body: String) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

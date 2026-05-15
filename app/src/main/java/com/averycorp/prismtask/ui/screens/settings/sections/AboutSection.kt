@@ -1,5 +1,7 @@
 package com.averycorp.prismtask.ui.screens.settings.sections
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,9 +15,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.ui.components.settings.SectionHeader
+
+private const val PHILOSOPHY_URL =
+    "https://github.com/averycorp/prismTask/blob/main/docs/PHILOSOPHY.md"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -67,6 +73,16 @@ fun AboutSection(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
+
+    val context = LocalContext.current
+    TextButton(
+        onClick = {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PHILOSOPHY_URL)))
+        },
+        modifier = Modifier.padding(top = 4.dp)
+    ) {
+        Text("Our Design Philosophy")
+    }
 
     // Hidden for v1.0 — widgets disabled until v1.2 re-enable
     if (BuildConfig.WIDGETS_ENABLED && onRefreshWidgets != null) {
