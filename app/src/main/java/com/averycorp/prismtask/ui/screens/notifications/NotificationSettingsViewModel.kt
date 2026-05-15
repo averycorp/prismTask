@@ -83,6 +83,32 @@ constructor(
     val reengagementEnabled = prefs.reengagementEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     val overloadAlertsEnabled = prefs.overloadAlertsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
+    // Per-type volume + vibration override. Each type owns three flags:
+    // "follow phone settings" (the alignment switch) plus the two app
+    // overrides (loud / repeating). When follow-system is true the
+    // overrides are ignored at notify time; the toggles still persist so
+    // disabling the switch restores the user's previous choices.
+    val taskRemindersFollowSystem = prefs.taskRemindersFollowSystem
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val taskRemindersVolumeLoud = prefs.taskRemindersVolumeLoud
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val taskRemindersVibrationRepeat = prefs.taskRemindersVibrationRepeat
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val timerAlertsFollowSystem = prefs.timerAlertsFollowSystem
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val timerAlertsVolumeLoud = prefs.timerAlertsVolumeLoud
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val timerAlertsVibrationRepeat = prefs.timerAlertsVibrationRepeat
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val medicationRemindersFollowSystem = prefs.medicationRemindersFollowSystem
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val medicationRemindersVolumeLoud = prefs.medicationRemindersVolumeLoud
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val medicationRemindersVibrationRepeat = prefs.medicationRemindersVibrationRepeat
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     // Habit nag suppression
     val habitNagSuppressionDays = prefs.habitNagSuppressionDays.stateIn(
         viewModelScope,
@@ -218,6 +244,42 @@ constructor(
     fun setReengagementEnabled(enabled: Boolean) = viewModelScope.launch { prefs.setReengagementEnabled(enabled) }
 
     fun setOverloadAlertsEnabled(enabled: Boolean) = viewModelScope.launch { prefs.setOverloadAlertsEnabled(enabled) }
+
+    fun setTaskRemindersFollowSystem(enabled: Boolean) = viewModelScope.launch {
+        prefs.setTaskRemindersFollowSystem(enabled)
+    }
+
+    fun setTaskRemindersVolumeLoud(enabled: Boolean) = viewModelScope.launch {
+        prefs.setTaskRemindersVolumeLoud(enabled)
+    }
+
+    fun setTaskRemindersVibrationRepeat(enabled: Boolean) = viewModelScope.launch {
+        prefs.setTaskRemindersVibrationRepeat(enabled)
+    }
+
+    fun setTimerAlertsFollowSystem(enabled: Boolean) = viewModelScope.launch {
+        prefs.setTimerAlertsFollowSystem(enabled)
+    }
+
+    fun setTimerAlertsVolumeLoud(enabled: Boolean) = viewModelScope.launch {
+        prefs.setTimerAlertsVolumeLoud(enabled)
+    }
+
+    fun setTimerAlertsVibrationRepeat(enabled: Boolean) = viewModelScope.launch {
+        prefs.setTimerAlertsVibrationRepeat(enabled)
+    }
+
+    fun setMedicationRemindersFollowSystem(enabled: Boolean) = viewModelScope.launch {
+        prefs.setMedicationRemindersFollowSystem(enabled)
+    }
+
+    fun setMedicationRemindersVolumeLoud(enabled: Boolean) = viewModelScope.launch {
+        prefs.setMedicationRemindersVolumeLoud(enabled)
+    }
+
+    fun setMedicationRemindersVibrationRepeat(enabled: Boolean) = viewModelScope.launch {
+        prefs.setMedicationRemindersVibrationRepeat(enabled)
+    }
 
     fun setHabitNagSuppressionDays(days: Int) = viewModelScope.launch { prefs.setHabitNagSuppressionDays(days) }
 

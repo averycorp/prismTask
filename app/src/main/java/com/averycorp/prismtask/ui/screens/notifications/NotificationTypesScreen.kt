@@ -31,6 +31,15 @@ fun NotificationTypesScreen(
     val task by viewModel.taskRemindersEnabled.collectAsStateWithLifecycle()
     val timer by viewModel.timerAlertsEnabled.collectAsStateWithLifecycle()
     val med by viewModel.medicationRemindersEnabled.collectAsStateWithLifecycle()
+    val taskFollowSystem by viewModel.taskRemindersFollowSystem.collectAsStateWithLifecycle()
+    val taskVolumeLoud by viewModel.taskRemindersVolumeLoud.collectAsStateWithLifecycle()
+    val taskVibrationRepeat by viewModel.taskRemindersVibrationRepeat.collectAsStateWithLifecycle()
+    val timerFollowSystem by viewModel.timerAlertsFollowSystem.collectAsStateWithLifecycle()
+    val timerVolumeLoud by viewModel.timerAlertsVolumeLoud.collectAsStateWithLifecycle()
+    val timerVibrationRepeat by viewModel.timerAlertsVibrationRepeat.collectAsStateWithLifecycle()
+    val medFollowSystem by viewModel.medicationRemindersFollowSystem.collectAsStateWithLifecycle()
+    val medVolumeLoud by viewModel.medicationRemindersVolumeLoud.collectAsStateWithLifecycle()
+    val medVibrationRepeat by viewModel.medicationRemindersVibrationRepeat.collectAsStateWithLifecycle()
     val briefing by viewModel.dailyBriefingEnabled.collectAsStateWithLifecycle()
     val evening by viewModel.eveningSummaryEnabled.collectAsStateWithLifecycle()
     val weekly by viewModel.weeklySummaryEnabled.collectAsStateWithLifecycle()
@@ -51,17 +60,46 @@ fun NotificationTypesScreen(
             checked = task,
             onCheckedChange = viewModel::setTaskRemindersEnabled
         )
+        PerTypeOverrideBlock(
+            enabled = task,
+            followSystem = taskFollowSystem,
+            volumeLoud = taskVolumeLoud,
+            vibrationRepeat = taskVibrationRepeat,
+            onFollowSystemChange = viewModel::setTaskRemindersFollowSystem,
+            onVolumeLoudChange = viewModel::setTaskRemindersVolumeLoud,
+            onVibrationRepeatChange = viewModel::setTaskRemindersVibrationRepeat
+        )
+
         SettingsToggleRow(
             title = "Timer Alerts",
             subtitle = "When a timer or focus session completes",
             checked = timer,
             onCheckedChange = viewModel::setTimerAlertsEnabled
         )
+        PerTypeOverrideBlock(
+            enabled = timer,
+            followSystem = timerFollowSystem,
+            volumeLoud = timerVolumeLoud,
+            vibrationRepeat = timerVibrationRepeat,
+            onFollowSystemChange = viewModel::setTimerAlertsFollowSystem,
+            onVolumeLoudChange = viewModel::setTimerAlertsVolumeLoud,
+            onVibrationRepeatChange = viewModel::setTimerAlertsVibrationRepeat
+        )
+
         SettingsToggleRow(
             title = "Medication Reminders",
             subtitle = "Medication and timed habit reminders",
             checked = med,
             onCheckedChange = viewModel::setMedicationRemindersEnabled
+        )
+        PerTypeOverrideBlock(
+            enabled = med,
+            followSystem = medFollowSystem,
+            volumeLoud = medVolumeLoud,
+            vibrationRepeat = medVibrationRepeat,
+            onFollowSystemChange = viewModel::setMedicationRemindersFollowSystem,
+            onVolumeLoudChange = viewModel::setMedicationRemindersVolumeLoud,
+            onVibrationRepeatChange = viewModel::setMedicationRemindersVibrationRepeat
         )
 
         SectionSpacer()
@@ -183,5 +221,53 @@ fun NotificationTypesScreen(
             checked = reengage,
             onCheckedChange = viewModel::setReengagementEnabled
         )
+    }
+}
+
+/**
+ * Volume + vibration sub-controls for a notification type. Hidden when
+ * the parent type is disabled — there's nothing to tune until it fires.
+ * When "Align with phone settings" is on, the loud/repeat toggles are
+ * also hidden because they don't take effect; their stored values
+ * persist so toggling the align switch off restores the user's choices.
+ *
+ * Indented one column to visually nest under the parent enable row.
+ */
+@Composable
+private fun PerTypeOverrideBlock(
+    enabled: Boolean,
+    followSystem: Boolean,
+    volumeLoud: Boolean,
+    vibrationRepeat: Boolean,
+    onFollowSystemChange: (Boolean) -> Unit,
+    onVolumeLoudChange: (Boolean) -> Unit,
+    onVibrationRepeatChange: (Boolean) -> Unit
+) {
+    if (!enabled) return
+    Column(modifier = Modifier.padding(start = 16.dp)) {
+        SettingsToggleRow(
+            title = "Align with phone settings",
+            subtitle = if (followSystem) {
+                "Volume and vibration follow your phone's notification settings"
+            } else {
+                "Using app overrides below"
+            },
+            checked = followSystem,
+            onCheckedChange = onFollowSystemChange
+        )
+        if (!followSystem) {
+            SettingsToggleRow(
+                title = "Loud (alarm volume)",
+                subtitle = "Play at alarm volume, bypassing silent mode",
+                checked = volumeLoud,
+                onCheckedChange = onVolumeLoudChange
+            )
+            SettingsToggleRow(
+                title = "Repeating vibration",
+                subtitle = "Buzz repeatedly until you act on it",
+                checked = vibrationRepeat,
+                onCheckedChange = onVibrationRepeatChange
+            )
+        }
     }
 }

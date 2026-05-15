@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.data.local.dao.NotificationProfileDao
+import com.averycorp.prismtask.data.preferences.NotificationOverrideType
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.domain.model.notifications.EscalationStepAction
@@ -120,13 +121,26 @@ object NotificationHelper {
         val repeatingVibration: Boolean
     )
 
-    private suspend fun currentStyle(context: Context): Style {
+    /**
+     * Resolves the channel [Style] for [type]. Importance and full-screen
+     * remain global, but the loud/repeat override pair is per-type as of
+     * v1.9.x — each notification class gets a "follow phone settings"
+     * switch plus explicit override toggles, resolved by
+     * [NotificationPreferences.getOverridesForOnce]. Channels are still
+     * namespaced by their style suffix, so flipping a per-type switch
+     * spawns a fresh channel and [deleteStaleChannels] retires the old.
+     */
+    private suspend fun currentStyle(
+        context: Context,
+        type: NotificationOverrideType
+    ): Style {
         val prefs = NotificationPreferences.from(context)
+        val overrides = prefs.getOverridesForOnce(type)
         return Style(
             importance = prefs.getImportanceOnce(),
             fullScreen = prefs.getFullScreenNotificationsEnabledOnce(),
-            overrideVolume = prefs.getOverrideVolumeEnabledOnce(),
-            repeatingVibration = prefs.getRepeatingVibrationEnabledOnce()
+            overrideVolume = overrides.loud,
+            repeatingVibration = overrides.repeat
         )
     }
 
@@ -256,7 +270,7 @@ object NotificationHelper {
     suspend fun createNotificationChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         migrateOldChannels(context)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.TASK_REMINDERS)
         deleteStaleChannels(context, BASE_CHANNEL_ID, style)
         val channel = buildChannel(
             context = context,
@@ -327,7 +341,7 @@ object NotificationHelper {
         }
         Log.d("NotificationHelper", "Showing notification for task=$taskId")
         createNotificationChannel(context)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.TASK_REMINDERS)
         val channelId = channelIdFor(BASE_CHANNEL_ID, style)
 
         val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -371,7 +385,7 @@ object NotificationHelper {
 
     private suspend fun createMedicationChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.MEDICATION_REMINDERS)
         deleteStaleChannels(context, BASE_MED_CHANNEL_ID, style)
         val channel = buildChannel(
             context = context,
@@ -400,7 +414,7 @@ object NotificationHelper {
             return
         }
         createMedicationChannel(context)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.MEDICATION_REMINDERS)
         val channelId = channelIdFor(BASE_MED_CHANNEL_ID, style)
 
         val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -537,7 +551,7 @@ object NotificationHelper {
             return
         }
         createMedicationChannel(context)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.MEDICATION_REMINDERS)
         val channelId = channelIdFor(BASE_MED_CHANNEL_ID, style)
 
         val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -577,7 +591,7 @@ object NotificationHelper {
             return
         }
         createMedicationChannel(context)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.MEDICATION_REMINDERS)
         val channelId = channelIdFor(BASE_MED_CHANNEL_ID, style)
 
         val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -608,7 +622,7 @@ object NotificationHelper {
 
     private suspend fun createTimerChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.TIMER_ALERTS)
         deleteStaleChannels(context, BASE_TIMER_CHANNEL_ID, style)
         val channel = buildChannel(
             context = context,
@@ -629,7 +643,7 @@ object NotificationHelper {
             return
         }
         createTimerChannel(context)
-        val style = currentStyle(context)
+        val style = currentStyle(context, NotificationOverrideType.TIMER_ALERTS)
         val channelId = channelIdFor(BASE_TIMER_CHANNEL_ID, style)
 
         val isBreak = mode.equals("BREAK", ignoreCase = true)

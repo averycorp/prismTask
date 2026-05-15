@@ -110,6 +110,15 @@ internal class DeviceConfigImporter(
         b("fullScreenNotificationsEnabled")?.let { p.setFullScreenNotificationsEnabled(it) }
         b("overrideVolumeEnabled")?.let { p.setOverrideVolumeEnabled(it) }
         b("repeatingVibrationEnabled")?.let { p.setRepeatingVibrationEnabled(it) }
+        b("taskRemindersFollowSystem")?.let { p.setTaskRemindersFollowSystem(it) }
+        b("taskRemindersVolumeLoud")?.let { p.setTaskRemindersVolumeLoud(it) }
+        b("taskRemindersVibrationRepeat")?.let { p.setTaskRemindersVibrationRepeat(it) }
+        b("timerAlertsFollowSystem")?.let { p.setTimerAlertsFollowSystem(it) }
+        b("timerAlertsVolumeLoud")?.let { p.setTimerAlertsVolumeLoud(it) }
+        b("timerAlertsVibrationRepeat")?.let { p.setTimerAlertsVibrationRepeat(it) }
+        b("medicationRemindersFollowSystem")?.let { p.setMedicationRemindersFollowSystem(it) }
+        b("medicationRemindersVolumeLoud")?.let { p.setMedicationRemindersVolumeLoud(it) }
+        b("medicationRemindersVibrationRepeat")?.let { p.setMedicationRemindersVibrationRepeat(it) }
         s("importance")?.let { p.setImportance(it) }
         l("defaultReminderOffset")?.let { p.setDefaultReminderOffset(it) }
         l("activeProfileId")?.let { p.setActiveProfileId(it) }
