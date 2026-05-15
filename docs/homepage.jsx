@@ -961,9 +961,24 @@ function Footer() {
             </p>
           </div>
           {[
-            { title: 'Product', links: ['Features', 'Themes', 'Pricing', 'Widgets', 'Changelog'] },
-            { title: 'Company', links: ['About', 'Contact', 'Press'] },
-            { title: 'Resources', links: ['Privacy policy', 'Terms', 'Accessibility', 'Support'] },
+            { title: 'Product', links: [
+              { label: 'Features',  href: '#features' },
+              { label: 'Themes',    href: '#themes' },
+              { label: 'Pricing',   href: '#pricing' },
+              { label: 'Widgets',   href: '#features' },
+              { label: 'Changelog', href: 'https://github.com/averycorp/prismTask/blob/main/CHANGELOG.md', external: true },
+            ]},
+            { title: 'Company', links: [
+              { label: 'About',   href: 'https://github.com/averycorp/prismTask', external: true },
+              { label: 'Contact', href: 'mailto:averykarlin3@gmail.com' },
+              { label: 'Press',   href: 'mailto:averykarlin3@gmail.com?subject=PrismTask%20press%20inquiry' },
+            ]},
+            { title: 'Resources', links: [
+              { label: 'Privacy policy', href: 'privacy-policy.html' },
+              { label: 'Terms',          href: 'terms-of-service.html' },
+              { label: 'Accessibility',  href: '#wellness' },
+              { label: 'Support',        href: 'mailto:averykarlin3@gmail.com?subject=PrismTask%20support' },
+            ]},
           ].map(col => (
             <div key={col.title}>
               <div style={{
@@ -971,9 +986,13 @@ function Footer() {
                 letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14,
               }}>{col.title}</div>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {col.links.map(l => (
-                  <li key={l}>
-                    <a href="#" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 13 }}>{l}</a>
+                {col.links.map(({ label, href, external }) => (
+                  <li key={label}>
+                    <a
+                      href={href}
+                      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontSize: 13 }}
+                    >{label}</a>
                   </li>
                 ))}
               </ul>
