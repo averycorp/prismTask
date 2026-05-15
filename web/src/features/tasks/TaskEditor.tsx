@@ -25,8 +25,11 @@ import { useTagStore } from '@/stores/tagStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { aiLifeCategoryClassifyText } from '@/api/ai/chat';
 import { DependencyEditor } from '@/features/tasks/DependencyEditor';
+import { ClassificationChipRow } from '@/features/tasks/ClassificationChipRow';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { formatRelative } from '@/utils/dates';
+import { classifyTaskMode } from '@/utils/taskModeClassifier';
+import { classifyCognitiveLoad } from '@/utils/cognitiveLoadClassifier';
 import type {
   CognitiveLoad,
   LifeCategory,
@@ -239,6 +242,12 @@ export default function TaskEditor({
   // Claude-backed Life Category auto-classify (parity Batch 3 D.1c —
   // mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude`).
   const [lifeCategoryAutoBusy, setLifeCategoryAutoBusy] = useState(false);
+  // On-device keyword classifier Auto buttons for TaskMode + CognitiveLoad
+  // (parity audit WEB_PILLARS_PHILOSOPHY_AUDIT § Phase 2 #2). Classifier
+  // calls are synchronous; the busy flag exists so we can paint a brief
+  // spinner for parity with the LifeCategory Claude button.
+  const [taskModeAutoBusy, setTaskModeAutoBusy] = useState(false);
+  const [cognitiveLoadAutoBusy, setCognitiveLoadAutoBusy] = useState(false);
   const aiFeaturesEnabled = useSettingsStore((s) => s.aiFeaturesEnabled);
 
   // Form state
@@ -558,6 +567,71 @@ export default function TaskEditor({
     // Same omit-on-null semantics as the other orthogonal dimensions.
     autoSave({ taskMode: v === '' ? null : v });
   };
+
+  // On-device Auto buttons for TaskMode + CognitiveLoad. Synchronous,
+  // keyword-only — mirrors the Android local-classifier fallback. The
+  // backend AI endpoints (`/ai/task-mode/classify_text`,
+  // `/ai/cognitive-load/classify_text`) don't exist yet; once they do,
+  // this handler can grow the same fire-and-forget upgrade shape that
+  // `handleLifeCategoryAutoClick` uses today.
+  const handleTaskModeAutoClick = useCallback(() => {
+    if (!title.trim()) {
+      toast.error('Enter a title before auto-classifying');
+      return;
+    }
+    if (taskModeAutoBusy) return;
+    setTaskModeAutoBusy(true);
+    // The brief async wrapper lets the spinner render at all — a purely
+    // synchronous classify call would finish before paint and look like
+    // nothing happened. setTimeout(0) yields one frame.
+    setTimeout(() => {
+      try {
+        const next = classifyTaskMode(title, description.trim() || null);
+        if (next === 'UNCATEGORIZED') {
+          toast.success("Couldn't auto-classify — keeping your current choice");
+          return;
+        }
+        if (next === taskMode) {
+          toast.success('Already a match');
+          return;
+        }
+        handleTaskModeChange(next);
+        toast.success(`Set Task Mode: ${next.charAt(0)}${next.slice(1).toLowerCase()}`);
+      } finally {
+        setTaskModeAutoBusy(false);
+      }
+    }, 0);
+    // handleTaskModeChange is a stable closure over setState — intentionally
+    // omitted from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, taskMode, taskModeAutoBusy]);
+
+  const handleCognitiveLoadAutoClick = useCallback(() => {
+    if (!title.trim()) {
+      toast.error('Enter a title before auto-classifying');
+      return;
+    }
+    if (cognitiveLoadAutoBusy) return;
+    setCognitiveLoadAutoBusy(true);
+    setTimeout(() => {
+      try {
+        const next = classifyCognitiveLoad(title, description.trim() || null);
+        if (next === 'UNCATEGORIZED') {
+          toast.success("Couldn't auto-classify — keeping your current choice");
+          return;
+        }
+        if (next === cognitiveLoad) {
+          toast.success('Already a match');
+          return;
+        }
+        handleCognitiveLoadChange(next);
+        toast.success(`Set Cognitive Load: ${next.charAt(0)}${next.slice(1).toLowerCase()}`);
+      } finally {
+        setCognitiveLoadAutoBusy(false);
+      }
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, cognitiveLoad, cognitiveLoadAutoBusy]);
 
   // Focus-Release per-task overrides (parity audit § B.8). Toggling the
   // override off writes `null` to clear the field; toggling on with an
@@ -1293,59 +1367,48 @@ export default function TaskEditor({
                   </p>
                 </div>
 
-                {/* Cognitive Load (start-friction) */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Cognitive Load
-                  </label>
-                  <select
-                    value={cognitiveLoad}
-                    onChange={(e) =>
-                      handleCognitiveLoadChange(
-                        (e.target.value as CognitiveLoad | '') || '',
-                      )
-                    }
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    {COGNITIVE_LOAD_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    How hard is it to start? Independent of duration,
-                    importance, and reward type. Leave as Uncategorized to
-                    let Android auto-classify.
-                  </p>
-                </div>
+                {/* Cognitive Load (start-friction) — chip-row parity with
+                    Android Organize tab. UNCATEGORIZED == no chip selected. */}
+                <ClassificationChipRow<CognitiveLoad>
+                  label="Cognitive Load"
+                  value={cognitiveLoad}
+                  options={COGNITIVE_LOAD_OPTIONS.filter(
+                    (o): o is { value: CognitiveLoad; label: string } => o.value !== '',
+                  )}
+                  onChange={handleCognitiveLoadChange}
+                  onAutoClick={handleCognitiveLoadAutoClick}
+                  autoBusy={cognitiveLoadAutoBusy}
+                  autoDisabled={!title.trim()}
+                  autoTooltip={
+                    !title.trim()
+                      ? 'Enter a title first'
+                      : 'Auto-classify from keywords'
+                  }
+                  autoAriaLabel="Auto-classify Cognitive Load"
+                  helperText="How hard is it to start? Independent of duration, importance, and reward type. Tap Auto to classify from the title + description."
+                />
 
-                {/* Task Mode (Work / Play / Relax) */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Task Mode
-                  </label>
-                  <select
-                    value={taskMode}
-                    onChange={(e) =>
-                      handleTaskModeChange(
-                        (e.target.value as TaskMode | '') || '',
-                      )
-                    }
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    {TASK_MODE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    What kind of output does this produce? Orthogonal to
-                    Life Category and Cognitive Load. Leave as Uncategorized
-                    to let Android auto-classify.
-                  </p>
-                </div>
+                {/* Task Mode (Work / Play / Relax) — chip-row parity with
+                    Android Organize tab. UNCATEGORIZED == no chip selected. */}
+                <ClassificationChipRow<TaskMode>
+                  label="Task Mode"
+                  value={taskMode}
+                  options={TASK_MODE_OPTIONS.filter(
+                    (o): o is { value: TaskMode; label: string } => o.value !== '',
+                  )}
+                  onChange={handleTaskModeChange}
+                  onAutoClick={handleTaskModeAutoClick}
+                  autoBusy={taskModeAutoBusy}
+                  autoDisabled={!title.trim()}
+                  autoTooltip={
+                    !title.trim()
+                      ? 'Enter a title first'
+                      : 'Auto-classify from keywords'
+                  }
+                  autoAriaLabel="Auto-classify Task Mode"
+                  helperText="What kind of output does this produce? Orthogonal to Life Category and Cognitive Load. Tap Auto to classify from the title + description."
+                />
+
 
                 {/* Dependencies / Blockers (parity B.12 — mirrors Android
                     `OrganizeTab.kt :: BlockersSection`). Only meaningful
