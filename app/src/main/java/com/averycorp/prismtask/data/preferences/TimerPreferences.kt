@@ -33,6 +33,7 @@ constructor(
         private val AUTO_START_WORK = intPreferencesKey("auto_start_work")
         private val POMODORO_AVAILABLE_MINUTES = intPreferencesKey("pomodoro_available_minutes")
         private val POMODORO_FOCUS_PREFERENCE = stringPreferencesKey("pomodoro_focus_preference")
+        private val KEEP_SCREEN_ON = booleanPreferencesKey("timer_keep_screen_on")
         private val BUZZ_UNTIL_DISMISSED = booleanPreferencesKey("timer_buzz_until_dismissed")
         private val OVERRIDE_VOLUME = booleanPreferencesKey("timer_override_volume")
         private val ALARM_VOLUME_PERCENT = intPreferencesKey("timer_alarm_volume_percent")
@@ -179,6 +180,14 @@ constructor(
         context.timerDataStore.edit { prefs ->
             prefs[POMODORO_FOCUS_PREFERENCE] = sanitized
         }
+    }
+
+    fun getKeepScreenOn(): Flow<Boolean> = context.timerDataStore.data.map { prefs ->
+        prefs[KEEP_SCREEN_ON] ?: false
+    }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        context.timerDataStore.edit { prefs -> prefs[KEEP_SCREEN_ON] = enabled }
     }
 
     fun getBuzzUntilDismissed(): Flow<Boolean> = context.timerDataStore.data.map { prefs ->
