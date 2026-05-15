@@ -12,6 +12,12 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HabitBookingDialog } from './HabitBookingDialog';
 import type { HabitLog } from '@/api/firestore/habitLogs';
 
+// Stable empty fallback for the Zustand selector below. Returning a
+// fresh `[]` literal from inside the selector would defeat
+// `useSyncExternalStore`'s snapshot caching (new reference every call
+// when this habit has no logs yet) and loop the render → React error #185.
+const EMPTY_LOGS: HabitLog[] = [];
+
 /**
  * Per-habit activity history. Mirrors Android's bookable-habit log
  * list (`HabitDetailViewModel.logs`) — newest-first, delete via
@@ -28,7 +34,8 @@ export function HabitLogsScreen() {
   const habitId = id!;
 
   const { habits, fetchHabits } = useHabitStore();
-  const logs = useHabitLogStore((s) => s.logsByHabit[habitId] ?? []);
+  const logs =
+    useHabitLogStore((s) => s.logsByHabit[habitId]) ?? EMPTY_LOGS;
   const deleteLog = useHabitLogStore((s) => s.deleteLog);
 
   const [loading, setLoading] = useState(true);

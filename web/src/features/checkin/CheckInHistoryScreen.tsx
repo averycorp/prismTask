@@ -109,9 +109,13 @@ export function CheckInHistoryScreen() {
     load();
   }, [load]);
 
-  const forgiveness = useAdvancedTuningStore((s) =>
-    selectForgivenessConfig(s.prefs),
-  );
+  // Subscribe to the raw `prefs` reference and derive the forgiveness
+  // config in a memo. `selectForgivenessConfig` builds a fresh object on
+  // every call, so returning it directly from the Zustand selector breaks
+  // `useSyncExternalStore`'s snapshot-equality contract and loops the
+  // render until React trips error #185.
+  const prefs = useAdvancedTuningStore((s) => s.prefs);
+  const forgiveness = useMemo(() => selectForgivenessConfig(prefs), [prefs]);
 
   const streak = useMemo(
     () => computeCheckInStreak(logs, todayIso, forgiveness, restDays),
