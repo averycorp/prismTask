@@ -30,6 +30,7 @@ import com.averycorp.prismtask.ui.components.AnalogClockPicker
 import com.averycorp.prismtask.ui.components.formatHhMm
 import com.averycorp.prismtask.ui.components.parseHhMm
 import com.averycorp.prismtask.ui.components.rememberAnalogClockState
+import com.averycorp.prismtask.ui.screens.medication.components.IntervalHoursMinutesField
 import com.averycorp.prismtask.ui.screens.medication.components.applyMinuteFieldEdit
 
 /**
@@ -109,9 +110,6 @@ internal fun MedicationSlotEditorSheet(
     }
     var intervalMinutes by remember {
         mutableStateOf(initialReminderIntervalMinutes ?: 240)
-    }
-    var customIntervalText by remember(intervalMinutes) {
-        mutableStateOf(intervalMinutes.toString())
     }
     // Custom-mode visibility is explicit user state, not derived from
     // `value !in presets`. The derived shape silently hid the input
@@ -284,18 +282,9 @@ internal fun MedicationSlotEditorSheet(
                         )
                     }
                     if (isCustomInterval) {
-                        val intervalOutOfRange = customIntervalText.toIntOrNull()
-                            ?.let { it !in 60..1440 } == true
-                        OutlinedTextField(
-                            value = customIntervalText,
-                            onValueChange = { raw ->
-                                val update = applyMinuteFieldEdit(raw, 60, 1440)
-                                customIntervalText = update.text
-                                update.newMinutes?.let { intervalMinutes = it }
-                            },
-                            label = { Text("Custom interval (minutes, 60–1440)") },
-                            isError = intervalOutOfRange,
-                            singleLine = true,
+                        IntervalHoursMinutesField(
+                            totalMinutes = intervalMinutes,
+                            onTotalMinutesChange = { intervalMinutes = it },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

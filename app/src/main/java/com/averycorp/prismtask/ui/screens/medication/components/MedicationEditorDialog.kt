@@ -88,9 +88,6 @@ fun MedicationEditorDialog(
     var intervalMinutes by remember {
         mutableStateOf(initialReminderIntervalMinutes ?: 240)
     }
-    var customIntervalText by remember(intervalMinutes) {
-        mutableStateOf(intervalMinutes.toString())
-    }
     // Custom-mode visibility is explicit state, not derived from
     // `intervalMinutes !in presets`. The derived shape silently hid the
     // input field whenever a typed value landed on a preset (120/240/360/480),
@@ -212,18 +209,9 @@ fun MedicationEditorDialog(
                         )
                     }
                     if (isCustomInterval) {
-                        val intervalOutOfRange = customIntervalText.toIntOrNull()
-                            ?.let { it !in 60..1440 } == true
-                        OutlinedTextField(
-                            value = customIntervalText,
-                            onValueChange = { raw ->
-                                val update = applyMinuteFieldEdit(raw, 60, 1440)
-                                customIntervalText = update.text
-                                update.newMinutes?.let { intervalMinutes = it }
-                            },
-                            label = { Text("Custom interval (minutes, 60–1440)") },
-                            isError = intervalOutOfRange,
-                            singleLine = true,
+                        IntervalHoursMinutesField(
+                            totalMinutes = intervalMinutes,
+                            onTotalMinutesChange = { intervalMinutes = it },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,7 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.averycorp.prismtask.data.preferences.MedicationReminderMode
 import com.averycorp.prismtask.ui.components.settings.SectionHeader
-import com.averycorp.prismtask.ui.screens.medication.components.applyMinuteFieldEdit
+import com.averycorp.prismtask.ui.screens.medication.components.IntervalHoursMinutesField
 import kotlinx.coroutines.launch
 
 /**
@@ -121,7 +120,6 @@ private fun IntervalPicker(currentMinutes: Int, onSave: (Int) -> Unit) {
     // See `docs/audits/MEDICATION_CUSTOM_INTERVAL_INPUT_AUDIT.md` §
     // Anti-pattern recommendation #1.
     var isCustom by remember { mutableStateOf(currentMinutes !in presets) }
-    var customText by remember(currentMinutes) { mutableStateOf(currentMinutes.toString()) }
 
     Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -157,18 +155,9 @@ private fun IntervalPicker(currentMinutes: Int, onSave: (Int) -> Unit) {
             )
         }
         if (isCustom) {
-            val outOfRange = customText.toIntOrNull()
-                ?.let { it !in 60..1440 } == true
-            OutlinedTextField(
-                value = customText,
-                onValueChange = { raw ->
-                    val update = applyMinuteFieldEdit(raw, 60, 1440)
-                    customText = update.text
-                    update.newMinutes?.let(onSave)
-                },
-                label = { Text("Custom interval (minutes, 60–1440)") },
-                isError = outOfRange,
-                singleLine = true,
+            IntervalHoursMinutesField(
+                totalMinutes = currentMinutes,
+                onTotalMinutesChange = onSave,
                 modifier = Modifier.fillMaxWidth()
             )
         }
