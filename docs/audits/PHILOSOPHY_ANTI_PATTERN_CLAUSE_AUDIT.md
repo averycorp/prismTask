@@ -191,3 +191,19 @@ Pairs with: ED-6 / ED-7 (no one-off coachmark or help-icon *infrastructure intro
 
 - **ProductiveStreakNotifier** ships "Streak Reset" as a notification title. Even with empathetic body copy, the title word "Reset" is a signal. If the team later decides the title is too close to PHILOSOPHY.md L18 "no streak-loss notifications", a follow-up could re-word to "A gentle restart" or similar. Not blocking; flagged because PHILOSOPHY.md's implementation-summary line and its anti-pattern list disagree on strictness.
 - **EveningSummaryWorker + ReengagementWorker** both default-ON. Defensible under PHILOSOPHY.md L119's exact wording (daily *absence*-pings) but a strict reading of "quiet by default" could push these to default-OFF. Defer to operator preference.
+
+---
+
+## Phase 3 — Bundle summary
+
+| # | PR | Title | LOC | Impact |
+| --- | --- | --- | --- | --- |
+| 1 | [#1495](https://github.com/averycorp/prismTask/pull/1495) | docs(claude-md): philosophy anti-pattern enforcement clause | +19 CLAUDE.md, +193 audit doc | Merged 2026-05-15. Every future audit-first run inherits the 8-anti-pattern reject filter without operator re-citing. |
+
+**Wall-clock to ship.** ~25 min from prompt receipt to merged PR (Phase 0 sweep → 9-pattern verification → audit doc → CLAUDE.md edit → PR open → auto-merge → merged). Single-pass shape, no operator round-trips, no checkpoint pauses.
+
+**Memory entry candidates (wait-for-third rule applies — none filed this session):**
+- *Candidate (1/3)*: "Refine clause wording to mirror PHILOSOPHY.md's anti-pattern lists rather than prompt-draft wording when they disagree." — Worth memorializing if pattern recurs in a second philosophy-derived clause.
+- *Candidate (1/3)*: "ED-6 was overridden 2026-05-08; cite the *surviving* anti-pattern (one-off coachmark systems as a fix path), not the original blanket statement." — Worth memorializing if a third audit prompt parrots the original ED-6 wording.
+
+**Next-audit schedule.** No follow-up audit scheduled. F1/F2/F3 deferred follow-ons re-trigger only on operator ask, code change pressure, or Play Console rejection.
