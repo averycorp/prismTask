@@ -151,12 +151,12 @@ constructor(
     // current behavior for unexpected codes while making the common cases
     // (rate limit hit, AI features off, Anthropic outage) self-diagnosing.
     private fun mapBriefingHttpError(code: Int): String = when (code) {
-        401 -> "Sign in required to use Daily Briefing."
-        403 -> "Daily Briefing requires a Pro subscription."
-        429 -> "Daily Briefing limit reached — try again in a few minutes."
-        451 -> "AI features are disabled. Turn them on in Settings → AI Features."
-        500 -> "Briefing generation failed — please try again."
-        503 -> "AI service temporarily unavailable — try again in a moment."
+        401 -> "Sign in required to use Daily Briefing. (HTTP 401)"
+        403 -> "Daily Briefing requires a Pro subscription. (HTTP 403)"
+        429 -> "Daily Briefing limit reached — try again in a few minutes. (HTTP 429)"
+        451 -> "AI features are disabled. Turn them on in Settings → AI Features. (HTTP 451)"
+        500 -> "Briefing generation failed — please try again. (HTTP 500)"
+        503 -> "AI service temporarily unavailable — try again in a moment. (HTTP 503)"
         else -> "Couldn't generate briefing (HTTP $code)"
     }
 

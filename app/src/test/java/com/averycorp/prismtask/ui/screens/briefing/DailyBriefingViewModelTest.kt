@@ -119,7 +119,7 @@ class DailyBriefingViewModelTest {
 
         assertNull(vm.briefing.value)
         assertEquals(
-            "Daily Briefing limit reached — try again in a few minutes.",
+            "Daily Briefing limit reached — try again in a few minutes. (HTTP 429)",
             vm.error.value
         )
     }
@@ -133,7 +133,7 @@ class DailyBriefingViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            "AI features are disabled. Turn them on in Settings → AI Features.",
+            "AI features are disabled. Turn them on in Settings → AI Features. (HTTP 451)",
             vm.error.value
         )
     }
@@ -147,7 +147,7 @@ class DailyBriefingViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            "AI service temporarily unavailable — try again in a moment.",
+            "AI service temporarily unavailable — try again in a moment. (HTTP 503)",
             vm.error.value
         )
     }
