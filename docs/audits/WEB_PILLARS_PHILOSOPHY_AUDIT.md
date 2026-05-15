@@ -383,3 +383,75 @@ audit; project streak (#8) batches with the existing project-port work.
 
 Phase 3 summary + Phase 4 Claude Chat handoff fire pre-merge per
 CLAUDE.md § *Audit-first Phase 3 + 4 fire pre-merge*.
+
+---
+
+## Phase 3 — Bundle summary (post-merge)
+
+Phase 2 dispatched 4 parallel workers off `origin/main`. All 4 PRs +
+the audit doc itself merged to `main` the same session (2026-05-15):
+
+| # | PR | Title | Files | Tests added | Phase 2 item |
+|---|----|----|----|----|----|
+| Audit | [#1501](https://github.com/averycorp/prismTask/pull/1501) | `docs(audit): web pillars + philosophy alignment audit (Phase 1)` | `docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md` (385 LOC) | — | — |
+| A | [#1502](https://github.com/averycorp/prismTask/pull/1502) | `feat(web/nlp): recognize #work-mode/#play-mode/#relax-mode and #easy-load/#medium-load/#hard-load hashtags` | `web/src/utils/nlp.ts`, `nlp.test.ts` | 20 new (`nlp.test.ts` 67 total) | #1 |
+| B | [#1503](https://github.com/averycorp/prismTask/pull/1503) | `feat(web/tasks): chip-row pickers + on-device Auto for Task Mode and Cognitive Load` | `taskModeClassifier.ts`, `cognitiveLoadClassifier.ts`, `ClassificationChipRow.tsx`, `TaskEditor.tsx` | 23 (10 mode + 13 load, mirrored from Android JUnit) | #2 + #3 (bundled) |
+| C | [#1504](https://github.com/averycorp/prismTask/pull/1504) | `feat(web/settings): Advanced Tuning — forgiveness knobs + classifier custom keywords` | `advancedTuningPreferences.ts`, `advancedTuningStore.ts`, `AdvancedTuningSection.tsx`, `streaks.ts`/`checkInStreak.ts`/`habitStore.ts` rewired, `useFirestoreSync.ts` (18th listener), `CHANGELOG.md` | 8 (5 component + 3 streak-config) | #4 |
+| D | [#1507](https://github.com/averycorp/prismTask/pull/1507) | `feat(web/today): Rest Day end-to-end — Firestore + streak fold + Today banner` | `restDays.ts`, `restDayStore.ts`, `RestDayBanner.tsx`, `streaks.ts`/`checkInStreak.ts` signature change, all consumers rewired, `useFirestoreSync.ts` (19th listener), `TodayScreen.tsx` rest-day branch, `CHANGELOG.md` | 22 (9 store + 7 banner + 6 streak parity) | #6 |
+
+**Aggregate measured impact:**
+
+- **73 new tests** added across the 4 PRs (`nlp.test.ts` 20 +
+  classifier ports 23 + advanced-tuning suite 8 + rest-day suite 22),
+  all green on every worker's pre-push verification.
+- **Web test suite** went from 889 → 943 cases (worker D's `npm run
+  test:run` final count) over the four PRs.
+- **Two new Firestore listeners** wired into `useFirestoreSync.ts`
+  (`advancedTuningPreferences` + `restDays`); listener count now **19**
+  (up from 17 at audit time).
+- **Two new Firestore collections** under `users/{uid}/`:
+  `advanced_tuning_prefs` (single doc) and `restDays/{isoDate}` (one
+  doc per logical day).
+- **Three pillars + Rest Day** now have first-class web representation:
+  - **Forgiveness-First**: grace knobs surfaced in Settings → Advanced
+    Tuning; the streak path reads user prefs with `DEFAULT_FORGIVENESS`
+    fallback; rest days fold into the walk as kept-by-definition.
+  - **Cognitive Load**: chip-row picker, Auto button (on-device
+    classifier), NLP `-load` hashtags, Settings custom keywords.
+  - **Work/Play/Relax**: chip-row picker, Auto button (on-device
+    classifier with `RELAX → PLAY → WORK` tie-break preserved), NLP
+    `-mode` hashtags, Settings custom keywords.
+  - **Rest Day**: Firestore collection + sync, SoD-aware store, Today
+    takeover banner with "Yes, rest today" / "Not yet" dialog, full
+    streak fold across all consumers.
+
+**Memory entry candidates (surprising / non-obvious):**
+
+- `feedback_audit_first_phase2_fan_out_speed.md` — 4-worker parallel
+  Phase 2 fan-out shipped audit + 4 PRs in a single ~30-minute session;
+  validate the parallel-worker shape for future philosophy audits.
+- `project_web_pillars_listener_count.md` — `useFirestoreSync.ts`
+  listener count is 19 as of 2026-05-15 (added
+  `advancedTuningPreferences` and `restDays` on top of the 17 the
+  parent audit logged).
+
+**Phase 2 items NOT shipped in this round:**
+
+- **#5 mode-aware streak strictness** — blocked at audit time on
+  classifier port. Classifier port is now in main (#1503), so #5 is
+  unblocked. Recommend follow-up PR.
+- **#7 backend `/ai/task-mode/classify_text` + `/ai/cognitive-load/
+  classify_text`** — backend audit needed first (out of scope here).
+  On-device classifiers ship today; AI-augmented Auto is a follow-up.
+- **#8 project streak display** — batches with existing project-port
+  audit work; not pillar-blocking.
+
+**Schedule for next audit:**
+
+- After items #5 + #7 land, re-audit Pillar 3 RED→YELLOW transition.
+- After #5 lands, re-audit `WORK_PLAY_RELAX.md` § *Streak strictness*
+  coverage end-to-end.
+- Burnout band, project streak, Daily Essentials, leisure-budget streak
+  surfaces remain DEFERRED — re-audit when their feature ports land.
+- Service-worker / web-push gate becomes load-bearing only if web's
+  notification surface expands. Re-audit at that boundary.
