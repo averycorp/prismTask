@@ -9,6 +9,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.averycorp.prismtask.data.diagnostics.MigrationInstrumentor
 import dagger.hilt.android.testing.HiltTestApplication
 
 class HiltTestRunner : AndroidJUnitRunner() {
@@ -48,6 +49,34 @@ class HiltTestRunner : AndroidJUnitRunner() {
         )
         configureFirebaseEmulator()
         preGrantRuntimePermissions()
+        // Mirror of PrismTaskApplication.onCreate's belt-and-braces flush for
+        // migration events that fired before Firebase was ready on cold-boot
+        // (BootReceiver) paths. Production wraps this in a try/swallow because
+        // migration events are best-effort by design; do the same here so a
+        // diagnostics hiccup can never break tests.
+        try {
+            MigrationInstrumentor.flushPending(targetContext)
+        } catch (_: Exception) {
+            // Drop — migration events are best-effort by design.
+        }
+        // Production onCreate steps we intentionally do not mirror:
+        // configureCrashlytics() — Intentionally skipped: tests must not enable real Crashlytics writes
+        // installRatingPromptCrashHook() — Intentionally skipped: would stamp last_crash_at on every JUnit failure and pollute test signal
+        // scheduleAutoArchive() — Intentionally skipped: 24h periodic worker — no-op in test process, no need to enqueue
+        // scheduleDailyReset() — Intentionally skipped: unbounded Flow collection on getDayStartHour would leak coroutines across tests
+        // scheduleNotificationWorkers() — Intentionally skipped: would schedule briefing/summary/overload/re-engagement periodic workers
+        // scheduleWidgetRefresh() — Intentionally skipped: production behavior is just a cancel of a legacy work name, unnecessary in tests
+        // observeThemeChangesForWidgets() — Intentionally skipped: unbounded combine Flow collection would leak coroutines across tests
+        // scheduleCalendarSync() — Intentionally skipped: would schedule periodic calendar sync work (network) — unsafe in tests
+        // scheduleBatchUndoSweep() — Intentionally skipped: daily sweep — tests that exercise batch_undo_log insert rows directly
+        // seedStructuralHabits() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
+        // seedBuiltInTemplates() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
+        // runBuiltInBackfill() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
+        // runDriftCleanup() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
+        // runLifeCategoryBackfill() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
+        // runMedicationMigrationPasses() — Intentionally skipped: one-shot migration passes — migration tests run their own SQL
+        // startMedicationReschedulers() — Intentionally skipped: would schedule real AlarmManager alarms and start unbounded observer Flows
+        // startAutomationEngine() — Intentionally skipped: would boot in-process automation bus collector + per-minute self-rescheduling worker
         super.onStart()
     }
 
