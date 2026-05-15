@@ -8,26 +8,72 @@ import {
   MoreHorizontal,
   Calendar,
   LayoutGrid,
+  Timer,
+  CalendarClock,
+  CalendarDays,
+  Sparkles,
+  TrendingUp,
+  BarChart3,
+  ClipboardPaste,
+  Pill,
+  Smile,
+  Target,
   FileText,
   Archive,
   Settings,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 
-const PRIMARY_NAV = [
+type NavItem = { to: string; icon: LucideIcon; label: string };
+type NavSection = { id: string; label: string; items: readonly NavItem[] };
+
+// Match Android's bottom nav: 4 work areas + a More overflow that fans out
+// into the same grouped sections the desktop sidebar uses.
+const PRIMARY_NAV: readonly NavItem[] = [
   { to: '/', icon: Sun, label: 'Today' },
   { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/habits', icon: Activity, label: 'Habits' },
-] as const;
+];
 
-const MORE_ITEMS = [
-  { to: '/calendar', icon: Calendar, label: 'Calendar' },
-  { to: '/eisenhower', icon: LayoutGrid, label: 'Eisenhower' },
-  { to: '/templates', icon: FileText, label: 'Templates' },
-  { to: '/archive', icon: Archive, label: 'Archive' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-] as const;
+const MORE_SECTIONS: readonly NavSection[] = [
+  {
+    id: 'plan',
+    label: 'Plan',
+    items: [
+      { to: '/calendar', icon: Calendar, label: 'Calendar' },
+      { to: '/briefing', icon: Sparkles, label: 'Briefing' },
+      { to: '/eisenhower', icon: LayoutGrid, label: 'Eisenhower' },
+      { to: '/planner', icon: CalendarDays, label: 'Planner' },
+      { to: '/timeblock', icon: CalendarClock, label: 'Time Block' },
+      { to: '/pomodoro', icon: Timer, label: 'Pomodoro' },
+      { to: '/weekly-review', icon: TrendingUp, label: 'Weekly Review' },
+      { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+    ],
+  },
+  {
+    id: 'wellness',
+    label: 'Wellness',
+    items: [
+      { to: '/mood', icon: Smile, label: 'Mood' },
+      { to: '/medication', icon: Pill, label: 'Medication' },
+      { to: '/focus', icon: Target, label: 'Focus' },
+    ],
+  },
+  {
+    id: 'workspace',
+    label: 'Workspace',
+    items: [
+      { to: '/templates', icon: FileText, label: 'Templates' },
+      { to: '/extract', icon: ClipboardPaste, label: 'Extract' },
+      { to: '/archive', icon: Archive, label: 'Archive' },
+      { to: '/settings', icon: Settings, label: 'Settings' },
+    ],
+  },
+];
+
+const ALL_MORE_PATHS = MORE_SECTIONS.flatMap((s) => s.items.map((i) => i.to));
 
 export function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -47,8 +93,8 @@ export function MobileNav() {
     return () => document.removeEventListener('mousedown', handler);
   }, [moreOpen, closeMenu]);
 
-  const isMoreActive = MORE_ITEMS.some((item) =>
-    window.location.pathname.startsWith(item.to),
+  const isMoreActive = ALL_MORE_PATHS.some((to) =>
+    window.location.pathname.startsWith(to),
   );
 
   return (
@@ -58,16 +104,16 @@ export function MobileNav() {
         <div className="fixed inset-0 z-40 bg-black/30" aria-hidden="true" onClick={closeMenu} />
       )}
 
-      {/* More menu panel */}
+      {/* More menu panel — grouped sections mirror the desktop sidebar */}
       {moreOpen && (
         <div
           ref={menuRef}
           role="menu"
           aria-label="More navigation options"
-          className="fixed bottom-16 left-2 right-2 z-50 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2 shadow-xl animate-slide-up"
+          className="fixed bottom-16 left-2 right-2 z-50 max-h-[70vh] overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-2 shadow-xl animate-slide-up"
         >
           <div className="mb-1 flex items-center justify-between px-3 py-1">
-            <span className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
               More
             </span>
             <button
@@ -78,23 +124,30 @@ export function MobileNav() {
               <X className="h-4 w-4" />
             </button>
           </div>
-          {MORE_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              role="menuitem"
-              onClick={closeMenu}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
-                    : 'text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]'
-                }`
-              }
-            >
-              <Icon className="h-5 w-5" aria-hidden="true" />
-              {label}
-            </NavLink>
+          {MORE_SECTIONS.map((section, idx) => (
+            <div key={section.id} className={idx > 0 ? 'mt-2 border-t border-[var(--color-border)] pt-2' : ''}>
+              <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                {section.label}
+              </div>
+              {section.items.map(({ to, icon: Icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  role="menuitem"
+                  onClick={closeMenu}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                        : 'text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]'
+                    }`
+                  }
+                >
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  {label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -111,7 +164,7 @@ export function MobileNav() {
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-0.5 py-2 text-xs transition-colors min-h-[48px] justify-center ${
+                  `flex min-h-[48px] flex-col items-center justify-center gap-0.5 py-2 text-xs transition-colors ${
                     isActive
                       ? 'text-[var(--color-accent)]'
                       : 'text-[var(--color-text-secondary)]'
@@ -127,7 +180,7 @@ export function MobileNav() {
           <li className="flex-1">
             <button
               onClick={() => setMoreOpen(!moreOpen)}
-              className={`flex w-full flex-col items-center gap-0.5 py-2 text-xs transition-colors min-h-[48px] justify-center ${
+              className={`flex min-h-[48px] w-full flex-col items-center justify-center gap-0.5 py-2 text-xs transition-colors ${
                 isMoreActive || moreOpen
                   ? 'text-[var(--color-accent)]'
                   : 'text-[var(--color-text-secondary)]'
