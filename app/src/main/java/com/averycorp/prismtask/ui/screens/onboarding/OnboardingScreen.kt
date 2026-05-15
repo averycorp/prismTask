@@ -287,7 +287,13 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 32.dp, vertical = 64.dp)
+                .padding(horizontal = 32.dp)
+                // Bottom padding clears the parent OnboardingScreen's BottomCenter
+                // overlay (page dots + Back/Next buttons, ~110dp). Without it, the
+                // EmailAuthSection's "Create Account" button + "Already have an
+                // account?" toggle land under the overlay and the Next button
+                // intercepts the taps even at full scroll.
+                .padding(top = 64.dp, bottom = 160.dp)
         ) {
             Text(
                 text = "\uD83D\uDD73",
