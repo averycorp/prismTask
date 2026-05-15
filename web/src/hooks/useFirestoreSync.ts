@@ -20,6 +20,11 @@ import { useSelfCareStore } from '@/stores/selfCareStore';
 import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
 import { useTemplateStore } from '@/stores/templateStore';
 import { useDashboardStore } from '@/stores/dashboardStore';
+import { useMoodEnergyLogsStore } from '@/stores/moodEnergyLogsStore';
+import { useCheckInLogsStore } from '@/stores/checkInLogsStore';
+import { useFocusReleaseLogsStore } from '@/stores/focusReleaseLogsStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useWeeklyReviewsStore } from '@/stores/weeklyReviewsStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -36,6 +41,12 @@ import { useDashboardStore } from '@/stores/dashboardStore';
  *
  * Parity audit A.1a (2026-05-13) extends this to 11 listeners — adds
  * task_dependencies, project_phases, project_risks, external_anchors.
+ * Parity audit A.1b residual (Unit 16) adds the remaining cross-device
+ * collections — `mood_energy_logs`, `check_in_logs`,
+ * `focus_release_logs`, `medications`, `weekly_reviews` — so Android
+ * writes (and the backend `weekly_review_generator` cron for the last)
+ * surface on web without a manual refresh on the mood / check-in /
+ * focus-release / medication / weekly-review screens.
  * `subscribeToAiFeaturesEnabled` is intentionally NOT wired here: the
  * AI-features flag is already pulled imperatively via
  * `settingsStore.loadAiFeaturesFromFirestore` on auth bootstrap, and
@@ -90,6 +101,21 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToDashboardPrefs = useDashboardStore(
     (s) => s.subscribeToPrefs,
   );
+  const subscribeToMoodLogs = useMoodEnergyLogsStore(
+    (s) => s.subscribeToLogs,
+  );
+  const subscribeToCheckIns = useCheckInLogsStore(
+    (s) => s.subscribeToCheckIns,
+  );
+  const subscribeToFocusLogs = useFocusReleaseLogsStore(
+    (s) => s.subscribeToFocusLogs,
+  );
+  const subscribeToMedications = useMedicationsStore(
+    (s) => s.subscribeToMedications,
+  );
+  const subscribeToWeeklyReviews = useWeeklyReviewsStore(
+    (s) => s.subscribeToWeeklyReviews,
+  );
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
   const resetBoundaryRules = useBoundaryRulesStore((s) => s.reset);
@@ -101,6 +127,11 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const resetPhases = useProjectPhaseStore((s) => s.reset);
   const resetRisks = useProjectRiskStore((s) => s.reset);
   const resetAnchors = useExternalAnchorStore((s) => s.reset);
+  const resetMoodLogs = useMoodEnergyLogsStore((s) => s.reset);
+  const resetCheckIns = useCheckInLogsStore((s) => s.reset);
+  const resetFocusLogs = useFocusReleaseLogsStore((s) => s.reset);
+  const resetMedications = useMedicationsStore((s) => s.reset);
+  const resetWeeklyReviews = useWeeklyReviewsStore((s) => s.reset);
 
   useEffect(() => {
     if (!uid) {
@@ -118,6 +149,11 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetBoundaryRules();
       resetTaskTemplates();
       resetDashboard();
+      resetMoodLogs();
+      resetCheckIns();
+      resetFocusLogs();
+      resetMedications();
+      resetWeeklyReviews();
       return;
     }
 
@@ -162,6 +198,11 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToBoundaryRules, 'boundary-rules');
     safeSubscribe(subscribeToTaskTemplates, 'task-templates');
     safeSubscribe(subscribeToDashboardPrefs, 'dashboard-preferences');
+    safeSubscribe(subscribeToMoodLogs, 'mood-energy-logs');
+    safeSubscribe(subscribeToCheckIns, 'check-in-logs');
+    safeSubscribe(subscribeToFocusLogs, 'focus-release-logs');
+    safeSubscribe(subscribeToMedications, 'medications');
+    safeSubscribe(subscribeToWeeklyReviews, 'weekly-reviews');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -198,6 +239,11 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToBoundaryRules,
     subscribeToTaskTemplates,
     subscribeToDashboardPrefs,
+    subscribeToMoodLogs,
+    subscribeToCheckIns,
+    subscribeToFocusLogs,
+    subscribeToMedications,
+    subscribeToWeeklyReviews,
     resetSelfCare,
     resetSlots,
     resetPrefs,
@@ -209,5 +255,10 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     resetBoundaryRules,
     resetTaskTemplates,
     resetDashboard,
+    resetMoodLogs,
+    resetCheckIns,
+    resetFocusLogs,
+    resetMedications,
+    resetWeeklyReviews,
   ]);
 }
