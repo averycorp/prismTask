@@ -80,7 +80,7 @@ function Nav() {
           PrismTask
         </a>
         <div style={{ display: 'flex', gap: 24, flex: 1, justifyContent: 'center' }}>
-          {['Features', 'Themes', 'Wellness', 'Pricing', 'FAQ'].map(item => (
+          {['Features', 'Themes', 'Philosophy', 'Wellness', 'Pricing', 'FAQ'].map(item => (
             <a key={item} href={`#${item.toLowerCase()}`} style={{
               fontFamily: 'Space Grotesk, sans-serif', fontSize: 13.5, fontWeight: 500,
               color: '#4A4A52', textDecoration: 'none', letterSpacing: 0.1,
@@ -378,6 +378,98 @@ function ThemeShowcase() {
               );
             })}
           </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+// ── Philosophy — the 7 principles (see docs/PHILOSOPHY.md) ────────────
+function Philosophy() {
+  const principles = [
+    {
+      n: '01',
+      title: 'Forgiveness over punishment',
+      rule: 'No feature punishes the user for a missed day, broken streak, or skipped task. Every fail state has a graceful recovery path.',
+    },
+    {
+      n: '02',
+      title: 'User reality over user aspiration',
+      rule: 'The app reflects the day the user actually had, not the day they should have had. Plans bend to reality; reality is never wrong.',
+    },
+    {
+      n: '03',
+      title: 'Multiple legitimate modes',
+      rule: 'Rest, play, and low-output days are first-class states, not "off" states. The app values restoration as much as production.',
+    },
+    {
+      n: '04',
+      title: 'Friction calibrated to the brain',
+      rule: 'Task difficulty is measured by start-friction — how hard it is to begin — not by importance or time. The app surfaces easy starts when the user is depleted.',
+    },
+    {
+      n: '05',
+      title: 'Honest disclosure, no dark patterns',
+      rule: 'Every AI feature, every data egress, every paid tier limit is disclosed in plain language before the user encounters it. No retention traps, no manufactured urgency.',
+    },
+    {
+      n: '06',
+      title: 'The user is the expert on their own brain',
+      rule: 'Defaults are gentle, but every behavior is configurable. The app proposes; it does not prescribe. Any feature can be turned off — including the ones we think are essential.',
+    },
+    {
+      n: '07',
+      title: 'Quiet by default',
+      rule: 'Notifications, badges, sounds, and alerts are off-by-default or minimal-by-default. The app asks permission to interrupt; it does not assume it.',
+    },
+  ];
+
+  return (
+    <section id="philosophy" style={{ padding: '140px 0', background: '#fff' }}>
+      <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 32px' }}>
+        <Reveal>
+          <SectionHeader
+            eyebrow="Our philosophy"
+            title={<>Seven principles. <em style={{ fontStyle: 'italic', color: '#5B47E0' }}>No exceptions.</em></>}
+            subtitle="PrismTask is built mental-health-first. These principles are the spec — every feature must pass them before it ships. They exist in writing so we can be held to them."
+          />
+        </Reveal>
+        <Reveal delay={120}>
+          <div style={{
+            marginTop: 80,
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: 1, background: 'rgba(0,0,0,0.06)',
+            borderRadius: 18, overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.06)',
+          }}>
+            {principles.map(p => (
+              <div key={p.n} style={{ background: '#fff', padding: '36px 32px' }}>
+                <div style={{
+                  fontFamily: 'Fraunces, serif', fontSize: 14, fontWeight: 500,
+                  color: '#5B47E0', letterSpacing: 1.2, marginBottom: 14,
+                }}>{p.n}</div>
+                <h4 style={{
+                  fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 500,
+                  letterSpacing: -0.4, color: '#0F0F12', margin: '0 0 12px',
+                  lineHeight: 1.2,
+                }}>{p.title}</h4>
+                <p style={{
+                  fontFamily: 'Space Grotesk, sans-serif', fontSize: 14.5,
+                  lineHeight: 1.55, color: '#54545E', margin: 0,
+                }}>{p.rule}</p>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+        <Reveal delay={200}>
+          <p style={{
+            marginTop: 32, fontFamily: 'Space Grotesk, sans-serif',
+            fontSize: 14, color: '#7A7A83', textAlign: 'center', letterSpacing: 0.1,
+          }}>
+            Read the full philosophy in <a href="PHILOSOPHY.md" style={{
+              color: '#5B47E0', textDecoration: 'none', borderBottom: '1px solid rgba(91,71,224,0.3)',
+            }}>docs/PHILOSOPHY.md</a> — including the "why" and the anti-patterns each principle rules out.
+          </p>
         </Reveal>
       </div>
     </section>
@@ -950,6 +1042,7 @@ function App() {
       <Hero/>
       <Features/>
       <ThemeShowcase/>
+      <Philosophy/>
       <Screenshots/>
       <Wellness/>
       <Pricing/>
