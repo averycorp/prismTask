@@ -12,6 +12,10 @@ import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { computeCheckInStreak } from '@/utils/checkInStreak';
+import {
+  selectForgivenessConfig,
+  useAdvancedTuningStore,
+} from '@/stores/advancedTuningStore';
 import { MorningCheckInStepper } from './MorningCheckInStepper';
 
 /**
@@ -54,9 +58,13 @@ export function MorningCheckInCard() {
     if (show) load();
   }, [show, load]);
 
+  const forgiveness = useAdvancedTuningStore((s) =>
+    selectForgivenessConfig(s.prefs),
+  );
+
   if (!show) return null;
 
-  const streak = computeCheckInStreak(recent, todayIso);
+  const streak = computeCheckInStreak(recent, todayIso, forgiveness);
 
   return (
     <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">

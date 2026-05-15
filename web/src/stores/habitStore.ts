@@ -11,6 +11,10 @@ import * as firestoreHabits from '@/api/firestore/habits';
 import { calculateStreaks, type StreakData } from '@/utils/streaks';
 import { logicalToday } from '@/utils/dayBoundary';
 import { useSettingsStore } from '@/stores/settingsStore';
+import {
+  selectForgivenessConfig,
+  useAdvancedTuningStore,
+} from '@/stores/advancedTuningStore';
 import type { Unsubscribe } from 'firebase/firestore';
 
 interface HabitState {
@@ -277,11 +281,22 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const completions = state.completions[habitId];
     if (!habit || !completions) return null;
 
+    // Per-user forgiveness knobs from Settings → Advanced Tuning. Reads
+    // the store imperatively so the streak picks up cross-device
+    // tweaks immediately without re-subscribing this component graph.
+    // When Advanced Tuning hasn't loaded yet, the store's default state
+    // already mirrors `DEFAULT_FORGIVENESS`, so the streak math degrades
+    // gracefully to the same numbers callers used to see pre-PR.
+    const forgiveness = selectForgivenessConfig(
+      useAdvancedTuningStore.getState().prefs,
+    );
+
     return calculateStreaks(
       completions.map((c) => ({ date: c.date, count: c.count })),
       habit.frequency,
       parseActiveDays(habit.active_days_json),
       habit.target_count,
+      forgiveness,
     );
   },
 

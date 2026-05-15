@@ -17,6 +17,10 @@ import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { computeCheckInStreak } from '@/utils/checkInStreak';
+import {
+  selectForgivenessConfig,
+  useAdvancedTuningStore,
+} from '@/stores/advancedTuningStore';
 
 /**
  * Web port of Android's CheckInHistoryScreen (parity C.5c). Shows the
@@ -100,9 +104,13 @@ export function CheckInHistoryScreen() {
     load();
   }, [load]);
 
+  const forgiveness = useAdvancedTuningStore((s) =>
+    selectForgivenessConfig(s.prefs),
+  );
+
   const streak = useMemo(
-    () => computeCheckInStreak(logs, todayIso),
-    [logs, todayIso],
+    () => computeCheckInStreak(logs, todayIso, forgiveness),
+    [logs, todayIso, forgiveness],
   );
 
   const logsByDate = useMemo(() => {
