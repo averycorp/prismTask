@@ -1,6 +1,6 @@
 PrismTask is a task manager, habit tracker, and focus companion for people who have bounced off rigid productivity systems. It is designed to work with your energy, your rhythm, and the messy reality of a real week.
 
-Built for focus. Made for humans.
+Built for every kind of mind.
 
 
 What PrismTask does

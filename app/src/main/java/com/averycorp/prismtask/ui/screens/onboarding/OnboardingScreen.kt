@@ -319,7 +319,7 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Your smart, adaptive productivity companion",
+                        text = "Built for every kind of mind.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center

@@ -44,7 +44,7 @@ fun BrainModeSection(
     SectionHeader("Brain Mode")
 
     SettingsToggleRow(
-        title = "ADHD Mode",
+        title = "Quick-Start Mode",
         subtitle = "Bigger nudges and quick-start prompts to help you begin",
         checked = ndPrefs.adhdModeEnabled,
         onCheckedChange = onAdhdModeChange
@@ -73,7 +73,7 @@ fun BrainModeSection(
         InfoChip("Full brain mode activated \u2014 start, sustain, and release.")
     }
     AnimatedVisibility(visible = adhdAndFr && !allThree) {
-        InfoChip("ADHD Mode helps you start. Focus & Release helps you finish. They work great together.")
+        InfoChip("Quick-Start Mode helps you begin. Focus & Release helps you finish. They work great together.")
     }
     AnimatedVisibility(visible = calmAndFr && !allThree) {
         InfoChip("Ship-it celebrations will use subtle animations in Calm Mode.")
