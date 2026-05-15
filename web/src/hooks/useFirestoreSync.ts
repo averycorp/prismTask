@@ -27,6 +27,7 @@ import { useFocusReleaseLogsStore } from '@/stores/focusReleaseLogsStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useWeeklyReviewsStore } from '@/stores/weeklyReviewsStore';
 import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
+import { useRestDayStore } from '@/stores/restDayStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -125,6 +126,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToAdvancedTuning = useAdvancedTuningStore(
     (s) => s.subscribeToPrefs,
   );
+  const subscribeToRestDays = useRestDayStore((s) => s.subscribeToRestDays);
   const resetHabitLogs = useHabitLogStore((s) => s.reset);
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
@@ -143,6 +145,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const resetMedications = useMedicationsStore((s) => s.reset);
   const resetWeeklyReviews = useWeeklyReviewsStore((s) => s.reset);
   const resetAdvancedTuning = useAdvancedTuningStore((s) => s.reset);
+  const resetRestDays = useRestDayStore((s) => s.reset);
 
   useEffect(() => {
     if (!uid) {
@@ -167,6 +170,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetWeeklyReviews();
       resetHabitLogs();
       resetAdvancedTuning();
+      resetRestDays();
       return;
     }
 
@@ -218,6 +222,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToWeeklyReviews, 'weekly-reviews');
     safeSubscribe(subscribeToHabitLogs, 'habit-logs');
     safeSubscribe(subscribeToAdvancedTuning, 'advanced-tuning');
+    safeSubscribe(subscribeToRestDays, 'rest-days');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -261,6 +266,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToWeeklyReviews,
     subscribeToHabitLogs,
     subscribeToAdvancedTuning,
+    subscribeToRestDays,
     resetHabitLogs,
     resetSelfCare,
     resetSlots,
@@ -279,5 +285,6 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     resetMedications,
     resetWeeklyReviews,
     resetAdvancedTuning,
+    resetRestDays,
   ]);
 }

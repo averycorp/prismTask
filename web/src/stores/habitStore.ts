@@ -15,6 +15,7 @@ import {
   selectForgivenessConfig,
   useAdvancedTuningStore,
 } from '@/stores/advancedTuningStore';
+import { useRestDayStore } from '@/stores/restDayStore';
 import type { Unsubscribe } from 'firebase/firestore';
 
 interface HabitState {
@@ -291,12 +292,20 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       useAdvancedTuningStore.getState().prefs,
     );
 
+    // Rest days fold into the daily forgiveness walk as
+    // kept-by-definition (`docs/REST_DAY.md` § *The core rule*). Pulled
+    // at read time from the restDay store so a fresh rest-day mark
+    // surfaces in the streak immediately — the snapshot listener wired
+    // in `useFirestoreSync` keeps the underlying set in sync.
+    const restDays = useRestDayStore.getState().restDates;
+
     return calculateStreaks(
       completions.map((c) => ({ date: c.date, count: c.count })),
       habit.frequency,
       parseActiveDays(habit.active_days_json),
       habit.target_count,
       forgiveness,
+      restDays,
     );
   },
 

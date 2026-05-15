@@ -10,6 +10,7 @@ import {
 } from '@/api/firestore/checkInLogs';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useRestDayStore } from '@/stores/restDayStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { computeCheckInStreak } from '@/utils/checkInStreak';
 import {
@@ -29,6 +30,11 @@ export function MorningCheckInCard() {
   const setSetting = useSettingsStore((s) => s.setSetting);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const todayIso = useLogicalToday(startOfDayHour);
+  // Subscribe to the rest-day set so a fresh mark/unmark re-renders the
+  // streak count without remount. The set is folded into
+  // `computeCheckInStreak` as kept-by-definition — see
+  // `docs/REST_DAY.md` § *The core rule*.
+  const restDays = useRestDayStore((s) => s.restDates);
   const navigate = useNavigate();
 
   const [log, setLog] = useState<CheckInLog | null>(null);
@@ -64,7 +70,7 @@ export function MorningCheckInCard() {
 
   if (!show) return null;
 
-  const streak = computeCheckInStreak(recent, todayIso, forgiveness);
+  const streak = computeCheckInStreak(recent, todayIso, forgiveness, restDays);
 
   return (
     <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">

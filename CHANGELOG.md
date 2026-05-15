@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- feat(web/today): Rest Day end-to-end — Firestore collection
+  (`users/{uid}/restDays/{isoDate}`), `restDayStore` with SoD-aware
+  date resolution + idempotent mark/unmark, real-time listener wired
+  through `useFirestoreSync`, signature change to
+  `forgivenessDailyWalk` + `calculateStreaks` + `computeCheckInStreak`
+  to accept `restDays: Set<string>` and treat each date as
+  kept-by-definition (no grace consumption), and a soft Today-screen
+  banner with takeover header + "End Rest Day" action / non-leading
+  confirmation dialog ("Yes, rest today" / "Not yet"). Closes Phase 2
+  item #6 of the Web Pillars + Philosophy audit (PR #1501,
+  `docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md`) — the largest
+  cross-cutting philosophy gap on web. Mirrors Android's
+  `RestDayEntity` / `RestDayDao` / `RestDayRepository` /
+  `RestDayBanner` and the `restDays` parameter shape of
+  `DailyForgivenessStreakCore.calculate`. Web is rest-day-aware for
+  streak purposes and surfaces the deliberate-pause UI; the
+  non-medication notification gate Android wires via `RestDayGate` is
+  N/A on web (no relevant notifications fire there). Copy follows
+  `docs/REST_DAY.md` § *Copy guidelines* strictly — descriptive, not
+  prescriptive; non-clinical; non-shaming.
+
 ### Docs
 
 - docs(audits): Parity Batch 7 — Complete Android↔Web parity Phase 1
