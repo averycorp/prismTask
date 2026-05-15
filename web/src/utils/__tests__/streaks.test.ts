@@ -236,6 +236,159 @@ describe('streaks utils', () => {
       expect(result.currentStreak).toBe(2);
     });
 
+    // -----------------------------------------------------------------
+    // Rest-day fold parity tests — mirror Android's
+    // `DailyForgivenessStreakCore.calculate(restDays = ...)` shape
+    // (`docs/REST_DAY.md` § *The core rule*). A rest day is "kept by
+    // definition": it extends the streak, does NOT consume the grace
+    // cap, and an idempotent "rest + completion same day" still counts
+    // as kept.
+    // -----------------------------------------------------------------
+
+    it('rest day: a rest day inside a would-otherwise-be-broken streak preserves it', () => {
+      // April 11 + April 10 are both missed → without forgiveness OR
+      // rest days, the resilient walk would break (two misses inside the
+      // 7-day rolling window exhausts grace). Marking April 11 as a
+      // rest day flips it to "met by definition", so only April 10
+      // costs the single grace slot, and the walk reaches April 9 + 8.
+      const completions = [
+        { date: '2026-04-12', count: 1 },
+        // April 11 missed → marked as rest day
+        // April 10 missed
+        { date: '2026-04-09', count: 1 },
+        { date: '2026-04-08', count: 1 },
+      ];
+      const restDays = new Set(['2026-04-11']);
+      const result = calculateStreaks(
+        completions,
+        'daily',
+        null,
+        1,
+        undefined,
+        restDays,
+      );
+      // today + rest April 11 + (forgiven April 10) + April 9 + April 8 = 5
+      expect(result.currentStreak).toBe(5);
+    });
+
+    it('rest day: rest days do NOT consume the grace cap', () => {
+      // April 11 is a rest day → free, doesn't cost grace.
+      // April 9 is a genuine miss → costs the single allowed grace slot.
+      // April 7 is a second genuine miss → terminates the walk.
+      // Expected: April 12 + rest April 11 + April 10 + (forgiven
+      // April 9) + April 8 = 5. April 7 is the second miss inside the
+      // rolling window → break. The point: April 11 being a rest day
+      // did NOT eat into the grace budget the genuine April 9 miss
+      // still needs.
+      const completions = [
+        { date: '2026-04-12', count: 1 },
+        // April 11 → rest day
+        { date: '2026-04-10', count: 1 },
+        // April 9 missed (genuine)
+        { date: '2026-04-08', count: 1 },
+        // April 7 missed (genuine — exhausts grace, terminates walk)
+        { date: '2026-04-06', count: 1 },
+      ];
+      const restDays = new Set(['2026-04-11']);
+      const result = calculateStreaks(
+        completions,
+        'daily',
+        null,
+        1,
+        undefined,
+        restDays,
+      );
+      expect(result.currentStreak).toBe(5);
+    });
+
+    it('rest day: a day that is BOTH a rest day AND has a completion still counts as kept', () => {
+      // Idempotency: marking a rest day on a day the user already
+      // completed the habit shouldn't double-count, double-break, or
+      // otherwise mutate the walk. The fold collapses both signals
+      // into "kept" — exactly one met-day, regardless of overlap.
+      const completions = [
+        { date: '2026-04-12', count: 1 },
+        { date: '2026-04-11', count: 1 }, // also a rest day
+        { date: '2026-04-10', count: 1 },
+      ];
+      const restDays = new Set(['2026-04-11']);
+      const result = calculateStreaks(
+        completions,
+        'daily',
+        null,
+        1,
+        undefined,
+        restDays,
+      );
+      expect(result.currentStreak).toBe(3);
+    });
+
+    it('rest day: today is a rest day with no completion → streak still ticks', () => {
+      // The mid-day rule normally starts the walk at yesterday when
+      // today isn't met. With today marked as a rest day, today is
+      // "met by definition" and anchors the walk.
+      const completions = [
+        // April 12 (today) missed — but marked as rest day
+        { date: '2026-04-11', count: 1 },
+        { date: '2026-04-10', count: 1 },
+      ];
+      const restDays = new Set(['2026-04-12']);
+      const result = calculateStreaks(
+        completions,
+        'daily',
+        null,
+        1,
+        undefined,
+        restDays,
+      );
+      // today (rest) + April 11 + April 10 = 3
+      expect(result.currentStreak).toBe(3);
+    });
+
+    it('rest day: rest day rescues hard-reset (today + yesterday both rest-day)', () => {
+      // Without rest days, today + yesterday both missing forces the
+      // resilient walk to zero (hard reset). Marking both as rest days
+      // flips them to met-by-definition, dodging the hard reset.
+      const completions = [
+        // April 12 missed → rest day
+        // April 11 missed → rest day
+        { date: '2026-04-10', count: 1 },
+        { date: '2026-04-09', count: 1 },
+      ];
+      const restDays = new Set(['2026-04-12', '2026-04-11']);
+      const result = calculateStreaks(
+        completions,
+        'daily',
+        null,
+        1,
+        undefined,
+        restDays,
+      );
+      // 2 rest + 2 met = 4
+      expect(result.currentStreak).toBe(4);
+    });
+
+    it('rest day: empty rest-day set is a no-op (default arg parity)', () => {
+      // Existing call sites that don't pass `restDays` must see
+      // identical behaviour to the pre-rest-day implementation. Passing
+      // an explicit empty set must match calling without the param.
+      const completions = [
+        { date: '2026-04-12', count: 1 },
+        { date: '2026-04-11', count: 1 },
+      ];
+      const withEmpty = calculateStreaks(
+        completions,
+        'daily',
+        null,
+        1,
+        undefined,
+        new Set<string>(),
+      );
+      const without = calculateStreaks(completions, 'daily', null, 1);
+      expect(withEmpty.currentStreak).toBe(without.currentStreak);
+      expect(withEmpty.longestStreak).toBe(without.longestStreak);
+    });
+
     it('identifies best and worst day', () => {
       // Completions on every day of the week so best/worst are deterministic
       const completions = [

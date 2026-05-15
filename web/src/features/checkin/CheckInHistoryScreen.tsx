@@ -15,6 +15,7 @@ import {
 } from '@/api/firestore/moodEnergyLogs';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useRestDayStore } from '@/stores/restDayStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { computeCheckInStreak } from '@/utils/checkInStreak';
 import {
@@ -74,6 +75,10 @@ function stepCoverage(log: CheckInLog): number {
 export function CheckInHistoryScreen() {
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const todayIso = useLogicalToday(startOfDayHour);
+  // Rest-day set folds into the check-in streak as kept-by-definition
+  // (`docs/REST_DAY.md` § *The core rule*). Pulled via the store hook
+  // so a fresh rest-day mark re-renders the streak header.
+  const restDays = useRestDayStore((s) => s.restDates);
   const [rangeDays, setRangeDays] = useState<number>(90);
   const [logs, setLogs] = useState<CheckInLog[]>([]);
   const [moodLogs, setMoodLogs] = useState<MoodEnergyLog[]>([]);
@@ -109,8 +114,8 @@ export function CheckInHistoryScreen() {
   );
 
   const streak = useMemo(
-    () => computeCheckInStreak(logs, todayIso, forgiveness),
-    [logs, todayIso, forgiveness],
+    () => computeCheckInStreak(logs, todayIso, forgiveness, restDays),
+    [logs, todayIso, forgiveness, restDays],
   );
 
   const logsByDate = useMemo(() => {

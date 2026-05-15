@@ -21,6 +21,12 @@ import { DEFAULT_FORGIVENESS, type ForgivenessConfig } from '@/utils/streaks';
  * the `allowedMisses` value caps how many bends we'll tolerate inside
  * the rolling chain; the previously hardcoded single-bend behaviour is
  * preserved as the `DEFAULT_FORGIVENESS` default.
+ *
+ * The `restDays` parameter folds the user's explicit Rest-Day set
+ * (`docs/REST_DAY.md`) into the "logged" set so the bend-aware walk
+ * treats each as kept-by-definition. Rest days do NOT consume the bend
+ * budget — they're never reached as "missed" — matching Android's
+ * `DailyForgivenessStreakCore.calculate(restDays = ...)` fold exactly.
  */
 
 export interface StreakResult {
@@ -43,8 +49,18 @@ export function computeCheckInStreak(
   logs: CheckInLog[],
   todayIso: string,
   forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
+  restDays: Set<string> = new Set<string>(),
 ): StreakResult {
+  // Rest days are kept-by-definition: fold them into the "logged" set
+  // before walking so the bend-aware walk treats them exactly like a
+  // real check-in. Matches Android's
+  // `DailyForgivenessStreakCore.calculate(restDays = ...)` fold —
+  // resting still counts toward the streak. See `docs/REST_DAY.md` §
+  // *The core rule*. Rest days do NOT consume the bend budget, because
+  // they're never reached as "missed" — they're already met.
   const loggedDays = new Set(logs.map((l) => isoOnly(l.date_iso)));
+  for (const d of restDays) loggedDays.add(d);
+
   const today = parseISO(todayIso);
   const loggedToday = loggedDays.has(todayIso);
 
@@ -81,7 +97,7 @@ export function computeCheckInStreak(
     }
   }
 
-  // Longest streak: scan forward across the log set.
+  // Longest streak: scan forward across the (rest-day-augmented) set.
   const sorted = Array.from(loggedDays).sort();
   let longest = 0;
   let run = 0;

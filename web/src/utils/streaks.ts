@@ -129,6 +129,16 @@ interface ForgivenessStreakWalk {
  *  - Walk stops at the earliest known activity day so pre-history days
  *    aren't counted as misses.
  *
+ * Rest-day fold (`docs/REST_DAY.md` § *The core rule*, mirror of
+ * `DailyForgivenessStreakCore.calculate(restDays = ...)`): days the user
+ * explicitly marked as a rest day are treated as "kept by definition" —
+ * they extend the run, do NOT consume the grace window, and do NOT count
+ * as misses. The seam is the cleanest possible: fold `restDays` into the
+ * effective met-day set before the walk starts, so every existing branch
+ * (mid-day rule, hard reset, rolling-window check, earliest-activity
+ * halt) behaves identically. Empty `restDays` is the default so existing
+ * call sites see no behaviour change.
+ *
  * Web addition: when `activeDays` is supplied, non-active weekdays are
  * skipped entirely (not counted as met or missed) — matches the existing
  * behavior of `calculateStreaks` and how the Habits UI treats partial-week
@@ -140,39 +150,56 @@ function forgivenessDailyWalk(
   targetCount: number,
   activeDays: number[] | null,
   config: ForgivenessConfig,
+  restDays: Set<string> = new Set<string>(),
 ): ForgivenessStreakWalk {
   // Strict walk first — also doubles as the early-out value for the
-  // "forgiveness disabled" config.
+  // "forgiveness disabled" config. Rest days count as met here too —
+  // strict-walk also sees rest days as kept, matching Android's
+  // `effectiveActivity` fold (resting still counts).
   const strictStreak = strictDailyWalk(
     completionMap,
     today,
     targetCount,
     activeDays,
+    restDays,
   );
 
   if (!config.enabled) {
     return { strictStreak, resilientStreak: strictStreak, forgivenDates: [] };
   }
 
-  // No completions at all → no run, no grace to spend.
-  if (completionMap.size === 0) {
+  // No completions at all and no rest days → no run, no grace to spend.
+  if (completionMap.size === 0 && restDays.size === 0) {
     return { strictStreak: 0, resilientStreak: 0, forgivenDates: [] };
   }
 
   const allowed = Math.max(0, config.allowedMisses);
   const window = Math.max(1, config.gracePeriodDays);
 
-  const isMet = (d: Date): boolean =>
-    (completionMap.get(toDateStr(d)) || 0) >= targetCount;
+  // A day is "met" iff the user logged enough completions OR the user
+  // explicitly marked it as a rest day. Rest-day-as-met is the seam that
+  // makes rest days "kept by definition" without consuming the grace
+  // window — the walk below never reaches the miss branch on a rest day.
+  const isMet = (d: Date): boolean => {
+    const iso = toDateStr(d);
+    if (restDays.has(iso)) return true;
+    return (completionMap.get(iso) || 0) >= targetCount;
+  };
 
   // Earliest known activity — walk halts here so pre-history isn't punished.
-  const allDates = Array.from(completionMap.keys())
-    .filter((iso) => (completionMap.get(iso) || 0) >= targetCount)
-    .sort();
-  if (allDates.length === 0) {
+  // Rest days are folded in too: a rest day before the earliest completion
+  // is still "earliest known", matching Android's
+  // `effectiveActivity.minOrNull()` semantics (resting counts as being there).
+  const metDates: string[] = [];
+  for (const [iso, count] of completionMap.entries()) {
+    if (count >= targetCount) metDates.push(iso);
+  }
+  for (const iso of restDays) metDates.push(iso);
+  metDates.sort();
+  if (metDates.length === 0) {
     return { strictStreak, resilientStreak: 0, forgivenDates: [] };
   }
-  const earliest = parseISO(allDates[0]);
+  const earliest = parseISO(metDates[0]);
 
   // Mid-day rule: if today isn't met (or today is not an active day), step
   // back to the most recent active day before evaluating.
@@ -233,19 +260,29 @@ function forgivenessDailyWalk(
  * today (or yesterday if today isn't logged yet) and walks backwards,
  * skipping non-active weekdays. Mirrors
  * `DailyForgivenessStreakCore.strictWalk` exactly.
+ *
+ * Rest-day fold (`docs/REST_DAY.md`): a day in `restDays` is treated as
+ * met here too — same as Android's `effectiveActivity` fold inside
+ * `DailyForgivenessStreakCore.calculate`. "Resting still counts" applies
+ * to the strict walk as well as the resilient walk.
  */
 function strictDailyWalk(
   completionMap: Map<string, number>,
   today: Date,
   targetCount: number,
   activeDays: number[] | null,
+  restDays: Set<string> = new Set<string>(),
 ): number {
-  if (completionMap.size === 0) return 0;
+  if (completionMap.size === 0 && restDays.size === 0) return 0;
+
+  const isMet = (iso: string): boolean => {
+    if (restDays.has(iso)) return true;
+    return (completionMap.get(iso) || 0) >= targetCount;
+  };
 
   let cursor = today;
   if (isActiveDayOfWeek(cursor, activeDays)) {
-    const todayCount = completionMap.get(toDateStr(cursor)) || 0;
-    if (todayCount < targetCount) {
+    if (!isMet(toDateStr(cursor))) {
       cursor = subDays(cursor, 1);
     }
   }
@@ -257,8 +294,7 @@ function strictDailyWalk(
       cursor = subDays(cursor, 1);
       continue;
     }
-    const count = completionMap.get(toDateStr(cursor)) || 0;
-    if (count >= targetCount) {
+    if (isMet(toDateStr(cursor))) {
       streak += 1;
       cursor = subDays(cursor, 1);
     } else {
@@ -270,18 +306,27 @@ function strictDailyWalk(
   return streak;
 }
 
+/**
+ * Compute streak stats for a habit-like activity.
+ *
+ * @param forgivenessConfig Optional per-user forgiveness knobs
+ *   (Settings → Advanced Tuning). When omitted, the function falls
+ *   back to the same defaults Android's `DailyForgivenessStreakCore`
+ *   ships with, so signed-out users and mid-bootstrap renders behave
+ *   identically.
+ * @param restDays Optional ISO `yyyy-MM-dd` set of dates the user
+ *   explicitly marked as rest days. Treated as kept-by-definition for
+ *   the daily forgiveness walk — they extend the run without consuming
+ *   the rolling grace cap. Empty by default so existing call sites
+ *   behave identically. See `docs/REST_DAY.md` § *The core rule*.
+ */
 export function calculateStreaks(
   completions: CompletionEntry[],
   frequency: 'daily' | 'weekly',
   activeDays: number[] | null,
   targetCount: number,
-  /**
-   * Optional per-user forgiveness knobs (Settings → Advanced Tuning).
-   * When omitted the function falls back to the same defaults Android's
-   * `DailyForgivenessStreakCore` ships with, so signed-out users and
-   * mid-bootstrap renders behave identically.
-   */
   forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
+  restDays: Set<string> = new Set<string>(),
 ): StreakData {
   const today = startOfDay(new Date());
   const completionMap = new Map<string, number>();
@@ -331,13 +376,17 @@ export function calculateStreaks(
   // Daily frequency — forgiveness-first current streak (parity with
   // Android's DailyForgivenessStreakCore). Longest stays strict-consecutive
   // to match Android's StreakCalculator.calculateLongestStreak (default
-  // maxMissedDays = 1, which breaks the run on the first miss).
+  // maxMissedDays = 1, which breaks the run on the first miss). Rest
+  // days fold in as kept-by-definition — see the walk's docstring.
+  // `forgivenessConfig` carries the per-user grace knobs from
+  // Settings → Advanced Tuning; the default mirrors Android.
   const walk = forgivenessDailyWalk(
     completionMap,
     today,
     targetCount,
     activeDays,
     forgivenessConfig,
+    restDays,
   );
   const currentStreak = walk.resilientStreak;
 

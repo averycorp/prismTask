@@ -29,6 +29,8 @@ import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow'
 import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
 import { PlanForTodaySheet } from '@/features/today/PlanForTodaySheet';
+import { RestDayBanner } from '@/features/today/RestDayBanner';
+import { useRestDayStore } from '@/stores/restDayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
@@ -77,6 +79,14 @@ export function TodayScreen() {
     getTodayCount,
     getTodayProgress,
   } = useHabitStore();
+
+  // Rest-Day primitive (`docs/REST_DAY.md`). When today is marked as a
+  // rest day we replace the dense task list with a soft takeover banner;
+  // the rest of the screen scaffolding (header date, balance bar, etc.)
+  // stays so the user can still tap into other surfaces. The dashboard
+  // sections, plan-more affordance, and "Show Blocked Tasks" toggle —
+  // i.e. everything that nags about uncompleted work — drop out.
+  const isRestingToday = useRestDayStore((s) => s.isRestDayToday());
 
   const settingsShowBriefing = useSettingsStore((s) => s.showBriefingCard);
   const settingsStartOfDayHour = useSettingsStore((s) => s.startOfDayHour);
@@ -337,6 +347,12 @@ export function TodayScreen() {
       <TodayLeisureMinimumRow />
       <SchoolworkTodayCard />
 
+      {/* Rest-Day primitive. The banner renders both states (takeover
+          when resting; small mark-as-rest affordance when not). Tasks
+          stay in Room either way — see `docs/REST_DAY.md` § *The core
+          rule*. */}
+      <RestDayBanner />
+
       {/* AI Briefing teaser — hidden by default respect setting */}
       {settingsShowBriefing && (
         <button
@@ -367,8 +383,13 @@ export function TodayScreen() {
       {/* Dashboard sections render in user-configured order (parity
           C.1f). Hidden sections drop out entirely. Always-on cards
           above (mood/balance/check-in/etc.) are non-dashboard
-          surfaces and stay above the reorderable list. */}
-      {dashboardSectionOrder.map((sectionKey) => {
+          surfaces and stay above the reorderable list.
+
+          On a rest day the dashboard sections drop out — the soft
+          takeover banner replaces the dense task list per
+          `docs/REST_DAY.md` § *The core rule* ("the Today screen
+          replaces the dense list with a soft header"). */}
+      {!isRestingToday && dashboardSectionOrder.map((sectionKey) => {
         if (dashboardHiddenSections.includes(sectionKey)) return null;
         switch (sectionKey) {
           case 'progress':
@@ -484,8 +505,9 @@ export function TodayScreen() {
 
       {/* "Show Blocked Tasks" toggle (parity B.12). Non-dashboard; only
           renders when there's something to reveal — keeps the chrome
-          quiet on days when nothing is blocked. */}
-      {(hiddenBlockedCount > 0 || showBlocked) && (
+          quiet on days when nothing is blocked. Hidden on rest days so
+          the takeover banner isn't trailed by task-shaped chrome. */}
+      {!isRestingToday && (hiddenBlockedCount > 0 || showBlocked) && (
         <div className="mb-3 flex items-center justify-end">
           <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--color-text-secondary)]">
             <input
@@ -504,8 +526,10 @@ export function TodayScreen() {
         </div>
       )}
 
-      {/* Empty state */}
-      {isEmpty && (
+      {/* Empty state — hidden on rest days; the takeover banner is its
+          own copy and an extra "All Caught Up" card would muddy the
+          message. */}
+      {!isRestingToday && isEmpty && (
         <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 text-center">
           <PartyPopper className="mb-4 h-16 w-16 text-[var(--color-accent)]" />
           <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">
@@ -517,8 +541,10 @@ export function TodayScreen() {
         </div>
       )}
 
-      {/* Upcoming Section — non-dashboard (no Android counterpart key) */}
-      {activeUpcoming.length > 0 && (
+      {/* Upcoming Section — non-dashboard (no Android counterpart key).
+          Hidden on rest days so the takeover banner isn't followed by a
+          list of looming work. */}
+      {!isRestingToday && activeUpcoming.length > 0 && (
         <TaskSection
           title="Upcoming"
           count={activeUpcoming.length}
