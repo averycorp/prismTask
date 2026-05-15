@@ -2,7 +2,9 @@ package com.averycorp.prismtask.ui.screens.batch
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.preferences.CustomBrainModePreferences
 import com.averycorp.prismtask.data.preferences.NdPreferencesDataStore
+import com.averycorp.prismtask.data.preferences.effectiveNdPreferencesFlow
 import com.averycorp.prismtask.data.remote.api.AmbiguousEntityHintResponse
 import com.averycorp.prismtask.data.remote.api.ProposedMutationResponse
 import com.averycorp.prismtask.data.repository.BatchOperationsRepository
@@ -36,7 +38,8 @@ class BatchPreviewViewModel
 constructor(
     private val repository: BatchOperationsRepository,
     private val undoBus: BatchUndoEventBus,
-    ndPreferencesDataStore: NdPreferencesDataStore
+    ndPreferencesDataStore: NdPreferencesDataStore,
+    customBrainModePreferences: CustomBrainModePreferences
 ) : ViewModel() {
     private val _state = MutableStateFlow<BatchPreviewState>(BatchPreviewState.Idle)
     val state: StateFlow<BatchPreviewState> = _state.asStateFlow()
@@ -65,8 +68,13 @@ constructor(
      * picker and routes the user to a Cancel-and-retype flow instead. Other
      * ND modes leave the picker visible — only Calm Mode signals "fewer
      * decision affordances at once."
+     *
+     * Reads the *effective* flow so an active [com.averycorp.prismtask
+     * .data.preferences.CustomBrainMode] that forces `calmModeEnabled` on
+     * (or off) takes precedence over the base setting.
      */
-    val simplifiedUi: StateFlow<Boolean> = ndPreferencesDataStore.ndPreferencesFlow
+    val simplifiedUi: StateFlow<Boolean> = ndPreferencesDataStore
+        .effectiveNdPreferencesFlow(customBrainModePreferences)
         .map { it.calmModeEnabled }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
