@@ -275,7 +275,7 @@ fun SettingsScreen(
                         )
                         SettingsNavRow(
                             title = "Brain Mode",
-                            subtitle = "ADHD, Calm, Focus Release",
+                            subtitle = "Quick-Start, Calm, Focus & Release",
                             iconEmoji = "\uD83E\uDDE0",
                             iconBgColor = ColBrainMode,
                             onClick = { navController.navigate("settings/brain_mode") }

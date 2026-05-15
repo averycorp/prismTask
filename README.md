@@ -13,6 +13,8 @@
 [![Backend CI](https://github.com/averycorp/prismTask/actions/workflows/backend-ci.yml/badge.svg?branch=main)](https://github.com/averycorp/prismTask/actions/workflows/backend-ci.yml)
 [![Web CI](https://github.com/averycorp/prismTask/actions/workflows/web-ci.yml/badge.svg?branch=main)](https://github.com/averycorp/prismTask/actions/workflows/web-ci.yml)
 
+*Built for every kind of mind — a productivity app that works with your brain, not against it.*
+
 A cross-platform task manager and wellness-aware productivity layer.
 Features AI-powered NLP and batch ops, voice input, full accessibility,
 deep customization, productivity analytics, Work-Life Balance Engine, mood

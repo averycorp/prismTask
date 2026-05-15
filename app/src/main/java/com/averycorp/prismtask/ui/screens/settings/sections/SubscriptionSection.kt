@@ -178,7 +178,7 @@ private fun SubscriptionComparisonCard() {
             ComparisonRow("All Views (Today/Week/Month/Timeline/Eisenhower)", free = true, pro = true)
             ComparisonRow("Templates, NLP, Widgets (soon)", free = true, pro = true)
             ComparisonRow("Google Calendar Sync", free = true, pro = true)
-            ComparisonRow("ADHD Mode & Calm Mode", free = true, pro = true)
+            ComparisonRow("Quick-Start Mode & Calm Mode", free = true, pro = true)
             ComparisonRow("Cloud Sync & Template Sync", free = false, pro = true)
             ComparisonRow("AI Eisenhower, Pomodoro, Briefing", free = false, pro = true)
             ComparisonRow("AI Weekly Planner (Sonnet)", free = false, pro = true)
