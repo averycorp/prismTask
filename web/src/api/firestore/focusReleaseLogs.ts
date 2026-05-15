@@ -2,9 +2,11 @@ import {
   addDoc,
   collection,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   type DocumentData,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 
@@ -104,4 +106,24 @@ export async function getRecentLogs(
     query(logsCol(uid), orderBy('startedAt', 'desc')),
   );
   return snap.docs.slice(0, limit).map((d) => docToLog(d.id, d.data()));
+}
+
+// ── Real-time listener ───────────────────────────────────────
+
+/**
+ * Subscribe to the user's focus-release log collection. Wired from
+ * `useFirestoreSync` so a session shipped on Android shows up in the
+ * web focus-release history without a refresh. Closes parity audit
+ * § A.1b residual for `focus_release_logs`.
+ *
+ * Ordered descending by `startedAt` to match `getRecentLogs`.
+ */
+export function subscribeToFocusLogs(
+  uid: string,
+  callback: (logs: FocusReleaseLog[]) => void,
+): Unsubscribe {
+  const q = query(logsCol(uid), orderBy('startedAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => docToLog(d.id, d.data())));
+  });
 }

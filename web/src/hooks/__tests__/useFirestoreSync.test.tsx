@@ -22,6 +22,11 @@ const {
   subscribeToAllAnchorsMock,
   subscribeToRulesMock,
   subscribeToTaskTemplatesMock,
+  subscribeToMoodLogsMock,
+  subscribeToCheckInsMock,
+  subscribeToFocusLogsMock,
+  subscribeToMedicationsMock,
+  subscribeToWeeklyReviewsMock,
   unsubTasks,
   unsubProjects,
   unsubTags,
@@ -36,6 +41,11 @@ const {
   unsubAnchors,
   unsubRules,
   unsubTaskTemplates,
+  unsubMoodLogs,
+  unsubCheckIns,
+  unsubFocusLogs,
+  unsubMedications,
+  unsubWeeklyReviews,
 } = vi.hoisted(() => {
   const unsubTasks = vi.fn();
   const unsubProjects = vi.fn();
@@ -51,6 +61,11 @@ const {
   const unsubAnchors = vi.fn();
   const unsubRules = vi.fn();
   const unsubTaskTemplates = vi.fn();
+  const unsubMoodLogs = vi.fn();
+  const unsubCheckIns = vi.fn();
+  const unsubFocusLogs = vi.fn();
+  const unsubMedications = vi.fn();
+  const unsubWeeklyReviews = vi.fn();
   return {
     subscribeToTasksMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
@@ -94,6 +109,21 @@ const {
     subscribeToTaskTemplatesMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubTaskTemplates),
+    subscribeToMoodLogsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubMoodLogs),
+    subscribeToCheckInsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubCheckIns),
+    subscribeToFocusLogsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubFocusLogs),
+    subscribeToMedicationsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubMedications),
+    subscribeToWeeklyReviewsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubWeeklyReviews),
     unsubTasks,
     unsubProjects,
     unsubTags,
@@ -108,6 +138,11 @@ const {
     unsubAnchors,
     unsubRules,
     unsubTaskTemplates,
+    unsubMoodLogs,
+    unsubCheckIns,
+    unsubFocusLogs,
+    unsubMedications,
+    unsubWeeklyReviews,
   };
 });
 
@@ -205,6 +240,39 @@ vi.mock('@/api/firestore/taskTemplates', async () => {
     subscribeToTaskTemplates: subscribeToTaskTemplatesMock,
   };
 });
+vi.mock('@/api/firestore/moodEnergyLogs', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/moodEnergyLogs')
+  >('@/api/firestore/moodEnergyLogs');
+  return { ...actual, subscribeToMoodLogs: subscribeToMoodLogsMock };
+});
+vi.mock('@/api/firestore/checkInLogs', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/checkInLogs')
+  >('@/api/firestore/checkInLogs');
+  return { ...actual, subscribeToCheckIns: subscribeToCheckInsMock };
+});
+vi.mock('@/api/firestore/focusReleaseLogs', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/focusReleaseLogs')
+  >('@/api/firestore/focusReleaseLogs');
+  return { ...actual, subscribeToFocusLogs: subscribeToFocusLogsMock };
+});
+vi.mock('@/api/firestore/medications', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/medications')
+  >('@/api/firestore/medications');
+  return { ...actual, subscribeToMedications: subscribeToMedicationsMock };
+});
+vi.mock('@/api/firestore/weeklyReviews', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/weeklyReviews')
+  >('@/api/firestore/weeklyReviews');
+  return {
+    ...actual,
+    subscribeToWeeklyReviews: subscribeToWeeklyReviewsMock,
+  };
+});
 vi.mock('@/lib/firebase', () => ({ firestore: { __mock: true } }));
 
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
@@ -224,12 +292,22 @@ import { useProjectRiskStore } from '@/stores/projectRiskStore';
 import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
 import { useTemplateStore } from '@/stores/templateStore';
+import { useMoodEnergyLogsStore } from '@/stores/moodEnergyLogsStore';
+import { useCheckInLogsStore } from '@/stores/checkInLogsStore';
+import { useFocusReleaseLogsStore } from '@/stores/focusReleaseLogsStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useWeeklyReviewsStore } from '@/stores/weeklyReviewsStore';
 import {
   DEFAULT_REMINDER_MODE_PREFERENCES,
   type MedicationReminderModePreferences,
 } from '@/api/firestore/medicationPreferences';
 import type { MedicationSlotDef } from '@/api/firestore/medicationSlots';
 import type { BoundaryRule } from '@/api/firestore/boundaryRules';
+import type { MoodEnergyLog } from '@/api/firestore/moodEnergyLogs';
+import type { CheckInLog } from '@/api/firestore/checkInLogs';
+import type { FocusReleaseLog } from '@/api/firestore/focusReleaseLogs';
+import type { MedicationDoc } from '@/api/firestore/medications';
+import type { WeeklyReview } from '@/api/firestore/weeklyReviews';
 import type { Task } from '@/types/task';
 import type { TaskDependency } from '@/types/taskDependency';
 import type { ProjectPhase } from '@/types/projectPhase';
@@ -252,6 +330,11 @@ const ALL_SUBSCRIBES = [
   subscribeToAllAnchorsMock,
   subscribeToRulesMock,
   subscribeToTaskTemplatesMock,
+  subscribeToMoodLogsMock,
+  subscribeToCheckInsMock,
+  subscribeToFocusLogsMock,
+  subscribeToMedicationsMock,
+  subscribeToWeeklyReviewsMock,
 ] as const;
 
 const ALL_UNSUBS = [
@@ -269,6 +352,11 @@ const ALL_UNSUBS = [
   unsubAnchors,
   unsubRules,
   unsubTaskTemplates,
+  unsubMoodLogs,
+  unsubCheckIns,
+  unsubFocusLogs,
+  unsubMedications,
+  unsubWeeklyReviews,
 ] as const;
 
 function resetAllMocks() {
@@ -288,6 +376,11 @@ function resetAllMocks() {
   subscribeToAllAnchorsMock.mockReturnValue(unsubAnchors);
   subscribeToRulesMock.mockReturnValue(unsubRules);
   subscribeToTaskTemplatesMock.mockReturnValue(unsubTaskTemplates);
+  subscribeToMoodLogsMock.mockReturnValue(unsubMoodLogs);
+  subscribeToCheckInsMock.mockReturnValue(unsubCheckIns);
+  subscribeToFocusLogsMock.mockReturnValue(unsubFocusLogs);
+  subscribeToMedicationsMock.mockReturnValue(unsubMedications);
+  subscribeToWeeklyReviewsMock.mockReturnValue(unsubWeeklyReviews);
 }
 
 function resetStores() {
@@ -314,6 +407,11 @@ function resetStores() {
     isLoading: false,
     error: null,
   });
+  useMoodEnergyLogsStore.setState({ logs: [] });
+  useCheckInLogsStore.setState({ logs: [] });
+  useFocusReleaseLogsStore.setState({ logs: [] });
+  useMedicationsStore.setState({ medications: [] });
+  useWeeklyReviewsStore.setState({ reviews: [] });
 }
 
 describe('useFirestoreSync', () => {
@@ -669,6 +767,127 @@ describe('useFirestoreSync', () => {
     expect(useBoundaryRulesStore.getState().rules).toEqual([]);
   });
 
+  // Parity audit § A.1b residual (Unit 16) — mood / check-in / focus /
+  // medications / weekly-reviews now stream live from Firestore.
+  it('a remote mood-energy-logs snapshot updates the mood store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToMoodLogsMock.mock.calls[0]?.[1] as unknown as (
+      logs: MoodEnergyLog[],
+    ) => void;
+    const log: MoodEnergyLog = {
+      id: '2026-05-15__morning',
+      date_iso: '2026-05-15',
+      mood: 4,
+      energy: 3,
+      notes: '',
+      time_of_day: 'morning',
+      created_at: 0,
+      updated_at: 0,
+    };
+    callback([log]);
+
+    expect(useMoodEnergyLogsStore.getState().logs).toEqual([log]);
+  });
+
+  it('a remote check-in-logs snapshot updates the check-in store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToCheckInsMock.mock.calls[0]?.[1] as unknown as (
+      logs: CheckInLog[],
+    ) => void;
+    const log: CheckInLog = {
+      id: '2026-05-15',
+      date_iso: '2026-05-15',
+      steps_completed_csv: 'hydrated,medicated',
+      medications_confirmed: true,
+      tasks_reviewed: false,
+      habits_completed: false,
+      created_at: 0,
+      updated_at: 0,
+    };
+    callback([log]);
+
+    expect(useCheckInLogsStore.getState().logs).toEqual([log]);
+  });
+
+  it('a remote focus-release-logs snapshot updates the focus-release store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToFocusLogsMock.mock.calls[0]?.[1] as unknown as (
+      logs: FocusReleaseLog[],
+    ) => void;
+    const log: FocusReleaseLog = {
+      id: 'fr1',
+      task_id: null,
+      task_title_snapshot: 'Refactor sync',
+      planned_minutes: 25,
+      actual_minutes: 22,
+      release_state: 'shipped',
+      note: '',
+      started_at: 0,
+      ended_at: 0,
+    };
+    callback([log]);
+
+    expect(useFocusReleaseLogsStore.getState().logs).toEqual([log]);
+  });
+
+  it('a remote medications snapshot updates the medications store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToMedicationsMock.mock
+      .calls[0]?.[1] as unknown as (meds: MedicationDoc[]) => void;
+    const med = {
+      id: 'm1',
+      name: 'Vitamin D',
+      sortOrder: 0,
+    } as unknown as MedicationDoc;
+    callback([med]);
+
+    expect(useMedicationsStore.getState().medications).toEqual([med]);
+  });
+
+  it('a remote weekly-reviews snapshot updates the weekly-reviews store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToWeeklyReviewsMock.mock
+      .calls[0]?.[1] as unknown as (reviews: WeeklyReview[]) => void;
+    const review = {
+      id: '2026-05-11',
+      weekStartDate: '2026-05-11',
+    } as unknown as WeeklyReview;
+    callback([review]);
+
+    expect(useWeeklyReviewsStore.getState().reviews).toEqual([review]);
+  });
+
+  it('resets mood/check-in/focus/medications/weekly-reviews caches on sign-out', () => {
+    useMoodEnergyLogsStore.setState({
+      logs: [{ id: 'stale' } as unknown as MoodEnergyLog],
+    });
+    useCheckInLogsStore.setState({
+      logs: [{ id: 'stale' } as unknown as CheckInLog],
+    });
+    useFocusReleaseLogsStore.setState({
+      logs: [{ id: 'stale' } as unknown as FocusReleaseLog],
+    });
+    useMedicationsStore.setState({
+      medications: [{ id: 'stale' } as unknown as MedicationDoc],
+    });
+    useWeeklyReviewsStore.setState({
+      reviews: [{ id: 'stale' } as unknown as WeeklyReview],
+    });
+
+    renderHook(() => useFirestoreSync(null));
+
+    expect(useMoodEnergyLogsStore.getState().logs).toEqual([]);
+    expect(useCheckInLogsStore.getState().logs).toEqual([]);
+    expect(useFocusReleaseLogsStore.getState().logs).toEqual([]);
+    expect(useMedicationsStore.getState().medications).toEqual([]);
+    expect(useWeeklyReviewsStore.getState().reviews).toEqual([]);
+  });
+
   it('a failed subscription does not block the remaining listeners', () => {
     subscribeToTasksMock.mockImplementationOnce(() => {
       throw new Error('permission-denied');
@@ -693,6 +912,13 @@ describe('useFirestoreSync', () => {
     expect(subscribeToAllAnchorsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToRulesMock).toHaveBeenCalledTimes(1);
     expect(subscribeToTaskTemplatesMock).toHaveBeenCalledTimes(1);
+    // Tasks throw; every other tracked subscribe in ALL_SUBSCRIBES still
+    // fires. Iterating keeps this assertion in lockstep with the array
+    // — no manual count to update when a new listener is added.
+    for (const m of ALL_SUBSCRIBES) {
+      if (m === subscribeToTasksMock) continue;
+      expect(m).toHaveBeenCalledTimes(1);
+    }
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();

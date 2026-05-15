@@ -3,10 +3,12 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   deleteDoc,
   type DocumentData,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
@@ -110,4 +112,26 @@ export async function getRecentCheckIns(
   // cheap for a sixty-day streak-check window.
   const snap = await getDocs(query(logsCol(uid), orderBy('__name__', 'desc')));
   return snap.docs.slice(0, limit).map((d) => docToLog(d.id, d.data()));
+}
+
+// ── Real-time listener ───────────────────────────────────────
+
+/**
+ * Subscribe to the user's morning check-in collection. Wired from
+ * `useFirestoreSync` so a check-in submitted on Android surfaces in
+ * the web check-in card + streak count without a refresh. Closes
+ * parity audit § A.1b residual for `check_in_logs`.
+ *
+ * Doc IDs are ISO dates so `orderBy('__name__', 'desc')` yields a
+ * recent-first list — mirrors `getRecentCheckIns` so any limit-on-read
+ * consumer can drop in the same slicing logic.
+ */
+export function subscribeToCheckIns(
+  uid: string,
+  callback: (logs: CheckInLog[]) => void,
+): Unsubscribe {
+  const q = query(logsCol(uid), orderBy('__name__', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => docToLog(d.id, d.data())));
+  });
 }

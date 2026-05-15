@@ -3,11 +3,13 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   setDoc,
   where,
   type DocumentData,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
@@ -162,4 +164,30 @@ export async function getLogsInRange(
     ),
   );
   return snap.docs.map((d) => docToLog(d.id, d.data()));
+}
+
+// ── Real-time listener ───────────────────────────────────────
+
+/**
+ * Subscribe to the user's mood/energy log collection. Wired from
+ * `useFirestoreSync` so cross-device logs (Android writes a morning
+ * entry, web should reflect it on Today / Mood screens without a
+ * refresh). Closes parity audit § A.1b residual for `mood_energy_logs`.
+ *
+ * Ordered ascending by `dateIso` then `createdAt` to match the existing
+ * range-query shape — consumers that want descending recent-first
+ * traversal can slice/reverse on read.
+ */
+export function subscribeToMoodLogs(
+  uid: string,
+  callback: (logs: MoodEnergyLog[]) => void,
+): Unsubscribe {
+  const q = query(
+    logsCol(uid),
+    orderBy('dateIso', 'asc'),
+    orderBy('createdAt', 'asc'),
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => docToLog(d.id, d.data())));
+  });
 }
