@@ -99,10 +99,10 @@ function Nav() {
 }
 
 // ── Hero ───────────────────────────────────────────────────────────────
-// Waitlist relay: every signup POSTs here. formsubmit.co emails each submission
-// to the address baked into the URL and also keeps a per-address dashboard, so
-// the list accumulates automatically with no backend / no Formspree account.
-const WAITLIST_ENDPOINT = 'https://formsubmit.co/ajax/support@prismtask.app';
+// Waitlist sink: each signup is written to a `waitlist` collection in the
+// shared averytask-50dc5 Firestore project. The SDK is initialized in
+// index.html and exposed on window.__prismWaitlist (the page has no
+// bundler, so babel-standalone'd JSX cannot use ESM imports directly).
 
 function Hero() {
   const [email, setEmail] = useState('');
@@ -126,24 +126,20 @@ function Hero() {
     } catch (_) { /* private mode / quota — non-fatal */ }
 
     try {
-      const res = await fetch(WAITLIST_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          email,
-          _subject: 'PrismTask waitlist signup',
-          _template: 'table',
-          source: 'docs.homepage',
-          ts: new Date().toISOString(),
-        }),
+      const sink = window.__prismWaitlist;
+      if (!sink) throw new Error('waitlist-sdk-not-ready');
+      const { db, collection, addDoc, serverTimestamp } = sink;
+      await addDoc(collection(db, 'waitlist'), {
+        email,
+        source: 'docs.homepage',
+        userAgent: (navigator.userAgent || '').slice(0, 512),
+        createdAt: serverTimestamp(),
       });
-      if (!res.ok) throw new Error('relay-' + res.status);
       setStatus('submitted');
     } catch (_) {
-      // Don't show a hard error — the email is already in localStorage and we
-      // can fall back to a mailto so the user can still tell us. Treat as
-      // submitted to honor the user's intent, but flag the error state so the
-      // button copy can soften.
+      // Don't show a hard error — the email is already in localStorage so we
+      // honor the user's intent, but flag the error state so the button copy
+      // can soften and they can retry.
       setStatus('error');
     }
   }

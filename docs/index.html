@@ -34,6 +34,23 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+  import { getFirestore, collection, addDoc, serverTimestamp }
+    from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+  const app = initializeApp({
+    apiKey: "AIzaSyCr8PY_DJh00LmpW8nS3_fnsqttlUr__3g",
+    authDomain: "averytask-50dc5.firebaseapp.com",
+    projectId: "averytask-50dc5",
+    storageBucket: "averytask-50dc5.firebasestorage.app",
+    messagingSenderId: "403186103462",
+    appId: "1:403186103462:web:70dccb94955d5d2647b067",
+  });
+  window.__prismWaitlist = {
+    db: getFirestore(app), collection, addDoc, serverTimestamp,
+  };
+</script>
+
 <script src="themes.js"></script>
 <script type="text/babel" src="phone.jsx"></script>
 <script type="text/babel" src="screen-today.jsx"></script>
