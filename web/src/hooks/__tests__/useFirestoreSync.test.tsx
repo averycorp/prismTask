@@ -27,6 +27,7 @@ const {
   subscribeToFocusLogsMock,
   subscribeToMedicationsMock,
   subscribeToWeeklyReviewsMock,
+  subscribeToHabitLogsMock,
   unsubTasks,
   unsubProjects,
   unsubTags,
@@ -46,6 +47,7 @@ const {
   unsubFocusLogs,
   unsubMedications,
   unsubWeeklyReviews,
+  unsubHabitLogs,
 } = vi.hoisted(() => {
   const unsubTasks = vi.fn();
   const unsubProjects = vi.fn();
@@ -66,6 +68,7 @@ const {
   const unsubFocusLogs = vi.fn();
   const unsubMedications = vi.fn();
   const unsubWeeklyReviews = vi.fn();
+  const unsubHabitLogs = vi.fn();
   return {
     subscribeToTasksMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
@@ -124,6 +127,9 @@ const {
     subscribeToWeeklyReviewsMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubWeeklyReviews),
+    subscribeToHabitLogsMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubHabitLogs),
     unsubTasks,
     unsubProjects,
     unsubTags,
@@ -143,6 +149,7 @@ const {
     unsubFocusLogs,
     unsubMedications,
     unsubWeeklyReviews,
+    unsubHabitLogs,
   };
 });
 
@@ -273,6 +280,12 @@ vi.mock('@/api/firestore/weeklyReviews', async () => {
     subscribeToWeeklyReviews: subscribeToWeeklyReviewsMock,
   };
 });
+vi.mock('@/api/firestore/habitLogs', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/habitLogs')
+  >('@/api/firestore/habitLogs');
+  return { ...actual, subscribeToHabitLogs: subscribeToHabitLogsMock };
+});
 vi.mock('@/lib/firebase', () => ({ firestore: { __mock: true } }));
 
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
@@ -280,6 +293,7 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
 import { useHabitStore } from '@/stores/habitStore';
+import { useHabitLogStore } from '@/stores/habitLogStore';
 import {
   useMedicationSlotsStore,
 } from '@/stores/medicationSlotsStore';
@@ -335,6 +349,7 @@ const ALL_SUBSCRIBES = [
   subscribeToFocusLogsMock,
   subscribeToMedicationsMock,
   subscribeToWeeklyReviewsMock,
+  subscribeToHabitLogsMock,
 ] as const;
 
 const ALL_UNSUBS = [
@@ -357,6 +372,7 @@ const ALL_UNSUBS = [
   unsubFocusLogs,
   unsubMedications,
   unsubWeeklyReviews,
+  unsubHabitLogs,
 ] as const;
 
 function resetAllMocks() {
@@ -381,6 +397,7 @@ function resetAllMocks() {
   subscribeToFocusLogsMock.mockReturnValue(unsubFocusLogs);
   subscribeToMedicationsMock.mockReturnValue(unsubMedications);
   subscribeToWeeklyReviewsMock.mockReturnValue(unsubWeeklyReviews);
+  subscribeToHabitLogsMock.mockReturnValue(unsubHabitLogs);
 }
 
 function resetStores() {
@@ -412,6 +429,7 @@ function resetStores() {
   useFocusReleaseLogsStore.setState({ logs: [] });
   useMedicationsStore.setState({ medications: [] });
   useWeeklyReviewsStore.setState({ reviews: [] });
+  useHabitLogStore.setState({ logsByHabit: {} });
 }
 
 describe('useFirestoreSync', () => {
@@ -919,6 +937,7 @@ describe('useFirestoreSync', () => {
       if (m === subscribeToTasksMock) continue;
       expect(m).toHaveBeenCalledTimes(1);
     }
+    expect(subscribeToHabitLogsMock).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();

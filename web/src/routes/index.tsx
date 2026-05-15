@@ -26,6 +26,7 @@ const ProjectDetailScreen = lazy(() => import('@/features/projects/ProjectDetail
 const ProjectRoadmapScreen = lazy(() => import('@/features/projects/ProjectRoadmapScreen').then(m => ({ default: m.ProjectRoadmapScreen })));
 const HabitListScreen = lazy(() => import('@/features/habits/HabitListScreen').then(m => ({ default: m.HabitListScreen })));
 const HabitAnalyticsScreen = lazy(() => import('@/features/habits/HabitAnalyticsScreen').then(m => ({ default: m.HabitAnalyticsScreen })));
+const HabitLogsScreen = lazy(() => import('@/features/habits/HabitLogsScreen').then(m => ({ default: m.HabitLogsScreen })));
 const WeekViewScreen = lazy(() => import('@/features/calendar/WeekViewScreen').then(m => ({ default: m.WeekViewScreen })));
 const MonthViewScreen = lazy(() => import('@/features/calendar/MonthViewScreen').then(m => ({ default: m.MonthViewScreen })));
 const TimelineScreen = lazy(() => import('@/features/calendar/TimelineScreen').then(m => ({ default: m.TimelineScreen })));
@@ -115,6 +116,7 @@ const routes: RouteObject[] = [
       { path: 'projects/:id/roadmap', element: <LazyRoute Component={ProjectRoadmapScreen} fallback={<ProjectListSkeleton />} /> },
       { path: 'habits', element: <LazyRoute Component={HabitListScreen} fallback={<HabitListSkeleton />} /> },
       { path: 'habits/:id/analytics', element: <LazyRoute Component={HabitAnalyticsScreen} /> },
+      { path: 'habits/:id/logs', element: <LazyRoute Component={HabitLogsScreen} /> },
       { path: 'calendar', element: <LazyRoute Component={CalendarRedirect} /> },
       { path: 'calendar/week', element: <LazyRoute Component={WeekViewScreen} /> },
       { path: 'calendar/month', element: <LazyRoute Component={MonthViewScreen} /> },

@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
+  BookOpen,
   Plus,
   Flame,
   MoreVertical,
   Pencil,
+  PlusCircle,
   Trash2,
   BarChart3,
 } from 'lucide-react';
@@ -26,6 +28,7 @@ import {
   findPendingUpdates,
   type PendingBuiltInUpdate,
 } from '@/utils/builtInHabitReconciler';
+import { HabitBookingDialog } from './HabitBookingDialog';
 import type { Habit } from '@/types/habit';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -59,6 +62,10 @@ export function HabitListScreen() {
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Habit | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Booking dialog target — parity audit § B.3b. Surfaced from the
+  // card context menu so Android-bookable habits get a quick-log path
+  // without diving into analytics first.
+  const [bookingHabit, setBookingHabit] = useState<Habit | null>(null);
 
   // Built-in habit template-version detector (parity B.4). `dismissalTick`
   // bumps after a localStorage dismissal so the memoized list refreshes
@@ -233,6 +240,10 @@ export function HabitListScreen() {
             onEdit={() => handleEdit(habit)}
             onDelete={() => setDeleteConfirm(habit)}
             onViewAnalytics={() => navigate(`/habits/${habit.id}/analytics`)}
+            onViewHistory={() => navigate(`/habits/${habit.id}/logs`)}
+            onBookActivity={
+              habit.is_bookable ? () => setBookingHabit(habit) : undefined
+            }
           />
         ))}
       </div>
@@ -245,6 +256,14 @@ export function HabitListScreen() {
             setModalOpen(false);
             setEditingHabit(null);
           }}
+        />
+      )}
+
+      {/* Book Activity dialog for bookable habits — parity § B.3b. */}
+      {bookingHabit && (
+        <HabitBookingDialog
+          habit={bookingHabit}
+          onClose={() => setBookingHabit(null)}
         />
       )}
 
@@ -274,6 +293,8 @@ function HabitCard({
   onEdit,
   onDelete,
   onViewAnalytics,
+  onViewHistory,
+  onBookActivity,
 }: {
   habit: Habit;
   streakData: ReturnType<typeof useHabitStore.getState>['getStreakData'] extends (
@@ -288,6 +309,9 @@ function HabitCard({
   onEdit: () => void;
   onDelete: () => void;
   onViewAnalytics: () => void;
+  onViewHistory: () => void;
+  /** Only set for `is_bookable` habits — parity § B.3b. */
+  onBookActivity?: () => void;
 }) {
   const currentStreak = streakData?.currentStreak ?? 0;
   const activeDays = parseActiveDays(habit.active_days_json);
@@ -428,6 +452,22 @@ function HabitCard({
                   icon: <BarChart3 className="h-4 w-4" />,
                   onClick: onViewAnalytics,
                 },
+                {
+                  key: 'history',
+                  label: 'Show History',
+                  icon: <BookOpen className="h-4 w-4" />,
+                  onClick: onViewHistory,
+                },
+                ...(onBookActivity
+                  ? [
+                      {
+                        key: 'book',
+                        label: 'Book Activity',
+                        icon: <PlusCircle className="h-4 w-4" />,
+                        onClick: onBookActivity,
+                      },
+                    ]
+                  : []),
                 {
                   key: 'edit',
                   label: 'Edit',

@@ -12,6 +12,15 @@ export interface Habit {
   target_count: number;
   active_days_json: string | null;
   is_active: boolean;
+  /**
+   * Mirrors Android's `HabitEntity.isBookable`. Web doesn't currently
+   * write the flag from its create/update payloads (see § "Why omission
+   * instead of writing-defaults" in `web/src/api/firestore/habits.ts`),
+   * but Android-authored habits propagate it through Firestore so the
+   * web UI reads it to surface the "Book Activity" action only on
+   * bookable habits. Parity audit § B.3b.
+   */
+  is_bookable?: boolean;
   created_at: string;
   updated_at: string;
   // Built-in template identity (parity B.4). Optional because user-created
