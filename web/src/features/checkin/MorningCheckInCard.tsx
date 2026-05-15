@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronRight, Flame, Loader2, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -64,9 +64,14 @@ export function MorningCheckInCard() {
     if (show) load();
   }, [show, load]);
 
-  const forgiveness = useAdvancedTuningStore((s) =>
-    selectForgivenessConfig(s.prefs),
-  );
+  // Subscribe to the raw `prefs` reference (stable across renders) and
+  // derive the forgiveness config in a memo. Returning the
+  // `selectForgivenessConfig` literal directly from the selector breaks
+  // `useSyncExternalStore`'s snapshot-equality contract — every call
+  // builds a fresh object, the snapshot never matches, and React loops
+  // until it trips error #185.
+  const prefs = useAdvancedTuningStore((s) => s.prefs);
+  const forgiveness = useMemo(() => selectForgivenessConfig(prefs), [prefs]);
 
   if (!show) return null;
 
