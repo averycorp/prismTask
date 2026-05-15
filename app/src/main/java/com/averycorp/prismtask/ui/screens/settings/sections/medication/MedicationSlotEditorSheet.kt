@@ -77,6 +77,8 @@ internal fun MedicationSlotEditorSheet(
     initialReminderIntervalMinutes: Int? = null,
     globalDefaultModeLabel: String = "Clock"
 ) {
+    val intervalPresets = listOf(120, 240, 360, 480) // 2h / 4h / 6h / 8h
+    val driftPresets = listOf(30, 60, 120, 180)
     var name by remember { mutableStateOf(initialName) }
     var idealTime by remember { mutableStateOf(initialIdealTime) }
     var driftMinutes by remember { mutableStateOf(initialDriftMinutes) }
@@ -92,10 +94,18 @@ internal fun MedicationSlotEditorSheet(
     var customIntervalText by remember(intervalMinutes) {
         mutableStateOf(intervalMinutes.toString())
     }
-    val intervalPresets = listOf(120, 240, 360, 480) // 2h / 4h / 6h / 8h
-    val isCustomInterval = intervalMinutes !in intervalPresets
-    val driftPresets = listOf(30, 60, 120, 180)
-    val isCustomDrift = driftMinutes !in driftPresets
+    // Custom-mode visibility is explicit user state, not derived from
+    // `value !in presets`. The derived shape silently hid the input
+    // field whenever a typed value landed on a preset, trapping users
+    // mid-keystroke (e.g. typing "1200" passes through "120"). See
+    // `docs/audits/MEDICATION_CUSTOM_INTERVAL_INPUT_AUDIT.md` §
+    // Anti-pattern recommendation #1.
+    var isCustomInterval by remember {
+        mutableStateOf((initialReminderIntervalMinutes ?: 240) !in intervalPresets)
+    }
+    var isCustomDrift by remember {
+        mutableStateOf(initialDriftMinutes !in driftPresets)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -127,7 +137,10 @@ internal fun MedicationSlotEditorSheet(
                     driftPresets.forEach { mins ->
                         val selected = !isCustomDrift && driftMinutes == mins
                         AssistChip(
-                            onClick = { driftMinutes = mins },
+                            onClick = {
+                                driftMinutes = mins
+                                isCustomDrift = false
+                            },
                             label = { Text(formatDrift(mins)) },
                             colors = if (selected) {
                                 AssistChipDefaults.assistChipColors(
@@ -140,13 +153,7 @@ internal fun MedicationSlotEditorSheet(
                         )
                     }
                     AssistChip(
-                        onClick = {
-                            // Switch to custom mode by nudging value off a preset.
-                            if (!isCustomDrift) {
-                                driftMinutes = (driftMinutes + 1).coerceAtLeast(1)
-                                customDriftText = driftMinutes.toString()
-                            }
-                        },
+                        onClick = { isCustomDrift = true },
                         label = { Text("Custom") },
                         colors = if (isCustomDrift) {
                             AssistChipDefaults.assistChipColors(
@@ -224,7 +231,10 @@ internal fun MedicationSlotEditorSheet(
                         intervalPresets.forEach { mins ->
                             val selected = !isCustomInterval && intervalMinutes == mins
                             AssistChip(
-                                onClick = { intervalMinutes = mins },
+                                onClick = {
+                                    intervalMinutes = mins
+                                    isCustomInterval = false
+                                },
                                 label = { Text(formatInterval(mins)) },
                                 colors = if (selected) {
                                     AssistChipDefaults.assistChipColors(
@@ -237,12 +247,7 @@ internal fun MedicationSlotEditorSheet(
                             )
                         }
                         AssistChip(
-                            onClick = {
-                                if (!isCustomInterval) {
-                                    intervalMinutes = (intervalMinutes + 1).coerceIn(60, 1440)
-                                    customIntervalText = intervalMinutes.toString()
-                                }
-                            },
+                            onClick = { isCustomInterval = true },
                             label = { Text("Custom") },
                             colors = if (isCustomInterval) {
                                 AssistChipDefaults.assistChipColors(

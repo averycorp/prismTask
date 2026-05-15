@@ -1,11 +1,17 @@
 package com.averycorp.prismtask.ui.screens.medication.components
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.averycorp.prismtask.data.local.entity.MedicationSlotEntity
+import com.averycorp.prismtask.domain.model.medication.MedicationTier
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -140,5 +146,82 @@ class MedicationEditorDialogTest {
             )
         }
         composeRule.onNodeWithText("Save").assertIsNotEnabled()
+    }
+
+    /**
+     * Regression for the typing-through-preset trap: previously the
+     * custom-interval TextField only rendered when
+     * `intervalMinutes !in intervalPresets`. Typing toward 1200 passed
+     * through 120 (a preset), which hid the field mid-keystroke and
+     * prevented the user from completing the value. Post-fix, the
+     * field's visibility is governed by an explicit `isCustomInterval`
+     * state that only flips on chip clicks, so typing through any
+     * preset is non-disruptive. See
+     * `docs/audits/MEDICATION_CUSTOM_INTERVAL_INPUT_AUDIT.md` §
+     * Anti-pattern recommendation #1 for the unfixed-half-of-#1051
+     * history.
+     */
+    @Test
+    fun customIntervalField_staysVisible_whenTypedValueLandsOnPreset() {
+        composeRule.setContent {
+            MedicationEditorDialog(
+                title = "Add Medication",
+                initialName = "Test",
+                initialTier = MedicationTier.ESSENTIAL,
+                initialSelections = emptyList(),
+                activeSlots = listOf(morningSlot),
+                initialReminderMode = "INTERVAL",
+                initialReminderIntervalMinutes = 241, // off-preset → custom on open
+                onDismiss = {},
+                onConfirm = { _, _, _, _, _, _, _ -> },
+                onCreateNewSlot = {}
+            )
+        }
+        val field = composeRule.onNodeWithText("Custom interval (minutes, 60–1440)")
+        field.assertIsDisplayed()
+        field.performTextClearance()
+        // Type digit-by-digit to mimic real key events. After "120" the
+        // pre-fix code re-derived `isCustomInterval = false`, hiding
+        // the field. We type the trailing "0" *after* the assertion to
+        // prove the field accepted further keystrokes.
+        field.performTextInput("1")
+        field.performTextInput("2")
+        field.performTextInput("0")
+        composeRule
+            .onNodeWithText("Custom interval (minutes, 60–1440)")
+            .assertIsDisplayed()
+        field.performTextInput("0")
+        composeRule
+            .onNodeWithText("Custom interval (minutes, 60–1440)")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun customIntervalField_persistsTypedValue_throughPreset_onSave() {
+        var capturedInterval: Int? = null
+        composeRule.setContent {
+            MedicationEditorDialog(
+                title = "Add Medication",
+                initialName = "Test",
+                initialTier = MedicationTier.ESSENTIAL,
+                initialSelections = emptyList(),
+                activeSlots = listOf(morningSlot),
+                initialReminderMode = "INTERVAL",
+                initialReminderIntervalMinutes = 241,
+                onDismiss = {},
+                onConfirm = { _, _, _, _, _, intervalMinutes, _ ->
+                    capturedInterval = intervalMinutes
+                },
+                onCreateNewSlot = {}
+            )
+        }
+        val field = composeRule.onNodeWithText("Custom interval (minutes, 60–1440)")
+        field.performTextClearance()
+        field.performTextInput("1")
+        field.performTextInput("2")
+        field.performTextInput("0") // would have trapped pre-fix
+        field.performTextInput("0")
+        composeRule.onNodeWithText("Save").performClick()
+        assertEquals(1200, capturedInterval)
     }
 }
