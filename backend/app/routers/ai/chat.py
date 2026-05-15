@@ -33,6 +33,7 @@ from app.services.crisis_keywords import (
     crisis_safety_response,
 )
 
+from .context import load_user_context_bundle
 from .memory import (
     _apply_preference_diff,
     _load_user_preferences,
@@ -78,6 +79,26 @@ async def chat(
         {"id": p.id, "text": p.preference_text} for p in existing_prefs
     ]
 
+    # Load today's current-state bundle — open tasks, habit progress,
+    # active projects, today's leisure totals, medication adherence — so
+    # the AI can ground replies in concrete state instead of guessing
+    # from the message text. ``today`` is UTC-date for now; per-user SoD
+    # handling needs the client to forward the SoD hour (PR 2). A DB
+    # failure here is non-fatal: the chat reply still goes through, just
+    # without the current-state grounding.
+    today = datetime.now(timezone.utc).date()
+    current_state: dict | None
+    try:
+        current_state = await load_user_context_bundle(
+            db, current_user.id, today
+        )
+    except Exception:
+        logger.exception(
+            "Failed to load chat current-state bundle for user_id=%s",
+            current_user.id,
+        )
+        current_state = None
+
     # G2 — defense-in-depth crisis pre-filter. A high-confidence crisis
     # term short-circuits to a static reply that points the user to the
     # in-app crisis resources surface (G1). The model never sees the
@@ -102,6 +123,7 @@ async def chat(
                 ),
                 history=[h.model_dump() for h in data.history],
                 user_preferences=prefs_for_prompt,
+                current_state=current_state,
             )
         except RuntimeError:
             raise HTTPException(status_code=503, detail="AI service temporarily unavailable")

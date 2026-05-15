@@ -28,6 +28,7 @@ from app.services.crisis_keywords import (
     crisis_safety_response,
 )
 
+from .context import load_user_context_bundle
 from .memory import (
     _apply_preference_diff,
     _load_user_preferences,
@@ -100,6 +101,23 @@ async def chat_stream(
         {"id": p.id, "text": p.preference_text} for p in existing_prefs
     ]
 
+    # Load today's current-state bundle so the streaming endpoint has the
+    # same grounding as the single-shot endpoint. Failure is non-fatal —
+    # the chat reply still streams, just without current-state grounding.
+    today = datetime.now(timezone.utc).date()
+    current_state: dict | None
+    try:
+        current_state = await load_user_context_bundle(
+            db, current_user.id, today
+        )
+    except Exception:
+        logger.exception(
+            "Failed to load streaming chat current-state bundle for"
+            " user_id=%s",
+            current_user.id,
+        )
+        current_state = None
+
     # G2 — defense-in-depth crisis pre-filter. Mirrors the non-streaming
     # /chat handler. We synthesize a single 'done' event with the static
     # safety reply rather than streaming tokens, since the static text is
@@ -135,6 +153,7 @@ async def chat_stream(
                     ),
                     history=[h.model_dump() for h in data.history],
                     user_preferences=prefs_for_prompt,
+                    current_state=current_state,
                 )
             for event in stream_iter:
                 if event.get("type") == "done":
