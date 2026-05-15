@@ -43,7 +43,11 @@ constructor(
     companion object {
         private val ENABLED_KEY = booleanPreferencesKey("reflection_enabled")
         private val ENTRIES_KEY = stringPreferencesKey("reflection_entries")
-        private const val FIELD_SEP = ''
+        // ASCII Unit Separator (0x1F). Spelt as a unicode escape so future
+        // file rewrites don't accidentally strip the raw byte (this file
+        // shipped briefly with an empty char literal in PR #1506 because
+        // of exactly that hazard).
+        private const val FIELD_SEP = '\u001F'
         private const val LINE_SEP = '\n'
 
         fun encode(entries: List<ReflectionEntry>): String =

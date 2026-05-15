@@ -42,6 +42,8 @@ class BatchPreviewViewModelTest {
     private lateinit var repository: BatchOperationsRepository
     private lateinit var undoBus: BatchUndoEventBus
     private lateinit var ndPreferencesDataStore: NdPreferencesDataStore
+    private lateinit var customBrainModePreferences:
+        com.averycorp.prismtask.data.preferences.CustomBrainModePreferences
 
     @Before
     fun setUp() {
@@ -50,6 +52,10 @@ class BatchPreviewViewModelTest {
         undoBus = mockk(relaxed = true)
         ndPreferencesDataStore = mockk()
         every { ndPreferencesDataStore.ndPreferencesFlow } returns flowOf(NdPreferences())
+        customBrainModePreferences = mockk()
+        every { customBrainModePreferences.observe() } returns flowOf(emptyList())
+        every { customBrainModePreferences.observeActiveName() } returns flowOf(null)
+        every { customBrainModePreferences.observeActive() } returns flowOf(null)
         coEvery { repository.getTagNamesForTasks(any()) } returns emptyMap()
         coEvery { repository.getMedicationsByIds(any()) } returns emptyList()
     }
@@ -399,7 +405,8 @@ class BatchPreviewViewModelTest {
     private fun newViewModel(): BatchPreviewViewModel = BatchPreviewViewModel(
         repository = repository,
         undoBus = undoBus,
-        ndPreferencesDataStore = ndPreferencesDataStore
+        ndPreferencesDataStore = ndPreferencesDataStore,
+        customBrainModePreferences = customBrainModePreferences
     )
 
     private fun stubParse(
