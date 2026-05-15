@@ -461,7 +461,9 @@ constructor(
      */
     fun clearConversation() {
         _showClearConfirm.value = false
-        chatRepository.clearConversation()
+        viewModelScope.launch {
+            chatRepository.clearConversation()
+        }
     }
 
     /**
@@ -753,11 +755,24 @@ constructor(
 
     private suspend fun resolveDate(dateStr: String?): Long? {
         if (dateStr == null) return null
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 23)
-        cal.set(Calendar.MINUTE, 59)
-        cal.set(Calendar.SECOND, 59)
-        cal.set(Calendar.MILLISECOND, 0)
+        // SoD-anchor: when the AI says "today" / "tomorrow" it means the
+        // user's logical day, not the wall-clock calendar date. Without
+        // this, a user with Start-of-Day = 4 AM tapping a "Reschedule to
+        // today" chip at 2 AM would land the due date on the wrong
+        // calendar day relative to every other date surface in the app
+        // (Today screen, habits, widgets, NLP date parsing).
+        val sod = taskBehaviorPreferences.getStartOfDay().first()
+        val logicalToday = com.averycorp.prismtask.util.DayBoundary
+            .currentLocalDate(dayStartHour = sod.hour, dayStartMinute = sod.minute)
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, logicalToday.year)
+            set(Calendar.MONTH, logicalToday.monthValue - 1)
+            set(Calendar.DAY_OF_MONTH, logicalToday.dayOfMonth)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 0)
+        }
 
         return when (dateStr) {
             "today" -> cal.timeInMillis

@@ -1370,9 +1370,56 @@ def _format_current_state_block(current_state: dict | None) -> str:
     return "\n".join(lines)
 
 
+def _format_user_context_block(user_context: dict | None) -> str:
+    """Render the user's SoD-anchored logical day into a prompt section.
+
+    ``user_context`` carries the client-resolved ``today`` / ``tomorrow``
+    ISO dates plus the configured Start-of-Day hour/minute and the
+    device's timezone. The Android client resolves these via
+    ``DayBoundary.currentLocalDateString(...)`` and forwards them on
+    every chat turn so the AI's date references stay in lockstep with
+    the rest of the app (Today screen, habits, widgets, NLP date
+    parsing). Returns the empty string when no anchor is available so
+    legacy clients fall back to the previous UTC-anchored behaviour.
+    """
+    if not user_context:
+        return ""
+    today = user_context.get("today")
+    if not today:
+        return ""
+
+    lines = [
+        "User's logical day (anchored on the user-configurable "
+        "Start-of-Day, NOT server UTC):",
+        f"- Today is {today}.",
+    ]
+    tomorrow = user_context.get("tomorrow")
+    if tomorrow:
+        lines.append(f"- Tomorrow is {tomorrow}.")
+    hour = user_context.get("day_start_hour")
+    minute = user_context.get("day_start_minute")
+    if hour is not None:
+        m = int(minute or 0)
+        lines.append(
+            f"- The user's day rolls over at {int(hour):02d}:{m:02d} local time."
+        )
+    tz = user_context.get("timezone")
+    if tz:
+        lines.append(f"- Device timezone: {tz}.")
+    lines.append(
+        'When the user (or you) says "today", "tomorrow", or "yesterday", '
+        "interpret them relative to this logical day. A user messaging at "
+        "2 AM with a 4 AM Start-of-Day is still in yesterday's logical "
+        "day — treat \"today\" as the date above, not the calendar date "
+        "of the wall-clock instant."
+    )
+    return "\n".join(lines)
+
+
 def _format_chat_system_prompt(
     user_preferences: list[dict] | None,
     current_state: dict | None = None,
+    user_context: dict | None = None,
 ) -> str:
     """Append the preference list and (optional) current state onto the base.
 
@@ -1385,6 +1432,11 @@ def _format_chat_system_prompt(
     failed, the prompt falls back to the preferences-only shape that
     predated this feature, so a transient DB hiccup degrades to "no
     current-state grounding" rather than a 500.
+
+    ``user_context`` carries the SoD-anchored ``today``/``tomorrow`` so
+    the AI's date references line up with the user's logical day. When
+    None (legacy client) the prompt omits the anchor and the model
+    keeps its prior server-UTC notion of "today".
     """
     prefs = user_preferences or []
     if not prefs:
@@ -1402,6 +1454,9 @@ def _format_chat_system_prompt(
         f"Current stored preferences ({len(prefs)}/{_CHAT_USER_PREFERENCES_CAP}):\n"
         f"{rendered}"
     )
+    user_context_block = _format_user_context_block(user_context)
+    if user_context_block:
+        prompt = f"{prompt}\n\n{user_context_block}"
     state_block = _format_current_state_block(current_state)
     if state_block:
         prompt = f"{prompt}\n\n{state_block}"
@@ -1679,6 +1734,7 @@ def _build_chat_messages_array(
     task_context: dict | None,
     history: list[dict] | None,
     user_preferences: list[dict] | None = None,
+    user_context: dict | None = None,
 ) -> list[dict]:
     """Build the Anthropic ``messages`` array for a chat turn.
 
@@ -1692,6 +1748,12 @@ def _build_chat_messages_array(
     ``user_preferences`` is the AI-memory list (already capped at 15)
     forwarded to the model inside the user payload so the AI sees the
     same data shape on each turn as the rendered system-prompt block.
+
+    ``user_context`` carries the SoD-anchored today/tomorrow + the
+    user's Start-of-Day hour/minute so the AI can reason about the
+    user's logical day instead of server UTC. Echoed into the user
+    payload (in addition to the system-prompt block) so the dates are
+    in plain view alongside ``user_message``.
     """
     user_block: dict = {
         "conversation_id": conversation_id,
@@ -1702,6 +1764,8 @@ def _build_chat_messages_array(
         user_block["task_context"] = task_context
     if user_preferences:
         user_block["user_preferences"] = user_preferences
+    if user_context:
+        user_block["user_context"] = user_context
     user_payload = json.dumps(user_block, default=str, indent=2)
 
     anthropic_messages: list[dict] = []
@@ -1772,6 +1836,7 @@ def generate_chat_response(
     history: list[dict] | None = None,
     user_preferences: list[dict] | None = None,
     current_state: dict | None = None,
+    user_context: dict | None = None,
 ) -> dict:
     """Call Claude Haiku to produce a conversational chat reply + optional actions.
 
@@ -1811,8 +1876,11 @@ def generate_chat_response(
         task_context,
         history,
         user_preferences,
+        user_context,
     )
-    system_prompt = _format_chat_system_prompt(user_preferences, current_state)
+    system_prompt = _format_chat_system_prompt(
+        user_preferences, current_state, user_context
+    )
 
     last_error: Exception | None = None
     for attempt in range(2):
@@ -1849,6 +1917,7 @@ def generate_chat_response_stream(
     history: list[dict] | None = None,
     user_preferences: list[dict] | None = None,
     current_state: dict | None = None,
+    user_context: dict | None = None,
 ) -> Iterator[dict]:
     """Stream a conversational chat reply token-by-token.
 
@@ -1884,8 +1953,11 @@ def generate_chat_response_stream(
         task_context,
         history,
         user_preferences,
+        user_context,
     )
-    system_prompt = _format_chat_system_prompt(user_preferences, current_state)
+    system_prompt = _format_chat_system_prompt(
+        user_preferences, current_state, user_context
+    )
 
     final_message = None
     try:

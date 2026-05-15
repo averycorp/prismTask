@@ -692,12 +692,30 @@ data class ChatTaskContext(
     @SerializedName("is_completed") val isCompleted: Boolean? = null
 )
 
+/**
+ * SoD-anchored "today" context forwarded on every chat turn so the AI's
+ * notion of today/tomorrow/yesterday matches the user's logical day
+ * instead of server UTC. Resolved client-side via `DayBoundary` and the
+ * user-configurable Start-of-Day hour/minute. Mirrors the backend's
+ * `ChatUserContext` schema. `today`/`tomorrow` always populated when
+ * sent; the SoD components and timezone are optional context the model
+ * may use to phrase replies but are not required for date resolution.
+ */
+data class ChatUserContext(
+    val today: String,
+    val tomorrow: String? = null,
+    @SerializedName("day_start_hour") val dayStartHour: Int? = null,
+    @SerializedName("day_start_minute") val dayStartMinute: Int? = null,
+    val timezone: String? = null
+)
+
 data class ChatRequest(
     val message: String,
     @SerializedName("conversation_id") val conversationId: String,
     @SerializedName("task_context_id") val taskContextId: Long? = null,
     @SerializedName("task_context") val taskContext: ChatTaskContext? = null,
-    val history: List<ChatHistoryEntry> = emptyList()
+    val history: List<ChatHistoryEntry> = emptyList(),
+    @SerializedName("user_context") val userContext: ChatUserContext? = null
 )
 
 data class ChatActionResponse(

@@ -7,7 +7,7 @@ and apply AI-proposed preference diffs (D12).
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import ValidationError
@@ -26,6 +26,7 @@ from app.schemas.ai import (
     ChatResponse,
     ChatTaskContext,
     ChatTokensUsed,
+    ChatUserContext,
 )
 from app.services.beta_codes import resolve_effective_tier
 from app.services.crisis_keywords import (
@@ -43,6 +44,27 @@ from .memory import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _resolve_logical_today(user_context: ChatUserContext | None) -> date:
+    """Resolve the user's logical "today" from the SoD-anchored client payload.
+
+    Clients running v1.7+ forward ``user_context.today`` as an ISO date
+    pre-resolved via ``DayBoundary.currentLocalDateString(...)`` on the
+    Android side, so the bundle and prompt anchor on the user's
+    Start-of-Day-adjusted day. Falls back to ``datetime.now(timezone.utc).date()``
+    when the client omits it (older clients) or supplies a malformed
+    value — never raises, since today-resolution is best-effort.
+    """
+    if user_context is not None and user_context.today:
+        try:
+            return date.fromisoformat(user_context.today)
+        except ValueError:
+            logger.info(
+                "Ignoring malformed user_context.today=%r; falling back to UTC date",
+                user_context.today,
+            )
+    return datetime.now(timezone.utc).date()
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -82,11 +104,14 @@ async def chat(
     # Load today's current-state bundle — open tasks, habit progress,
     # active projects, today's leisure totals, medication adherence — so
     # the AI can ground replies in concrete state instead of guessing
-    # from the message text. ``today`` is UTC-date for now; per-user SoD
-    # handling needs the client to forward the SoD hour (PR 2). A DB
-    # failure here is non-fatal: the chat reply still goes through, just
-    # without the current-state grounding.
-    today = datetime.now(timezone.utc).date()
+    # from the message text. The client forwards a SoD-anchored
+    # ``user_context.today`` (resolved via ``DayBoundary`` + the user's
+    # Start-of-Day hour/minute) so the AI's notion of "today" matches the
+    # rest of the app instead of server UTC; legacy clients that omit it
+    # fall back to UTC date. A DB failure on the bundle is non-fatal: the
+    # chat reply still goes through, just without the current-state
+    # grounding.
+    today = _resolve_logical_today(data.user_context)
     current_state: dict | None
     try:
         current_state = await load_user_context_bundle(
@@ -124,6 +149,11 @@ async def chat(
                 history=[h.model_dump() for h in data.history],
                 user_preferences=prefs_for_prompt,
                 current_state=current_state,
+                user_context=(
+                    data.user_context.model_dump(exclude_none=True)
+                    if data.user_context is not None
+                    else None
+                ),
             )
         except RuntimeError:
             raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
