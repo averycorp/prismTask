@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Docs
+
+- docs(audits): Parity Batch 7 — Complete Android↔Web parity Phase 1
+  audit (`docs/audits/PARITY_BATCH_7_COMPLETE_PARITY_AUDIT.md`).
+  Final consolidation batch on top of Batches 1–6: itemises the 16
+  remaining open PROCEED items from `ANDROID_WEB_PARITY_AUDIT_2026-05-13.md`
+  (habit logs B.3b, built-in reconciler B.4, today-skip + Focus-Release
+  per-task B.5/B.8, multi-task paste B.9, task templates Firestore
+  migration B.10, dependency editor + Today blocker chips B.12,
+  dashboard section reorder UI C.1f, Weekly Balance Report screen C.2c,
+  weekly review backend cron C.4b, morning check-in stepper C.5a, 90-day
+  check-in history C.5c, ND modes settings C.7c, ND Pomodoro integrations
+  C.7d, schoolwork course/assignment CRUD F.2 follow-up, leisure
+  `startOfDayHour` boundary, listener-parity sweep A.1b residual) and
+  reaffirms the ACCEPT-AS-DIVERGENCE register (voice input, widgets,
+  custom-sound notifications + escalation, Pomodoro foreground
+  continuation, email/password auth, keyboard shortcuts modal, Install
+  PWA prompt, battery-optimization onboarding, `batch_undo_log`,
+  `sync_metadata`, `usage_logs`, `calendar_sync`, IndexedDB, ~35
+  Android-only advanced settings, tag LWW, append-only/canonical-id
+  writes). Phase 3 bundle summary fills in as the 16 sibling worker PRs
+  merge; Phase 4 Claude Chat handoff appends when Phase 3 settles.
+
 ### Fixed
 
 - fix(web/build): bump `idb` pin from `^8.0.4` to `^8.0.3` — `8.0.4` was never published to npm so every clean `npm install` since PR #1239 (2026-05-10) failed with `ETARGET`, silently turning web CI red across the repo. Also cleans up 3 pre-existing lint errors (`no-useless-assignment` in `batchHistoryStore.ts` + `batchStore.ts`; `react-hooks/set-state-in-effect` in `WorkLifeBalanceSection.tsx`) plus 1 tautology test (`endsWith(slice(0,0))` always true) in `chatStore.test.ts`. Web suite now lint + tsc + vitest clean: 72/72 files, 679/679 tests.
