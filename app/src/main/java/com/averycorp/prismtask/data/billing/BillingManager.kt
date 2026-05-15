@@ -315,8 +315,8 @@ constructor(
         val (billingResult, productDetailsList) = suspendCancellableCoroutine { cont ->
             billingClient.queryProductDetailsAsync(
                 params,
-                ProductDetailsResponseListener { result, detailsList ->
-                    cont.resume(Pair(result, detailsList))
+                ProductDetailsResponseListener { result, queryResult ->
+                    cont.resume(Pair(result, queryResult.productDetailsList))
                 }
             )
         }

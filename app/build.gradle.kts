@@ -361,7 +361,7 @@ dependencies {
     implementation("com.google.http-client:google-http-client-gson:2.1.0")
 
     // Google Play Billing
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    implementation("com.android.billingclient:billing-ktx:8.3.0")
 
     // Google Play In-App Review (E2 in-app ratings)
     implementation("com.google.android.play:review:2.0.2")
