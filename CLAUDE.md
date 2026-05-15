@@ -200,6 +200,25 @@ remains the final verification gate.
 - **Audit doc length**: cap each Phase at ~500 lines. Above that, split into batches with separate Phase 1 sweeps. The validated single-pass shape (`docs/audits/CONNECTED_TESTS_STABILIZATION_AUDIT.md`, PR #859) is 390 lines; mega-audits (e.g. `PRE_PHASE_F_MEGA_AUDIT.md` at 1,115 lines) cost wall-clock to write *and* to re-read.
 - **Audit-first Phase 3 + 4 fire pre-merge.** Override the skill's default ("after Phase 2 PRs merge"). Append Phase 3 (bundle summary) and emit Phase 4 (Claude Chat handoff block) as soon as the implementation PR is opened — don't wait for CI green or merge. Rationale: operator wants the handoff block ready to paste into a follow-up Chat thread without round-tripping back through this session post-merge.
 
+## Anti-pattern enforcement (philosophy)
+
+PrismTask's design principles are documented in [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md). Each principle ends with an explicit anti-pattern list; those lists are the canonical reject filter for new feature work. Audit-first prompts that surface any of them as proposed scope must flag and surface to operator before Phase 2.
+
+Headline anti-patterns (full list in `PHILOSOPHY.md`):
+
+1. Streak-reset shame UI; "X days since failure" counters; punitive streak-loss notifications (Principle 1).
+2. End-of-day judgment screens; "you missed X% of your plan" framing; calendar greying-out of missed time (Principle 2).
+3. Productivity scores or streaks that count only Work tasks and treat Play / Relax as wasted time (Principle 3).
+4. Single-axis priority as the locked default sort; "eat the frog" defaults (Principle 4).
+5. Fake countdowns; pre-checked subscription boxes; retention guilt; dark-grey decline buttons; "free trial" auto-bill without re-confirm (Principle 5).
+6. Locked defaults; major features (AI, sync, automations, medication reminders, streak, balance bar, cognitive load) with no Settings-level disable path (Principle 6).
+7. Onboarding that demands notification permission as a *blocking* step; daily-cadence absence-pings; badge-count gamification (Principle 7).
+8. Diagnosis-language (ADHD, autism, depression, bipolar, etc.) as the *primary audience descriptor* on Play Store short description, feature graphic, or README first paragraph. Use "every kind of mind" framing instead. Rationale: Apr 25 2026 Play Console reclassification + Principle 5 honest disclosure.
+
+Override path: any apparent violation requires operator pre-approval AND a documented justification in the PR description. The audit-first STOP protocol is the load-bearing gate.
+
+Pairs with: ED-6 / ED-7 (no one-off coachmark or help-icon *infrastructure introduced as a fix path*) from the D-series UX audit — see [`docs/audits/D_SERIES_UX_AUDIT.md`](docs/audits/D_SERIES_UX_AUDIT.md). Note: ED-6 was selectively overridden 2026-05-08 for the onboarding-tour expansion; the surviving anti-pattern is "don't ship a *one-off* coachmark system as a fix path".
+
 ## Important Files
 
 - `build.gradle.kts` — Root build file with plugin versions (AGP 9.1.1, Kotlin 2.3.20, KSP 2.3.6, Hilt 2.59.2)
