@@ -18,6 +18,7 @@ import com.averycorp.prismtask.data.local.database.PrismTaskDatabase
 import com.averycorp.prismtask.data.preferences.ArchivePreferences
 import com.averycorp.prismtask.data.preferences.AuthTokenPreferences
 import com.averycorp.prismtask.data.preferences.BackendSyncPreferences
+import com.averycorp.prismtask.data.preferences.CompletionCountMode
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.OnboardingPreferences
@@ -570,6 +571,14 @@ constructor(
         .getProgressStyle()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ring")
 
+    val completionCountMode: StateFlow<CompletionCountMode> = dashboardPreferences
+        .getCompletionCountMode()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            DashboardPreferences.DEFAULT_COMPLETION_COUNT_MODE
+        )
+
     // --- Navigation ---
     val tabOrder: StateFlow<List<String>> = tabPreferences
         .getTabOrder()
@@ -917,6 +926,10 @@ constructor(
 
     fun setProgressStyle(style: String) {
         viewModelScope.launch { dashboardPreferences.setProgressStyle(style) }
+    }
+
+    fun setCompletionCountMode(mode: CompletionCountMode) {
+        viewModelScope.launch { dashboardPreferences.setCompletionCountMode(mode) }
     }
 
     fun resetDashboardDefaults() {

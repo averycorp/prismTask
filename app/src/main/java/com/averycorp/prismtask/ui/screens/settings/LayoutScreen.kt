@@ -37,6 +37,7 @@ fun LayoutScreen(
     val sectionOrder by viewModel.sectionOrder.collectAsStateWithLifecycle()
     val hiddenSections by viewModel.hiddenSections.collectAsStateWithLifecycle()
     val progressStyle by viewModel.progressStyle.collectAsStateWithLifecycle()
+    val completionCountMode by viewModel.completionCountMode.collectAsStateWithLifecycle()
     val swipePrefs by viewModel.swipePrefs.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -68,9 +69,11 @@ fun LayoutScreen(
 
             DashboardSection(
                 progressStyle = progressStyle,
+                completionCountMode = completionCountMode,
                 sectionOrder = sectionOrder,
                 hiddenSections = hiddenSections,
                 onProgressStyleChange = viewModel::setProgressStyle,
+                onCompletionCountModeChange = viewModel::setCompletionCountMode,
                 onHiddenSectionsChange = viewModel::setHiddenSections,
                 onSectionOrderChange = viewModel::setSectionOrder,
                 onResetDashboardDefaults = viewModel::resetDashboardDefaults

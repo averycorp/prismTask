@@ -309,6 +309,9 @@ class SelfCareRepositoryConflictTest {
         override fun getLogForDate(routineType: String, date: Long): Flow<SelfCareLogEntity?> =
             flowOf(logs.firstOrNull { it.routineType == routineType && it.date == date })
 
+        override fun getLogsForDate(date: Long): Flow<List<SelfCareLogEntity>> =
+            flowOf(logs.filter { it.date == date })
+
         override suspend fun getLogForDateOnce(routineType: String, date: Long): SelfCareLogEntity? =
             logs.firstOrNull { it.routineType == routineType && it.date == date }
 

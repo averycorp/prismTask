@@ -13,6 +13,7 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
+import com.averycorp.prismtask.data.preferences.CompletionCountMode
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.MorningCheckInPreferences
@@ -893,13 +894,82 @@ constructor(
             habits.isEmpty() || habits.all { it.isCompletedToday }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    // Combined progress (tasks + habits)
-    val combinedTotal: StateFlow<Int> = combine(totalTodayCount, completedTodayCount, todayHabits) { taskTotal, taskDone, habits ->
-        taskTotal + taskDone + habits.size
+    // Self-care routine counts for the Today progress header.
+    //
+    // Self-care logs are written with `date = DayBoundary.startOfCurrentDay(hour)`
+    // (see SelfCareRepository.getTodayLog) so we re-key the same value when
+    // pulling all-routine logs for today. Visibility honors the same three
+    // toggles that govern the habit-list rendering (self-care → morning +
+    // bedtime, medication → medication, housework → housework).
+    private val selfCareLogsToday: StateFlow<List<com.averycorp.prismtask.data.local.entity.SelfCareLogEntity>> = dayStart
+        .flatMapLatest { start -> selfCareRepository.getLogsForDate(start) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val enabledSelfCareRoutineTypes: StateFlow<Set<String>> = combine(
+        selfCareEnabled,
+        medicationEnabled,
+        houseworkEnabled
+    ) { selfCareOn, medOn, houseworkOn ->
+        buildSet {
+            if (selfCareOn) {
+                add("morning")
+                add("bedtime")
+            }
+            if (medOn) add("medication")
+            if (houseworkOn) add("housework")
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val selfCareCompletedCount: StateFlow<Int> = combine(
+        selfCareLogsToday,
+        enabledSelfCareRoutineTypes
+    ) { logs, enabled ->
+        logs.count { it.isComplete && it.routineType in enabled }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val combinedCompleted: StateFlow<Int> = combine(completedTodayCount, habitCompletedCount) { taskDone, habitDone ->
-        taskDone + habitDone
+    val selfCareTotalCount: StateFlow<Int> = enabledSelfCareRoutineTypes
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // What the user chose to count toward "X done" at the top of Today.
+    private val completionCountMode: StateFlow<CompletionCountMode> = dashboardPreferences
+        .getCompletionCountMode()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            DashboardPreferences.DEFAULT_COMPLETION_COUNT_MODE
+        )
+
+    // Combined progress, gated by [completionCountMode].
+    //
+    // `totalTodayCount` is the count of *not-yet-completed* tasks today
+    // (see allTodayItems), so the all-day denominator is "total + done".
+    val combinedTotal: StateFlow<Int> = combine(
+        totalTodayCount,
+        completedTodayCount,
+        habitTotalCount,
+        selfCareTotalCount,
+        completionCountMode
+    ) { taskTotal, taskDone, habitTotal, selfCareTotal, mode ->
+        val taskAll = taskTotal + taskDone
+        when (mode) {
+            CompletionCountMode.TASKS_ONLY -> taskAll
+            CompletionCountMode.TASKS_AND_HABITS -> taskAll + habitTotal
+            CompletionCountMode.TASKS_HABITS_AND_SELFCARE -> taskAll + habitTotal + selfCareTotal
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val combinedCompleted: StateFlow<Int> = combine(
+        completedTodayCount,
+        habitCompletedCount,
+        selfCareCompletedCount,
+        completionCountMode
+    ) { taskDone, habitDone, selfCareDone, mode ->
+        when (mode) {
+            CompletionCountMode.TASKS_ONLY -> taskDone
+            CompletionCountMode.TASKS_AND_HABITS -> taskDone + habitDone
+            CompletionCountMode.TASKS_HABITS_AND_SELFCARE -> taskDone + habitDone + selfCareDone
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val combinedProgress: StateFlow<Float> = combine(combinedTotal, combinedCompleted) { total, completed ->

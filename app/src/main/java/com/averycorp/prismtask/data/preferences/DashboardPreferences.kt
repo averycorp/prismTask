@@ -26,6 +26,7 @@ constructor(
         private val HIDDEN_SECTIONS = stringSetPreferencesKey("hidden_sections")
         private val PROGRESS_STYLE = stringPreferencesKey("progress_style")
         private val COLLAPSED_SECTIONS = stringSetPreferencesKey("collapsed_sections")
+        private val COMPLETION_COUNT_MODE = stringPreferencesKey("completion_count_mode")
 
         val DEFAULT_ORDER = listOf(
             "progress",
@@ -41,6 +42,8 @@ constructor(
         val DEFAULT_COLLAPSED = setOf("planned", "completed")
 
         val DEFAULT_HIDDEN = emptySet<String>()
+
+        val DEFAULT_COMPLETION_COUNT_MODE = CompletionCountMode.TASKS_AND_HABITS
     }
 
     fun getSectionOrder(): Flow<List<String>> = context.dashboardDataStore.data.map { prefs ->
@@ -61,6 +64,16 @@ constructor(
 
     fun getCollapsedSections(): Flow<Set<String>> = context.dashboardDataStore.data.map { prefs ->
         prefs[COLLAPSED_SECTIONS] ?: DEFAULT_COLLAPSED
+    }
+
+    fun getCompletionCountMode(): Flow<CompletionCountMode> = context.dashboardDataStore.data.map { prefs ->
+        CompletionCountMode.fromName(prefs[COMPLETION_COUNT_MODE])
+    }
+
+    suspend fun setCompletionCountMode(mode: CompletionCountMode) {
+        context.dashboardDataStore.edit { prefs ->
+            prefs[COMPLETION_COUNT_MODE] = mode.name
+        }
     }
 
     suspend fun setSectionCollapsed(sectionKey: String, collapsed: Boolean) {
@@ -94,6 +107,27 @@ constructor(
             prefs.remove(HIDDEN_SECTIONS)
             prefs.remove(PROGRESS_STYLE)
             prefs.remove(COLLAPSED_SECTIONS)
+            prefs.remove(COMPLETION_COUNT_MODE)
         }
+    }
+}
+
+/**
+ * Controls what counts toward the "X done" number shown in the Today screen
+ * progress header.
+ *
+ * - [TASKS_ONLY]: only completed tasks contribute.
+ * - [TASKS_AND_HABITS]: completed tasks + completed habits (legacy default).
+ * - [TASKS_HABITS_AND_SELFCARE]: tasks + habits + completed self-care routines
+ *   (morning / bedtime / housework / medication).
+ */
+enum class CompletionCountMode {
+    TASKS_ONLY,
+    TASKS_AND_HABITS,
+    TASKS_HABITS_AND_SELFCARE;
+
+    companion object {
+        fun fromName(name: String?): CompletionCountMode = entries.firstOrNull { it.name == name }
+            ?: TASKS_AND_HABITS
     }
 }

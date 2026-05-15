@@ -204,6 +204,9 @@ constructor(
             selfCareDao.getLogForDate(routineType, DayBoundary.startOfCurrentDay(hour))
         }
 
+    fun getLogsForDate(date: Long): Flow<List<SelfCareLogEntity>> =
+        selfCareDao.getLogsForDate(date)
+
     fun getLogsForRoutine(routineType: String): Flow<List<SelfCareLogEntity>> =
         selfCareDao.getLogsForRoutine(routineType)
 
