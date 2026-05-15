@@ -16,6 +16,7 @@ import { useCourseStore } from '@/stores/courseStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useNdPreferencesStore } from '@/stores/ndPreferencesStore';
 import { useA11yStore } from '@/stores/a11yStore';
+import { useSelfCareStore } from '@/stores/selfCareStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -75,6 +76,9 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToTheme = useThemeStore((s) => s.subscribeToFirestore);
   const subscribeToNdPrefs = useNdPreferencesStore((s) => s.subscribeToPrefs);
   const subscribeToA11y = useA11yStore((s) => s.subscribeToFirestore);
+  const subscribeToSelfCareLogs = useSelfCareStore((s) => s.subscribeToLogs);
+  const subscribeToSelfCareSteps = useSelfCareStore((s) => s.subscribeToSteps);
+  const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
@@ -95,6 +99,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetRisks();
       resetAnchors();
       resetNdPrefs();
+      resetSelfCare();
       return;
     }
 
@@ -134,6 +139,8 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToTheme, 'theme-preferences');
     safeSubscribe(subscribeToNdPrefs, 'nd-preferences');
     safeSubscribe(subscribeToA11y, 'a11y-preferences');
+    safeSubscribe(subscribeToSelfCareLogs, 'self-care-logs');
+    safeSubscribe(subscribeToSelfCareSteps, 'self-care-steps');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -165,6 +172,9 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToTheme,
     subscribeToNdPrefs,
     subscribeToA11y,
+    subscribeToSelfCareLogs,
+    subscribeToSelfCareSteps,
+    resetSelfCare,
     resetSlots,
     resetPrefs,
     resetDependencies,

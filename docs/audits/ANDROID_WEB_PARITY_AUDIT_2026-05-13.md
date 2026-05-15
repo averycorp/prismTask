@@ -255,7 +255,8 @@ All formalized in `docs/divergences/web-vs-android.md` or covered by prior audit
 - **Keyboard shortcuts modal + Install PWA prompt** (web-only).
 - **Battery-optimization onboarding prompt** (Android-only).
 - **`batch_undo_log`** (per-device by design on both).
-- **`sync_metadata`, `usage_logs`, `calendar_sync`, `medication_log_events`, `self_care_logs/steps`** (local-only / external-provider / audit-log / deprecated).
+- **`sync_metadata`, `usage_logs`, `calendar_sync`, `medication_log_events`** (local-only / external-provider / audit-log / deprecated).
+- ~~`self_care_logs/steps`~~ — divergence override (PR follow-up to #1437): web now subscribes to the Firestore mirror Android already pushes, with a read-first Self-Care screen + LWW per-step toggle. Bidirectional check-off for non-medication routines ships in the same PR; medication's per-block `MedStepLog` shape stays Android-only until a follow-up.
 - **`IndexedDB`/migrations model** (per A.6/A.7 above + divergence doc).
 - **35+ Android-specific advanced settings** (escalation chains, custom sounds, voice prefs, shake-to-X, debug-tier, Brain Mode picker on Android UI).
 
