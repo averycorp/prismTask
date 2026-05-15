@@ -11,7 +11,7 @@
  * the test will time out or React will throw the depth error.
  */
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { useSettingsStore } from '@/stores/settingsStore';
