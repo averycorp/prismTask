@@ -46,6 +46,7 @@ fun TimerSection(
     timerCustomSeconds: Int,
     pomodoroAvailableMinutes: Int,
     pomodoroFocusPreference: String,
+    keepScreenOn: Boolean,
     buzzUntilDismissed: Boolean,
     overrideVolume: Boolean,
     alarmVolumePercent: Int,
@@ -63,6 +64,7 @@ fun TimerSection(
     onTimerCustomMinutesChange: (Int) -> Unit,
     onPomodoroAvailableMinutesChange: (Int) -> Unit,
     onPomodoroFocusPreferenceChange: (String) -> Unit,
+    onKeepScreenOnChange: (Boolean) -> Unit,
     onBuzzUntilDismissedChange: (Boolean) -> Unit,
     onOverrideVolumeChange: (Boolean) -> Unit,
     onAlarmVolumePercentChange: (Int) -> Unit,
@@ -250,6 +252,12 @@ fun TimerSection(
             onClick = { showRingDurationDialog = true }
         )
     }
+    SettingsToggleRow(
+        title = "Keep Screen On",
+        subtitle = "Prevent the screen from turning off while the timer is running.",
+        checked = keepScreenOn,
+        onCheckedChange = onKeepScreenOnChange
+    )
     SettingsToggleRow(
         title = "Vibrate When Timer Ends",
         subtitle = "Vibrate the device when a focus session or break ends.",

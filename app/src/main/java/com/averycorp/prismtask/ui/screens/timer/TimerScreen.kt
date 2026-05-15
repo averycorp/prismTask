@@ -43,12 +43,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -93,6 +95,11 @@ fun TimerScreen(
         }
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val view = LocalView.current
+    DisposableEffect(uiState.isRunning, uiState.keepScreenOn) {
+        view.keepScreenOn = uiState.isRunning && uiState.keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
     val colors = LocalPrismColors.current
     val prismTheme = LocalPrismTheme.current
     val displayFont = LocalPrismFonts.current.display

@@ -34,7 +34,8 @@ data class TimerUiState(
     val isLongBreak: Boolean = false,
     val autoStartBreaks: Boolean = false,
     val autoStartWork: Boolean = false,
-    val customDurationSeconds: Int = TimerPreferences.DEFAULT_CUSTOM_SECONDS
+    val customDurationSeconds: Int = TimerPreferences.DEFAULT_CUSTOM_SECONDS,
+    val keepScreenOn: Boolean = false
 )
 
 @HiltViewModel
@@ -118,6 +119,11 @@ constructor(
         viewModelScope.launch {
             timerPreferences.getAutoStartWork().collect { auto ->
                 _uiState.value = _uiState.value.copy(autoStartWork = auto)
+            }
+        }
+        viewModelScope.launch {
+            timerPreferences.getKeepScreenOn().collect { keep ->
+                _uiState.value = _uiState.value.copy(keepScreenOn = keep)
             }
         }
 
