@@ -23,6 +23,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -126,6 +127,35 @@ class TaskListViewModelTest {
         advanceUntilIdle()
         // isLoading transitions to false after the first emission of root tasks.
         assertFalse(vm.isLoading.value)
+    }
+
+    /**
+     * Regression — Crashlytics NPE on Tasks-tab cold open.
+     *
+     * The bug: `observeAiUrgencyScores()` was invoked from the first init
+     * block before `allRootTasks` and `_currentSort` were initialized.
+     * Production `viewModelScope` runs on `Main.immediate`, so the launched
+     * coroutine ran synchronously and `combine(...)` saw nulls →
+     * `CombineKt.combineInternal` NPE on `Flow.collect`.
+     *
+     * `StandardTestDispatcher` (lazy) hid the bug because launches don't run
+     * until `advanceUntilIdle`. `UnconfinedTestDispatcher` mirrors
+     * `Main.immediate`'s eager-dispatch behaviour and reproduces the crash
+     * deterministically.
+     */
+    @Test
+    fun viewModel_constructsWithoutNpe_underEagerDispatch() {
+        val eager = UnconfinedTestDispatcher()
+        Dispatchers.resetMain()
+        Dispatchers.setMain(eager)
+        try {
+            // Smoke: construction itself must not throw under eager dispatch.
+            val vm = newViewModel()
+            assertEquals(SortOption.DUE_DATE, vm.currentSort.value)
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(dispatcher)
+        }
     }
 
     @Test

@@ -182,7 +182,9 @@ constructor(
                 Log.e("TaskListVM", "Failed to load urgency weights", e)
             }
         }
-        observeAiUrgencyScores()
+        // observeAiUrgencyScores() must run AFTER allRootTasks, _currentSort,
+        // and subtasksMap are initialized — see the trailing init block at the
+        // end of this class.
     }
 
     /**
@@ -1045,5 +1047,16 @@ constructor(
         return order
             .filter { it in grouped }
             .associateWith { sortTasks(grouped.getValue(it), sort) }
+    }
+
+    // Trailing init block: combines `allRootTasks` (line ~241) and
+    // `_currentSort` (line ~299), neither of which exists yet when the
+    // earlier init block runs. Under `Main.immediate` (production
+    // viewModelScope), the launched coroutine starts synchronously and
+    // dereferences both fields before their initializers fire — NPE inside
+    // CombineKt.combineInternal. Placing this last guarantees every
+    // referenced field is initialized first.
+    init {
+        observeAiUrgencyScores()
     }
 }
