@@ -31,6 +31,7 @@ import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
 import { PlanForTodaySheet } from '@/features/today/PlanForTodaySheet';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useDashboardStore } from '@/stores/dashboardStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 
@@ -80,6 +81,12 @@ export function TodayScreen() {
 
   const settingsShowBriefing = useSettingsStore((s) => s.showBriefingCard);
   const settingsStartOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  // Cross-device dashboard order + per-section visibility (parity C.1f).
+  // The Settings → Dashboard subsection writes here; the Firestore
+  // listener wired in `useFirestoreSync` keeps it in sync with
+  // Android's `DashboardPreferences` DataStore.
+  const dashboardSectionOrder = useDashboardStore((s) => s.sectionOrder);
+  const dashboardHiddenSections = useDashboardStore((s) => s.hiddenSections);
   // Derive a bundle so the reference is stable across renders and
   // callers can read the logical "today" ISO without recomputing.
   const settingsStartOfDayTodayIso = useLogicalToday(settingsStartOfDayHour);
@@ -358,200 +365,127 @@ export function TodayScreen() {
         </button>
       )}
 
-      {/* Progress Header */}
-      <div className="mb-6 flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3">
-        {/* Progress ring */}
-        <div className="relative h-12 w-12 shrink-0">
-          <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48">
-            <circle
-              cx="24"
-              cy="24"
-              r="20"
-              fill="none"
-              stroke="var(--color-bg-secondary)"
-              strokeWidth="4"
-            />
-            <circle
-              cx="24"
-              cy="24"
-              r="20"
-              fill="none"
-              stroke="var(--color-accent)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={`${(progressPct / 100) * 125.6} 125.6`}
-              className="transition-all duration-500"
-            />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[var(--color-text-primary)]">
-            {progressPct}%
-          </span>
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-[var(--color-text-primary)]">
-            {completedToday} of {totalToday} completed today
-            {habitProgress.total > 0 && (
-              <span className="text-[var(--color-text-secondary)]">
-                {' '}({completedTasksToday} tasks, {habitProgress.completed} habits)
-              </span>
-            )}
-          </p>
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-secondary)]">
-            <div
-              className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
-        {summary && (
-          <div className="hidden gap-4 text-center sm:flex">
-            <div>
-              <p className="text-lg font-bold text-red-500">
-                {summary.overdue_tasks}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Overdue
-              </p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-[var(--color-accent)]">
-                {summary.today_tasks}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Today
-              </p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-[var(--color-text-primary)]">
-                {summary.upcoming_tasks}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Upcoming
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Dashboard sections render in user-configured order (parity
+          C.1f). Hidden sections drop out entirely. Always-on cards
+          above (mood/balance/check-in/etc.) are non-dashboard
+          surfaces and stay above the reorderable list. */}
+      {dashboardSectionOrder.map((sectionKey) => {
+        if (dashboardHiddenSections.includes(sectionKey)) return null;
+        switch (sectionKey) {
+          case 'progress':
+            return (
+              <ProgressSection
+                key={sectionKey}
+                progressPct={progressPct}
+                completedToday={completedToday}
+                totalToday={totalToday}
+                completedTasksToday={completedTasksToday}
+                habitProgress={habitProgress}
+                summary={summary}
+              />
+            );
+          case 'daily_essentials':
+            return <DailyEssentialsSection key={sectionKey} />;
+          case 'habits':
+            return (
+              <HabitChipsSection
+                key={sectionKey}
+                habits={habits}
+                isTodayCompleted={isTodayCompleted}
+                getTodayCount={getTodayCount}
+                toggleCompletion={toggleCompletion}
+                todayIso={settingsStartOfDayTodayIso}
+                navigate={navigate}
+              />
+            );
+          case 'overdue':
+            return activeOverdue.length > 0 ? (
+              <TaskSection
+                key={sectionKey}
+                title="Overdue"
+                count={activeOverdue.length}
+                accentColor="#ef4444"
+                collapsed={!!collapsed['overdue']}
+                onToggle={() => toggleSection('overdue')}
+              >
+                {activeOverdue
+                  .sort(
+                    (a, b) => (b.urgency_score ?? 0) - (a.urgency_score ?? 0),
+                  )
+                  .map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onComplete={handleComplete}
+                      onUncomplete={handleUncomplete}
+                      onClick={handleTaskClick}
+                      onReschedule={handleReschedule}
+                      showProject
+                      projectName={projectMap.get(task.project_id)?.title}
+                      projectColor={undefined}
+                      blockedByCount={unmetBlockerCount(task.id)}
+                      onBlockerChipClick={handleTaskClick}
+                    />
+                  ))}
+              </TaskSection>
+            ) : null;
+          case 'today_tasks':
+            return activeToday.length > 0 ? (
+              <TaskSection
+                key={sectionKey}
+                title="Today"
+                count={activeToday.length}
+                accentColor="var(--color-accent)"
+                collapsed={!!collapsed['today']}
+                onToggle={() => toggleSection('today')}
+              >
+                {activeToday
+                  .sort(
+                    (a, b) =>
+                      a.priority - b.priority ||
+                      (b.urgency_score ?? 0) - (a.urgency_score ?? 0),
+                  )
+                  .map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onComplete={handleComplete}
+                      onUncomplete={handleUncomplete}
+                      onClick={handleTaskClick}
+                      onReschedule={handleReschedule}
+                      showProject
+                      projectName={projectMap.get(task.project_id)?.title}
+                      projectColor={undefined}
+                      blockedByCount={unmetBlockerCount(task.id)}
+                      onBlockerChipClick={handleTaskClick}
+                    />
+                  ))}
+              </TaskSection>
+            ) : null;
+          case 'plan_more':
+            return (
+              <PlanMoreSection
+                key={sectionKey}
+                onClick={() => setPlanSheetOpen(true)}
+              />
+            );
+          case 'completed':
+            // Web doesn't currently expose a Completed-today list on
+            // Today (the done count lives in the progress header).
+            // Hidden by default; the key still round-trips so Android
+            // can show it without overwriting web state.
+            return null;
+          default:
+            return null;
+        }
+      })}
 
-      {/* Plan For Today */}
-      <div className="mb-4">
-        <button
-          onClick={() => setPlanSheetOpen(true)}
-          className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 text-left transition-colors hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-bg-secondary)]"
-          aria-label="Open plan for today sheet"
-        >
-          <Pin className="h-5 w-5 shrink-0 text-[var(--color-accent)]" aria-hidden="true" />
-          <span className="flex-1">
-            <span className="block text-sm font-semibold text-[var(--color-text-primary)]">
-              Plan For Today
-            </span>
-            <span className="block text-xs text-[var(--color-text-secondary)]">
-              Pull undone tasks into today's plan in one batch.
-            </span>
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden="true" />
-        </button>
-      </div>
-
-      {/* Habit Chips */}
-      {habits.length > 0 && (
-        <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-[var(--color-accent)]" />
-              <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                Today's Habits
-              </span>
-            </div>
-            <button
-              onClick={() => navigate('/habits')}
-              className="text-xs text-[var(--color-accent)] hover:underline"
-            >
-              View All
-            </button>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {habits
-              .filter((h) => h.is_active)
-              .map((habit) => {
-                const completed = isTodayCompleted(habit.id);
-                const habitColor = habit.color || 'var(--color-accent)';
-                const count = getTodayCount(habit.id);
-                return (
-                  <button
-                    key={habit.id}
-                    onClick={async () => {
-                      try {
-                        await toggleCompletion(
-                          habit.id,
-                          settingsStartOfDayTodayIso,
-                        );
-                      } catch {
-                        toast.error('Failed to update habit');
-                      }
-                    }}
-                    className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                      completed
-                        ? 'border-transparent text-white'
-                        : 'border-[var(--color-border)] text-[var(--color-text-primary)] hover:border-[var(--color-accent)]/50'
-                    }`}
-                    style={
-                      completed
-                        ? { backgroundColor: habitColor }
-                        : undefined
-                    }
-                  >
-                    <span>{habit.icon || '🎯'}</span>
-                    <span className="max-w-[100px] truncate">
-                      {habit.name}
-                    </span>
-                    {habit.target_count > 1 && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                          completed
-                            ? 'bg-white/20'
-                            : 'bg-[var(--color-bg-secondary)]'
-                        }`}
-                      >
-                        {count}/{habit.target_count}
-                      </span>
-                    )}
-                    {completed && habit.target_count <= 1 && (
-                      <svg
-                        className="h-3 w-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* Weekly Habit Summary Banner */}
+      {/* Weekly Habit Summary Banner — non-dashboard, always shown */}
       <WeeklyHabitSummary />
 
-      {/* Daily Essentials — medication time slots */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-          Medications
-        </h3>
-        <MedicationSlotList />
-      </section>
-
-      {/* "Show Blocked Tasks" toggle (parity B.12). Only renders when
-          there's something to reveal — keeps the chrome quiet on days
-          when nothing is blocked. */}
+      {/* "Show Blocked Tasks" toggle (parity B.12). Non-dashboard; only
+          renders when there's something to reveal — keeps the chrome
+          quiet on days when nothing is blocked. */}
       {(hiddenBlockedCount > 0 || showBlocked) && (
         <div className="mb-3 flex items-center justify-end">
           <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--color-text-secondary)]">
@@ -584,69 +518,7 @@ export function TodayScreen() {
         </div>
       )}
 
-      {/* Overdue Section */}
-      {activeOverdue.length > 0 && (
-        <TaskSection
-          title="Overdue"
-          count={activeOverdue.length}
-          accentColor="#ef4444"
-          collapsed={!!collapsed['overdue']}
-          onToggle={() => toggleSection('overdue')}
-        >
-          {activeOverdue
-            .sort((a, b) => (b.urgency_score ?? 0) - (a.urgency_score ?? 0))
-            .map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                onComplete={handleComplete}
-                onUncomplete={handleUncomplete}
-                onClick={handleTaskClick}
-                onReschedule={handleReschedule}
-                showProject
-                projectName={projectMap.get(task.project_id)?.title}
-                projectColor={undefined}
-                blockedByCount={unmetBlockerCount(task.id)}
-                onBlockerChipClick={handleTaskClick}
-              />
-            ))}
-        </TaskSection>
-      )}
-
-      {/* Today Section */}
-      {activeToday.length > 0 && (
-        <TaskSection
-          title="Today"
-          count={activeToday.length}
-          accentColor="var(--color-accent)"
-          collapsed={!!collapsed['today']}
-          onToggle={() => toggleSection('today')}
-        >
-          {activeToday
-            .sort(
-              (a, b) =>
-                a.priority - b.priority ||
-                (b.urgency_score ?? 0) - (a.urgency_score ?? 0),
-            )
-            .map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                onComplete={handleComplete}
-                onUncomplete={handleUncomplete}
-                onClick={handleTaskClick}
-                onReschedule={handleReschedule}
-                showProject
-                projectName={projectMap.get(task.project_id)?.title}
-                projectColor={undefined}
-                blockedByCount={unmetBlockerCount(task.id)}
-                onBlockerChipClick={handleTaskClick}
-              />
-            ))}
-        </TaskSection>
-      )}
-
-      {/* Upcoming Section */}
+      {/* Upcoming Section — non-dashboard (no Android counterpart key) */}
       {activeUpcoming.length > 0 && (
         <TaskSection
           title="Upcoming"
@@ -781,6 +653,241 @@ function WeeklyHabitSummary() {
       >
         View Details
       </button>
+    </div>
+  );
+}
+
+/**
+ * Progress card — top dashboard slot. Mirrors the original inline JSX
+ * 1:1; extracted only so it can be ordered/hidden by the dashboard
+ * preferences (parity C.1f).
+ */
+function ProgressSection({
+  progressPct,
+  completedToday,
+  totalToday,
+  completedTasksToday,
+  habitProgress,
+  summary,
+}: {
+  progressPct: number;
+  completedToday: number;
+  totalToday: number;
+  completedTasksToday: number;
+  habitProgress: { completed: number; total: number };
+  summary: DashboardSummary | null;
+}) {
+  return (
+    <div className="mb-6 flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3">
+      <div className="relative h-12 w-12 shrink-0">
+        <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48">
+          <circle
+            cx="24"
+            cy="24"
+            r="20"
+            fill="none"
+            stroke="var(--color-bg-secondary)"
+            strokeWidth="4"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r="20"
+            fill="none"
+            stroke="var(--color-accent)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${(progressPct / 100) * 125.6} 125.6`}
+            className="transition-all duration-500"
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[var(--color-text-primary)]">
+          {progressPct}%
+        </span>
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          {completedToday} of {totalToday} completed today
+          {habitProgress.total > 0 && (
+            <span className="text-[var(--color-text-secondary)]">
+              {' '}({completedTasksToday} tasks, {habitProgress.completed} habits)
+            </span>
+          )}
+        </p>
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-secondary)]">
+          <div
+            className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-500"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
+      {summary && (
+        <div className="hidden gap-4 text-center sm:flex">
+          <div>
+            <p className="text-lg font-bold text-red-500">
+              {summary.overdue_tasks}
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">Overdue</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-[var(--color-accent)]">
+              {summary.today_tasks}
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">Today</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-[var(--color-text-primary)]">
+              {summary.upcoming_tasks}
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Upcoming
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Plan-more card — opens the PlanForTodaySheet. Extracted from the
+ * inline JSX so the dashboard ordering switch can place it
+ * arbitrarily.
+ */
+function PlanMoreSection({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="mb-4">
+      <button
+        onClick={onClick}
+        className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 text-left transition-colors hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-bg-secondary)]"
+        aria-label="Open plan for today sheet"
+      >
+        <Pin
+          className="h-5 w-5 shrink-0 text-[var(--color-accent)]"
+          aria-hidden="true"
+        />
+        <span className="flex-1">
+          <span className="block text-sm font-semibold text-[var(--color-text-primary)]">
+            Plan For Today
+          </span>
+          <span className="block text-xs text-[var(--color-text-secondary)]">
+            Pull undone tasks into today's plan in one batch.
+          </span>
+        </span>
+        <ChevronRight
+          className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]"
+          aria-hidden="true"
+        />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Daily Essentials slot — currently just the medication slot list.
+ * Extracted for dashboard-order parity.
+ */
+function DailyEssentialsSection() {
+  return (
+    <section className="mb-4 flex flex-col gap-2">
+      <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+        Medications
+      </h3>
+      <MedicationSlotList />
+    </section>
+  );
+}
+
+/**
+ * Habit chip row. Extracted from the inline JSX with no behavior
+ * change; the dashboard-order map decides where it renders.
+ */
+function HabitChipsSection({
+  habits,
+  isTodayCompleted,
+  getTodayCount,
+  toggleCompletion,
+  todayIso,
+  navigate,
+}: {
+  habits: ReturnType<typeof useHabitStore.getState>['habits'];
+  isTodayCompleted: (id: string) => boolean;
+  getTodayCount: (id: string) => number;
+  toggleCompletion: (id: string, dateIso: string) => Promise<void>;
+  todayIso: string;
+  navigate: (path: string) => void;
+}) {
+  if (habits.length === 0) return null;
+  return (
+    <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-[var(--color-accent)]" />
+          <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+            Today's Habits
+          </span>
+        </div>
+        <button
+          onClick={() => navigate('/habits')}
+          className="text-xs text-[var(--color-accent)] hover:underline"
+        >
+          View All
+        </button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {habits
+          .filter((h) => h.is_active)
+          .map((habit) => {
+            const completed = isTodayCompleted(habit.id);
+            const habitColor = habit.color || 'var(--color-accent)';
+            const count = getTodayCount(habit.id);
+            return (
+              <button
+                key={habit.id}
+                onClick={async () => {
+                  try {
+                    await toggleCompletion(habit.id, todayIso);
+                  } catch {
+                    toast.error('Failed to update habit');
+                  }
+                }}
+                className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                  completed
+                    ? 'border-transparent text-white'
+                    : 'border-[var(--color-border)] text-[var(--color-text-primary)] hover:border-[var(--color-accent)]/50'
+                }`}
+                style={completed ? { backgroundColor: habitColor } : undefined}
+              >
+                <span>{habit.icon || '🎯'}</span>
+                <span className="max-w-[100px] truncate">{habit.name}</span>
+                {habit.target_count > 1 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                      completed ? 'bg-white/20' : 'bg-[var(--color-bg-secondary)]'
+                    }`}
+                  >
+                    {count}/{habit.target_count}
+                  </span>
+                )}
+                {completed && habit.target_count <= 1 && (
+                  <svg
+                    className="h-3 w-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+      </div>
     </div>
   );
 }
