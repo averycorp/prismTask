@@ -966,10 +966,8 @@ function Footer() {
               { label: 'Themes',    href: '#themes' },
               { label: 'Pricing',   href: '#pricing' },
               { label: 'Widgets',   href: '#features' },
-              { label: 'Changelog', href: 'https://github.com/averycorp/prismTask/blob/main/CHANGELOG.md', external: true },
             ]},
             { title: 'Company', links: [
-              { label: 'About',   href: 'https://github.com/averycorp/prismTask', external: true },
               { label: 'Contact', href: 'mailto:support@prismtask.app' },
               { label: 'Press',   href: 'mailto:support@prismtask.app?subject=PrismTask%20press%20inquiry' },
             ]},
