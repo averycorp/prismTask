@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Coffee, Loader2, Sparkles, Target, X } from 'lucide-react';
+import { BatteryLow, Coffee, Loader2, Sparkles, Target, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { aiApi } from '@/api/ai';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +10,7 @@ import type {
   PomodoroCoachingTrigger,
   PomodoroCoachingTask,
 } from '@/types/pomodoroCoaching';
+import type { PomodoroSessionConfig } from '@/utils/energyAwarePomodoro';
 
 type PhaseLabel = 'idle' | 'planning' | 'empty' | 'work' | 'break' | 'done';
 
@@ -40,6 +41,16 @@ export interface PomodoroCoachPanelProps {
   sessionDurationMinutes?: number;
   /** Past tips to avoid repeating during break_activity. */
   recentSuggestions?: string[];
+  /**
+   * Optional ND-friendly energy-aware session suggestion. When provided
+   * and the work length differs from the defaults, surfaces a small
+   * banner before the session so the user can apply it (or ignore).
+   * Mirrors Android's EnergyAwarePomodoro nudge. The `onApply` callback
+   * receives the resolved work / break minutes so the caller can update
+   * the session config in one place.
+   */
+  energySuggestion?: PomodoroSessionConfig | null;
+  onApplyEnergySuggestion?: (config: PomodoroSessionConfig) => void;
 }
 
 /**
@@ -123,13 +134,53 @@ export function PomodoroCoachPanel(props: PomodoroCoachPanelProps) {
     }
   }, [isPro, buildRequest, setShowUpgrade]);
 
-  if (!trigger || dismissed) return null;
+  // Energy-aware suggestion banner. Surfaces only on pre_session phases
+  // (idle / planning) and only when the suggested work length disagrees
+  // with the current session length — otherwise it would just nag.
+  const energy = props.energySuggestion;
+  const showEnergyBanner =
+    !!energy &&
+    (trigger === 'pre_session' || props.phase === 'idle' || props.phase === 'planning') &&
+    energy.workMinutes !== props.sessionLengthMinutes;
+  const energyBanner = showEnergyBanner && energy ? (
+    <div
+      className="my-3 flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm"
+      role="status"
+    >
+      <BatteryLow
+        className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          Energy-aware suggestion: {energy.workMinutes}m focus /{' '}
+          {energy.breakMinutes}m break
+        </p>
+        <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+          {energy.rationale}
+        </p>
+      </div>
+      {props.onApplyEnergySuggestion && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => props.onApplyEnergySuggestion?.(energy)}
+        >
+          Apply
+        </Button>
+      )}
+    </div>
+  ) : null;
+
+  if (!trigger || dismissed) return energyBanner;
 
   const heading = HEADINGS[trigger];
   const Icon = heading.icon;
 
   return (
-    <div className="my-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+    <>
+      {energyBanner}
+      <div className="my-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
       <div className="flex items-start gap-3">
         <Icon
           className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-accent)]"
@@ -185,6 +236,7 @@ export function PomodoroCoachPanel(props: PomodoroCoachPanelProps) {
         featureName="Pomodoro+ Coaching"
         featureDescription="AI prompts before sessions, break-activity suggestions, and session recaps tailored to what you worked on."
       />
-    </div>
+      </div>
+    </>
   );
 }
