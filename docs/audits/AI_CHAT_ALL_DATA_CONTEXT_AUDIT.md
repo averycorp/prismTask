@@ -82,7 +82,7 @@ No changes to:
 
 ## Phase 3 — Bundle summary
 
-(Filled in once PR opens.)
+**PR:** [#1448](https://github.com/averycorp/prismTask/pull/1448) — `feat/chat-all-data-context`.
 
 **Intent:** Make the AI Coach grounded in the user's full task ladder (today + upcoming + backlog + recently done), each habit's streak shape, every active project's velocity, this week's leisure totals, and this week's medication adherence — instead of only the today-slice that landed in PR #1442.
 
@@ -107,7 +107,7 @@ No changes to:
 The set of Android-only data gaps documented in `docs/audits/AI_CHAT_CURRENT_STATE_AUDIT.md` Phase 4 — active Pomodoro state, mood/energy logs, check-ins, boundary rule violations — remains unaddressed by this PR. The handoff block in that earlier audit is still the right starting point for that follow-up.
 
 ```
-Background: PR #<INSERT-PR-NUMBER> shipped the all-server-data expansion for AI
+Background: PR #1448 shipped the all-server-data expansion for AI
 Coach context — the chat now sees upcoming tasks (next 14d), backlog, recently
 completed, per-habit streaks + 7-day rates, per-project progress, active goals,
 7-day leisure totals, and 7-day medication adherence. See
@@ -131,11 +131,17 @@ sits at ~1500–1800 after this PR — aim to stay under 2500 combined).
 Don't change _CHAT_SYSTEM_PROMPT_BASE text. Append, don't rewrite.
 ```
 
-## Verification (filled in post-implementation)
+## Verification
 
 ```
-$ pytest tests/test_ai_chat_context.py tests/test_ai_chat.py \
-         tests/test_ai_chat_stream.py tests/test_chat_persistence.py \
-         tests/test_ai_memory.py
-<results>
+$ pytest tests/test_ai_chat_context.py
+21 passed in 7.18s  (11 prior + 10 new)
+
+$ pytest tests/test_ai_chat.py tests/test_ai_chat_stream.py \
+         tests/test_chat_persistence.py tests/test_ai_memory.py \
+         tests/test_ai_chat_context.py
+94 passed in 30.47s  (forgiveness-first canaries + chat handlers + persistence + memory)
+
+$ pytest tests/ -k "ai_"
+186 passed in 44.79s  (no AI-suite regressions)
 ```
