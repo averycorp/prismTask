@@ -99,9 +99,54 @@ function Nav() {
 }
 
 // ── Hero ───────────────────────────────────────────────────────────────
+// Waitlist relay: every signup POSTs here. formsubmit.co emails each submission
+// to the address baked into the URL and also keeps a per-address dashboard, so
+// the list accumulates automatically with no backend / no Formspree account.
+const WAITLIST_ENDPOINT = 'https://formsubmit.co/ajax/averykarlin3@gmail.com';
+
 function Hero() {
   const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState('idle'); // idle | sending | submitted | error
+  const submitted = status === 'submitted';
+
+  async function handleWaitlistSubmit(e) {
+    e.preventDefault();
+    if (!email || status === 'sending' || submitted) return;
+    setStatus('sending');
+
+    // Local backup so the entry survives a network failure and the user can
+    // see their own signup if they come back.
+    try {
+      const key = 'prismtask_waitlist_local';
+      const prior = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!prior.includes(email)) {
+        prior.push(email);
+        localStorage.setItem(key, JSON.stringify(prior));
+      }
+    } catch (_) { /* private mode / quota — non-fatal */ }
+
+    try {
+      const res = await fetch(WAITLIST_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          email,
+          _subject: 'PrismTask waitlist signup',
+          _template: 'table',
+          source: 'docs.homepage',
+          ts: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) throw new Error('relay-' + res.status);
+      setStatus('submitted');
+    } catch (_) {
+      // Don't show a hard error — the email is already in localStorage and we
+      // can fall back to a mailto so the user can still tell us. Treat as
+      // submitted to honor the user's intent, but flag the error state so the
+      // button copy can soften.
+      setStatus('error');
+    }
+  }
 
   return (
     <section id="top" style={{ paddingTop: 96, paddingBottom: 80, overflow: 'hidden', position: 'relative' }}>
@@ -138,16 +183,17 @@ function Hero() {
             maxWidth: 640,
             letterSpacing: -0.2,
           }}>
-            Tasks, habits, focus timer, medication tracking — and four hand-crafted themes
-            so the app you live in actually feels like yours. Built for the days that go
-            to plan and the days that don't.
+            A mental-health-first task manager. Tasks, habits, focus timer, medication
+            tracking, and mood check-ins — designed so productivity supports your
+            wellbeing instead of grinding against it. Built for the days that go to
+            plan and the days that don't.
           </p>
         </Reveal>
 
         <Reveal delay={240}>
           <form
             id="waitlist"
-            onSubmit={e => { e.preventDefault(); if (email) setSubmitted(true); }}
+            onSubmit={handleWaitlistSubmit}
             style={{
               marginTop: 36, display: 'flex', gap: 8, flexWrap: 'wrap',
               maxWidth: 460,
@@ -157,7 +203,8 @@ function Hero() {
               type="email" required
               value={email} onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
-              disabled={submitted}
+              disabled={submitted || status === 'sending'}
+              autoComplete="email"
               style={{
                 flex: 1, minWidth: 240,
                 padding: '14px 18px', borderRadius: 999,
@@ -169,14 +216,19 @@ function Hero() {
                 transition: 'border-color 0.2s',
               }}
             />
-            <button type="submit" disabled={submitted} style={{
+            <button type="submit" disabled={submitted || status === 'sending'} style={{
               padding: '14px 24px', borderRadius: 999,
-              background: submitted ? '#0AA371' : '#0F0F12',
+              background: submitted ? '#0AA371' : status === 'error' ? '#B45309' : '#0F0F12',
               color: '#fff', border: 'none',
               fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 500,
-              cursor: submitted ? 'default' : 'pointer',
+              cursor: submitted ? 'default' : status === 'sending' ? 'progress' : 'pointer',
               transition: 'all 0.2s',
-            }}>{submitted ? '✓ You\u2019re on the list' : 'Join the waitlist'}</button>
+            }}>{
+              status === 'submitted' ? '✓ You\u2019re on the list'
+              : status === 'sending'  ? 'Adding you\u2026'
+              : status === 'error'    ? 'Saved \u2014 try again to confirm'
+              : 'Join the waitlist'
+            }</button>
           </form>
           <p style={{
             marginTop: 12, fontFamily: 'Space Grotesk, sans-serif',
@@ -501,7 +553,7 @@ function Pricing() {
           <SectionHeader
             eyebrow="Pricing"
             title={<>Fair. <em style={{ fontStyle: 'italic', color: '#5B47E0' }}>Honest.</em> Mostly free.</>}
-            subtitle="The core experience is free forever. Pro unlocks sync, AI, and analytics — for the price of a coffee, once a month."
+            subtitle="The core experience is free forever — because mental-health tools shouldn't sit behind a paywall. Pro unlocks sync, AI, and analytics for the people who want more. No dark patterns, cancel any time."
           />
         </Reveal>
         <div style={{
@@ -522,9 +574,9 @@ function Pricing() {
           <Reveal delay={120}>
             <PriceCard
               name="Pro"
-              price="$3.99"
+              price="$7.99"
               priceSuffix="/mo"
-              tagline="Or $29 / year — save 40%"
+              tagline="Or $59.99 / year — save 37% · 7-day free trial"
               features={pro}
               cta="Start 7-day trial"
               ctaStyle="solid"
@@ -613,7 +665,7 @@ function PriceCard({ name, price, priceSuffix, tagline, features, cta, ctaStyle,
   );
 }
 
-// ── Privacy / open-source ─────────────────────────────────────────────
+// ── Privacy ───────────────────────────────────────────────────────────
 function Privacy() {
   return (
     <section style={{ padding: '120px 0', background: '#fff' }}>
@@ -627,7 +679,7 @@ function Privacy() {
                 fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, fontWeight: 600,
                 color: '#5B47E0', letterSpacing: 1.4, textTransform: 'uppercase',
                 marginBottom: 18,
-              }}>Privacy & open source</div>
+              }}>Privacy & dignity</div>
               <h3 style={{
                 fontFamily: 'Fraunces, serif',
                 fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 500,
@@ -639,21 +691,22 @@ function Privacy() {
                 marginTop: 18, fontFamily: 'Space Grotesk, sans-serif',
                 fontSize: 16, lineHeight: 1.55, color: '#3D3D45',
               }}>
-                PrismTask is open source under AGPL-3.0. Everything runs locally first.
-                Cloud sync is optional — and if you don't trust ours, host the backend yourself.
-                No tracking, no ads, no behavioral profiling.
+                Mood, medication, and check-in data is the most sensitive thing on
+                your phone. Everything runs locally first. Cloud sync is optional and
+                encrypted in transit. No tracking, no ads, no behavioral profiling — and
+                a one-tap export so your history is always yours to take with you.
               </p>
             </div>
             <div style={{
               flex: '1 1 320px', display: 'grid', gridTemplateColumns: '1fr 1fr',
               gap: 16,
             }}>
-              <PrivacyCard k="Open source" v="AGPL-3.0"/>
               <PrivacyCard k="Tracking" v="None"/>
               <PrivacyCard k="Ads" v="None"/>
               <PrivacyCard k="Default storage" v="Local"/>
-              <PrivacyCard k="Self-hostable" v="Yes"/>
+              <PrivacyCard k="Sensitive data" v="Encrypted"/>
               <PrivacyCard k="Data export" v="JSON / CSV"/>
+              <PrivacyCard k="Account delete" v="One tap"/>
             </div>
           </div>
         </Reveal>
@@ -683,14 +736,14 @@ function PrivacyCard({ k, v }) {
 // ── FAQ ────────────────────────────────────────────────────────────────
 function FAQ() {
   const items = [
-    { q: 'Is it really free?', a: 'Yes. The full task manager, habit tracker, focus timer, all 4 themes, and 14 widgets are free forever. Pro adds sync, AI, and analytics for $3.99/month.' },
+    { q: 'Is it really free?', a: 'Yes. The full task manager, habit tracker, focus timer, all 4 themes, mood check-ins, and 14 widgets are free forever — because mental-health tools shouldn\u2019t sit behind a paywall. Pro adds sync, AI, and analytics for $7.99/month or $59.99/year (a 37% saving), with a 7-day free trial.' },
     { q: 'What platforms are supported?', a: 'Android (Android 8.0+) and a web app available now. iOS is in development.' },
     { q: 'Does it work offline?', a: 'Yes — everything works offline by default. Sync is opt-in and runs in the background when you have a connection.' },
-    { q: 'How does sync work?', a: 'We use end-to-end Firebase sync between your devices. You can also self-host the FastAPI backend if you prefer.' },
-    { q: 'Is my data private?', a: 'PrismTask doesn\u2019t track you, doesn\u2019t show ads, and doesn\u2019t profile your behavior. Local-first storage by default; cloud sync is opt-in and encrypted in transit.' },
+    { q: 'How does sync work?', a: 'End-to-end Firebase sync between your devices, encrypted in transit. Sync is opt-in — you can stay fully local if you prefer.' },
+    { q: 'Is my data private?', a: 'PrismTask doesn\u2019t track you, doesn\u2019t show ads, and doesn\u2019t profile your behavior. Local-first storage by default; cloud sync is opt-in and encrypted in transit. Mood, medication, and check-in data is treated as the most sensitive thing on your phone — because it is.' },
     { q: 'What makes it ADHD-friendly?', a: 'Forgiveness-first streaks, energy-aware Pomodoro, Brain Mode for low-friction capture, shake-to-report, configurable Boundaries to prevent overload, and a Weekly Review that you can skip without consequence.' },
     { q: 'How do themes work?', a: 'Pick one of four — Void, Cyberpunk, Synthwave, or Matrix — in Settings. Each is a complete visual system: fonts, color, motion, shape, and atmosphere. Switch any time.' },
-    { q: 'Is the source available?', a: 'Yes — the Android app and backend are both open source under AGPL-3.0 on GitHub.' },
+    { q: 'Is this a real mental-health tool?', a: 'PrismTask is built mental-health-first — but it isn\u2019t a replacement for therapy or medical care. It\u2019s a daily-living tool: mood and energy check-ins, medication tracking, gentle streaks, and overload protection, designed alongside neurodivergent and chronically-ill users. If you\u2019re in crisis, please reach out to a clinician or a local crisis line.' },
   ];
   const [open, setOpen] = useState(null);
   return (
@@ -773,11 +826,11 @@ function FinalCTA() {
           Get the app that finally <em style={{ fontStyle: 'italic', color: '#C8B8FF' }}>gets it.</em>
         </h2>
         <p style={{
-          marginTop: 24, maxWidth: 540, marginLeft: 'auto', marginRight: 'auto',
+          marginTop: 24, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto',
           fontFamily: 'Space Grotesk, sans-serif', fontSize: 18, lineHeight: 1.5,
           color: 'rgba(255,255,255,0.65)',
         }}>
-          Join the waitlist. We'll let you know the moment PrismTask is ready — no spam, no marketing emails, just one note.
+          Join the waitlist. We're building PrismTask carefully because mental health deserves better than another productivity app. One quiet note when it ships — no spam, no growth hacks, no follow-ups.
         </p>
         <a href="#waitlist" style={{
           display: 'inline-block', marginTop: 36,
@@ -812,13 +865,13 @@ function Footer() {
               color: '#fff', letterSpacing: -0.4, marginBottom: 12,
             }}>PrismTask</div>
             <p style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>
-              An adaptive task manager for real brains.
+              A mental-health-first task manager for real brains.
             </p>
           </div>
           {[
             { title: 'Product', links: ['Features', 'Themes', 'Pricing', 'Widgets', 'Changelog'] },
             { title: 'Company', links: ['About', 'Contact', 'Press'] },
-            { title: 'Resources', links: ['Privacy policy', 'Terms', 'Open source', 'GitHub'] },
+            { title: 'Resources', links: ['Privacy policy', 'Terms', 'Accessibility', 'Support'] },
           ].map(col => (
             <div key={col.title}>
               <div style={{
@@ -842,7 +895,7 @@ function Footer() {
           flexWrap: 'wrap', gap: 12,
           fontSize: 12, color: 'rgba(255,255,255,0.4)',
         }}>
-          <span>© 2026 Avery Corp · AGPL-3.0</span>
+          <span>© 2026 Avery Corp · All rights reserved</span>
           <span>Made with care for the brains that need it.</span>
         </div>
       </div>
