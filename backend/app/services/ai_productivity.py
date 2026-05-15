@@ -1266,11 +1266,14 @@ def _format_current_state_block(current_state: dict | None) -> str:
     """Render the user's current state into a compact prompt section.
 
     ``current_state`` arrives from ``context.load_user_context_bundle``
-    with today's task buckets, habit progress, active projects, leisure
-    totals, and medication adherence. Rendered as a Markdown-flavored
-    block the model can pattern-match on. Empty buckets render as a
-    single ``(none)`` line so the AI never has to guess whether a zero
-    means "no data" vs "not loaded".
+    with the user's full open task ladder (overdue + today + planned +
+    upcoming + backlog), recently completed work, each active habit's
+    today/streak/last-7-day shape, active projects with progress,
+    active goals, today + 7-day leisure totals, and today + 7-day
+    medication adherence. Rendered as a Markdown-flavored block the
+    model can pattern-match on. Empty buckets render as a single
+    ``(none)`` line so the AI never has to guess whether a zero means
+    "no data" vs "no items".
     """
     if not current_state:
         return ""
@@ -1278,13 +1281,27 @@ def _format_current_state_block(current_state: dict | None) -> str:
     tasks = current_state.get("tasks") or {}
     habits = current_state.get("habits") or {}
     projects = current_state.get("projects") or {}
-    leisure = current_state.get("leisure_today") or {}
-    meds = current_state.get("medications_today") or {}
+    goals = current_state.get("goals") or {}
+    leisure = current_state.get("leisure") or {
+        "today": current_state.get("leisure_today") or {},
+        "last_7_days": {},
+    }
+    meds = current_state.get("medications") or {
+        "today": current_state.get("medications_today") or {},
+        "last_7_days": {},
+        "active_count": 0,
+        "active": [],
+    }
 
     def _task_line(entry: dict) -> str:
         bits = [entry.get("title", "")]
         if entry.get("days_overdue"):
             bits.append(f"({entry['days_overdue']}d overdue)")
+        elif entry.get("days_until_due") is not None:
+            d = int(entry["days_until_due"])
+            bits.append(f"(in {d}d)" if d != 1 else "(in 1d)")
+        elif entry.get("completed_on"):
+            bits.append(f"(done {entry['completed_on']})")
         pid = entry.get("id")
         if pid is not None:
             bits.append(f"#{pid}")
@@ -1326,8 +1343,29 @@ def _format_current_state_block(current_state: dict | None) -> str:
             list(tasks.get("planned_today") or []),
         )
     )
+    lines.extend(
+        _render_bucket(
+            "Upcoming (next 14d)",
+            int(tasks.get("upcoming_count", 0) or 0),
+            list(tasks.get("upcoming") or []),
+        )
+    )
+    lines.extend(
+        _render_bucket(
+            "Backlog (no date)",
+            int(tasks.get("backlog_count", 0) or 0),
+            list(tasks.get("backlog") or []),
+        )
+    )
     lines.append(
         f"- Completed today: {int(tasks.get('completed_today_count', 0) or 0)}"
+    )
+    lines.extend(
+        _render_bucket(
+            "Recently completed (last 7d)",
+            int(tasks.get("recently_completed_count", 0) or 0),
+            list(tasks.get("recently_completed") or []),
+        )
     )
 
     active = int(habits.get("active_count", 0) or 0)
@@ -1338,9 +1376,17 @@ def _format_current_state_block(current_state: dict | None) -> str:
         for h in today_habits:
             check = "✓" if (h.get("count", 0) or 0) >= (h.get("target", 1) or 1) else " "
             cat = f" [{h['category']}]" if h.get("category") else ""
+            extras: list[str] = []
+            streak = int(h.get("streak", 0) or 0)
+            if streak > 0:
+                extras.append(f"{streak}d streak")
+            last7 = h.get("last7_count")
+            if last7 is not None:
+                extras.append(f"{int(last7)}/7 last week")
+            extras_str = f" — {', '.join(extras)}" if extras else ""
             lines.append(
                 f"  - [{check}] {h.get('name', '')}: "
-                f"{h.get('count', 0)}/{h.get('target', 1)}{cat}"
+                f"{h.get('count', 0)}/{h.get('target', 1)}{cat}{extras_str}"
             )
     elif active == 0:
         lines.append("  - (no active habits)")
@@ -1348,24 +1394,92 @@ def _format_current_state_block(current_state: dict | None) -> str:
     active_projects = int(projects.get("active_count", 0) or 0)
     lines.append(f"Active projects: {active_projects}")
     for p in (projects.get("active") or []):
-        lines.append(f"  - {p.get('title', '')} #{p.get('id', '')}")
+        bits = [p.get("title", "")]
+        pid = p.get("id")
+        if pid is not None:
+            bits.append(f"#{pid}")
+        progress = p.get("progress_pct")
+        done_tasks = int(p.get("done_tasks", 0) or 0)
+        total_tasks = int(p.get("total_tasks", 0) or 0)
+        if total_tasks > 0:
+            if progress is not None:
+                bits.append(f"({done_tasks}/{total_tasks}, {int(progress)}%)")
+            else:
+                bits.append(f"({done_tasks}/{total_tasks})")
+        if p.get("days_until_due") is not None:
+            d = int(p["days_until_due"])
+            if d < 0:
+                bits.append(f"(due {-d}d ago)")
+            elif d == 0:
+                bits.append("(due today)")
+            else:
+                bits.append(f"(due in {d}d)")
+        lines.append("  - " + " ".join(b for b in bits if b))
 
-    total_min = int(leisure.get("total_minutes", 0) or 0)
-    by_cat = leisure.get("by_category") or {}
-    if total_min == 0:
+    active_goals = int(goals.get("active_count", 0) or 0)
+    if active_goals > 0:
+        lines.append(f"Active goals: {active_goals}")
+        for g in (goals.get("active") or []):
+            bits = [g.get("title", "")]
+            gid = g.get("id")
+            if gid is not None:
+                bits.append(f"#{gid}")
+            if g.get("days_until_target") is not None:
+                d = int(g["days_until_target"])
+                if d < 0:
+                    bits.append(f"(target {-d}d ago)")
+                elif d == 0:
+                    bits.append("(target today)")
+                else:
+                    bits.append(f"(target in {d}d)")
+            lines.append("  - " + " ".join(b for b in bits if b))
+
+    leisure_today = leisure.get("today") or {}
+    leisure_recent = leisure.get("last_7_days") or {}
+    today_min = int(leisure_today.get("total_minutes", 0) or 0)
+    today_cats = leisure_today.get("by_category") or {}
+    if today_min == 0:
         lines.append("Leisure today: 0 min")
     else:
-        cats = ", ".join(f"{k} {v}m" for k, v in by_cat.items())
-        lines.append(f"Leisure today: {total_min} min ({cats})")
+        cats = ", ".join(f"{k} {v}m" for k, v in today_cats.items())
+        lines.append(f"Leisure today: {today_min} min ({cats})")
+    recent_min = int(leisure_recent.get("total_minutes", 0) or 0)
+    recent_cats = leisure_recent.get("by_category") or {}
+    if recent_min > 0 or recent_cats:
+        cats = ", ".join(f"{k} {v}m" for k, v in recent_cats.items())
+        suffix = f" ({cats})" if cats else ""
+        lines.append(f"Leisure last 7d: {recent_min} min{suffix}")
 
-    slots_taken = int(meds.get("slots_taken", 0) or 0)
-    slots_logged = int(meds.get("slots_logged", 0) or 0)
+    meds_today = meds.get("today") or {}
+    meds_recent = meds.get("last_7_days") or {}
+    slots_taken = int(meds_today.get("slots_taken", 0) or 0)
+    slots_logged = int(meds_today.get("slots_logged", 0) or 0)
     if slots_logged == 0:
         lines.append("Medications today: (no slots logged)")
     else:
         lines.append(
             f"Medications today: {slots_taken}/{slots_logged} slots taken"
         )
+    recent_logged = int(meds_recent.get("slots_logged", 0) or 0)
+    recent_taken = int(meds_recent.get("slots_taken", 0) or 0)
+    if recent_logged > 0:
+        pct = meds_recent.get("adherence_pct")
+        pct_str = f" ({int(pct)}%)" if pct is not None else ""
+        lines.append(
+            f"Medications last 7d: {recent_taken}/{recent_logged} slots taken{pct_str}"
+        )
+    active_meds = list(meds.get("active") or [])
+    active_meds_count = int(meds.get("active_count", 0) or 0)
+    if active_meds_count > 0:
+        lines.append(f"Active medications: {active_meds_count}")
+        for m in active_meds:
+            bits = [m.get("name", "")]
+            if m.get("dosage"):
+                bits.append(f"({m['dosage']})")
+            mid = m.get("id")
+            if mid is not None:
+                bits.append(f"#{mid}")
+            lines.append("  - " + " ".join(b for b in bits if b))
 
     return "\n".join(lines)
 
