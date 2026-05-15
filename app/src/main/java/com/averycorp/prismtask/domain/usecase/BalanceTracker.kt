@@ -64,12 +64,35 @@ data class BalanceConfig(
 }
 
 /**
+ * One habit completion's contribution to balance ratios. The [lifeCategory]
+ * is pre-resolved by the caller (either via an explicit habit-side field or
+ * by running [LifeCategoryClassifier] on the habit's name / category) so
+ * the tracker stays free of habit-entity coupling.
+ */
+data class HabitContribution(
+    val completedAt: Long,
+    val lifeCategory: LifeCategory
+)
+
+/**
+ * One leisure session's contribution to balance ratios. Leisure mode is
+ * orthogonal to [LifeCategory]; every logged session counts toward
+ * [LifeCategory.SELF_CARE] because leisure time *is* the user's restorative
+ * self-care signal in the work/play/relax model.
+ */
+data class LeisureContribution(
+    val loggedAt: Long
+)
+
+/**
  * Pure-function balance computations used by the Today screen balance bar,
  * weekly report, and burnout scorer.
  *
- * The tracker intentionally takes a list of [TaskEntity] and a "now" long so it
- * is trivial to unit-test deterministically. Repositories wire it up with
- * `Flow<List<TaskEntity>>` combine operators.
+ * The tracker takes tasks plus optional habit and leisure contributions so
+ * the balance bar reflects every activity the user logs, not just tasks.
+ * A habit completion counts as one unit in its resolved [LifeCategory]; a
+ * leisure session counts as one unit in [LifeCategory.SELF_CARE]. Callers
+ * that have not yet wired habits or leisure just leave the lists empty.
  *
  * Window cutoffs respect the user-configured Start-of-Day so that the balance
  * bar's "this week" matches the Today-screen task filter, habit streaks, and
@@ -78,21 +101,23 @@ data class BalanceConfig(
  * to the SoD preference fall back to system midnight (`dayStartHour = 0`).
  */
 class BalanceTracker {
-    /** Compute a [BalanceState] from a pool of tasks. */
+    /** Compute a [BalanceState] from tasks, habit completions, and leisure sessions. */
     fun compute(
         allTasks: List<TaskEntity>,
         config: BalanceConfig,
         now: Long = System.currentTimeMillis(),
         timeZone: TimeZone = TimeZone.getDefault(),
         dayStartHour: Int = 0,
-        dayStartMinute: Int = 0
+        dayStartMinute: Int = 0,
+        habitContributions: List<HabitContribution> = emptyList(),
+        leisureContributions: List<LeisureContribution> = emptyList()
     ): BalanceState {
         val weekCutoff = cutoff(now, days = 7, timeZone, dayStartHour, dayStartMinute)
         val monthCutoff = cutoff(now, days = 28, timeZone, dayStartHour, dayStartMinute)
 
-        val current = computeRatios(allTasks, weekCutoff)
-        val rolling = computeRatios(allTasks, monthCutoff)
-        val total = countTracked(allTasks, weekCutoff)
+        val current = computeRatios(allTasks, habitContributions, leisureContributions, weekCutoff)
+        val rolling = computeRatios(allTasks, habitContributions, leisureContributions, monthCutoff)
+        val total = countTracked(allTasks, habitContributions, leisureContributions, weekCutoff)
 
         val workRatio = current[LifeCategory.WORK] ?: 0f
         val overloaded = total > 0 && workRatio > (config.workTarget + config.overloadThreshold)
@@ -115,6 +140,8 @@ class BalanceTracker {
 
     private fun computeRatios(
         tasks: List<TaskEntity>,
+        habitContributions: List<HabitContribution>,
+        leisureContributions: List<LeisureContribution>,
         cutoff: Long
     ): Map<LifeCategory, Float> {
         val counts = LifeCategory.TRACKED.associateWith { 0 }.toMutableMap()
@@ -127,17 +154,42 @@ class BalanceTracker {
             counts[cat] = (counts[cat] ?: 0) + 1
             total++
         }
+        for (h in habitContributions) {
+            if (h.completedAt < cutoff) continue
+            if (h.lifeCategory == LifeCategory.UNCATEGORIZED) continue
+            counts[h.lifeCategory] = (counts[h.lifeCategory] ?: 0) + 1
+            total++
+        }
+        for (l in leisureContributions) {
+            if (l.loggedAt < cutoff) continue
+            counts[LifeCategory.SELF_CARE] = (counts[LifeCategory.SELF_CARE] ?: 0) + 1
+            total++
+        }
         if (total == 0) return LifeCategory.TRACKED.associateWith { 0f }
         return counts.mapValues { (_, count) -> count.toFloat() / total.toFloat() }
     }
 
-    private fun countTracked(tasks: List<TaskEntity>, cutoff: Long): Int {
+    private fun countTracked(
+        tasks: List<TaskEntity>,
+        habitContributions: List<HabitContribution>,
+        leisureContributions: List<LeisureContribution>,
+        cutoff: Long
+    ): Int {
         var total = 0
         for (t in tasks) {
             val ts = timestampFor(t)
             if (ts < cutoff) continue
             val cat = LifeCategory.fromStorage(t.lifeCategory)
             if (cat == LifeCategory.UNCATEGORIZED) continue
+            total++
+        }
+        for (h in habitContributions) {
+            if (h.completedAt < cutoff) continue
+            if (h.lifeCategory == LifeCategory.UNCATEGORIZED) continue
+            total++
+        }
+        for (l in leisureContributions) {
+            if (l.loggedAt < cutoff) continue
             total++
         }
         return total

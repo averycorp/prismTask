@@ -17,6 +17,7 @@ import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.CognitiveLoad
+import com.averycorp.prismtask.domain.usecase.BalanceContributionsProvider
 import com.averycorp.prismtask.domain.usecase.CognitiveLoadBalanceConfig
 import com.averycorp.prismtask.domain.usecase.CognitiveLoadBalanceTracker
 import dagger.assisted.Assisted
@@ -55,7 +56,8 @@ constructor(
     private val taskRepository: TaskRepository,
     private val notificationPreferences: NotificationPreferences,
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
-    private val notificationPauseGate: NotificationPauseGate
+    private val notificationPauseGate: NotificationPauseGate,
+    private val balanceContributionsProvider: BalanceContributionsProvider
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!notificationPreferences.overloadAlertsEnabled.first()) return Result.success()
@@ -64,11 +66,14 @@ constructor(
 
         val tasks = taskRepository.getAllTasksOnce()
         val sod = taskBehaviorPreferences.getStartOfDay().first()
+        val contributions = balanceContributionsProvider.snapshot()
         val balance = CognitiveLoadBalanceTracker().compute(
-            tasks,
-            CognitiveLoadBalanceConfig(),
+            allTasks = tasks,
+            config = CognitiveLoadBalanceConfig(),
             dayStartHour = sod.hour,
-            dayStartMinute = sod.minute
+            dayStartMinute = sod.minute,
+            habitCompletionTimestamps = contributions.habitTimestamps,
+            leisureSessionTimestamps = contributions.leisureTimestamps
         )
 
         if (balance.totalTracked == 0) return Result.success()

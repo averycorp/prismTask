@@ -96,7 +96,8 @@ class SmartPomodoroViewModelTest {
         moodEnergyRepository,
         timerPreferences,
         aiCoach,
-        taskTimingRepository
+        taskTimingRepository,
+        io.mockk.mockk(relaxed = true)
     )
 
     @Test

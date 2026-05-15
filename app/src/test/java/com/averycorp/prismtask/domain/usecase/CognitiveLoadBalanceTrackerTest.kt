@@ -118,4 +118,46 @@ class CognitiveLoadBalanceTrackerTest {
     fun `config isValid false when sum is wrong`() {
         assertEquals(false, CognitiveLoadBalanceConfig(0.5f, 0.5f, 0.5f).isValid())
     }
+
+    @Test
+    fun `habit completions count toward EASY load`() {
+        // One HARD task + three habits → 25% HARD, 75% EASY.
+        val tasks = listOf(task(1, CognitiveLoad.HARD))
+        val state = tracker.compute(
+            allTasks = tasks,
+            now = now,
+            timeZone = utc,
+            habitCompletionTimestamps = listOf(now - oneDay, now - oneDay, now - oneDay)
+        )
+        assertEquals(4, state.totalTracked)
+        assertEquals(0.25f, state.currentRatios[CognitiveLoad.HARD]!!, 0.001f)
+        assertEquals(0.75f, state.currentRatios[CognitiveLoad.EASY]!!, 0.001f)
+        assertEquals(CognitiveLoad.EASY, state.dominantLoad)
+    }
+
+    @Test
+    fun `leisure sessions count toward EASY load`() {
+        val tasks = listOf(task(1, CognitiveLoad.HARD))
+        val state = tracker.compute(
+            allTasks = tasks,
+            now = now,
+            timeZone = utc,
+            leisureSessionTimestamps = listOf(now - oneDay, now - oneDay)
+        )
+        assertEquals(3, state.totalTracked)
+        assertEquals(0.333f, state.currentRatios[CognitiveLoad.HARD]!!, 0.01f)
+        assertEquals(0.667f, state.currentRatios[CognitiveLoad.EASY]!!, 0.01f)
+    }
+
+    @Test
+    fun `habit and leisure timestamps outside the window are excluded`() {
+        val state = tracker.compute(
+            allTasks = emptyList(),
+            now = now,
+            timeZone = utc,
+            habitCompletionTimestamps = listOf(now - 30 * oneDay),
+            leisureSessionTimestamps = listOf(now - 30 * oneDay)
+        )
+        assertEquals(0, state.totalTracked)
+    }
 }

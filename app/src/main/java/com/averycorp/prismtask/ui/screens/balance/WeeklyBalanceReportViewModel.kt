@@ -7,6 +7,7 @@ import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.usecase.BalanceConfig
+import com.averycorp.prismtask.domain.usecase.BalanceContributionsProvider
 import com.averycorp.prismtask.domain.usecase.BalanceState
 import com.averycorp.prismtask.domain.usecase.BalanceTracker
 import com.averycorp.prismtask.domain.usecase.BurnoutBand
@@ -39,7 +40,8 @@ class WeeklyBalanceReportViewModel
 constructor(
     private val taskRepository: TaskRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val balanceContributionsProvider: BalanceContributionsProvider
 ) : ViewModel() {
     private val aggregator = WeeklyReviewAggregator()
     private val balanceTracker = BalanceTracker()
@@ -59,6 +61,7 @@ constructor(
                 val prefs = userPreferencesDataStore.workLifeBalanceFlow.first()
                 val sod = taskBehaviorPreferences.getStartOfDay().first()
                 val tasks = taskRepository.getAllTasksOnce()
+                val contributions = balanceContributionsProvider.snapshot(now = reference)
                 val stats = aggregator.aggregate(tasks, reference)
                 val config = BalanceConfig(
                     workTarget = prefs.workTarget / 100f,
@@ -68,25 +71,32 @@ constructor(
                     overloadThreshold = prefs.overloadThresholdPct / 100f
                 )
                 val balance = balanceTracker.compute(
-                    tasks,
-                    config,
+                    allTasks = tasks,
+                    config = config,
                     now = reference,
                     dayStartHour = sod.hour,
-                    dayStartMinute = sod.minute
+                    dayStartMinute = sod.minute,
+                    habitContributions = contributions.habits,
+                    leisureContributions = contributions.leisure
                 )
                 val cognitiveLoadBalance = cognitiveLoadBalanceTracker.compute(
-                    tasks,
-                    CognitiveLoadBalanceConfig(),
+                    allTasks = tasks,
+                    config = CognitiveLoadBalanceConfig(),
                     now = reference,
                     dayStartHour = sod.hour,
-                    dayStartMinute = sod.minute
+                    dayStartMinute = sod.minute,
+                    habitCompletionTimestamps = contributions.habitTimestamps,
+                    leisureSessionTimestamps = contributions.leisureTimestamps
                 )
                 val workRatio = balance.currentRatios[LifeCategory.WORK] ?: 0f
                 val burnout = burnoutScorer.computeFromTasks(
-                    tasks,
-                    workRatio,
-                    prefs.workTarget / 100f,
-                    now = reference
+                    tasks = tasks,
+                    workRatio = workRatio,
+                    workTarget = prefs.workTarget / 100f,
+                    now = reference,
+                    habitStreakBreaks = contributions.habitStreakBreaks,
+                    selfCareHabitCompletionsRecent = contributions.selfCareHabitCompletionsRecent,
+                    leisureMinutesRecent = contributions.leisureMinutesRecent
                 )
 
                 // v1.4.0 V3 phase 3: 4-week rolling trend per tracked

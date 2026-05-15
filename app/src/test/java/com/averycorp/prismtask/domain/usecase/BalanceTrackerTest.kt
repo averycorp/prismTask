@@ -197,4 +197,103 @@ class BalanceTrackerTest {
         )
         assertFalse(config.isValid())
     }
+
+    @Test
+    fun `habit completions in window contribute to their resolved category`() {
+        // Two work tasks + two SELF_CARE habit completions → 50% SELF_CARE.
+        val tasks = listOf(
+            task(1, LifeCategory.WORK),
+            task(2, LifeCategory.WORK)
+        )
+        val habits = listOf(
+            HabitContribution(now - oneDay, LifeCategory.SELF_CARE),
+            HabitContribution(now - 2 * oneDay, LifeCategory.SELF_CARE)
+        )
+        val state = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            habitContributions = habits
+        )
+        assertEquals(4, state.totalTracked)
+        assertEquals(0.5f, state.currentRatios[LifeCategory.WORK]!!, 0.001f)
+        assertEquals(0.5f, state.currentRatios[LifeCategory.SELF_CARE]!!, 0.001f)
+    }
+
+    @Test
+    fun `leisure sessions count toward SELF_CARE`() {
+        val tasks = listOf(task(1, LifeCategory.WORK))
+        val leisure = listOf(
+            LeisureContribution(now - oneDay),
+            LeisureContribution(now - 2 * oneDay),
+            LeisureContribution(now - 3 * oneDay)
+        )
+        val state = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            leisureContributions = leisure
+        )
+        assertEquals(4, state.totalTracked)
+        assertEquals(0.25f, state.currentRatios[LifeCategory.WORK]!!, 0.001f)
+        assertEquals(0.75f, state.currentRatios[LifeCategory.SELF_CARE]!!, 0.001f)
+        assertEquals(LifeCategory.SELF_CARE, state.dominantCategory)
+    }
+
+    @Test
+    fun `habit completions outside the window are excluded`() {
+        val habits = listOf(
+            HabitContribution(now - 2 * oneDay, LifeCategory.SELF_CARE),
+            HabitContribution(now - 30 * oneDay, LifeCategory.SELF_CARE)
+        )
+        val state = tracker.compute(
+            allTasks = emptyList(),
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            habitContributions = habits
+        )
+        assertEquals(1, state.totalTracked)
+        assertEquals(1f, state.currentRatios[LifeCategory.SELF_CARE]!!, 0.001f)
+    }
+
+    @Test
+    fun `uncategorized habits are excluded from ratios`() {
+        val habits = listOf(
+            HabitContribution(now - oneDay, LifeCategory.UNCATEGORIZED),
+            HabitContribution(now - oneDay, LifeCategory.HEALTH)
+        )
+        val state = tracker.compute(
+            allTasks = emptyList(),
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            habitContributions = habits
+        )
+        assertEquals(1, state.totalTracked)
+        assertEquals(1f, state.currentRatios[LifeCategory.HEALTH]!!, 0.001f)
+    }
+
+    @Test
+    fun `habit and leisure activity can shift work ratio below overload`() {
+        // 8 work tasks alone would push work to 80% → overloaded.
+        val tasks = (1..8).map { task(it.toLong(), LifeCategory.WORK) }
+        val noContrib = tracker.compute(tasks, BalanceConfig(), now, utc)
+        assertTrue(noContrib.isOverloaded)
+        // Adding 8 leisure sessions + 4 self-care habits dilutes work to 8/20 = 40%.
+        val habits = (1..4).map { HabitContribution(now - oneDay, LifeCategory.SELF_CARE) }
+        val leisure = (1..8).map { LeisureContribution(now - oneDay) }
+        val balanced = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            habitContributions = habits,
+            leisureContributions = leisure
+        )
+        assertFalse(balanced.isOverloaded)
+        assertEquals(0.4f, balanced.currentRatios[LifeCategory.WORK]!!, 0.001f)
+    }
 }

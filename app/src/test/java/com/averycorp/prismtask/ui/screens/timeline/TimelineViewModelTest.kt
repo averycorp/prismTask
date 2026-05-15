@@ -87,7 +87,8 @@ class TimelineViewModelTest {
         sortPreferences,
         aiTimeBlockUseCase,
         proFeatureGate,
-        taskBehaviorPreferences
+        taskBehaviorPreferences,
+        io.mockk.mockk(relaxed = true)
     )
 
     @Test

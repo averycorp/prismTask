@@ -20,6 +20,7 @@ import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.RestDayRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.BalanceConfig
+import com.averycorp.prismtask.domain.usecase.BalanceContributionsProvider
 import com.averycorp.prismtask.domain.usecase.BalanceTracker
 import com.averycorp.prismtask.domain.usecase.RecentMoodSignal
 import dagger.assisted.Assisted
@@ -53,7 +54,8 @@ constructor(
     private val notificationPauseGate: NotificationPauseGate,
     private val recentMoodSignal: RecentMoodSignal,
     private val restDayRepository: RestDayRepository,
-    private val diagnosticLogger: DiagnosticLogger
+    private val diagnosticLogger: DiagnosticLogger,
+    private val balanceContributionsProvider: BalanceContributionsProvider
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!notificationPreferences.overloadAlertsEnabled.first()) return Result.success()
@@ -85,11 +87,14 @@ constructor(
             overloadThreshold = prefs.overloadThresholdPct / 100f
         )
         val sod = taskBehaviorPreferences.getStartOfDay().first()
+        val contributions = balanceContributionsProvider.snapshot()
         val balance = BalanceTracker().compute(
-            tasks,
-            config,
+            allTasks = tasks,
+            config = config,
             dayStartHour = sod.hour,
-            dayStartMinute = sod.minute
+            dayStartMinute = sod.minute,
+            habitContributions = contributions.habits,
+            leisureContributions = contributions.leisure
         )
 
         if (!balance.isOverloaded || balance.totalTracked == 0) {

@@ -18,6 +18,8 @@ import com.averycorp.prismtask.data.repository.MoodEnergyRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.usecase.BalanceConfig
+import com.averycorp.prismtask.domain.usecase.BalanceContributions
+import com.averycorp.prismtask.domain.usecase.BalanceContributionsProvider
 import com.averycorp.prismtask.domain.usecase.BalanceState
 import com.averycorp.prismtask.domain.usecase.BalanceTracker
 import com.averycorp.prismtask.domain.usecase.BurnoutResult
@@ -68,11 +70,16 @@ constructor(
     private val calendarManager: CalendarManager,
     private val calendarEventRepository: CalendarEventRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val balanceContributionsProvider: BalanceContributionsProvider
 ) : ViewModel() {
     private val resolver = MorningCheckInResolver()
     private val balanceTracker = BalanceTracker()
     private val burnoutScorer = BurnoutScorer()
+
+    private val balanceContributions: StateFlow<BalanceContributions> =
+        balanceContributionsProvider.observe()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BalanceContributions.EMPTY)
 
     private val _completedSteps = MutableStateFlow<Set<CheckInStep>>(emptySet())
     val completedSteps: StateFlow<Set<CheckInStep>> = _completedSteps
@@ -111,13 +118,14 @@ constructor(
         userPreferencesDataStore.workLifeBalanceFlow
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WorkLifeBalancePrefs())
 
-    /** Live balance state (last 7 days of task categorization). */
+    /** Live balance state (last 7 days of task, habit, and leisure activity). */
     val balanceState: StateFlow<BalanceState> =
         combine(
             taskRepository.getAllTasks(),
             workLifeBalancePrefs,
-            taskBehaviorPreferences.getStartOfDay()
-        ) { allTasks, prefs, sod ->
+            taskBehaviorPreferences.getStartOfDay(),
+            balanceContributions
+        ) { allTasks, prefs, sod, contributions ->
             val config = BalanceConfig(
                 workTarget = prefs.workTarget / 100f,
                 personalTarget = prefs.personalTarget / 100f,
@@ -126,10 +134,12 @@ constructor(
                 overloadThreshold = prefs.overloadThresholdPct / 100f
             )
             balanceTracker.compute(
-                allTasks,
-                config,
+                allTasks = allTasks,
+                config = config,
                 dayStartHour = sod.hour,
-                dayStartMinute = sod.minute
+                dayStartMinute = sod.minute,
+                habitContributions = contributions.habits,
+                leisureContributions = contributions.leisure
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BalanceState.EMPTY)
 
@@ -138,13 +148,17 @@ constructor(
         combine(
             taskRepository.getAllTasks(),
             workLifeBalancePrefs,
-            balanceState
-        ) { allTasks, prefs, balance ->
+            balanceState,
+            balanceContributions
+        ) { allTasks, prefs, balance, contributions ->
             val workRatio = balance.currentRatios[LifeCategory.WORK] ?: 0f
             burnoutScorer.computeFromTasks(
                 tasks = allTasks,
                 workRatio = workRatio,
-                workTarget = prefs.workTarget / 100f
+                workTarget = prefs.workTarget / 100f,
+                habitStreakBreaks = contributions.habitStreakBreaks,
+                selfCareHabitCompletionsRecent = contributions.selfCareHabitCompletionsRecent,
+                leisureMinutesRecent = contributions.leisureMinutesRecent
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BurnoutResult.EMPTY)
 

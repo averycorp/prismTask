@@ -59,7 +59,7 @@ class EisenhowerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = EisenhowerViewModel(api, taskRepository, proFeatureGate)
+    private fun newViewModel() = EisenhowerViewModel(api, taskRepository, proFeatureGate, io.mockk.mockk(relaxed = true))
 
     @Test
     fun categorize_freeTierShowsUpgradePromptAndSkipsApiCall() = runTest(dispatcher) {
