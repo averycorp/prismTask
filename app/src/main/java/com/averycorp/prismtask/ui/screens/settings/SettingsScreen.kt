@@ -287,23 +287,6 @@ fun SettingsScreen(
                             iconBgColor = ColWellbeing,
                             onClick = { navController.navigate("settings/wellbeing") }
                         )
-                        // G1 \u2014 Crisis resources entry. Surfaced inside the
-                        // Productivity / Wellness-adjacent group rather
-                        // than buried in About, so it's findable without
-                        // searching. The neutral title matches the screen
-                        // header so the cross-app reference (chat safety
-                        // reply, Mood & Energy footer) stays consistent.
-                        SettingsNavRow(
-                            title = "If You Need Help Now",
-                            subtitle = "Crisis hotlines, 24/7",
-                            iconEmoji = "\uD83E\uDD1D",
-                            iconBgColor = ColWellbeing,
-                            onClick = {
-                                navController.navigate(
-                                    PrismTaskRoute.CrisisResources.route
-                                )
-                            }
-                        )
                     }
                 }
 
@@ -388,6 +371,28 @@ fun SettingsScreen(
 
                 item {
                     SettingsGroup(label = "If You Need Help") {
+                        // Crisis resources are the only entry in this group so
+                        // the heading reads as a direct offer of help rather
+                        // than a catch-all for support/about. The neutral
+                        // row title matches the screen header so the
+                        // cross-app reference (chat safety reply, Mood &
+                        // Energy footer) stays consistent.
+                        SettingsNavRow(
+                            title = "If You Need Help Now",
+                            subtitle = "Crisis hotlines, 24/7",
+                            iconEmoji = "\ud83e\udd1d",
+                            iconBgColor = ColWellbeing,
+                            onClick = {
+                                navController.navigate(
+                                    PrismTaskRoute.CrisisResources.route
+                                )
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    SettingsGroup(label = "Support") {
                         SettingsNavRow(
                             title = "Report a Bug",
                             subtitle = "Tell us what went wrong",
