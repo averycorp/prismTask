@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,16 +26,24 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.local.entity.MedicationSlotEntity
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.formatHhMm
+import com.averycorp.prismtask.ui.components.parseHhMm
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Selection summary for a single (medication ↔ slot) link, used by the
@@ -204,11 +213,31 @@ private fun OverrideEditor(
 ) {
     val sel = selection ?: return
     var overrideEnabled by remember(sel.hasOverride) { mutableStateOf(sel.hasOverride) }
-    var timeInput by remember(sel.overrideIdealTime) {
-        mutableStateOf(sel.overrideIdealTime ?: slot.idealTime)
+    val (initialHour, initialMinute) = remember(sel.overrideIdealTime, slot.idealTime) {
+        parseHhMm(sel.overrideIdealTime ?: slot.idealTime) ?: (9 to 0)
     }
+    val context = LocalContext.current
+    val is24Hour = remember(context) { DateFormat.is24HourFormat(context) }
+    val clockState = rememberAnalogClockState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        initialSecond = 0,
+        is24Hour = is24Hour
+    )
+    val timeInput = formatHhMm(clockState.hour, clockState.minute)
     var driftInput by remember(sel.overrideDriftMinutes) {
         mutableStateOf((sel.overrideDriftMinutes ?: slot.driftMinutes).toString())
+    }
+
+    // Push hour/minute changes upstream on every dial movement so the
+    // parent's selection list stays in sync without requiring a "Save"
+    // tap inside the row. Lifecycle-scoped so it tears down when the
+    // override is collapsed.
+    LaunchedEffect(overrideEnabled) {
+        if (!overrideEnabled) return@LaunchedEffect
+        snapshotFlow { clockState.hour to clockState.minute }.collectLatest { (h, m) ->
+            onOverrideChange(formatHhMm(h, m), driftInput.toIntOrNull())
+        }
     }
 
     Column(
@@ -244,14 +273,14 @@ private fun OverrideEditor(
             }
         }
         if (overrideEnabled) {
-            OutlinedTextField(
-                value = timeInput,
-                onValueChange = { raw ->
-                    timeInput = raw.filter { it.isDigit() || it == ':' }.take(5)
-                    onOverrideChange(timeInput, driftInput.toIntOrNull())
-                },
-                label = { Text("Override time (HH:mm)") },
-                singleLine = true,
+            Text(
+                text = "Override time",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AnalogClockPicker(
+                state = clockState,
+                diameter = 200.dp,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(

@@ -14,9 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -24,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -34,13 +34,18 @@ import java.time.ZoneId
  * but only just opened the app". Opened via long-press on the slot's
  * tier chip.
  *
- * The time picker defaults to the current intended_time (or the current
- * wall-clock if no user override exists yet). Save composes the picked
- * hour/minute with the slot card's [logicalDay] (the user's SoD-anchored
- * "today"), then caps to `now` so the user can never produce a future
- * timestamp. See [composeIntendedTime] for the algorithm — in particular,
- * it correctly handles the SoD-boundary window where wall-clock has
- * crossed midnight but the logical day has not yet rolled over.
+ * The picker is the three-hand analog clock (hour / minute / second) per
+ * the `feedback-time-input-use-clock-not-slider` memory. The data model
+ * stores HH:mm, so the seconds hand is captured but rounded out at save
+ * time; the affordance stays consistent with every other time-of-day
+ * input in the app.
+ *
+ * Save composes the picked hour/minute with the slot card's [logicalDay]
+ * (the user's SoD-anchored "today"), then caps to `now` so the user can
+ * never produce a future timestamp. See [composeIntendedTime] for the
+ * algorithm — in particular, it correctly handles the SoD-boundary
+ * window where wall-clock has crossed midnight but the logical day has
+ * not yet rolled over.
  *
  * Long-tail "log yesterday's dose" (a logical-day cross-day backlog)
  * remains out of scope; that case is served via the medication log
@@ -64,9 +69,10 @@ fun MedicationTimeEditSheet(
     }
     val context = LocalContext.current
     val is24Hour = remember(context) { DateFormat.is24HourFormat(context) }
-    val timePickerState = rememberTimePickerState(
+    val clockState = rememberAnalogClockState(
         initialHour = seedTime.hour,
         initialMinute = seedTime.minute,
+        initialSecond = 0,
         is24Hour = is24Hour
     )
 
@@ -92,21 +98,7 @@ fun MedicationTimeEditSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(20.dp))
-            TimePicker(state = timePickerState)
-            Spacer(modifier = Modifier.height(8.dp))
-            // Source-of-truth readout — see MedicationTimePickerLabel docs.
-            // The dial + AM/PM toggle can mislead about the picked half-of-day;
-            // this label reads from state.hour/state.minute, which are exactly
-            // what composeIntendedTime will save below.
-            Text(
-                text = "Selected: ${formatPickedTime(
-                    timePickerState.hour,
-                    timePickerState.minute,
-                    is24Hour
-                )}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            AnalogClockPicker(state = clockState)
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -117,8 +109,8 @@ fun MedicationTimeEditSheet(
                 Button(onClick = {
                     onSave(
                         composeIntendedTime(
-                            pickedHour = timePickerState.hour,
-                            pickedMinute = timePickerState.minute,
+                            pickedHour = clockState.hour,
+                            pickedMinute = clockState.minute,
                             logicalDay = logicalDay,
                             nowMillis = System.currentTimeMillis(),
                             zone = zone

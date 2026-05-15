@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -21,7 +23,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.text.format.DateFormat
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.formatHhMm
+import com.averycorp.prismtask.ui.components.parseHhMm
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.ui.screens.medication.components.applyMinuteFieldEdit
 
 /**
@@ -52,11 +60,11 @@ internal fun choiceToReminderModeString(choice: SlotReminderModeChoice): String?
  * the dialog title and the "save / create" button label differ.
  *
  * Drift presets cover the common product asks (±30/60/120/180 min) plus a
- * "Custom" override that opens a numeric field. The picker is a wall-clock
- * hh:mm string editor — we deliberately avoid Material's `TimePicker` here
- * because the existing medication time inputs in `MedicationComponents.kt`
- * use the same plain `OutlinedTextField` pattern, and consistency wins
- * over the slightly nicer popup picker for now.
+ * "Custom" override that opens a numeric field. The ideal-time picker is
+ * the three-hand analog clock per the
+ * `feedback-time-input-use-clock-not-slider` memory — the seconds hand is
+ * captured but rounded out at save time because the slot's `ideal_time`
+ * column is HH:mm.
  */
 @Composable
 internal fun MedicationSlotEditorSheet(
@@ -78,7 +86,18 @@ internal fun MedicationSlotEditorSheet(
     globalDefaultModeLabel: String = "Clock"
 ) {
     var name by remember { mutableStateOf(initialName) }
-    var idealTime by remember { mutableStateOf(initialIdealTime) }
+    val context = LocalContext.current
+    val is24Hour = remember(context) { DateFormat.is24HourFormat(context) }
+    val (initialIdealHour, initialIdealMinute) = remember(initialIdealTime) {
+        parseHhMm(initialIdealTime) ?: (9 to 0)
+    }
+    val idealTimeClockState = rememberAnalogClockState(
+        initialHour = initialIdealHour,
+        initialMinute = initialIdealMinute,
+        initialSecond = 0,
+        is24Hour = is24Hour
+    )
+    val idealTime = formatHhMm(idealTimeClockState.hour, idealTimeClockState.minute)
     var driftMinutes by remember { mutableStateOf(initialDriftMinutes) }
     var customDriftText by remember(driftMinutes) {
         mutableStateOf(driftMinutes.toString())
@@ -101,7 +120,10 @@ internal fun MedicationSlotEditorSheet(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -110,12 +132,14 @@ internal fun MedicationSlotEditorSheet(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = idealTime,
-                    onValueChange = { raw -> idealTime = sanitizeHhMm(raw, idealTime) },
-                    label = { Text("Ideal Time (HH:mm)") },
-                    placeholder = { Text("09:00") },
-                    singleLine = true,
+                Text(
+                    text = "Ideal Time",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AnalogClockPicker(
+                    state = idealTimeClockState,
+                    diameter = 220.dp,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
@@ -284,7 +308,7 @@ internal fun MedicationSlotEditorSheet(
                         if (reminderModeChoice == SlotReminderModeChoice.INTERVAL) intervalMinutes else null
                     )
                 },
-                enabled = name.isNotBlank() && isValidHhMm(idealTime) && driftMinutes >= 1,
+                enabled = name.isNotBlank() && driftMinutes >= 1,
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(confirmLabel)
@@ -319,22 +343,3 @@ private fun formatInterval(mins: Int): String = when {
     else -> "${mins}m"
 }
 
-private fun isValidHhMm(value: String): Boolean {
-    val parts = value.split(":")
-    if (parts.size != 2) return false
-    val h = parts[0].toIntOrNull() ?: return false
-    val m = parts[1].toIntOrNull() ?: return false
-    return h in 0..23 && m in 0..59
-}
-
-/**
- * Best-effort `HH:mm` shape coercion. Strips non-digit/non-colon and
- * caps lengths so the user can type freely without the field rejecting
- * keystrokes mid-edit. Returns the previous value when the new input is
- * obviously past the maximum length.
- */
-private fun sanitizeHhMm(raw: String, prev: String): String {
-    val filtered = raw.filter { it.isDigit() || it == ':' }
-    if (filtered.length > 5) return prev
-    return filtered
-}
