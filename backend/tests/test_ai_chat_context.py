@@ -492,3 +492,493 @@ class TestChatEndpointWiresCurrentState:
         assert bundle is not None
         assert bundle["tasks"]["due_today_count"] == 1
         assert bundle["tasks"]["due_today"][0]["title"] == "Demo task"
+
+
+class TestLoadAllDataBundle:
+    """Coverage for the all-data expansion on top of today-only buckets.
+
+    The today-scoped behavior is already locked down by
+    ``TestLoadUserContextBundle`` above; this class focuses on the new
+    upcoming/backlog/recently-completed task buckets, per-habit
+    streak + 7d count, per-project progress, active goals, leisure
+    7-day rollup, and medication 7-day adherence + active med list.
+    """
+
+    @pytest.mark.asyncio
+    async def test_upcoming_tasks_window_excludes_today_and_far_future(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        project_id = await _seed_project(user_id)
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            session.add_all([
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Tomorrow", status="todo",
+                    due_date=today + timedelta(days=1),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Day 7", status="todo",
+                    due_date=today + timedelta(days=7),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Day 14", status="todo",
+                    due_date=today + timedelta(days=14),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Day 15 (outside window)", status="todo",
+                    due_date=today + timedelta(days=15),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Today shouldn't appear in upcoming", status="todo",
+                    due_date=today,
+                ),
+            ])
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        upcoming_titles = [t["title"] for t in bundle["tasks"]["upcoming"]]
+        assert bundle["tasks"]["upcoming_count"] == 3
+        assert set(upcoming_titles) == {"Tomorrow", "Day 7", "Day 14"}
+        # Upcoming entries carry days_until_due so the AI can ground its phrasing.
+        for entry in bundle["tasks"]["upcoming"]:
+            assert entry["days_until_due"] >= 1
+            assert "due_date" in entry
+
+    @pytest.mark.asyncio
+    async def test_backlog_tasks_no_due_or_planned_date(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        project_id = await _seed_project(user_id)
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            for i in range(3):
+                session.add(Task(
+                    user_id=user_id, project_id=project_id,
+                    title=f"Backlog {i}", status="todo",
+                ))
+            session.add(Task(
+                user_id=user_id, project_id=project_id,
+                title="Has due date", status="todo",
+                due_date=today + timedelta(days=2),
+            ))
+            session.add(Task(
+                user_id=user_id, project_id=project_id,
+                title="Has planned date", status="todo",
+                planned_date=today,
+            ))
+            session.add(Task(
+                user_id=user_id, project_id=project_id,
+                title="Done", status="done",
+            ))
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        backlog_titles = {t["title"] for t in bundle["tasks"]["backlog"]}
+        assert bundle["tasks"]["backlog_count"] == 3
+        assert backlog_titles == {"Backlog 0", "Backlog 1", "Backlog 2"}
+
+    @pytest.mark.asyncio
+    async def test_recently_completed_window_7_days(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        project_id = await _seed_project(user_id)
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            session.add_all([
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Done today", status="done",
+                    completed_at=datetime(2026, 5, 14, 9, 0, tzinfo=timezone.utc),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Done 3d ago", status="done",
+                    completed_at=datetime(2026, 5, 11, 9, 0, tzinfo=timezone.utc),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Done 6d ago", status="done",
+                    completed_at=datetime(2026, 5, 8, 9, 0, tzinfo=timezone.utc),
+                ),
+                Task(
+                    user_id=user_id, project_id=project_id,
+                    title="Done 8d ago (outside)", status="done",
+                    completed_at=datetime(2026, 5, 6, 9, 0, tzinfo=timezone.utc),
+                ),
+            ])
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        titles = [t["title"] for t in bundle["tasks"]["recently_completed"]]
+        assert bundle["tasks"]["recently_completed_count"] == 3
+        assert set(titles) == {"Done today", "Done 3d ago", "Done 6d ago"}
+        for entry in bundle["tasks"]["recently_completed"]:
+            assert "completed_on" in entry
+
+    @pytest.mark.asyncio
+    async def test_habit_streak_counts_consecutive_days_ending_today(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            h_streak = Habit(user_id=user_id, name="StreakHabit", target_count=1, is_active=True)
+            h_broken = Habit(user_id=user_id, name="BrokenHabit", target_count=1, is_active=True)
+            h_new = Habit(user_id=user_id, name="NewHabit", target_count=1, is_active=True)
+            session.add_all([h_streak, h_broken, h_new])
+            await session.flush()
+            for i in range(5):
+                session.add(HabitCompletion(
+                    habit_id=h_streak.id,
+                    date=today - timedelta(days=i),
+                    count=1,
+                ))
+            session.add(HabitCompletion(habit_id=h_broken.id, date=today, count=1))
+            session.add(HabitCompletion(
+                habit_id=h_broken.id, date=today - timedelta(days=2), count=1,
+            ))
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        by_name = {h["name"]: h for h in bundle["habits"]["today"]}
+        assert by_name["StreakHabit"]["streak"] == 5
+        assert by_name["StreakHabit"]["last7_count"] == 5
+        assert by_name["BrokenHabit"]["streak"] == 1
+        assert by_name["BrokenHabit"]["last7_count"] == 2
+        assert by_name["NewHabit"]["streak"] == 0
+        assert by_name["NewHabit"]["last7_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_active_projects_carry_progress_and_due(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            goal = Goal(user_id=user_id, title="G")
+            session.add(goal)
+            await session.flush()
+            project = Project(
+                user_id=user_id, goal_id=goal.id, title="With progress",
+                status="active", due_date=today + timedelta(days=10),
+            )
+            session.add(project)
+            await session.flush()
+            session.add_all([
+                Task(user_id=user_id, project_id=project.id, title="A", status="todo"),
+                Task(user_id=user_id, project_id=project.id, title="B", status="in_progress"),
+                Task(
+                    user_id=user_id, project_id=project.id, title="C",
+                    status="done",
+                    completed_at=datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc),
+                ),
+                Task(
+                    user_id=user_id, project_id=project.id, title="D",
+                    status="done",
+                    completed_at=datetime(2026, 5, 12, 9, 0, tzinfo=timezone.utc),
+                ),
+            ])
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        active = bundle["projects"]["active"]
+        assert len(active) == 1
+        entry = active[0]
+        assert entry["title"] == "With progress"
+        assert entry["open_tasks"] == 2
+        assert entry["done_tasks"] == 2
+        assert entry["total_tasks"] == 4
+        assert entry["progress_pct"] == 50
+        assert entry["due_date"] == "2026-05-24"
+        assert entry["days_until_due"] == 10
+
+    @pytest.mark.asyncio
+    async def test_active_goals_surfaced_with_target_date(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            session.add_all([
+                Goal(
+                    user_id=user_id, title="Ship v2", status="active",
+                    target_date=today + timedelta(days=30),
+                ),
+                Goal(user_id=user_id, title="Daily exercise", status="active"),
+                Goal(
+                    user_id=user_id, title="Archived goal", status="archived",
+                    target_date=today + timedelta(days=1),
+                ),
+            ])
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        titles = [g["title"] for g in bundle["goals"]["active"]]
+        assert bundle["goals"]["active_count"] == 2
+        assert set(titles) == {"Ship v2", "Daily exercise"}
+        ship = next(g for g in bundle["goals"]["active"] if g["title"] == "Ship v2")
+        assert ship["target_date"] == "2026-06-13"
+        assert ship["days_until_target"] == 30
+
+    @pytest.mark.asyncio
+    async def test_leisure_aggregates_today_and_last_7_days(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            session.add_all([
+                LeisureSession(
+                    id="ls-today-p", user_id=user_id, category="PHYSICAL",
+                    duration_minutes=30,
+                    logged_at=datetime(2026, 5, 14, 9, 0, tzinfo=timezone.utc),
+                    source="TIMER",
+                ),
+                LeisureSession(
+                    id="ls-4d-p", user_id=user_id, category="PHYSICAL",
+                    duration_minutes=20,
+                    logged_at=datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc),
+                    source="TIMER",
+                ),
+                LeisureSession(
+                    id="ls-4d-s", user_id=user_id, category="SOCIAL",
+                    duration_minutes=60,
+                    logged_at=datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc),
+                    source="TIMER",
+                ),
+                LeisureSession(
+                    id="ls-old", user_id=user_id, category="PHYSICAL",
+                    duration_minutes=999,
+                    logged_at=datetime(2026, 5, 6, 9, 0, tzinfo=timezone.utc),
+                    source="TIMER",
+                ),
+            ])
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        assert bundle["leisure"]["today"]["total_minutes"] == 30
+        assert bundle["leisure"]["today"]["by_category"] == {"PHYSICAL": 30}
+        assert bundle["leisure"]["last_7_days"]["total_minutes"] == 110
+        assert bundle["leisure"]["last_7_days"]["by_category"] == {
+            "PHYSICAL": 50,
+            "SOCIAL": 60,
+        }
+        assert bundle["leisure_today"] == bundle["leisure"]["today"]
+
+    @pytest.mark.asyncio
+    async def test_medications_7d_adherence_plus_active_list(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        from tests.conftest import TestSessionLocal
+
+        from app.routers.ai.context import load_user_context_bundle
+
+        user_id = await _resolve_test_user_id()
+        today = date(2026, 5, 14)
+        async with TestSessionLocal() as session:
+            session.add_all([
+                Medication(user_id=user_id, name="Adderall", dosage="20mg"),
+                Medication(user_id=user_id, name="Vitamin D"),
+                Medication(user_id=user_id, name="Old med", is_active=False),
+            ])
+            for i in range(7):
+                d = today - timedelta(days=i)
+                session.add(DailyEssentialSlotCompletion(
+                    user_id=user_id, date=d, slot_key="08:00",
+                    med_ids_json="[]",
+                    taken_at=datetime.combine(
+                        d, datetime.min.time(), tzinfo=timezone.utc
+                    ),
+                ))
+                session.add(DailyEssentialSlotCompletion(
+                    user_id=user_id, date=d, slot_key="20:00",
+                    med_ids_json="[]",
+                    taken_at=None if i == 0 else datetime.combine(
+                        d, datetime.min.time(), tzinfo=timezone.utc
+                    ),
+                ))
+            await session.commit()
+
+        async with TestSessionLocal() as session:
+            bundle = await load_user_context_bundle(session, user_id, today)
+
+        meds = bundle["medications"]
+        assert meds["today"]["slots_logged"] == 2
+        assert meds["today"]["slots_taken"] == 1
+        assert meds["last_7_days"]["slots_logged"] == 14
+        assert meds["last_7_days"]["slots_taken"] == 13
+        assert meds["last_7_days"]["adherence_pct"] == 93
+        names = [m["name"] for m in meds["active"]]
+        assert meds["active_count"] == 2
+        assert set(names) == {"Adderall", "Vitamin D"}
+        # Compat alias keeps the today sub-dict accessible at the legacy key.
+        assert bundle["medications_today"] == meds["today"]
+
+
+class TestFormatAllDataBlock:
+    def test_renders_upcoming_backlog_recent_completed_sections(self):
+        from app.services.ai_productivity import _format_chat_system_prompt
+
+        bundle = {
+            "today_iso": "2026-05-14",
+            "tasks": {
+                "overdue_count": 0, "overdue": [],
+                "due_today_count": 0, "due_today": [],
+                "planned_today_count": 0, "planned_today": [],
+                "upcoming_count": 2,
+                "upcoming": [
+                    {"id": 11, "title": "Tax forms", "days_until_due": 3,
+                     "due_date": "2026-05-17"},
+                    {"id": 12, "title": "Doctor visit", "days_until_due": 7,
+                     "due_date": "2026-05-21"},
+                ],
+                "backlog_count": 1,
+                "backlog": [{"id": 13, "title": "Sort photos"}],
+                "completed_today_count": 0,
+                "recently_completed_count": 1,
+                "recently_completed": [
+                    {"id": 9, "title": "Submit invoice",
+                     "completed_on": "2026-05-13"},
+                ],
+            },
+            "habits": {
+                "active_count": 1, "completed_today_count": 1,
+                "today": [{
+                    "name": "Read", "count": 1, "target": 1,
+                    "category": None, "streak": 12, "last7_count": 6,
+                }],
+            },
+            "projects": {
+                "active_count": 1,
+                "active": [{
+                    "id": 4, "title": "Ship v2", "open_tasks": 6,
+                    "done_tasks": 4, "total_tasks": 10, "progress_pct": 40,
+                    "due_date": "2026-06-13", "days_until_due": 30,
+                }],
+            },
+            "goals": {
+                "active_count": 1,
+                "active": [{
+                    "id": 1, "title": "Healthier 2026",
+                    "target_date": "2026-12-31", "days_until_target": 231,
+                }],
+            },
+            "leisure": {
+                "today": {"total_minutes": 45, "by_category": {"PHYSICAL": 45}},
+                "last_7_days": {
+                    "total_minutes": 210,
+                    "by_category": {"PHYSICAL": 120, "SOCIAL": 90},
+                },
+            },
+            "medications": {
+                "today": {"slots_logged": 2, "slots_taken": 1},
+                "last_7_days": {
+                    "slots_logged": 14, "slots_taken": 13,
+                    "adherence_pct": 93,
+                },
+                "active_count": 2,
+                "active": [
+                    {"id": 1, "name": "Adderall", "dosage": "20mg"},
+                    {"id": 2, "name": "Vitamin D", "dosage": None},
+                ],
+            },
+        }
+        out = _format_chat_system_prompt(user_preferences=None, current_state=bundle)
+
+        assert "Upcoming (next 14d): 2" in out
+        assert "Tax forms (in 3d)" in out
+        assert "Doctor visit (in 7d)" in out
+        assert "Backlog (no date): 1" in out
+        assert "Sort photos" in out
+        assert "Recently completed (last 7d): 1" in out
+        assert "Submit invoice (done 2026-05-13)" in out
+        assert "12d streak" in out
+        assert "6/7 last week" in out
+        assert "Ship v2 #4 (4/10, 40%) (due in 30d)" in out
+        assert "Active goals: 1" in out
+        assert "Healthier 2026" in out
+        assert "Leisure last 7d: 210 min (PHYSICAL 120m, SOCIAL 90m)" in out
+        assert "Medications last 7d: 13/14 slots taken (93%)" in out
+        assert "Active medications: 2" in out
+        assert "Adderall (20mg) #1" in out
+        assert "Vitamin D #2" in out
+
+    def test_compat_keys_keep_today_only_callers_working(self):
+        """Ensure passing the legacy bundle shape (with only leisure_today /
+        medications_today + no goals/leisure/medications keys) still renders
+        without crashing — protects external test setups that pre-date the
+        all-data expansion."""
+        from app.services.ai_productivity import _format_chat_system_prompt
+
+        legacy_bundle = {
+            "today_iso": "2026-05-14",
+            "tasks": {
+                "overdue_count": 0, "overdue": [],
+                "due_today_count": 0, "due_today": [],
+                "planned_today_count": 0, "planned_today": [],
+                "completed_today_count": 0,
+            },
+            "habits": {"active_count": 0, "completed_today_count": 0, "today": []},
+            "projects": {"active_count": 0, "active": []},
+            "leisure_today": {"total_minutes": 0, "by_category": {}},
+            "medications_today": {"slots_logged": 0, "slots_taken": 0},
+        }
+        out = _format_chat_system_prompt(None, current_state=legacy_bundle)
+        # Today blocks still render from compat keys.
+        assert "Leisure today: 0 min" in out
+        assert "Medications today: (no slots logged)" in out
+        # 7-day rollups + goals are silently omitted when the bundle didn't
+        # carry them.
+        assert "Leisure last 7d" not in out
+        assert "Medications last 7d" not in out
+        assert "Active goals" not in out
