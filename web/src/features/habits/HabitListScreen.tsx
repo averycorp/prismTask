@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -20,6 +20,12 @@ import { Dropdown } from '@/components/ui/Dropdown';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { HabitModal } from './HabitModal';
+import { BuiltInTemplateUpdateBanner } from './BuiltInTemplateUpdateBanner';
+import {
+  dismissBuiltInUpdate,
+  findPendingUpdates,
+  type PendingBuiltInUpdate,
+} from '@/utils/builtInHabitReconciler';
 import type { Habit } from '@/types/habit';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -53,6 +59,23 @@ export function HabitListScreen() {
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Habit | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Built-in habit template-version detector (parity B.4). `dismissalTick`
+  // bumps after a localStorage dismissal so the memoized list refreshes
+  // without forcing a full habit re-fetch.
+  const [dismissalTick, setDismissalTick] = useState(0);
+  const pendingUpdates = useMemo<PendingBuiltInUpdate[]>(
+    () => findPendingUpdates(habits),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [habits, dismissalTick],
+  );
+  const handleDismissUpdate = useCallback(
+    (templateKey: string, version: number) => {
+      dismissBuiltInUpdate(templateKey, version);
+      setDismissalTick((t) => t + 1);
+    },
+    [],
+  );
 
   // SoD-aware logical-today ISO. Toggling a habit at 02:00 with SoD = 4
   // must write to *yesterday's* logical date so the doc collapses with
@@ -129,6 +152,15 @@ export function HabitListScreen() {
           New Habit
         </Button>
       </div>
+
+      {/* Built-in template update banner (parity B.4). Renders above the
+          progress header so it's the first thing the user sees when a new
+          registry version is available. Banner self-hides when there are
+          no pending updates. */}
+      <BuiltInTemplateUpdateBanner
+        pending={pendingUpdates}
+        onDismiss={handleDismissUpdate}
+      />
 
       {/* Progress Header */}
       {todayProgress.total > 0 && (

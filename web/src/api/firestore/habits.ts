@@ -59,6 +59,15 @@ function completionDoc(uid: string, completionId: string) {
 // ── Firestore doc → Web Habit ─────────────────────────────────
 
 function docToHabit(docId: string, data: DocumentData, uid: string): Habit {
+  // Built-in identity (parity B.4). Mirror Android's `SyncMapper.mapToHabit`
+  // shape: when `isBuiltIn` is missing on the Firestore doc but `templateKey`
+  // is present, treat the row as built-in (legacy docs written before the
+  // `isBuiltIn` column existed).
+  const templateKey: string | null =
+    typeof data.templateKey === 'string' ? data.templateKey : null;
+  const explicitIsBuiltIn =
+    typeof data.isBuiltIn === 'boolean' ? data.isBuiltIn : null;
+  const isBuiltIn = explicitIsBuiltIn ?? templateKey !== null;
   return {
     id: docId,
     user_id: uid,
@@ -73,6 +82,16 @@ function docToHabit(docId: string, data: DocumentData, uid: string): Habit {
     is_active: !data.isArchived,
     created_at: timestampToIso(data.createdAt) ?? new Date().toISOString(),
     updated_at: timestampToIso(data.updatedAt) ?? new Date().toISOString(),
+    is_built_in: isBuiltIn,
+    template_key: templateKey,
+    source_version:
+      typeof data.sourceVersion === 'number' ? data.sourceVersion : 0,
+    is_user_modified:
+      typeof data.isUserModified === 'boolean' ? data.isUserModified : false,
+    is_detached_from_template:
+      typeof data.isDetachedFromTemplate === 'boolean'
+        ? data.isDetachedFromTemplate
+        : false,
   };
 }
 
@@ -175,6 +194,14 @@ function habitUpdateToDoc(
   if (data.target_count !== undefined) result.targetFrequency = data.target_count;
   if (data.active_days_json !== undefined) result.activeDays = data.active_days_json;
   if (data.is_active !== undefined) result.isArchived = !data.is_active;
+  // Built-in identity fields (parity B.4). Only written by the reconciler /
+  // version-update apply path — the standard `HabitModal` editor never sets
+  // these. Mirror Android's column names from `SyncMapper`.
+  if (data.source_version !== undefined) result.sourceVersion = data.source_version;
+  if (data.is_user_modified !== undefined) result.isUserModified = data.is_user_modified;
+  if (data.is_detached_from_template !== undefined) {
+    result.isDetachedFromTemplate = data.is_detached_from_template;
+  }
   return result;
 }
 
