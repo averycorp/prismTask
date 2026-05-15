@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.GridView
@@ -158,6 +159,7 @@ fun TodayScreen(
     val resumeTourVisible by viewModel.resumeTourVisible.collectAsStateWithLifecycle()
     val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
     val isRestDayToday by viewModel.isRestDayToday.collectAsStateWithLifecycle()
+    val lowEnergyMode by viewModel.lowEnergyModeEnabled.collectAsStateWithLifecycle()
     var showRestDayConfirm by remember { mutableStateOf(false) }
     var overloadBannerDismissed by remember { mutableStateOf(false) }
 
@@ -405,7 +407,13 @@ fun TodayScreen(
                                 taskCount = completedToday.size,
                                 habitCount = habitCompletedCount,
                                 habitTotal = habitTotalCount,
-                                onPlanTomorrow = { viewModel.onShowPlanSheet() }
+                                onPlanTomorrow = { viewModel.onShowPlanSheet() },
+                                onReflect = {
+                                    navController.navigate(
+                                        com.averycorp.prismtask.ui.navigation
+                                            .PrismTaskRoute.EndOfDayReflection.route
+                                    )
+                                }
                             )
                         }
                     }
@@ -678,6 +686,29 @@ fun TodayScreen(
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Bedtime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                colors = chipColors,
+                                border = chipBorder
+                            )
+                            // F4 Item 2 — Low-energy mode toggle. Lighter
+                            // than Rest Day: tasks stay visible but only
+                            // EASY-load ones, so the user can still pick
+                            // a small win without the harder items
+                            // pulling on attention. User-invoked
+                            // (Principle 6); default off (Principle 7).
+                            AssistChip(
+                                onClick = {
+                                    viewModel.setLowEnergyModeEnabled(!lowEnergyMode)
+                                },
+                                label = {
+                                    Text(if (lowEnergyMode) "Low Energy On" else "Low Energy")
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Bolt,
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )

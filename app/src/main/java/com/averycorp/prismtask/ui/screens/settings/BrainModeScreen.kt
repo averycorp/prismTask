@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.averycorp.prismtask.ui.screens.settings.sections.BrainModeSection
+import com.averycorp.prismtask.ui.screens.settings.sections.CustomBrainModeSubSection
 import com.averycorp.prismtask.ui.theme.ThemedSubScreenTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +32,7 @@ fun BrainModeScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val ndPrefs by viewModel.ndPrefs.collectAsStateWithLifecycle()
+    val customModes by viewModel.customBrainModes.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -67,6 +69,11 @@ fun BrainModeScreen(
                 onMaxRevisionsChange = viewModel::setMaxRevisions,
                 onShipItCelebrationsChange = viewModel::setShipItCelebrationsEnabled,
                 onCelebrationIntensityChange = viewModel::setCelebrationIntensity
+            )
+            CustomBrainModeSubSection(
+                modes = customModes,
+                onAdd = viewModel::addCustomBrainMode,
+                onRemove = viewModel::removeCustomBrainMode
             )
             Spacer(modifier = Modifier.height(32.dp))
         }

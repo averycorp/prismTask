@@ -499,12 +499,14 @@ private fun SessionPlanCard(session: PomodoroSession, index: Int) {
                     )
                 }
             }
-            Text(
-                session.rationale,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            if (session.rationale.isNotBlank()) {
+                Text(
+                    text = "Why: ${session.rationale}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }

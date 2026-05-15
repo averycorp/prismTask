@@ -24,6 +24,7 @@ import androidx.navigation.NavController
 import com.averycorp.prismtask.ui.screens.settings.sections.CheckInStreakSection
 import com.averycorp.prismtask.ui.screens.settings.sections.ForgivenessStreakSection
 import com.averycorp.prismtask.ui.screens.settings.sections.HabitsSection
+import com.averycorp.prismtask.ui.screens.settings.sections.StreakPauseSection
 import com.averycorp.prismtask.ui.theme.ThemedSubScreenTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +36,7 @@ fun HabitsStreaksScreen(
     val streakMaxMissedDays by viewModel.streakMaxMissedDays.collectAsStateWithLifecycle()
     val forgivenessPrefs by viewModel.forgivenessPrefs.collectAsStateWithLifecycle()
     val checkInStreak by viewModel.checkInStreak.collectAsStateWithLifecycle()
+    val restDayUi by viewModel.restDayUiSnapshot.collectAsStateWithLifecycle()
     val todaySkipAfterCompleteDays by viewModel.todaySkipAfterCompleteDays.collectAsStateWithLifecycle()
     val todaySkipBeforeScheduleDays by viewModel.todaySkipBeforeScheduleDays.collectAsStateWithLifecycle()
 
@@ -69,6 +71,13 @@ fun HabitsStreaksScreen(
             ForgivenessStreakSection(
                 prefs = forgivenessPrefs,
                 onPrefsChange = viewModel::setForgivenessPrefs
+            )
+
+            StreakPauseSection(
+                activeFrom = restDayUi.pauseFrom,
+                activeTo = restDayUi.pauseTo,
+                onApplyPause = viewModel::applyStreakPause,
+                onClearPause = viewModel::clearStreakPause
             )
 
             CheckInStreakSection(streak = checkInStreak)

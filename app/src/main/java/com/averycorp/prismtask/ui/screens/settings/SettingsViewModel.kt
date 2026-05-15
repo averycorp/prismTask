@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -97,6 +98,14 @@ constructor(
     // weekly-review / boundary / focus-release data. Distinct from the
     // full account-delete path on [SyncSettingsViewModel].
     private val mentalHealthDataWiper: com.averycorp.prismtask.data.privacy.MentalHealthDataWiper,
+    // F4 Item 2/3 — rest-day UI prefs (pause window + low-energy filter) +
+    // the existing rest-day primitive repo that backs streak-pause range
+    // marking via the rest_days DAO.
+    private val restDayPreferences: com.averycorp.prismtask.data.preferences.RestDayPreferences,
+    private val restDayRepository: com.averycorp.prismtask.data.repository.RestDayRepository,
+    // F4 Item 5 — user-defined Brain Modes (additive; 3 built-in toggles
+    // unchanged, no dispatch refactor).
+    private val customBrainModePreferences: com.averycorp.prismtask.data.preferences.CustomBrainModePreferences,
     // --- Sub-VMs extracted as part of T1.2 refactor ---
     private val themeSettings: ThemeSettingsViewModel,
     private val notificationSettings: NotificationSettingsViewModel,
@@ -413,6 +422,55 @@ constructor(
 
     fun setForgivenessPrefs(prefs: com.averycorp.prismtask.data.preferences.ForgivenessPrefs) {
         viewModelScope.launch { userPreferencesDataStore.setForgivenessPrefs(prefs) }
+    }
+
+    /**
+     * F4 Item 3 — Streak-pause snapshot. Holds the user-set pause window
+     * (start/end) and the low-energy filter toggle. The actual day
+     * marking that the streak core reads lives in the rest-day DAO via
+     * [restDayRepository]; this flow only powers the UI affordances.
+     */
+    val restDayUiSnapshot: StateFlow<com.averycorp.prismtask.data.preferences.RestDayUiSnapshot> =
+        restDayPreferences.observe()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.RestDayUiSnapshot(null, null, false)
+            )
+
+    fun applyStreakPause(from: java.time.LocalDate, to: java.time.LocalDate) {
+        viewModelScope.launch {
+            restDayRepository.markRangeAsRestDay(from, to)
+            restDayPreferences.setPause(from, to)
+        }
+    }
+
+    fun clearStreakPause() {
+        viewModelScope.launch {
+            val snap = restDayPreferences.observe().firstOrNull()
+            val from = snap?.pauseFrom
+            val to = snap?.pauseTo
+            if (from != null && to != null) {
+                restDayRepository.unmarkRangeAsRestDay(from, to)
+            }
+            restDayPreferences.clearPause()
+        }
+    }
+
+    /**
+     * F4 Item 5 — user-defined Brain Modes. The list lives alongside (not
+     * replacing) the 3 built-in toggles. Dispatch is informational v1.
+     */
+    val customBrainModes: StateFlow<List<com.averycorp.prismtask.data.preferences.CustomBrainMode>> =
+        customBrainModePreferences.observe()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addCustomBrainMode(mode: com.averycorp.prismtask.data.preferences.CustomBrainMode) {
+        viewModelScope.launch { customBrainModePreferences.add(mode) }
+    }
+
+    fun removeCustomBrainMode(name: String) {
+        viewModelScope.launch { customBrainModePreferences.remove(name) }
     }
 
     fun setCompactMode(enabled: Boolean) {

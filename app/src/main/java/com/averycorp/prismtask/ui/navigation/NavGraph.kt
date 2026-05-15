@@ -260,6 +260,8 @@ sealed class PrismTaskRoute(
 
     data object WeeklyReview : PrismTaskRoute("weekly_review")
 
+    data object EndOfDayReflection : PrismTaskRoute("end_of_day_reflection")
+
     data object WeeklyReviewsList : PrismTaskRoute("weekly_reviews_list")
 
     data object WeeklyReviewDetail : PrismTaskRoute("weekly_reviews_detail/{reviewId}") {
