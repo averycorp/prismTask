@@ -21,6 +21,7 @@ const {
   subscribeToAllRisksMock,
   subscribeToAllAnchorsMock,
   subscribeToRulesMock,
+  subscribeToTaskTemplatesMock,
   unsubTasks,
   unsubProjects,
   unsubTags,
@@ -34,6 +35,7 @@ const {
   unsubRisks,
   unsubAnchors,
   unsubRules,
+  unsubTaskTemplates,
 } = vi.hoisted(() => {
   const unsubTasks = vi.fn();
   const unsubProjects = vi.fn();
@@ -48,6 +50,7 @@ const {
   const unsubRisks = vi.fn();
   const unsubAnchors = vi.fn();
   const unsubRules = vi.fn();
+  const unsubTaskTemplates = vi.fn();
   return {
     subscribeToTasksMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
@@ -88,6 +91,9 @@ const {
     subscribeToRulesMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubRules),
+    subscribeToTaskTemplatesMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubTaskTemplates),
     unsubTasks,
     unsubProjects,
     unsubTags,
@@ -101,6 +107,7 @@ const {
     unsubRisks,
     unsubAnchors,
     unsubRules,
+    unsubTaskTemplates,
   };
 });
 
@@ -189,6 +196,15 @@ vi.mock('@/api/firestore/boundaryRules', async () => {
   >('@/api/firestore/boundaryRules');
   return { ...actual, subscribeToRules: subscribeToRulesMock };
 });
+vi.mock('@/api/firestore/taskTemplates', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/taskTemplates')
+  >('@/api/firestore/taskTemplates');
+  return {
+    ...actual,
+    subscribeToTaskTemplates: subscribeToTaskTemplatesMock,
+  };
+});
 vi.mock('@/lib/firebase', () => ({ firestore: { __mock: true } }));
 
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
@@ -207,6 +223,7 @@ import { useProjectPhaseStore } from '@/stores/projectPhaseStore';
 import { useProjectRiskStore } from '@/stores/projectRiskStore';
 import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
 import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
+import { useTemplateStore } from '@/stores/templateStore';
 import {
   DEFAULT_REMINDER_MODE_PREFERENCES,
   type MedicationReminderModePreferences,
@@ -218,6 +235,7 @@ import type { TaskDependency } from '@/types/taskDependency';
 import type { ProjectPhase } from '@/types/projectPhase';
 import type { ProjectRisk } from '@/types/projectRisk';
 import type { ExternalAnchorRecord } from '@/types/externalAnchor';
+import type { TaskTemplate } from '@/types/template';
 
 const ALL_SUBSCRIBES = [
   subscribeToTasksMock,
@@ -233,6 +251,7 @@ const ALL_SUBSCRIBES = [
   subscribeToAllRisksMock,
   subscribeToAllAnchorsMock,
   subscribeToRulesMock,
+  subscribeToTaskTemplatesMock,
 ] as const;
 
 const ALL_UNSUBS = [
@@ -249,6 +268,7 @@ const ALL_UNSUBS = [
   unsubRisks,
   unsubAnchors,
   unsubRules,
+  unsubTaskTemplates,
 ] as const;
 
 function resetAllMocks() {
@@ -267,6 +287,7 @@ function resetAllMocks() {
   subscribeToAllRisksMock.mockReturnValue(unsubRisks);
   subscribeToAllAnchorsMock.mockReturnValue(unsubAnchors);
   subscribeToRulesMock.mockReturnValue(unsubRules);
+  subscribeToTaskTemplatesMock.mockReturnValue(unsubTaskTemplates);
 }
 
 function resetStores() {
@@ -288,6 +309,11 @@ function resetStores() {
   useProjectRiskStore.setState({ risks: [] });
   useExternalAnchorStore.setState({ anchors: [] });
   useBoundaryRulesStore.setState({ rules: [] });
+  useTemplateStore.setState({
+    templates: [],
+    isLoading: false,
+    error: null,
+  });
 }
 
 describe('useFirestoreSync', () => {
@@ -558,6 +584,70 @@ describe('useFirestoreSync', () => {
     expect(useBoundaryRulesStore.getState().rules).toEqual([rule]);
   });
 
+  // Parity audit § B.10 — task templates stream live from Firestore.
+  it('a remote task-templates snapshot updates the template store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToTaskTemplatesMock.mock
+      .calls[0]?.[1] as unknown as (templates: TaskTemplate[]) => void;
+    const template: TaskTemplate = {
+      id: 'tt1',
+      user_id: 'uid-A',
+      name: 'Morning Routine',
+      description: null,
+      icon: '🌅',
+      category: 'Productivity',
+      template_title: 'Morning Routine',
+      template_description: null,
+      template_priority: null,
+      template_project_id: null,
+      template_tags_json: null,
+      template_recurrence_json: null,
+      template_duration: null,
+      template_subtasks_json: null,
+      is_built_in: false,
+      usage_count: 0,
+      last_used_at: null,
+      created_at: '2026-05-15T00:00:00.000Z',
+      updated_at: '2026-05-15T00:00:00.000Z',
+    };
+    callback([template]);
+
+    expect(useTemplateStore.getState().templates).toEqual([template]);
+  });
+
+  it('resets the task-templates cache on sign-out', () => {
+    useTemplateStore.setState({
+      templates: [
+        {
+          id: 'tt-prev',
+          user_id: 'uid-prev',
+          name: 'Stale',
+          description: null,
+          icon: null,
+          category: null,
+          template_title: null,
+          template_description: null,
+          template_priority: null,
+          template_project_id: null,
+          template_tags_json: null,
+          template_recurrence_json: null,
+          template_duration: null,
+          template_subtasks_json: null,
+          is_built_in: false,
+          usage_count: 3,
+          last_used_at: null,
+          created_at: '2026-05-14T00:00:00.000Z',
+          updated_at: '2026-05-14T00:00:00.000Z',
+        },
+      ],
+    });
+
+    renderHook(() => useFirestoreSync(null));
+
+    expect(useTemplateStore.getState().templates).toEqual([]);
+  });
+
   it('resets the boundary-rules cache on sign-out', () => {
     useBoundaryRulesStore.setState({
       rules: [
@@ -587,8 +677,9 @@ describe('useFirestoreSync', () => {
 
     renderHook(() => useFirestoreSync('uid-A'));
 
-    // Tasks throw; the other seven still subscribe
-    // Tasks throw; the other ten still subscribe
+    // Tasks throw; every other tracked subscribe (see ALL_SUBSCRIBES)
+    // still fires. Update the list below when adding a new listener
+    // to `useFirestoreSync`.
     expect(subscribeToProjectsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToTagsMock).toHaveBeenCalledTimes(1);
     expect(subscribeToHabitsMock).toHaveBeenCalledTimes(1);
@@ -600,6 +691,8 @@ describe('useFirestoreSync', () => {
     expect(subscribeToAllPhasesMock).toHaveBeenCalledTimes(1);
     expect(subscribeToAllRisksMock).toHaveBeenCalledTimes(1);
     expect(subscribeToAllAnchorsMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToRulesMock).toHaveBeenCalledTimes(1);
+    expect(subscribeToTaskTemplatesMock).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();
