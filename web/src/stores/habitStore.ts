@@ -9,6 +9,8 @@ import type {
 } from '@/types/habit';
 import * as firestoreHabits from '@/api/firestore/habits';
 import { calculateStreaks, type StreakData } from '@/utils/streaks';
+import { logicalToday } from '@/utils/dayBoundary';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type { Unsubscribe } from 'firebase/firestore';
 
 interface HabitState {
@@ -60,8 +62,23 @@ function parseActiveDays(json: string | null): number[] | null {
   }
 }
 
+/**
+ * Logical "today" ISO (`YYYY-MM-DD`) honouring the user's Start-of-Day
+ * hour. Reads `startOfDayHour` from the settings store at call time so
+ * the value stays in sync with cross-device updates.
+ *
+ * The bug this fixes: previously this returned the calendar-midnight
+ * date via `format(new Date(), 'yyyy-MM-dd')`. Android writes
+ * `completedDateLocal` via `DayBoundary.normalizeToDayStart` (SoD-aware,
+ * see `HabitRepository.completeHabit` → `epochToLocalDateString`). For a
+ * user with SoD = 4 completing a habit at 02:00 local, Android stamps
+ * yesterday's date (logical day started at 04:00 yesterday) but the web
+ * `isTodayCompleted` / `getTodayCount` getters were looking up *today's*
+ * calendar date, so the completion appeared to vanish on web.
+ */
 function todayStr(): string {
-  return format(new Date(), 'yyyy-MM-dd');
+  const hour = useSettingsStore.getState().startOfDayHour;
+  return logicalToday(Date.now(), hour);
 }
 
 export const useHabitStore = create<HabitState>((set, get) => ({
@@ -289,7 +306,12 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const state = get();
     const activeHabits = state.habits.filter((h) => h.is_active);
     const today = todayStr();
-    const todayDate = new Date();
+    // Use the logical-day Date (parsed from `today`) so the active-day
+    // weekday filter and weekly-window math align with Android's
+    // `DayBoundary`-driven semantics. A user with SoD = 4 doing their
+    // habit at 02:00 should still see Monday-only habits as "today" if
+    // the logical day is Monday.
+    const todayDate = new Date(today + 'T12:00:00');
     let total = 0;
     let completed = 0;
 
