@@ -55,10 +55,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -76,6 +74,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
 import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
@@ -1680,18 +1680,19 @@ private fun EditSessionTimeDialog(
     }
 
     if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
+        val clockState = rememberAnalogClockState(
             initialHour = pickedHour,
-            initialMinute = pickedMinute
+            initialMinute = pickedMinute,
+            is24Hour = false
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             title = { Text("Select Time") },
-            text = { TimePicker(state = timePickerState) },
+            text = { AnalogClockPicker(state = clockState) },
             confirmButton = {
                 TextButton(onClick = {
-                    pickedHour = timePickerState.hour
-                    pickedMinute = timePickerState.minute
+                    pickedHour = clockState.hour
+                    pickedMinute = clockState.minute
                     showTimePicker = false
                 }) { Text("OK") }
             },

@@ -40,10 +40,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,7 +62,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.TaskEntity
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
 import com.averycorp.prismtask.ui.components.MoveToProjectSheet
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.ui.components.QuickReschedulePopup
 import com.averycorp.prismtask.ui.components.UpgradePrompt
 import com.averycorp.prismtask.ui.navigation.PrismTaskRoute
@@ -490,9 +490,10 @@ fun TimelineScreen(
 
     // Schedule dialog
     scheduleDialogTask?.let { task ->
-        val timePickerState = rememberTimePickerState(
+        val clockState = rememberAnalogClockState(
             initialHour = LocalTime.now().hour,
-            initialMinute = (LocalTime.now().minute / 15) * 15
+            initialMinute = (LocalTime.now().minute / 15) * 15,
+            is24Hour = false
         )
         AlertDialog(
             onDismissRequest = { scheduleDialogTask = null },
@@ -500,7 +501,7 @@ fun TimelineScreen(
                 TextButton(onClick = {
                     val cal = Calendar.getInstance()
                     cal.timeInMillis = currentDate
-                        .atTime(timePickerState.hour, timePickerState.minute)
+                        .atTime(clockState.hour, clockState.minute)
                         .atZone(ZoneId.systemDefault())
                         .toInstant()
                         .toEpochMilli()
@@ -512,7 +513,7 @@ fun TimelineScreen(
                 TextButton(onClick = { scheduleDialogTask = null }) { Text("Cancel") }
             },
             title = { Text("Schedule: ${task.title}") },
-            text = { TimePicker(state = timePickerState) }
+            text = { AnalogClockPicker(state = clockState) }
         )
     }
 

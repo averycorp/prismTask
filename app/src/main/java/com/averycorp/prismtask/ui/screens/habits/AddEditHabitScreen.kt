@@ -42,10 +42,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import kotlinx.coroutines.launch
 
 private val presetColors = listOf(
@@ -425,7 +425,7 @@ fun AddEditHabitScreen(
                 }
 
                 if (showTimePicker.value) {
-                    val timePickerState = rememberTimePickerState(
+                    val clockState = rememberAnalogClockState(
                         initialHour = viewModel.reminderHour,
                         initialMinute = viewModel.reminderMinute,
                         is24Hour = false
@@ -434,15 +434,15 @@ fun AddEditHabitScreen(
                         onDismissRequest = { showTimePicker.value = false },
                         confirmButton = {
                             TextButton(onClick = {
-                                viewModel.onReminderHourChange(timePickerState.hour)
-                                viewModel.onReminderMinuteChange(timePickerState.minute)
+                                viewModel.onReminderHourChange(clockState.hour)
+                                viewModel.onReminderMinuteChange(clockState.minute)
                                 showTimePicker.value = false
                             }) { Text("OK") }
                         },
                         dismissButton = {
                             TextButton(onClick = { showTimePicker.value = false }) { Text("Cancel") }
                         },
-                        text = { TimePicker(state = timePickerState) }
+                        text = { AnalogClockPicker(state = clockState) }
                     )
                 }
             }

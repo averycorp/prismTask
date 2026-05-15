@@ -62,11 +62,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,8 +83,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.averycorp.prismtask.data.local.entity.AttachmentEntity
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
 import com.averycorp.prismtask.ui.components.RecurrenceSelector
 import com.averycorp.prismtask.ui.components.TagSelector
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.ui.theme.LocalPriorityColors
 import com.averycorp.prismtask.ui.theme.LocalPrismShapes
 import com.averycorp.prismtask.ui.theme.ThemedSubScreenTitle
@@ -556,16 +556,17 @@ internal fun AddEditTaskFormFields(
         val cal = Calendar.getInstance().apply {
             viewModel.dueTime?.let { timeInMillis = it }
         }
-        val state = rememberTimePickerState(
+        val clockState = rememberAnalogClockState(
             initialHour = cal.get(Calendar.HOUR_OF_DAY),
-            initialMinute = cal.get(Calendar.MINUTE)
+            initialMinute = cal.get(Calendar.MINUTE),
+            is24Hour = false
         )
         TimePickerDialog(
             onDismiss = { showTimePicker = false },
             onConfirm = {
                 val picked = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, state.hour)
-                    set(Calendar.MINUTE, state.minute)
+                    set(Calendar.HOUR_OF_DAY, clockState.hour)
+                    set(Calendar.MINUTE, clockState.minute)
                     set(Calendar.SECOND, 0)
                     set(Calendar.MILLISECOND, 0)
                 }
@@ -573,7 +574,7 @@ internal fun AddEditTaskFormFields(
                 showTimePicker = false
             }
         ) {
-            TimePicker(state = state)
+            AnalogClockPicker(state = clockState)
         }
     }
 }

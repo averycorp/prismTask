@@ -33,9 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,7 +47,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.domain.model.RecurrenceRule
 import com.averycorp.prismtask.domain.model.RecurrenceType
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
 import com.averycorp.prismtask.ui.components.RecurrenceDialog
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.ui.screens.addedittask.AddEditTaskViewModel
 import com.averycorp.prismtask.ui.screens.addedittask.ReminderPickerDialog
 import com.averycorp.prismtask.ui.screens.addedittask.SectionLabel
@@ -451,16 +451,17 @@ internal fun ScheduleTabContent(viewModel: AddEditTaskViewModel) {
         val cal = Calendar.getInstance().apply {
             viewModel.dueTime?.let { timeInMillis = it }
         }
-        val state = rememberTimePickerState(
+        val clockState = rememberAnalogClockState(
             initialHour = cal.get(Calendar.HOUR_OF_DAY),
-            initialMinute = cal.get(Calendar.MINUTE)
+            initialMinute = cal.get(Calendar.MINUTE),
+            is24Hour = false
         )
         TimePickerDialog(
             onDismiss = { showTimePicker = false },
             onConfirm = {
                 val picked = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, state.hour)
-                    set(Calendar.MINUTE, state.minute)
+                    set(Calendar.HOUR_OF_DAY, clockState.hour)
+                    set(Calendar.MINUTE, clockState.minute)
                     set(Calendar.SECOND, 0)
                     set(Calendar.MILLISECOND, 0)
                 }
@@ -468,7 +469,7 @@ internal fun ScheduleTabContent(viewModel: AddEditTaskViewModel) {
                 showTimePicker = false
             }
         ) {
-            TimePicker(state = state)
+            AnalogClockPicker(state = clockState)
         }
     }
 }
