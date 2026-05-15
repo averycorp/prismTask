@@ -328,73 +328,82 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                 visible = visible,
                 enter = fadeIn(tween(400, delayMillis = 400))
             ) {
-                when (val state = signInState.value) {
-                    is SignInState.Loading, is SignInState.CheckingExistingUser -> {
-                        Spacer(modifier = Modifier.height(24.dp))
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                    is SignInState.SignedIn, is SignInState.ExistingUserDetected -> {
-                        // Signed in — navigation handled by OnboardingScreen LaunchedEffect
-                        // or user continues through onboarding as a new user.
-                    }
-                    is SignInState.ExistingUserCheckFailed -> {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Couldn't check for existing account — continuing with setup.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                                .politeLiveRegion()
-                        )
-                    }
-                    else -> {
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Button(
-                            onClick = {
-                                val activity = run {
-                                    var ctx = context
-                                    while (ctx is android.content.ContextWrapper && ctx !is Activity) {
-                                        ctx = ctx.baseContext
-                                    }
-                                    ctx as? Activity
-                                } ?: return@Button
-                                coroutineScope.launch {
-                                    try {
-                                        val option = GetSignInWithGoogleOption.Builder(BuildConfig.WEB_CLIENT_ID).build()
-                                        val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-                                        val result = CredentialManager.create(context).getCredential(activity, request)
-                                        val idToken = GoogleIdTokenCredential.createFrom(result.credential.data).idToken
-                                        viewModel.onGoogleSignIn(idToken)
-                                    } catch (_: GetCredentialCancellationException) {
-                                        // User cancelled — leave state unchanged.
-                                    } catch (_: Exception) {
-                                        // Credential error — leave state unchanged.
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Sign In with Google")
+                // AnimatedVisibility lays out its content in a Box-like
+                // stack, so multiple siblings inside a `when` branch would
+                // overlap. Wrap the branches in a Column so the Google
+                // button, email fields, and error text stack vertically.
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    when (val state = signInState.value) {
+                        is SignInState.Loading, is SignInState.CheckingExistingUser -> {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        EmailAuthSection(
-                            onSignUp = viewModel::onEmailSignUp,
-                            onSignIn = viewModel::onEmailSignIn
-                        )
-                        if (state is SignInState.Error) {
+                        is SignInState.SignedIn, is SignInState.ExistingUserDetected -> {
+                            // Signed in — navigation handled by OnboardingScreen LaunchedEffect
+                            // or user continues through onboarding as a new user.
+                        }
+                        is SignInState.ExistingUserCheckFailed -> {
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Sign-in failed. Tap to try again.",
+                                text = "Couldn't check for existing account — continuing with setup.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
                                 modifier = Modifier
-                                    .padding(top = 4.dp)
+                                    .padding(horizontal = 16.dp)
                                     .politeLiveRegion()
                             )
+                        }
+                        else -> {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = {
+                                    val activity = run {
+                                        var ctx = context
+                                        while (ctx is android.content.ContextWrapper && ctx !is Activity) {
+                                            ctx = ctx.baseContext
+                                        }
+                                        ctx as? Activity
+                                    } ?: return@Button
+                                    coroutineScope.launch {
+                                        try {
+                                            val option = GetSignInWithGoogleOption.Builder(BuildConfig.WEB_CLIENT_ID).build()
+                                            val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+                                            val result = CredentialManager.create(context).getCredential(activity, request)
+                                            val idToken = GoogleIdTokenCredential.createFrom(result.credential.data).idToken
+                                            viewModel.onGoogleSignIn(idToken)
+                                        } catch (_: GetCredentialCancellationException) {
+                                            // User cancelled — leave state unchanged.
+                                        } catch (_: Exception) {
+                                            // Credential error — leave state unchanged.
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Sign In with Google")
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            EmailAuthSection(
+                                onSignUp = viewModel::onEmailSignUp,
+                                onSignIn = viewModel::onEmailSignIn
+                            )
+                            if (state is SignInState.Error) {
+                                Text(
+                                    text = "Sign-in failed. Tap to try again.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .politeLiveRegion()
+                                )
+                            }
                         }
                     }
                 }
