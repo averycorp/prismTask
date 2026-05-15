@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Scale, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Scale, AlertTriangle, ChevronRight } from 'lucide-react';
 import {
   computeBalanceState,
   type BalanceConfig,
@@ -39,6 +40,7 @@ const CATEGORY_LABEL: Record<LifeCategory, string> = {
 };
 
 export function TodayBalanceBar() {
+  const navigate = useNavigate();
   const tasks = useTaskStore((s) => s.tasks);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const [prefs, setPrefs] = useState<BalancePreferences>(DEFAULT_BALANCE_PREFERENCES);
@@ -87,9 +89,11 @@ export function TodayBalanceBar() {
   const hasData = state.totalTracked > 0;
 
   return (
-    <div
-      className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3"
-      aria-label="Work-life balance"
+    <button
+      type="button"
+      onClick={() => navigate('/balance/weekly-report')}
+      className="mb-4 block w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3 text-left transition-colors hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-bg-secondary)]"
+      aria-label="Work-life balance — open weekly report"
     >
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -110,6 +114,10 @@ export function TodayBalanceBar() {
               {CATEGORY_LABEL[state.dominantCategory]}
             </span>
           )}
+          <ChevronRight
+            className="h-3.5 w-3.5 text-[var(--color-text-secondary)]"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
@@ -123,7 +131,7 @@ export function TodayBalanceBar() {
           Add categories to your tasks to see your balance.
         </p>
       )}
-    </div>
+    </button>
   );
 }
 
