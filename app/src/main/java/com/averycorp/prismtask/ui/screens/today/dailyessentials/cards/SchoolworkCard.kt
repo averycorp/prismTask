@@ -61,8 +61,17 @@ fun SchoolworkCard(
                 Text(
                     text = "Schoolwork",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f, fill = true)
                 )
+                if (state.allComplete) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Finished",
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             val assignmentsByCourse: Map<Long, List<AssignmentSummary>> =
