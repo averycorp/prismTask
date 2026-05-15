@@ -347,4 +347,3 @@ private fun formatInterval(mins: Int): String = when {
     mins % 60 == 0 -> "${mins / 60}h"
     else -> "${mins}m"
 }
-
