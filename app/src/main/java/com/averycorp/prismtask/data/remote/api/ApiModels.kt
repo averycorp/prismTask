@@ -341,6 +341,22 @@ data class UrgencyScoreResponse(
     val scores: List<UrgencyScoreEntry>
 )
 
+/**
+ * Pro-only per-task duration estimate. Called fire-and-forget from
+ * AddEditTaskViewModel save when the user leaves estimatedDuration blank.
+ * Free users skip the call entirely and inherit
+ * `TaskDefaults.defaultDuration` (preset 30 min).
+ */
+data class EstimateDurationRequest(
+    val title: String,
+    val description: String? = null
+)
+
+data class EstimateDurationResponse(
+    @SerializedName("estimated_minutes") val estimatedMinutes: Int,
+    val reason: String = ""
+)
+
 data class PomodoroRequest(
     @SerializedName("available_minutes") val availableMinutes: Int = 120,
     @SerializedName("session_length") val sessionLength: Int = 25,

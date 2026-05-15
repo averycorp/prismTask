@@ -426,6 +426,76 @@ Respond ONLY with valid JSON (no markdown, no prose):
     raise ValueError(f"Failed to parse AI response: {last_error}")
 
 
+def estimate_task_duration_text(
+    title: str,
+    description: str | None,
+    tier: str = "PRO",
+) -> dict:
+    """Estimate how many minutes a single task will take to complete.
+
+    Returns ``{"estimated_minutes": int, "reason": str}`` clamped to 1..480.
+    Pro-only — the router rejects FREE tier callers — because Free users get
+    the deterministic ``TaskDefaults.defaultDuration`` (preset 30 min)
+    instead of a Haiku call. Raises ``ValueError`` on malformed AI response,
+    ``RuntimeError`` when the Anthropic client is unavailable, mirroring
+    ``classify_cognitive_load_text`` and ``classify_eisenhower_text``.
+    """
+    client = _get_client()
+    model = get_model("eisenhower")  # Haiku tier matches other classify-text endpoints
+    task_summary = {
+        "title": title,
+        "description": description or "",
+    }
+    prompt = f"""You are a productivity assistant. Estimate how many MINUTES one task will realistically take a typical adult to complete from start to finish.
+
+Rules:
+- Output an integer between 1 and 480 (8 hours max).
+- Estimate working time, not elapsed wall time.
+- Quick replies / small reminders / acknowledgements: 1-5 min.
+- Routine errands, focused emails, short reads: 10-30 min.
+- Reviews, drafting, deep work, project chunks: 45-180 min.
+- Multi-hour deliverables (writing reports, deep coding sessions): 180-480 min.
+- If a task title clearly bundles many subtasks, estimate the bundle.
+- If genuinely ambiguous, prefer the conservative middle (45 min).
+
+Task:
+{json.dumps(task_summary, default=str, indent=2)}
+
+Respond ONLY with valid JSON (no markdown, no prose):
+{{"estimated_minutes": 30, "reason": "brief reason"}}"""
+
+    last_error = None
+    for attempt in range(2):
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=128,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = message.content[0].text
+            result = _parse_ai_json(content)
+            if not isinstance(result, dict):
+                raise ValueError("Expected a JSON object")
+            raw_minutes = result.get("estimated_minutes")
+            if not isinstance(raw_minutes, (int, float)):
+                raise ValueError(f"Invalid estimated_minutes: {raw_minutes!r}")
+            minutes = max(1, min(480, int(round(raw_minutes))))
+            return {
+                "estimated_minutes": minutes,
+                "reason": str(result.get("reason", ""))[:500],
+            }
+        except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
+            last_error = e
+            logger.error(f"Failed to parse duration-estimate response (attempt {attempt + 1}): {e}")
+            if attempt == 0:
+                continue
+            raise ValueError(f"Failed to parse AI response after retry: {e}") from e
+        except Exception as e:
+            logger.error(f"Duration-estimate AI error: {type(e).__name__}: {e}")
+            raise
+    raise ValueError(f"Failed to parse AI response: {last_error}")
+
+
 def plan_pomodoro(tasks: list[dict], available_minutes: int, session_length: int, break_length: int, long_break_length: int, focus_preference: str, today: date, tier: str = "FREE") -> dict:
     """Call Claude to generate a Pomodoro focus session plan."""
     client = _get_client()

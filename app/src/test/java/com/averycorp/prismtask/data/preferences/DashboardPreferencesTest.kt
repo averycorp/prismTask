@@ -82,14 +82,39 @@ class DashboardPreferencesTest {
     }
 
     @Test
+    fun getCompletionCountMode_defaultsToTasksAndHabits() = runTest {
+        assertEquals(CompletionCountMode.TASKS_AND_HABITS, prefs.getCompletionCountMode().first())
+    }
+
+    @Test
+    fun setCompletionCountMode_roundTripsForEveryVariant() = runTest {
+        for (mode in CompletionCountMode.entries) {
+            prefs.setCompletionCountMode(mode)
+            assertEquals(mode, prefs.getCompletionCountMode().first())
+        }
+    }
+
+    @Test
+    fun completionCountMode_fromName_fallsBackToTasksAndHabitsForUnknown() {
+        assertEquals(CompletionCountMode.TASKS_AND_HABITS, CompletionCountMode.fromName(null))
+        assertEquals(CompletionCountMode.TASKS_AND_HABITS, CompletionCountMode.fromName("garbage"))
+        assertEquals(
+            CompletionCountMode.TASKS_HABITS_AND_SELFCARE,
+            CompletionCountMode.fromName(CompletionCountMode.TASKS_HABITS_AND_SELFCARE.name)
+        )
+    }
+
+    @Test
     fun resetToDefaults_clearsAllOverrides() = runTest {
         prefs.setSectionOrder(listOf("completed"))
         prefs.setHiddenSections(setOf("completed"))
         prefs.setProgressStyle("bar")
+        prefs.setCompletionCountMode(CompletionCountMode.TASKS_ONLY)
         prefs.resetToDefaults()
 
         assertEquals(DashboardPreferences.DEFAULT_ORDER, prefs.getSectionOrder().first())
         assertEquals(DashboardPreferences.DEFAULT_HIDDEN, prefs.getHiddenSections().first())
         assertEquals("ring", prefs.getProgressStyle().first())
+        assertEquals(CompletionCountMode.TASKS_AND_HABITS, prefs.getCompletionCountMode().first())
     }
 }

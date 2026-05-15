@@ -70,6 +70,7 @@ class AddEditTaskViewModelTest {
     private lateinit var parsedTaskResolver: ParsedTaskResolver
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var lifeCategoryRemoteClassifier: LifeCategoryRemoteClassifier
+    private lateinit var durationEstimatorService: com.averycorp.prismtask.data.remote.DurationEstimatorService
     private lateinit var fileExtractionService: com.averycorp.prismtask.data.remote.FileExtractionService
     private lateinit var savedStateHandle: SavedStateHandle
 
@@ -113,6 +114,11 @@ class AddEditTaskViewModelTest {
         parsedTaskResolver = mockk(relaxed = true)
         proFeatureGate = mockk(relaxed = true)
         lifeCategoryRemoteClassifier = mockk(relaxed = true)
+        durationEstimatorService = mockk(relaxed = true)
+        // Default: Free-tier path (no Pro Haiku call). Tests covering the
+        // Pro auto-estimate path override this.
+        coEvery { durationEstimatorService.estimate(any(), any()) } returns
+            Result.failure(IllegalStateException("free tier"))
         fileExtractionService = mockk(relaxed = true)
         // Default: Auto-button remote classifier returns failure (offline /
         // logged-out). Tests that exercise the Claude-backed upgrade path
@@ -181,6 +187,7 @@ class AddEditTaskViewModelTest {
         parsedTaskResolver,
         proFeatureGate,
         lifeCategoryRemoteClassifier,
+        durationEstimatorService,
         fileExtractionService,
         savedStateHandle
     )

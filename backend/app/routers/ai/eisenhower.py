@@ -27,6 +27,8 @@ from app.schemas.ai import (
     EisenhowerRequest,
     EisenhowerResponse,
     EisenhowerSummary,
+    EstimateDurationRequest,
+    EstimateDurationResponse,
     LifeCategoryClassifyTextRequest,
     LifeCategoryClassifyTextResponse,
 )
@@ -222,5 +224,52 @@ async def classify_life_category_text(
 
     return LifeCategoryClassifyTextResponse(
         category=result["category"],
+        reason=result["reason"],
+    )
+
+
+@router.post("/tasks/estimate-duration", response_model=EstimateDurationResponse)
+async def estimate_task_duration(
+    data: EstimateDurationRequest,
+    request: Request,
+    current_user: User = Depends(get_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pro-only Haiku per-task duration estimate.
+
+    Called fire-and-forget from AddEditTaskViewModel save when the user
+    leaves estimatedDuration blank. Free users never reach here — the
+    Android client gates on `ProFeatureGate.isPro()` and the router
+    rejects FREE tier requests so a misbehaving client cannot consume
+    Haiku tokens. Free users inherit `TaskDefaults.defaultDuration`
+    (preset 30 min) instead.
+    """
+    from app.routers import ai as _ai_pkg
+    _ai_pkg.duration_estimate_rate_limiter.check(request)
+    tier = await resolve_effective_tier(current_user, db)
+    if tier != "PRO":
+        raise HTTPException(
+            status_code=403,
+            detail="Per-task duration estimation is a Pro feature",
+        )
+    daily_ai_rate_limiter.check(current_user.id, tier)
+
+    try:
+        from app.services.ai_productivity import (
+            estimate_task_duration_text as ai_estimate,
+        )
+
+        result = ai_estimate(
+            title=data.title,
+            description=data.description,
+            tier=tier,
+        )
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
+    except ValueError:
+        raise HTTPException(status_code=500, detail="AI returned an invalid response")
+
+    return EstimateDurationResponse(
+        estimated_minutes=result["estimated_minutes"],
         reason=result["reason"],
     )

@@ -18,6 +18,7 @@ import com.averycorp.prismtask.data.local.database.PrismTaskDatabase
 import com.averycorp.prismtask.data.preferences.ArchivePreferences
 import com.averycorp.prismtask.data.preferences.AuthTokenPreferences
 import com.averycorp.prismtask.data.preferences.BackendSyncPreferences
+import com.averycorp.prismtask.data.preferences.CompletionCountMode
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.OnboardingPreferences
@@ -438,6 +439,22 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setTaskDefaults(defaults) }
     }
 
+    /**
+     * Per-task fallback duration (minutes) used by the Today balance bar +
+     * cognitive-load tracker when a task has no `estimatedDuration`. Defaults
+     * to 30 min (Free-tier preset). Pro users normally see this overridden
+     * per task by the Haiku auto-estimate, so this row matters most for
+     * Free users.
+     */
+    fun setDefaultTaskDuration(minutes: Int) {
+        val clamped = minutes.coerceIn(5, 480)
+        viewModelScope.launch {
+            userPreferencesDataStore.setTaskDefaults(
+                taskDefaultPrefs.value.copy(defaultDuration = clamped)
+            )
+        }
+    }
+
     fun setSmartDefaultsEnabled(enabled: Boolean) {
         viewModelScope.launch { userPreferencesDataStore.setSmartDefaultsEnabled(enabled) }
     }
@@ -557,6 +574,14 @@ constructor(
     val progressStyle: StateFlow<String> = dashboardPreferences
         .getProgressStyle()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ring")
+
+    val completionCountMode: StateFlow<CompletionCountMode> = dashboardPreferences
+        .getCompletionCountMode()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            DashboardPreferences.DEFAULT_COMPLETION_COUNT_MODE
+        )
 
     // --- Navigation ---
     val tabOrder: StateFlow<List<String>> = tabPreferences
@@ -905,6 +930,10 @@ constructor(
 
     fun setProgressStyle(style: String) {
         viewModelScope.launch { dashboardPreferences.setProgressStyle(style) }
+    }
+
+    fun setCompletionCountMode(mode: CompletionCountMode) {
+        viewModelScope.launch { dashboardPreferences.setCompletionCountMode(mode) }
     }
 
     fun resetDashboardDefaults() {

@@ -35,13 +35,21 @@ data class SwipePrefs(
 
 /**
  * Default values applied when creating a new task.
+ *
+ * `defaultDuration` is the per-task fallback length in minutes used by both
+ * task-creation defaults and by the [BalanceTracker] / [CognitiveLoadBalanceTracker]
+ * weighting for any task missing an `estimatedDuration`. It defaults to 30 so
+ * Free users — who don't get the Pro Haiku per-task estimate — see
+ * meaningful balance + cognitive-load ratios out of the box. Kept nullable so
+ * SmartDefaultsEngine can still treat "explicitly null" as "fall through to
+ * the smart suggestion" if a user opts into Smart Defaults.
  */
 data class TaskDefaults(
     val defaultPriority: Int = 0,
     val defaultReminderOffset: Long = -1L,
     val defaultProjectId: Long? = null,
     val startOfWeek: StartOfWeek = StartOfWeek.MONDAY,
-    val defaultDuration: Int? = null,
+    val defaultDuration: Int? = 30,
     val autoSetDueDate: AutoDueDate = AutoDueDate.NONE,
     val smartDefaultsEnabled: Boolean = false
 )
@@ -359,7 +367,7 @@ class UserPreferencesDataStore(
             defaultReminderOffset = prefs[KEY_DEFAULT_REMINDER_OFFSET] ?: -1L,
             defaultProjectId = if (rawProjectId == null || rawProjectId == DEFAULT_PROJECT_NULL_SENTINEL) null else rawProjectId,
             startOfWeek = StartOfWeek.fromName(prefs[KEY_START_OF_WEEK]),
-            defaultDuration = prefs[KEY_DEFAULT_DURATION]?.takeIf { it > 0 },
+            defaultDuration = prefs[KEY_DEFAULT_DURATION]?.takeIf { it > 0 } ?: 30,
             autoSetDueDate = AutoDueDate.fromName(prefs[KEY_AUTO_SET_DUE_DATE]),
             smartDefaultsEnabled = prefs[KEY_SMART_DEFAULTS] ?: false
         )
@@ -555,7 +563,7 @@ class UserPreferencesDataStore(
             it[KEY_DEFAULT_REMINDER_OFFSET] = defaults.defaultReminderOffset
             it[KEY_DEFAULT_PROJECT_ID] = defaults.defaultProjectId ?: DEFAULT_PROJECT_NULL_SENTINEL
             it[KEY_START_OF_WEEK] = defaults.startOfWeek.name
-            it[KEY_DEFAULT_DURATION] = defaults.defaultDuration ?: -1
+            it[KEY_DEFAULT_DURATION] = defaults.defaultDuration ?: 30
             it[KEY_AUTO_SET_DUE_DATE] = defaults.autoSetDueDate.name
             it[KEY_SMART_DEFAULTS] = defaults.smartDefaultsEnabled
         }

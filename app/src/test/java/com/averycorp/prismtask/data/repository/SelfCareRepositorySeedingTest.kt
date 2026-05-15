@@ -199,6 +199,8 @@ class SelfCareRepositorySeedingTest {
         override fun getLogForDate(routineType: String, date: Long): Flow<SelfCareLogEntity?> =
             flowOf(null)
 
+        override fun getLogsForDate(date: Long): Flow<List<SelfCareLogEntity>> = flowOf(emptyList())
+
         override suspend fun getLogForDateOnce(routineType: String, date: Long): SelfCareLogEntity? =
             null
 

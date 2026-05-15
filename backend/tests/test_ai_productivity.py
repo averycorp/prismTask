@@ -175,6 +175,77 @@ class TestLifeCategoryClassifyText:
             assert result["category"] == "UNCATEGORIZED"
 
 
+class TestEstimateTaskDurationText:
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_estimate_duration_success(self):
+        from app.services.ai_productivity import estimate_task_duration_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response({
+                "estimated_minutes": 45,
+                "reason": "Drafting a focused email reply",
+            })
+
+            result = estimate_task_duration_text(
+                title="Reply to the partnership email thread",
+                description=None,
+            )
+
+            assert result["estimated_minutes"] == 45
+            assert "Drafting" in result["reason"]
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_estimate_duration_clamps_to_bounds(self):
+        from app.services.ai_productivity import estimate_task_duration_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            # Out-of-range value gets clamped to the 1..480 range, not retried.
+            mock_client.messages.create.return_value = _make_mock_response({
+                "estimated_minutes": 9000,
+                "reason": "way too big",
+            })
+
+            result = estimate_task_duration_text(title="Write novel", description=None)
+            assert result["estimated_minutes"] == 480
+            assert mock_client.messages.create.call_count == 1
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_estimate_duration_invalid_payload_retries(self):
+        from app.services.ai_productivity import estimate_task_duration_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+
+            bad_response = _make_mock_response({"estimated_minutes": "not a number"})
+            good_response = _make_mock_response({"estimated_minutes": 25, "reason": "ok"})
+            mock_client.messages.create.side_effect = [bad_response, good_response]
+
+            result = estimate_task_duration_text(title="Take out trash", description=None)
+            assert result["estimated_minutes"] == 25
+            assert mock_client.messages.create.call_count == 2
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_estimate_duration_both_fail_raises(self):
+        from app.services.ai_productivity import estimate_task_duration_text
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            bad_response = MagicMock()
+            bad_content = MagicMock()
+            bad_content.text = "{{invalid}}"
+            bad_response.content = [bad_content]
+            mock_client.messages.create.return_value = bad_response
+
+            with pytest.raises(ValueError, match="Failed to parse AI response"):
+                estimate_task_duration_text(title="Foo", description=None)
+
+
 class TestPomodoroService:
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
     def test_plan_pomodoro_success(self):

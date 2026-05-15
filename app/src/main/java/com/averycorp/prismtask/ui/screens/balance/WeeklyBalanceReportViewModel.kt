@@ -60,6 +60,8 @@ constructor(
             try {
                 val prefs = userPreferencesDataStore.workLifeBalanceFlow.first()
                 val sod = taskBehaviorPreferences.getStartOfDay().first()
+                val taskDefaults = userPreferencesDataStore.taskDefaultsFlow.first()
+                val defaultDuration = taskDefaults.defaultDuration ?: 30
                 val tasks = taskRepository.getAllTasksOnce()
                 val contributions = balanceContributionsProvider.snapshot(now = reference)
                 val stats = aggregator.aggregate(tasks, reference)
@@ -77,7 +79,8 @@ constructor(
                     dayStartHour = sod.hour,
                     dayStartMinute = sod.minute,
                     habitContributions = contributions.habits,
-                    leisureContributions = contributions.leisure
+                    leisureContributions = contributions.leisure,
+                    defaultDurationMinutes = defaultDuration
                 )
                 val cognitiveLoadBalance = cognitiveLoadBalanceTracker.compute(
                     allTasks = tasks,
@@ -86,7 +89,8 @@ constructor(
                     dayStartHour = sod.hour,
                     dayStartMinute = sod.minute,
                     habitCompletionTimestamps = contributions.habitTimestamps,
-                    leisureSessionTimestamps = contributions.leisureTimestamps
+                    leisureSessionTimestamps = contributions.leisureTimestamps,
+                    defaultDurationMinutes = defaultDuration
                 )
                 val workRatio = balance.currentRatios[LifeCategory.WORK] ?: 0f
                 val burnout = burnoutScorer.computeFromTasks(

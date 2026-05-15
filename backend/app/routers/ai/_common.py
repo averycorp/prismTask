@@ -56,6 +56,12 @@ life_category_classify_text_rate_limiter = RateLimiter(max_requests=20, window_s
 # ceiling.
 urgency_score_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
+# Per-task duration estimation — Pro-only Haiku call fired fire-and-forget
+# from AddEditTaskViewModel save when the user leaves estimatedDuration blank.
+# 20/min mirrors the other per-task text-classify limiters (one call per
+# saved task, with headroom for voice-add bursts).
+duration_estimate_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
 # Rate limiters for new AI endpoints
 briefing_rate_limiter = RateLimiter(max_requests=1, window_seconds=3600)  # 1 per hour
 weekly_plan_rate_limiter = RateLimiter(max_requests=1, window_seconds=1800)  # 1 per 30 min

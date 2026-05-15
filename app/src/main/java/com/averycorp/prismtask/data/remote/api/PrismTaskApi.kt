@@ -140,6 +140,11 @@ interface PrismTaskApi {
         @Body request: UrgencyScoreRequest
     ): UrgencyScoreResponse
 
+    @POST("api/v1/ai/tasks/estimate-duration")
+    suspend fun estimateTaskDuration(
+        @Body request: EstimateDurationRequest
+    ): EstimateDurationResponse
+
     @POST("api/v1/ai/pomodoro-plan")
     suspend fun planPomodoro(
         @Body request: PomodoroRequest

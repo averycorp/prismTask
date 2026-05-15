@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.averycorp.prismtask.data.preferences.CompletionCountMode
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.ui.components.CircularCheckbox
 import com.averycorp.prismtask.ui.components.settings.AdvancedToggle
@@ -35,9 +36,11 @@ import com.averycorp.prismtask.ui.screens.settings.sectionLabels
 @Composable
 fun DashboardSection(
     progressStyle: String,
+    completionCountMode: CompletionCountMode,
     sectionOrder: List<String>,
     hiddenSections: Set<String>,
     onProgressStyleChange: (String) -> Unit,
+    onCompletionCountModeChange: (CompletionCountMode) -> Unit,
     onHiddenSectionsChange: (Set<String>) -> Unit,
     onSectionOrderChange: (List<String>) -> Unit,
     onResetDashboardDefaults: () -> Unit
@@ -56,6 +59,37 @@ fun DashboardSection(
             FilterChip(
                 selected = progressStyle == value,
                 onClick = { onProgressStyleChange(value) },
+                label = { Text(label) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        text = "Today Counter Includes",
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+    Text(
+        text = "What contributes to the \"done\" number at the top of Today.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+    val countModeOptions = listOf(
+        CompletionCountMode.TASKS_ONLY to "Tasks Only",
+        CompletionCountMode.TASKS_AND_HABITS to "Tasks + Habits",
+        CompletionCountMode.TASKS_HABITS_AND_SELFCARE to "Tasks + Habits + Self-Care"
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        countModeOptions.forEach { (mode, label) ->
+            FilterChip(
+                selected = completionCountMode == mode,
+                onClick = { onCompletionCountModeChange(mode) },
                 label = { Text(label) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,

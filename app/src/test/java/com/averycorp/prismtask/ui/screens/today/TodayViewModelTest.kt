@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.screens.today
 import app.cash.turbine.test
 import com.averycorp.prismtask.core.time.LocalDateFlow
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+import com.averycorp.prismtask.data.preferences.CompletionCountMode
 import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
@@ -131,6 +132,9 @@ class TodayViewModelTest {
         coEvery { dashboardPreferences.getHiddenSections() } returns flowOf(emptySet())
         coEvery { dashboardPreferences.getCollapsedSections() } returns flowOf(setOf("planned"))
         coEvery { dashboardPreferences.getProgressStyle() } returns flowOf("ring")
+        coEvery { dashboardPreferences.getCompletionCountMode() } returns
+            flowOf(CompletionCountMode.TASKS_AND_HABITS)
+        coEvery { selfCareRepository.getLogsForDate(any()) } returns flowOf(emptyList())
         coEvery { sortPreferences.observeSortMode(any()) } returns flowOf(SortPreferences.SortModes.DEFAULT)
         coEvery { habitListPreferences.isSelfCareEnabled() } returns flowOf(true)
         coEvery { habitListPreferences.isMedicationEnabled() } returns flowOf(true)
@@ -326,6 +330,88 @@ class TodayViewModelTest {
 
         vm.onDismissPlanSheet()
         assert(!vm.showPlanSheet.value)
+    }
+
+    @Test
+    fun combinedCompleted_excludesSelfCareInTasksOnlyMode() = runTest(dispatcher) {
+        val task = com.averycorp.prismtask.data.local.entity.TaskEntity(
+            id = 1L,
+            title = "task",
+            isCompleted = true,
+            completedAt = 0L
+        )
+        val selfCareLog = com.averycorp.prismtask.data.local.entity.SelfCareLogEntity(
+            id = 1L,
+            routineType = "morning",
+            date = 0L,
+            isComplete = true
+        )
+        coEvery { taskRepository.getCompletedToday(any()) } returns flowOf(listOf(task))
+        coEvery { selfCareRepository.getLogsForDate(any()) } returns flowOf(listOf(selfCareLog))
+        coEvery { dashboardPreferences.getCompletionCountMode() } returns
+            flowOf(CompletionCountMode.TASKS_ONLY)
+
+        val vm = newViewModel()
+        vm.combinedCompleted.test {
+            advanceUntilIdle()
+            assert(expectMostRecentItem() == 1) {
+                "TASKS_ONLY should ignore the completed self-care routine"
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun combinedCompleted_includesSelfCareInFullMode() = runTest(dispatcher) {
+        val task = com.averycorp.prismtask.data.local.entity.TaskEntity(
+            id = 1L,
+            title = "task",
+            isCompleted = true,
+            completedAt = 0L
+        )
+        val morningLog = com.averycorp.prismtask.data.local.entity.SelfCareLogEntity(
+            id = 1L,
+            routineType = "morning",
+            date = 0L,
+            isComplete = true
+        )
+        val bedtimeLogIncomplete = com.averycorp.prismtask.data.local.entity.SelfCareLogEntity(
+            id = 2L,
+            routineType = "bedtime",
+            date = 0L,
+            isComplete = false
+        )
+        coEvery { taskRepository.getCompletedToday(any()) } returns flowOf(listOf(task))
+        coEvery { selfCareRepository.getLogsForDate(any()) } returns
+            flowOf(listOf(morningLog, bedtimeLogIncomplete))
+        coEvery { dashboardPreferences.getCompletionCountMode() } returns
+            flowOf(CompletionCountMode.TASKS_HABITS_AND_SELFCARE)
+
+        val vm = newViewModel()
+        vm.combinedCompleted.test {
+            advanceUntilIdle()
+            // 1 task + 0 habits + 1 completed self-care = 2 (incomplete bedtime ignored)
+            assert(expectMostRecentItem() == 2) {
+                "FULL mode should add only completed self-care routines"
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun selfCareTotalCount_dropsDisabledRoutines() = runTest(dispatcher) {
+        // Self-care toggle off → morning + bedtime drop; medication on → +1;
+        // housework off → no housework. Expect total = 1 (medication).
+        coEvery { habitListPreferences.isSelfCareEnabled() } returns flowOf(false)
+        coEvery { habitListPreferences.isMedicationEnabled() } returns flowOf(true)
+        coEvery { habitListPreferences.isHouseworkEnabled() } returns flowOf(false)
+
+        val vm = newViewModel()
+        vm.selfCareTotalCount.test {
+            advanceUntilIdle()
+            assert(expectMostRecentItem() == 1)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

@@ -166,6 +166,11 @@ class NaturalLanguageParserTest {
         ): com.averycorp.prismtask.data.remote.api.UrgencyScoreResponse =
             error("not used in offline parser tests")
 
+        override suspend fun estimateTaskDuration(
+            request: com.averycorp.prismtask.data.remote.api.EstimateDurationRequest
+        ): com.averycorp.prismtask.data.remote.api.EstimateDurationResponse =
+            error("not used in offline parser tests")
+
         override suspend fun planPomodoro(request: PomodoroRequest): PomodoroResponse =
             error("not used in offline parser tests")
 

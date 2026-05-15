@@ -101,7 +101,16 @@ data class LeisureContribution(
  * to the SoD preference fall back to system midnight (`dayStartHour = 0`).
  */
 class BalanceTracker {
-    /** Compute a [BalanceState] from tasks, habit completions, and leisure sessions. */
+    /**
+     * Compute a [BalanceState] from tasks, habit completions, and leisure sessions.
+     *
+     * @param defaultDurationMinutes Per-entry weight in minutes used when a
+     *   task has no `estimatedDuration` set, and the unit weight used for
+     *   every habit completion / leisure session (those have no per-entry
+     *   duration field). Coerced to at least 1 to prevent divide-by-zero.
+     *   Default 30 keeps ratios identical to the legacy count-based behaviour
+     *   when no task carries an explicit estimate.
+     */
     fun compute(
         allTasks: List<TaskEntity>,
         config: BalanceConfig,
@@ -110,13 +119,15 @@ class BalanceTracker {
         dayStartHour: Int = 0,
         dayStartMinute: Int = 0,
         habitContributions: List<HabitContribution> = emptyList(),
-        leisureContributions: List<LeisureContribution> = emptyList()
+        leisureContributions: List<LeisureContribution> = emptyList(),
+        defaultDurationMinutes: Int = 30
     ): BalanceState {
         val weekCutoff = cutoff(now, days = 7, timeZone, dayStartHour, dayStartMinute)
         val monthCutoff = cutoff(now, days = 28, timeZone, dayStartHour, dayStartMinute)
+        val unitMinutes = defaultDurationMinutes.coerceAtLeast(1)
 
-        val current = computeRatios(allTasks, habitContributions, leisureContributions, weekCutoff)
-        val rolling = computeRatios(allTasks, habitContributions, leisureContributions, monthCutoff)
+        val current = computeRatios(allTasks, habitContributions, leisureContributions, weekCutoff, unitMinutes)
+        val rolling = computeRatios(allTasks, habitContributions, leisureContributions, monthCutoff, unitMinutes)
         val total = countTracked(allTasks, habitContributions, leisureContributions, weekCutoff)
 
         val workRatio = current[LifeCategory.WORK] ?: 0f
@@ -142,31 +153,33 @@ class BalanceTracker {
         tasks: List<TaskEntity>,
         habitContributions: List<HabitContribution>,
         leisureContributions: List<LeisureContribution>,
-        cutoff: Long
+        cutoff: Long,
+        unitMinutes: Int
     ): Map<LifeCategory, Float> {
-        val counts = LifeCategory.TRACKED.associateWith { 0 }.toMutableMap()
-        var total = 0
+        val minutes = LifeCategory.TRACKED.associateWith { 0L }.toMutableMap()
+        var total = 0L
         for (t in tasks) {
             val ts = timestampFor(t)
             if (ts < cutoff) continue
             val cat = LifeCategory.fromStorage(t.lifeCategory)
             if (cat == LifeCategory.UNCATEGORIZED) continue
-            counts[cat] = (counts[cat] ?: 0) + 1
-            total++
+            val w = (t.estimatedDuration?.takeIf { it > 0 } ?: unitMinutes).toLong()
+            minutes[cat] = (minutes[cat] ?: 0L) + w
+            total += w
         }
         for (h in habitContributions) {
             if (h.completedAt < cutoff) continue
             if (h.lifeCategory == LifeCategory.UNCATEGORIZED) continue
-            counts[h.lifeCategory] = (counts[h.lifeCategory] ?: 0) + 1
-            total++
+            minutes[h.lifeCategory] = (minutes[h.lifeCategory] ?: 0L) + unitMinutes
+            total += unitMinutes
         }
         for (l in leisureContributions) {
             if (l.loggedAt < cutoff) continue
-            counts[LifeCategory.SELF_CARE] = (counts[LifeCategory.SELF_CARE] ?: 0) + 1
-            total++
+            minutes[LifeCategory.SELF_CARE] = (minutes[LifeCategory.SELF_CARE] ?: 0L) + unitMinutes
+            total += unitMinutes
         }
-        if (total == 0) return LifeCategory.TRACKED.associateWith { 0f }
-        return counts.mapValues { (_, count) -> count.toFloat() / total.toFloat() }
+        if (total == 0L) return LifeCategory.TRACKED.associateWith { 0f }
+        return minutes.mapValues { (_, m) -> m.toFloat() / total.toFloat() }
     }
 
     private fun countTracked(

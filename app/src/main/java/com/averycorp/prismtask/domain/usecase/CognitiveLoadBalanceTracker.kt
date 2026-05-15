@@ -74,6 +74,13 @@ data class CognitiveLoadBalanceConfig(
  * system midnight (`dayStartHour = 0`).
  */
 class CognitiveLoadBalanceTracker {
+    /**
+     * @param defaultDurationMinutes Minute weight applied to tasks lacking
+     *   an `estimatedDuration` and to every habit / leisure entry (those
+     *   carry no per-entry duration). Coerced to at least 1. Default 30
+     *   keeps ratios identical to the legacy count-based behaviour when
+     *   no task carries an explicit estimate.
+     */
     fun compute(
         allTasks: List<TaskEntity>,
         config: CognitiveLoadBalanceConfig = CognitiveLoadBalanceConfig(),
@@ -82,13 +89,15 @@ class CognitiveLoadBalanceTracker {
         dayStartHour: Int = 0,
         dayStartMinute: Int = 0,
         habitCompletionTimestamps: List<Long> = emptyList(),
-        leisureSessionTimestamps: List<Long> = emptyList()
+        leisureSessionTimestamps: List<Long> = emptyList(),
+        defaultDurationMinutes: Int = 30
     ): CognitiveLoadBalanceState {
         val weekCutoff = cutoff(now, days = 7, timeZone, dayStartHour, dayStartMinute)
         val monthCutoff = cutoff(now, days = 28, timeZone, dayStartHour, dayStartMinute)
+        val unitMinutes = defaultDurationMinutes.coerceAtLeast(1)
 
-        val current = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff)
-        val rolling = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, monthCutoff)
+        val current = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff, unitMinutes)
+        val rolling = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, monthCutoff, unitMinutes)
         val total = countTracked(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff)
 
         val dominant = if (total == 0) {
@@ -110,30 +119,32 @@ class CognitiveLoadBalanceTracker {
         tasks: List<TaskEntity>,
         habitCompletionTimestamps: List<Long>,
         leisureSessionTimestamps: List<Long>,
-        cutoff: Long
+        cutoff: Long,
+        unitMinutes: Int
     ): Map<CognitiveLoad, Float> {
-        val counts = CognitiveLoad.TRACKED.associateWith { 0 }.toMutableMap()
-        var total = 0
+        val minutes = CognitiveLoad.TRACKED.associateWith { 0L }.toMutableMap()
+        var total = 0L
         for (t in tasks) {
             val ts = timestampFor(t)
             if (ts < cutoff) continue
             val load = CognitiveLoad.fromStorage(t.cognitiveLoad)
             if (load == CognitiveLoad.UNCATEGORIZED) continue
-            counts[load] = (counts[load] ?: 0) + 1
-            total++
+            val w = (t.estimatedDuration?.takeIf { it > 0 } ?: unitMinutes).toLong()
+            minutes[load] = (minutes[load] ?: 0L) + w
+            total += w
         }
         for (ts in habitCompletionTimestamps) {
             if (ts < cutoff) continue
-            counts[CognitiveLoad.EASY] = (counts[CognitiveLoad.EASY] ?: 0) + 1
-            total++
+            minutes[CognitiveLoad.EASY] = (minutes[CognitiveLoad.EASY] ?: 0L) + unitMinutes
+            total += unitMinutes
         }
         for (ts in leisureSessionTimestamps) {
             if (ts < cutoff) continue
-            counts[CognitiveLoad.EASY] = (counts[CognitiveLoad.EASY] ?: 0) + 1
-            total++
+            minutes[CognitiveLoad.EASY] = (minutes[CognitiveLoad.EASY] ?: 0L) + unitMinutes
+            total += unitMinutes
         }
-        if (total == 0) return CognitiveLoad.TRACKED.associateWith { 0f }
-        return counts.mapValues { (_, count) -> count.toFloat() / total.toFloat() }
+        if (total == 0L) return CognitiveLoad.TRACKED.associateWith { 0f }
+        return minutes.mapValues { (_, m) -> m.toFloat() / total.toFloat() }
     }
 
     private fun countTracked(

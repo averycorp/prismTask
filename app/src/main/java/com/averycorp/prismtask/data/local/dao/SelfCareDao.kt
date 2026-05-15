@@ -15,6 +15,9 @@ interface SelfCareDao {
     @Query("SELECT * FROM self_care_logs WHERE routine_type = :routineType AND date = :date LIMIT 1")
     fun getLogForDate(routineType: String, date: Long): Flow<SelfCareLogEntity?>
 
+    @Query("SELECT * FROM self_care_logs WHERE date = :date")
+    fun getLogsForDate(date: Long): Flow<List<SelfCareLogEntity>>
+
     @Query("SELECT * FROM self_care_logs WHERE routine_type = :routineType AND date = :date LIMIT 1")
     suspend fun getLogForDateOnce(routineType: String, date: Long): SelfCareLogEntity?
 
