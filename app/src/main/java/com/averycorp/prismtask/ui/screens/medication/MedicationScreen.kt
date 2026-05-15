@@ -110,6 +110,17 @@ fun MedicationScreen(
     var archivingMed by remember { mutableStateOf<MedicationEntity?>(null) }
     // Slot whose intended_time is being edited (long-press → time sheet).
     var timeEditingSlotState by remember { mutableStateOf<MedicationSlotTodayState?>(null) }
+    // Open the medication editor for a given med. Loads slot selections
+    // first so the dialog enters composition with its final
+    // `initialSelections` (see [EditingMedicationState] doc). Shared by
+    // the All-Medications edit row AND the long-press tier-edit
+    // affordance on per-med dose rows + unslotted cards.
+    val openEditor: (MedicationEntity) -> Unit = { med ->
+        coroutineScope.launch {
+            val sels = viewModel.selectionsForMedication(med.id)
+            editingState = EditingMedicationState(med, sels)
+        }
+    }
     // Pending dose-prompt for a (medication, optional slot) pair when the
     // medication has `promptDoseAtLog = true`. The dialog collects a
     // free-form amount, then dispatches to the appropriate record path.
@@ -214,7 +225,8 @@ fun MedicationScreen(
                                 // tier — the click is idempotent.
                                 viewModel.bulkMark(BulkMarkScope.SLOT, state.slot.id, tier)
                             },
-                            onLongPressTier = { timeEditingSlotState = state }
+                            onLongPressTier = { timeEditingSlotState = state },
+                            onEditMedication = openEditor
                         )
                     }
                     if (unslottedStates.isNotEmpty()) {
@@ -238,7 +250,8 @@ fun MedicationScreen(
                                     } else {
                                         viewModel.recordUnslottedDose(state.medication)
                                     }
-                                }
+                                },
+                                onEditMedication = { openEditor(state.medication) }
                             )
                         }
                     }
@@ -254,17 +267,7 @@ fun MedicationScreen(
                         items(medications, key = { "edit_${it.id}" }) { med ->
                             MedicationEditRow(
                                 medication = med,
-                                onEdit = {
-                                    // Load selections first, then open — guarantees
-                                    // the dialog sees its final initialSelections on
-                                    // first composition (vs. an async update that
-                                    // wouldn't reach the dialog's remember-without-key
-                                    // state).
-                                    coroutineScope.launch {
-                                        val sels = viewModel.selectionsForMedication(med.id)
-                                        editingState = EditingMedicationState(med, sels)
-                                    }
-                                },
+                                onEdit = { openEditor(med) },
                                 onArchive = { archivingMed = med }
                             )
                         }
@@ -407,7 +410,8 @@ private fun SlotTodayCard(
     editMode: Boolean,
     onToggleDose: (MedicationEntity) -> Unit,
     onSelectTier: (AchievedTier) -> Unit,
-    onLongPressTier: () -> Unit
+    onLongPressTier: () -> Unit,
+    onEditMedication: (MedicationEntity) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -453,7 +457,8 @@ private fun SlotTodayCard(
                     taken = med.id in state.takenMedicationIds,
                     takenAt = state.takenAtByMedicationId[med.id],
                     enabled = !editMode,
-                    onToggle = { onToggleDose(med) }
+                    onToggle = { onToggleDose(med) },
+                    onLongPress = { onEditMedication(med) }
                 )
             }
         }
@@ -558,13 +563,15 @@ private fun TierSegmentButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MedicationDoseRow(
     medication: MedicationEntity,
     taken: Boolean,
     takenAt: Long?,
     enabled: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onLongPress: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -585,7 +592,17 @@ private fun MedicationDoseRow(
                     MaterialTheme.colorScheme.outlineVariant
                 },
                 shape = RoundedCornerShape(10.dp)
-            ).clickable(enabled = enabled, onClick = onToggle)
+            )
+            // Long-press is always available (even in edit mode) so users
+            // can change a med's tier / name / slots without first tapping
+            // the All Medications list. Tap stays gated by `enabled` to
+            // preserve the existing edit-mode no-toggle behavior.
+            .combinedClickable(
+                enabled = true,
+                onClick = { if (enabled) onToggle() },
+                onLongClick = onLongPress,
+                onLongClickLabel = "Edit medication"
+            )
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -691,10 +708,12 @@ private fun MedicationEditRow(
  * name surfaces the most recent take time today as visual feedback.
  * Un-recording goes through the Medication Log screen.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UnslottedMedicationCard(
     state: UnslottedMedicationState,
-    onRecordTaken: () -> Unit
+    onRecordTaken: () -> Unit,
+    onEditMedication: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -703,6 +722,13 @@ private fun UnslottedMedicationCard(
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            // Long-press whole-row → editor. Tap stays a no-op so the
+            // explicit Record Taken button remains the only logging path.
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onEditMedication,
+                onLongClickLabel = "Edit medication"
+            )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
