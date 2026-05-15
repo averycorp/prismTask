@@ -1,5 +1,7 @@
 package com.averycorp.prismtask.domain
 
+import com.averycorp.prismtask.data.preferences.StartOfDay
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
@@ -10,12 +12,22 @@ import com.averycorp.prismtask.data.repository.ChatMessage
 import com.averycorp.prismtask.data.repository.ChatRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
+private fun fakeTaskBehaviorPreferences(
+    sod: StartOfDay = StartOfDay()
+): TaskBehaviorPreferences {
+    val mock = mockk<TaskBehaviorPreferences>(relaxed = true)
+    every { mock.getStartOfDay() } returns flowOf(sod)
+    return mock
+}
 
 class ChatRepositoryTest {
     // --- ChatMessage ---
@@ -247,7 +259,8 @@ class ChatRepositoryTest {
             api,
             com.averycorp.prismtask.data.repository.FakeChatMessageDao(),
             mockk<ChatStreamClient>(relaxed = true),
-            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true)
+            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true),
+            fakeTaskBehaviorPreferences()
         )
 
         repo.sendMessage(userMessage = "hello")
@@ -272,7 +285,8 @@ class ChatRepositoryTest {
             api,
             com.averycorp.prismtask.data.repository.FakeChatMessageDao(),
             mockk<ChatStreamClient>(relaxed = true),
-            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true)
+            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true),
+            fakeTaskBehaviorPreferences()
         )
 
         repo.sendMessage(userMessage = "first user message")
@@ -301,7 +315,8 @@ class ChatRepositoryTest {
             api,
             com.averycorp.prismtask.data.repository.FakeChatMessageDao(),
             mockk<ChatStreamClient>(relaxed = true),
-            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true)
+            mockk<com.averycorp.prismtask.data.repository.UserAiPreferenceRepository>(relaxed = true),
+            fakeTaskBehaviorPreferences()
         )
 
         // 8 turns → after the 8th send, repo would hold 14 messages pre-trim;

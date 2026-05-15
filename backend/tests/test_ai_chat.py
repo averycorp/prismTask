@@ -203,6 +203,119 @@ class TestChatService:
             assert payload["user_message"] == "break this down"
 
 
+class TestChatSodAnchor:
+    """The AI Coach must anchor its notion of "today" on the user's
+    Start-of-Day-resolved logical day, not server UTC. Without this, a
+    user with SoD = 4 AM messaging at 2 AM gets an AI that disagrees with
+    every other date surface in the app (Today screen, habits, widgets,
+    NLP date parsing) on what date "today" refers to. The client
+    forwards a pre-resolved ``user_context`` payload on every turn.
+    """
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_user_context_renders_into_system_prompt(self):
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"message": "ok", "actions": []}
+            )
+
+            generate_chat_response(
+                message="schedule that for today",
+                conversation_id="chat_x",
+                user_context={
+                    "today": "2026-05-14",
+                    "tomorrow": "2026-05-15",
+                    "day_start_hour": 4,
+                    "day_start_minute": 0,
+                    "timezone": "America/Los_Angeles",
+                },
+            )
+            sys_prompt = mock_client.messages.create.call_args.kwargs["system"]
+            assert "User's logical day" in sys_prompt
+            assert "Today is 2026-05-14" in sys_prompt
+            assert "Tomorrow is 2026-05-15" in sys_prompt
+            assert "04:00" in sys_prompt
+            assert "America/Los_Angeles" in sys_prompt
+            # Behavior the prompt must teach the model.
+            assert "yesterday's logical day" in sys_prompt
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_user_context_echoed_into_user_payload(self):
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"message": "ok", "actions": []}
+            )
+
+            generate_chat_response(
+                message="what's left today",
+                conversation_id="chat_x",
+                user_context={"today": "2026-05-14", "tomorrow": "2026-05-15"},
+            )
+            sent_payload = mock_client.messages.create.call_args.kwargs[
+                "messages"
+            ][0]["content"]
+            payload = json.loads(sent_payload)
+            assert payload["user_context"]["today"] == "2026-05-14"
+            assert payload["user_context"]["tomorrow"] == "2026-05-15"
+
+    @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
+    def test_missing_user_context_keeps_legacy_prompt_shape(self):
+        """Legacy clients omit ``user_context``; the system prompt must
+        not gain an empty/garbled anchor block in that case."""
+        from app.services.ai_productivity import generate_chat_response
+
+        with patch("app.services.ai_productivity.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_client.messages.create.return_value = _make_mock_response(
+                {"message": "ok", "actions": []}
+            )
+
+            generate_chat_response(message="hi", conversation_id="chat_x")
+            sys_prompt = mock_client.messages.create.call_args.kwargs["system"]
+            assert "User's logical day" not in sys_prompt
+
+    def test_router_resolves_logical_today_from_user_context(self):
+        from datetime import date
+
+        from app.routers.ai.chat import _resolve_logical_today
+        from app.schemas.ai import ChatUserContext
+
+        anchored = ChatUserContext(today="2026-05-14")
+        assert _resolve_logical_today(anchored) == date(2026, 5, 14)
+
+    def test_router_falls_back_to_utc_when_no_user_context(self):
+        from datetime import date, datetime, timezone
+
+        from app.routers.ai.chat import _resolve_logical_today
+
+        resolved = _resolve_logical_today(None)
+        # Tolerate a one-day skew across the UTC midnight crossover so the
+        # test never flakes; the contract is "today's UTC date", not a
+        # frozen value.
+        utc_today = datetime.now(timezone.utc).date()
+        assert resolved in {utc_today, utc_today.fromordinal(utc_today.toordinal() - 1)}
+
+    def test_router_ignores_malformed_today_string(self):
+        from datetime import datetime, timezone
+
+        from app.routers.ai.chat import _resolve_logical_today
+        from app.schemas.ai import ChatUserContext
+
+        garbled = ChatUserContext(today="not-a-date")
+        resolved = _resolve_logical_today(garbled)
+        utc_today = datetime.now(timezone.utc).date()
+        assert resolved in {utc_today, utc_today.fromordinal(utc_today.toordinal() - 1)}
+
+
 class TestChatEndpoint:
     @pytest.mark.asyncio
     async def test_endpoint_returns_message_and_echoes_conversation_id(

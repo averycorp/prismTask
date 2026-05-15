@@ -2,6 +2,7 @@ package com.averycorp.prismtask.data.repository
 
 import com.averycorp.prismtask.data.local.dao.ChatMessageDao
 import com.averycorp.prismtask.data.local.entity.ChatMessageEntity
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.remote.api.ChatActionResponse
 import com.averycorp.prismtask.data.remote.api.ChatHistoryEntry
 import com.averycorp.prismtask.data.remote.api.ChatMessageRecord
@@ -9,8 +10,10 @@ import com.averycorp.prismtask.data.remote.api.ChatRequest
 import com.averycorp.prismtask.data.remote.api.ChatResponse
 import com.averycorp.prismtask.data.remote.api.ChatStreamEvent
 import com.averycorp.prismtask.data.remote.api.ChatTaskContext
+import com.averycorp.prismtask.data.remote.api.ChatUserContext
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.remote.sse.ChatStreamClient
+import com.averycorp.prismtask.util.DayBoundary
 import com.google.gson.Gson
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,12 +21,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -56,7 +60,8 @@ constructor(
     private val api: PrismTaskApi,
     private val chatMessageDao: ChatMessageDao,
     private val streamClient: ChatStreamClient,
-    private val userAiPreferenceRepository: UserAiPreferenceRepository
+    private val userAiPreferenceRepository: UserAiPreferenceRepository,
+    private val taskBehaviorPreferences: TaskBehaviorPreferences
 ) {
     /** Maximum conversation pairs forwarded to the backend (spec: 6). */
     private val maxHistoryPairs = 6
@@ -66,6 +71,13 @@ constructor(
     private val _conversationId = MutableStateFlow(generateConversationId())
     val conversationId: StateFlow<String> = _conversationId.asStateFlow()
 
+    /**
+     * Logical date of the current conversation, resolved via [DayBoundary]
+     * with the user's Start-of-Day. Tracked so the conversation rolls over
+     * when the user's logical day flips, NOT when calendar midnight passes.
+     * A user with SoD = 4 AM messaging at 2 AM is still in yesterday's
+     * conversation; the rollover doesn't fire until 4 AM local time.
+     */
     private var conversationDate: LocalDate = LocalDate.now()
 
     /**
@@ -81,11 +93,11 @@ constructor(
         }
 
     /**
-     * Returns the current conversation ID, resetting if the day has changed.
-     * The returned ID is also pushed to [_conversationId] so any active
-     * Flow subscriber re-subscribes to the new conversation.
+     * Returns the current conversation ID, resetting if the user's logical
+     * day has changed. The returned ID is also pushed to [_conversationId]
+     * so any active Flow subscriber re-subscribes to the new conversation.
      */
-    fun getConversationId(): String {
+    suspend fun getConversationId(): String {
         resetIfNewDay()
         return _conversationId.value
     }
@@ -107,6 +119,7 @@ constructor(
     ): ChatResponse {
         resetIfNewDay()
         val convId = _conversationId.value
+        val userContext = buildUserContext()
 
         // Snapshot history BEFORE the new turn — backend wants the rolling
         // window of prior turns, not including the message we're about to
@@ -123,7 +136,8 @@ constructor(
                 conversationId = convId,
                 taskContextId = taskContextId,
                 taskContext = taskContext,
-                history = historyPayload
+                history = historyPayload,
+                userContext = userContext
             )
         )
 
@@ -177,6 +191,7 @@ constructor(
     ): Flow<ChatStreamEvent> = flow {
         resetIfNewDay()
         val convId = _conversationId.value
+        val userContext = buildUserContext()
 
         // Suspend the rolling-history fetch inside the cold flow's coroutine
         // context so the caller's collector dispatcher (not a blocking thread)
@@ -192,7 +207,8 @@ constructor(
                     conversationId = convId,
                     taskContextId = taskContextId,
                     taskContext = taskContext,
-                    history = historyPayload
+                    history = historyPayload,
+                    userContext = userContext
                 )
             )
         )
@@ -261,23 +277,64 @@ constructor(
     /**
      * Mints a new conversation ID. Old messages remain in Room and on the
      * backend under their original conversation_id; the UI Flow flips to
-     * the empty new conversation (Item 7 of the audit doc).
+     * the empty new conversation (Item 7 of the audit doc). Suspends so the
+     * conversation date can be re-anchored against the user's SoD-resolved
+     * logical day instead of [LocalDate.now] (which would advance at
+     * midnight even when the user's logical day rolls at 4 AM).
      */
-    fun clearConversation() {
-        _conversationId.value = generateConversationId()
-        conversationDate = LocalDate.now()
+    suspend fun clearConversation() {
+        val today = currentLogicalDate()
+        _conversationId.value = generateConversationId(today)
+        conversationDate = today
     }
 
-    private fun resetIfNewDay() {
-        val today = LocalDate.now()
+    private suspend fun resetIfNewDay() {
+        val today = currentLogicalDate()
         if (today != conversationDate) {
-            clearConversation()
+            _conversationId.value = generateConversationId(today)
+            conversationDate = today
         }
     }
 
-    private fun generateConversationId(): String {
-        val date = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        return "chat_${date}_${UUID.randomUUID().toString().take(8)}"
+    /**
+     * Construction-time seed for [_conversationId]. The value is best-effort
+     * — the first send/stream call runs [resetIfNewDay] which re-mints the
+     * ID against the SoD-resolved logical day. Kept non-suspend because
+     * field initialization can't be suspending; we accept the brief
+     * misnamed seed during the small window between init and first send.
+     */
+    private fun generateConversationId(): String = generateConversationId(LocalDate.now())
+
+    private fun generateConversationId(date: LocalDate): String =
+        "chat_${date}_${UUID.randomUUID().toString().take(8)}"
+
+    /**
+     * Build the SoD-anchored user-context payload from the user's
+     * Start-of-Day preference + [DayBoundary]. Always emits a `today`
+     * (even when SoD is at midnight) so the backend prompt has a clear
+     * anchor; the backend tolerates legacy clients that omit it.
+     */
+    private suspend fun buildUserContext(): ChatUserContext {
+        val sod = taskBehaviorPreferences.getStartOfDay().first()
+        val today = DayBoundary.currentLocalDate(
+            dayStartHour = sod.hour,
+            dayStartMinute = sod.minute
+        )
+        return ChatUserContext(
+            today = today.toString(),
+            tomorrow = today.plusDays(1).toString(),
+            dayStartHour = sod.hour,
+            dayStartMinute = sod.minute,
+            timezone = ZoneId.systemDefault().id
+        )
+    }
+
+    private suspend fun currentLogicalDate(): LocalDate {
+        val sod = taskBehaviorPreferences.getStartOfDay().first()
+        return DayBoundary.currentLocalDate(
+            dayStartHour = sod.hour,
+            dayStartMinute = sod.minute
+        )
     }
 
     private fun ChatMessageEntity.toChatMessage(): ChatMessage {

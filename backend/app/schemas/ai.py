@@ -772,6 +772,35 @@ class ChatTaskContext(BaseModel):
     is_completed: Optional[bool] = None
 
 
+class ChatUserContext(BaseModel):
+    """The user's logical-day context, resolved client-side via
+    ``DayBoundary`` + the user-configurable Start-of-Day hour/minute.
+
+    The chat AI's notion of "today" / "tomorrow" must match the user's
+    SoD-adjusted day, not server UTC. Without this, a user with
+    Start-of-Day = 4 AM who messages the coach at 1 AM would have the AI
+    treat the next calendar date as "today" — diverging from every other
+    surface in the app (Today screen, habits, widgets, NLP date parsing).
+
+    All fields optional so older clients fail open: the prompt simply
+    omits the anchor when none is provided.
+    """
+
+    today: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        description="ISO-8601 date (YYYY-MM-DD) of the user's current logical day.",
+    )
+    tomorrow: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        description="ISO-8601 date (YYYY-MM-DD) of the day after ``today``.",
+    )
+    day_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
+    day_start_minute: Optional[int] = Field(default=None, ge=0, le=59)
+    timezone: Optional[str] = Field(default=None, max_length=64)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     conversation_id: str = Field(min_length=1, max_length=128)
@@ -788,6 +817,10 @@ class ChatRequest(BaseModel):
     # entries so the model has multi-turn memory. Capped at 12 entries to
     # bound input tokens; the client owns trimming.
     history: list[ChatHistoryEntry] = Field(default_factory=list, max_length=12)
+    # SoD-anchored "today"/"tomorrow" so the AI's date references align
+    # with the user's logical day rather than server UTC. Optional —
+    # legacy clients that omit it get the prior UTC-anchored behavior.
+    user_context: Optional[ChatUserContext] = None
     # Forwarded from the client for telemetry only — the server uses
     # ``resolve_effective_tier(current_user, db)`` for actual gating
     # (admin override + stored tier + active beta-code redemption).

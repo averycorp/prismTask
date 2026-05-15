@@ -28,6 +28,7 @@ from app.services.crisis_keywords import (
     crisis_safety_response,
 )
 
+from .chat import _resolve_logical_today
 from .context import load_user_context_bundle
 from .memory import (
     _apply_preference_diff,
@@ -102,9 +103,12 @@ async def chat_stream(
     ]
 
     # Load today's current-state bundle so the streaming endpoint has the
-    # same grounding as the single-shot endpoint. Failure is non-fatal —
-    # the chat reply still streams, just without current-state grounding.
-    today = datetime.now(timezone.utc).date()
+    # same grounding as the single-shot endpoint. ``user_context.today``
+    # carries the user's SoD-anchored logical day from the client;
+    # ``_resolve_logical_today`` falls back to UTC for legacy clients.
+    # Failure is non-fatal — the chat reply still streams, just without
+    # current-state grounding.
+    today = _resolve_logical_today(data.user_context)
     current_state: dict | None
     try:
         current_state = await load_user_context_bundle(
@@ -154,6 +158,11 @@ async def chat_stream(
                     history=[h.model_dump() for h in data.history],
                     user_preferences=prefs_for_prompt,
                     current_state=current_state,
+                    user_context=(
+                        data.user_context.model_dump(exclude_none=True)
+                        if data.user_context is not None
+                        else None
+                    ),
                 )
             for event in stream_iter:
                 if event.get("type") == "done":
