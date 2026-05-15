@@ -145,4 +145,87 @@ class BurnoutScorerTest {
         )
         assertEquals(100, result.score)
     }
+
+    @Test
+    fun `habit streak breaks feed the streak component`() {
+        val now = 1_775_779_200_000L
+        val result = scorer.computeFromTasks(
+            tasks = emptyList(),
+            workRatio = 0f,
+            workTarget = 0.40f,
+            now = now,
+            habitStreakBreaks = 5
+        )
+        // 5 broken streaks hits the streakMax ceiling.
+        assertEquals(10, result.streakBreakPoints)
+    }
+
+    @Test
+    fun `leisure minutes recently logged clear the rest deficit`() {
+        val now = 1_775_779_200_000L
+        val oneDay = 24L * 60 * 60 * 1000
+        val sevenDayOld = now - 2 * oneDay
+        val skippedSelfCare = com.averycorp.prismtask.data.local.entity.TaskEntity(
+            id = 1,
+            title = "yoga",
+            dueDate = sevenDayOld,
+            createdAt = sevenDayOld,
+            updatedAt = sevenDayOld,
+            lifeCategory = com.averycorp.prismtask.domain.model.LifeCategory.SELF_CARE.name,
+            isCompleted = false
+        )
+        val withoutLeisure = scorer.computeFromTasks(
+            tasks = listOf(skippedSelfCare),
+            workRatio = 0f,
+            workTarget = 0.40f,
+            now = now
+        )
+        assertTrue("rest deficit should fire without leisure", withoutLeisure.restDeficitPoints > 0)
+
+        val withLeisure = scorer.computeFromTasks(
+            tasks = listOf(skippedSelfCare),
+            workRatio = 0f,
+            workTarget = 0.40f,
+            now = now,
+            leisureMinutesRecent = 30
+        )
+        assertEquals("leisure minutes should clear rest deficit", 0, withLeisure.restDeficitPoints)
+    }
+
+    @Test
+    fun `self-care habit completions recently clear the rest deficit`() {
+        val now = 1_775_779_200_000L
+        val oneDay = 24L * 60 * 60 * 1000
+        val sevenDayOld = now - 2 * oneDay
+        val skippedSelfCare = com.averycorp.prismtask.data.local.entity.TaskEntity(
+            id = 1,
+            title = "yoga",
+            dueDate = sevenDayOld,
+            createdAt = sevenDayOld,
+            updatedAt = sevenDayOld,
+            lifeCategory = com.averycorp.prismtask.domain.model.LifeCategory.SELF_CARE.name,
+            isCompleted = false
+        )
+        val withHabit = scorer.computeFromTasks(
+            tasks = listOf(skippedSelfCare),
+            workRatio = 0f,
+            workTarget = 0.40f,
+            now = now,
+            selfCareHabitCompletionsRecent = 1
+        )
+        assertEquals(0, withHabit.restDeficitPoints)
+    }
+
+    @Test
+    fun `rest deficit absent when there is no self-care signal at all`() {
+        // With zero self-care tasks AND zero habits AND zero leisure, the
+        // user hasn't planned any rest — the flag stays off so the gauge
+        // doesn't punish someone who has the feature disabled.
+        val result = scorer.computeFromTasks(
+            tasks = emptyList(),
+            workRatio = 0f,
+            workTarget = 0.40f
+        )
+        assertEquals(0, result.restDeficitPoints)
+    }
 }

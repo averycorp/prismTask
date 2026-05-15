@@ -186,7 +186,13 @@ class TodayViewModelTest {
         tourCardPreferences,
         coachmarkController,
         habitDailyTaskGenerator,
-        restDayRepository
+        restDayRepository,
+        mockk(relaxed = true),
+        mockk<com.averycorp.prismtask.domain.usecase.BalanceContributionsProvider>(relaxed = true).also {
+            every { it.observe(any(), any(), any(), any()) } returns kotlinx.coroutines.flow.flowOf(
+                com.averycorp.prismtask.domain.usecase.BalanceContributions.EMPTY
+            )
+        }
     )
 
     @Test

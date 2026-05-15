@@ -130,14 +130,27 @@ class BurnoutScorer(
 
     /**
      * Convenience overload: derive [BurnoutInputs] from the raw pieces the
-     * rest of the app already has (task list, target ratio, current work
-     * ratio from [BalanceTracker]). Any unavailable signal defaults to 0.
+     * rest of the app already has — task list, target/current work ratio
+     * from [BalanceTracker], plus optional habit and leisure signals.
+     *
+     * Habits + leisure feed the rest-deficit and skipped-self-care signals
+     * so the burnout gauge reflects the user's full restorative picture,
+     * not just whether they scheduled a self-care task. Specifically:
+     *  - [habitStreakBreaks] counts habits whose streak reset this week
+     *    and feeds the existing [BurnoutInputs.streakBreaks] slot.
+     *  - [selfCareHabitCompletionsRecent] (within [BurnoutWeights.restDeficitDays])
+     *    and [leisureMinutesRecent] each clear the rest-deficit flag — a
+     *    completed self-care habit or a logged leisure session counts as
+     *    "rested" the same as a self-care task would.
      */
     fun computeFromTasks(
         tasks: List<TaskEntity>,
         workRatio: Float,
         workTarget: Float,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        habitStreakBreaks: Int = 0,
+        selfCareHabitCompletionsRecent: Int = 0,
+        leisureMinutesRecent: Int = 0
     ): BurnoutResult {
         val overdue = tasks.count { t ->
             !t.isCompleted &&
@@ -159,13 +172,21 @@ class BurnoutScorer(
             skipped.toFloat() / selfCareThisWeek.size.toFloat()
         }
 
-        // Rest deficit: no self-care tasks completed in the last [restDeficitDays] days.
-        val twoDaysAgo = now - weights.restDeficitDays.toLong() * 24L * 60 * 60 * 1000
+        // Rest deficit: nothing restorative — task, habit, or leisure — in the
+        // last [restDeficitDays]. Habits and leisure are equally valid rest
+        // signals, so either one clears the flag.
+        val cutoff = now - weights.restDeficitDays.toLong() * 24L * 60 * 60 * 1000
         val selfCareCompletedRecently = tasks.any { task ->
             LifeCategory.fromStorage(task.lifeCategory) == LifeCategory.SELF_CARE &&
                 task.isCompleted &&
-                (task.completedAt ?: 0L) >= twoDaysAgo
+                (task.completedAt ?: 0L) >= cutoff
         }
+        val restedRecently = selfCareCompletedRecently ||
+            selfCareHabitCompletionsRecent > 0 ||
+            leisureMinutesRecent > 0
+        val hasAnyRestSignal = selfCareThisWeek.isNotEmpty() ||
+            selfCareHabitCompletionsRecent > 0 ||
+            leisureMinutesRecent > 0
 
         return compute(
             BurnoutInputs(
@@ -174,8 +195,8 @@ class BurnoutScorer(
                 overdueCount = overdue,
                 skippedSelfCareRatio = skippedSelfCareRatio,
                 medicationGapRatio = 0f,
-                streakBreaks = 0,
-                restDeficit = !selfCareCompletedRecently && selfCareThisWeek.isNotEmpty()
+                streakBreaks = habitStreakBreaks,
+                restDeficit = !restedRecently && hasAnyRestSignal
             )
         )
     }

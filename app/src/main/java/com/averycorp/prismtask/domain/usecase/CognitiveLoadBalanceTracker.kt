@@ -61,6 +61,13 @@ data class CognitiveLoadBalanceConfig(
 /**
  * Pure-function balance computation for the [CognitiveLoad] dimension.
  *
+ * Tasks contribute according to their stored [CognitiveLoad] classification.
+ * Habit completions and leisure sessions both count toward [CognitiveLoad.EASY]
+ * — habits are by design recurring, low-friction routines, and leisure is
+ * intentionally restorative — so logging them shifts the bar toward EASY
+ * and helps the user see when a hard-task-heavy week was offset by lighter
+ * activity.
+ *
  * Window cutoffs respect the user-configured Start-of-Day, mirroring the
  * SoD-aware cutoff in [BalanceTracker] / [ModeBalanceTracker] (see
  * PR #1060). Callers without access to the SoD preference fall back to
@@ -73,14 +80,16 @@ class CognitiveLoadBalanceTracker {
         now: Long = System.currentTimeMillis(),
         timeZone: TimeZone = TimeZone.getDefault(),
         dayStartHour: Int = 0,
-        dayStartMinute: Int = 0
+        dayStartMinute: Int = 0,
+        habitCompletionTimestamps: List<Long> = emptyList(),
+        leisureSessionTimestamps: List<Long> = emptyList()
     ): CognitiveLoadBalanceState {
         val weekCutoff = cutoff(now, days = 7, timeZone, dayStartHour, dayStartMinute)
         val monthCutoff = cutoff(now, days = 28, timeZone, dayStartHour, dayStartMinute)
 
-        val current = computeRatios(allTasks, weekCutoff)
-        val rolling = computeRatios(allTasks, monthCutoff)
-        val total = countTracked(allTasks, weekCutoff)
+        val current = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff)
+        val rolling = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, monthCutoff)
+        val total = countTracked(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff)
 
         val dominant = if (total == 0) {
             CognitiveLoad.UNCATEGORIZED
@@ -97,7 +106,12 @@ class CognitiveLoadBalanceTracker {
         )
     }
 
-    private fun computeRatios(tasks: List<TaskEntity>, cutoff: Long): Map<CognitiveLoad, Float> {
+    private fun computeRatios(
+        tasks: List<TaskEntity>,
+        habitCompletionTimestamps: List<Long>,
+        leisureSessionTimestamps: List<Long>,
+        cutoff: Long
+    ): Map<CognitiveLoad, Float> {
         val counts = CognitiveLoad.TRACKED.associateWith { 0 }.toMutableMap()
         var total = 0
         for (t in tasks) {
@@ -108,17 +122,40 @@ class CognitiveLoadBalanceTracker {
             counts[load] = (counts[load] ?: 0) + 1
             total++
         }
+        for (ts in habitCompletionTimestamps) {
+            if (ts < cutoff) continue
+            counts[CognitiveLoad.EASY] = (counts[CognitiveLoad.EASY] ?: 0) + 1
+            total++
+        }
+        for (ts in leisureSessionTimestamps) {
+            if (ts < cutoff) continue
+            counts[CognitiveLoad.EASY] = (counts[CognitiveLoad.EASY] ?: 0) + 1
+            total++
+        }
         if (total == 0) return CognitiveLoad.TRACKED.associateWith { 0f }
         return counts.mapValues { (_, count) -> count.toFloat() / total.toFloat() }
     }
 
-    private fun countTracked(tasks: List<TaskEntity>, cutoff: Long): Int {
+    private fun countTracked(
+        tasks: List<TaskEntity>,
+        habitCompletionTimestamps: List<Long>,
+        leisureSessionTimestamps: List<Long>,
+        cutoff: Long
+    ): Int {
         var total = 0
         for (t in tasks) {
             val ts = timestampFor(t)
             if (ts < cutoff) continue
             val load = CognitiveLoad.fromStorage(t.cognitiveLoad)
             if (load == CognitiveLoad.UNCATEGORIZED) continue
+            total++
+        }
+        for (ts in habitCompletionTimestamps) {
+            if (ts < cutoff) continue
+            total++
+        }
+        for (ts in leisureSessionTimestamps) {
+            if (ts < cutoff) continue
             total++
         }
         return total

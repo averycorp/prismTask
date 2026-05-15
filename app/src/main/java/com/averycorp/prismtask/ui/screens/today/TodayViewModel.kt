@@ -33,6 +33,8 @@ import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.data.repository.TaskTemplateRepository
 import com.averycorp.prismtask.domain.usecase.BalanceConfig
+import com.averycorp.prismtask.domain.usecase.BalanceContributions
+import com.averycorp.prismtask.domain.usecase.BalanceContributionsProvider
 import com.averycorp.prismtask.domain.usecase.BalanceState
 import com.averycorp.prismtask.domain.usecase.BalanceTracker
 import com.averycorp.prismtask.domain.usecase.BurnoutResult
@@ -98,7 +100,8 @@ constructor(
     private val coachmarkController: CoachmarkController,
     private val habitDailyTaskGenerator: HabitDailyTaskGenerator,
     private val restDayRepository: RestDayRepository,
-    private val billingManager: BillingManager
+    private val billingManager: BillingManager,
+    private val balanceContributionsProvider: BalanceContributionsProvider
 ) : ViewModel() {
     /**
      * True when the user has marked today (logical, SoD-aware) as a rest
@@ -445,16 +448,27 @@ constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WorkLifeBalancePrefs())
 
     /**
-     * Live [BalanceState] derived from the user's full task pool and current
-     * WLB configuration. The Today screen balance bar, overload banner, and
-     * future burnout scorer (V2) all subscribe to this.
+     * Live habit + leisure contributions, fed into the balance bar, the
+     * cognitive-load bar, and the burnout scorer so all three reflect the
+     * user's full activity — not just their task pool.
+     */
+    private val balanceContributions: StateFlow<BalanceContributions> =
+        balanceContributionsProvider.observe()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BalanceContributions.EMPTY)
+
+    /**
+     * Live [BalanceState] derived from the user's full task pool, habit
+     * completions, leisure sessions, and current WLB configuration. The
+     * Today screen balance bar, overload banner, and burnout scorer all
+     * subscribe to this.
      */
     val balanceState: StateFlow<BalanceState> =
         combine(
             taskRepository.getAllTasks(),
             workLifeBalancePrefs,
-            taskBehaviorPreferences.getStartOfDay()
-        ) { allTasks, prefs, sod ->
+            taskBehaviorPreferences.getStartOfDay(),
+            balanceContributions
+        ) { allTasks, prefs, sod, contributions ->
             val config = BalanceConfig(
                 workTarget = prefs.workTarget / 100f,
                 personalTarget = prefs.personalTarget / 100f,
@@ -463,49 +477,59 @@ constructor(
                 overloadThreshold = prefs.overloadThresholdPct / 100f
             )
             balanceTracker.compute(
-                allTasks,
-                config,
+                allTasks = allTasks,
+                config = config,
                 dayStartHour = sod.hour,
-                dayStartMinute = sod.minute
+                dayStartMinute = sod.minute,
+                habitContributions = contributions.habits,
+                leisureContributions = contributions.leisure
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BalanceState.EMPTY)
 
     /**
-     * Live [CognitiveLoadBalanceState] derived from the same task pool. The
-     * Today balance bar's load section subscribes to this to render the
-     * Easy / Medium / Hard split. Targets default to even three-way until
-     * a future PR exposes per-load target sliders. See
-     * `docs/COGNITIVE_LOAD.md`.
+     * Live [CognitiveLoadBalanceState] derived from the same task pool plus
+     * habit + leisure contributions (both count as EASY load). The Today
+     * balance bar's load section subscribes to this to render the Easy /
+     * Medium / Hard split. Targets default to even three-way until a future
+     * PR exposes per-load target sliders. See `docs/COGNITIVE_LOAD.md`.
      */
     val cognitiveLoadBalanceState: StateFlow<CognitiveLoadBalanceState> =
         combine(
             taskRepository.getAllTasks(),
-            taskBehaviorPreferences.getStartOfDay()
-        ) { allTasks, sod ->
+            taskBehaviorPreferences.getStartOfDay(),
+            balanceContributions
+        ) { allTasks, sod, contributions ->
             cognitiveLoadBalanceTracker.compute(
-                allTasks,
-                CognitiveLoadBalanceConfig(),
+                allTasks = allTasks,
+                config = CognitiveLoadBalanceConfig(),
                 dayStartHour = sod.hour,
-                dayStartMinute = sod.minute
+                dayStartMinute = sod.minute,
+                habitCompletionTimestamps = contributions.habitTimestamps,
+                leisureSessionTimestamps = contributions.leisureTimestamps
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CognitiveLoadBalanceState.EMPTY)
 
     /**
-     * Composite burnout score (v1.4.0 V2). Derived from the same task pool +
-     * WLB prefs as the balance state so the UI can render both side-by-side
-     * without a second query.
+     * Composite burnout score. Derived from the same task pool + WLB prefs
+     * as the balance state so the UI can render both side-by-side without a
+     * second query. Habit streak breaks and leisure minutes feed the
+     * scorer's rest-deficit and streak signals.
      */
     val burnoutResult: StateFlow<BurnoutResult> =
         combine(
             taskRepository.getAllTasks(),
             workLifeBalancePrefs,
-            balanceState
-        ) { allTasks, prefs, balance ->
+            balanceState,
+            balanceContributions
+        ) { allTasks, prefs, balance, contributions ->
             val workRatio = balance.currentRatios[com.averycorp.prismtask.domain.model.LifeCategory.WORK] ?: 0f
             val result = burnoutScorer.computeFromTasks(
                 tasks = allTasks,
                 workRatio = workRatio,
-                workTarget = prefs.workTarget / 100f
+                workTarget = prefs.workTarget / 100f,
+                habitStreakBreaks = contributions.habitStreakBreaks,
+                selfCareHabitCompletionsRecent = contributions.selfCareHabitCompletionsRecent,
+                leisureMinutesRecent = contributions.leisureMinutesRecent
             )
             refreshNudge(balance, result)
             result
