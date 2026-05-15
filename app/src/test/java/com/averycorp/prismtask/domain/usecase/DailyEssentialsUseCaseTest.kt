@@ -174,4 +174,43 @@ class DailyEssentialsUseCaseTest {
         assertTrue(routine.allComplete)
         assertFalse(routine.copy(steps = routine.steps.map { it.copy(completedToday = false) }).allComplete)
     }
+
+    @Test
+    fun `SchoolworkCardState allComplete requires every course and assignment done`() {
+        val course = CourseCompletionStatus(
+            courseId = 1L, name = "CS101", code = "CS101", icon = "📘",
+            color = 0, completedToday = true
+        )
+        val assignment = AssignmentSummary(
+            id = 9L, title = "Pset", courseId = 1L, courseName = "CS101",
+            courseColor = 0, completed = true
+        )
+        val state = SchoolworkCardState(
+            courses = listOf(course),
+            assignmentsDueToday = listOf(assignment)
+        )
+        assertTrue(state.allComplete)
+        assertFalse(state.copy(courses = listOf(course.copy(completedToday = false))).allComplete)
+        assertFalse(state.copy(assignmentsDueToday = listOf(assignment.copy(completed = false))).allComplete)
+    }
+
+    @Test
+    fun `SchoolworkCardState allComplete is false when card is empty`() {
+        val empty = SchoolworkCardState(courses = emptyList(), assignmentsDueToday = emptyList())
+        assertFalse(empty.allComplete)
+    }
+
+    @Test
+    fun `SchoolworkCardState allComplete is true when only courses exist and all are done`() {
+        val state = SchoolworkCardState(
+            courses = listOf(
+                CourseCompletionStatus(
+                    courseId = 1L, name = "CS101", code = "CS101", icon = "📘",
+                    color = 0, completedToday = true
+                )
+            ),
+            assignmentsDueToday = emptyList()
+        )
+        assertTrue(state.allComplete)
+    }
 }

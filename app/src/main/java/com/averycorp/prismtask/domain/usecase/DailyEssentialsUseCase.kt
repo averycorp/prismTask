@@ -72,6 +72,11 @@ data class SchoolworkCardState(
     val assignmentsDueToday: List<AssignmentSummary>
 ) {
     val hasContent: Boolean get() = courses.isNotEmpty() || assignmentsDueToday.isNotEmpty()
+
+    val allComplete: Boolean
+        get() = hasContent &&
+            courses.all { it.completedToday } &&
+            assignmentsDueToday.all { it.completed }
 }
 
 /**
