@@ -3,7 +3,8 @@ import { projectsApi } from '@/api/projects';
 import { tasksApi } from '@/api/tasks';
 import { habitsApi } from '@/api/habits';
 import { tagsApi } from '@/api/tags';
-import { templatesApi } from '@/api/templates';
+import { getTaskTemplates } from '@/api/firestore/taskTemplates';
+import { getFirebaseUid } from '@/stores/firebaseUid';
 import type { Goal } from '@/types/goal';
 import type { Project } from '@/types/project';
 import type { Task } from '@/types/task';
@@ -70,9 +71,15 @@ export async function exportJson(
   onProgress?.('Fetching templates...');
   let templates: unknown[] = [];
   try {
-    templates = await templatesApi.list();
+    // Parity audit § B.10: templates live in Firestore now
+    // (`users/{uid}/task_templates`), no longer behind the REST
+    // `/templates` endpoint. The backup file format is unchanged —
+    // still a raw array of template shapes — so previously exported
+    // JSON files keep round-tripping through import.
+    const uid = getFirebaseUid();
+    templates = await getTaskTemplates(uid);
   } catch {
-    // templates may not exist
+    // templates may not exist (unauthenticated, or zero templates)
   }
 
   const exportData: PrismTaskExport = {

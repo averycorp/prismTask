@@ -24,6 +24,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { aiLifeCategoryClassifyText } from '@/api/ai/chat';
+import { DependencyEditor } from '@/features/tasks/DependencyEditor';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { formatRelative } from '@/utils/dates';
 import type {
@@ -1158,6 +1159,23 @@ export default function TaskEditor({
                     to let Android auto-classify.
                   </p>
                 </div>
+
+                {/* Dependencies / Blockers (parity B.12 — mirrors Android
+                    `OrganizeTab.kt :: BlockersSection`). Only meaningful
+                    once the task has a stable id, so suppress in create
+                    mode and show a hint instead. */}
+                {selectedTask ? (
+                  <DependencyEditor taskId={selectedTask.id} />
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                      Blockers
+                    </label>
+                    <p className="text-xs italic text-[var(--color-text-secondary)]">
+                      Save the task first to add blockers.
+                    </p>
+                  </div>
+                )}
 
                 {/* Tags */}
                 <div>

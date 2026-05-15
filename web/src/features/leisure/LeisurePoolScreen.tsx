@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useLeisureStore, type LeisureCategoryRef } from '@/stores/leisureStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import {
   LEISURE_CATEGORIES,
   LEISURE_CATEGORY_DISPLAY,
@@ -46,6 +47,9 @@ export function LeisurePoolScreen() {
   const getMinutesLoggedToday = useLeisureStore((s) => s.getMinutesLoggedToday);
   const getMinutesByCategoryIdToday = useLeisureStore((s) => s.getMinutesByCategoryIdToday);
   const getTargetMinutesToday = useLeisureStore((s) => s.getTargetMinutesToday);
+  // Subscribed for re-render so the per-day window recomputes when a
+  // cross-device Start-of-Day update lands (see `dayBoundary.ts`).
+  const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
 
   // Getters read live store state — depend on the slices they consume so
   // recomputation lands when settings/customCategories/sessions change. The
@@ -59,12 +63,12 @@ export function LeisurePoolScreen() {
   const minutesLogged = useMemo(
     () => getMinutesLoggedToday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getMinutesLoggedToday, sessions],
+    [getMinutesLoggedToday, sessions, startOfDayHour],
   );
   const minutesByCat = useMemo(
     () => getMinutesByCategoryIdToday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getMinutesByCategoryIdToday, sessions],
+    [getMinutesByCategoryIdToday, sessions, startOfDayHour],
   );
   const targetMinutes = getTargetMinutesToday();
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles, X, Loader2, FileText } from 'lucide-react';
+import { Sparkles, X, Loader2, FileText, ListPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { parseApi } from '@/api/parse';
@@ -9,8 +9,16 @@ import { useTemplateStore } from '@/stores/templateStore';
 import { useBatchStore } from '@/stores/batchStore';
 import { useProFeature } from '@/hooks/useProFeature';
 import { detectBatchIntent } from '@/utils/batchIntentDetector';
+import { detectMultiCreate } from '@/utils/multiCreateDetector';
+import { parseQuickAdd } from '@/utils/nlp';
 import type { NLPParseResult } from '@/types/api';
 import type { TaskTemplate } from '@/types/template';
+
+interface MultiTaskPreviewItem {
+  title: string;
+  due_date: string | null;
+  priority: number | null;
+}
 
 interface NLPInputProps {
   onTaskCreate?: (data: { title: string; due_date?: string; priority?: number; project_suggestion?: string }) => void;
@@ -25,9 +33,17 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
   const [editedResult, setEditedResult] = useState<Partial<NLPParseResult>>({});
   const [templateSuggestions, setTemplateSuggestions] = useState<TaskTemplate[]>([]);
   const [selectedTemplateIdx, setSelectedTemplateIdx] = useState(0);
+  // Multi-task paste preview (parity B.9). Null when input is a single
+  // task; populated when the detector flags newline / comma-with-marker
+  // segments. Confirming fans out one `onTaskCreate` call per item.
+  const [multiPreview, setMultiPreview] = useState<
+    MultiTaskPreviewItem[] | null
+  >(null);
+  const [submittingMulti, setSubmittingMulti] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
+  const multiPreviewRef = useRef<HTMLDivElement>(null);
 
   const { templates, fetch: fetchTemplates, use: applyTemplate } = useTemplateStore();
   const navigate = useNavigate();
@@ -61,20 +77,65 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
 
   // Close popover on outside click
   useEffect(() => {
-    if (!parseResult && templateSuggestions.length === 0) return;
+    if (
+      !parseResult &&
+      templateSuggestions.length === 0 &&
+      !multiPreview
+    ) {
+      return;
+    }
     const handler = (e: MouseEvent) => {
-      if (
-        popoverRef.current && !popoverRef.current.contains(e.target as Node) &&
-        templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      const inPopover = popoverRef.current?.contains(target);
+      const inTemplate = templateDropdownRef.current?.contains(target);
+      const inMulti = multiPreviewRef.current?.contains(target);
+      if (!inPopover && !inTemplate && !inMulti) {
         setParseResult(null);
         setEditedResult({});
         setTemplateSuggestions([]);
+        setMultiPreview(null);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [parseResult, templateSuggestions]);
+  }, [parseResult, templateSuggestions, multiPreview]);
+
+  // `<input type="text">` collapses pasted newlines to spaces, so the
+  // detector is fed by two sources: typed comma+marker lists (via
+  // `handleValueChange`) and a paste interceptor that preserves the raw
+  // multi-line clipboard text (`handlePaste`).
+  const evaluateMulti = useCallback((text: string) => {
+    const detection = detectMultiCreate(text);
+    if (detection.kind !== 'multi-create') {
+      setMultiPreview(null);
+      return;
+    }
+    setMultiPreview(
+      detection.segments.map((seg) => {
+        const result = parseQuickAdd(seg);
+        return {
+          title: result.title || seg,
+          due_date: result.dueDate,
+          priority: result.priority,
+        };
+      }),
+    );
+  }, []);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLInputElement>) => {
+      const pasted = e.clipboardData.getData('text');
+      if (!pasted || !pasted.includes('\n')) return;
+      e.preventDefault();
+      const input = inputRef.current;
+      const start = input?.selectionStart ?? value.length;
+      const end = input?.selectionEnd ?? value.length;
+      const next = value.slice(0, start) + pasted + value.slice(end);
+      setValue(next);
+      evaluateMulti(next);
+    },
+    [value, evaluateMulti],
+  );
 
   // Template autocomplete when typing /templatename
   const handleValueChange = useCallback(
@@ -95,8 +156,10 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
       } else {
         setTemplateSuggestions([]);
       }
+
+      evaluateMulti(newValue);
     },
-    [templates],
+    [templates, evaluateMulti],
   );
 
   const handleTemplateSelect = useCallback(async (template: TaskTemplate) => {
@@ -139,6 +202,13 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
     e.preventDefault();
     const text = value.trim();
     if (!text) return;
+
+    // Multi-task preview is showing — Enter is a no-op so the user
+    // commits explicitly via the "Create N Tasks" button (avoids
+    // accidental fan-out on a stray Enter).
+    if (multiPreview) {
+      return;
+    }
 
     // If it's a template shortcut, handle via template
     if (text.startsWith('/') && templateSuggestions.length > 0) {
@@ -198,7 +268,40 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
     setShowUpgrade,
     setPendingBatchCommand,
     navigate,
+    multiPreview,
   ]);
+
+  const handleConfirmMulti = useCallback(async () => {
+    if (!multiPreview || !onTaskCreate) return;
+    setSubmittingMulti(true);
+    let failed = 0;
+    for (const item of multiPreview) {
+      try {
+        await onTaskCreate({
+          title: item.title,
+          due_date: item.due_date ?? undefined,
+          priority: item.priority ?? undefined,
+        });
+      } catch {
+        failed += 1;
+      }
+    }
+    setSubmittingMulti(false);
+    const total = multiPreview.length;
+    setMultiPreview(null);
+    setValue('');
+    if (failed === 0) {
+      toast.success(`Created ${total} ${total === 1 ? 'task' : 'tasks'}`);
+    } else if (failed < total) {
+      toast.error(`Created ${total - failed} of ${total}; ${failed} failed`);
+    } else {
+      toast.error('Failed to create tasks');
+    }
+  }, [multiPreview, onTaskCreate]);
+
+  const handleCancelMulti = useCallback(() => {
+    setMultiPreview(null);
+  }, []);
 
   const handleConfirm = () => {
     onTaskCreate?.({
@@ -231,6 +334,7 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
             value={value}
             onChange={(e) => handleValueChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-2 pl-10 pr-4 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] outline-none transition-colors focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
             aria-label="Quick add task"
           />
@@ -369,6 +473,79 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
             </Button>
             <Button size="sm" onClick={handleConfirm}>
               Add Task
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-task paste preview (parity B.9). */}
+      {multiPreview && (
+        <div
+          ref={multiPreviewRef}
+          className="absolute left-0 top-full z-50 mt-2 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 shadow-lg"
+          role="dialog"
+          aria-label="Multi-task paste preview"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ListPlus
+                className="h-4 w-4 text-[var(--color-accent)]"
+                aria-hidden="true"
+              />
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                Create {multiPreview.length} Tasks?
+              </h4>
+            </div>
+            <button
+              onClick={handleCancelMulti}
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              aria-label="Cancel multi-task create"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <ul className="max-h-64 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+            {multiPreview.map((item, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2 border-b border-[var(--color-border)] px-3 py-2 last:border-b-0"
+              >
+                <span className="mt-0.5 text-xs font-mono text-[var(--color-text-secondary)]">
+                  {i + 1}.
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-[var(--color-text-primary)] truncate">
+                    {item.title}
+                  </div>
+                  {(item.due_date || item.priority) && (
+                    <div className="mt-0.5 flex gap-2 text-xs text-[var(--color-text-secondary)]">
+                      {item.due_date && <span>Due {item.due_date}</span>}
+                      {item.priority && <span>P{item.priority}</span>}
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelMulti}
+              disabled={submittingMulti}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleConfirmMulti}
+              disabled={submittingMulti}
+            >
+              {submittingMulti
+                ? 'Creating...'
+                : `Create ${multiPreview.length} Tasks`}
             </Button>
           </div>
         </div>

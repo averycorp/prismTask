@@ -14,6 +14,15 @@ export interface Habit {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Built-in template identity (parity B.4). Optional because user-created
+  // habits never carry these. Mirrors Android `HabitEntity.isBuiltIn` /
+  // `templateKey` / `sourceVersion` / `isUserModified` /
+  // `isDetachedFromTemplate`.
+  is_built_in?: boolean;
+  template_key?: string | null;
+  source_version?: number;
+  is_user_modified?: boolean;
+  is_detached_from_template?: boolean;
 }
 
 export interface HabitCreate {
@@ -37,6 +46,11 @@ export interface HabitUpdate {
   target_count?: number;
   active_days_json?: string;
   is_active?: boolean;
+  // Built-in identity (parity B.4). Reconciler-only — never set from the
+  // standard `HabitModal` editor.
+  source_version?: number;
+  is_user_modified?: boolean;
+  is_detached_from_template?: boolean;
 }
 
 export interface HabitCompletion {

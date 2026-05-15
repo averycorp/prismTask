@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Timer,
   Play,
@@ -10,8 +10,10 @@ import {
   Check,
   Coffee,
   ChevronRight,
+  Rocket,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { format, subDays } from 'date-fns';
 
 import { useAuthStore } from '@/stores/authStore';
 import { useTaskStore } from '@/stores/taskStore';
@@ -25,6 +27,21 @@ import { Spinner } from '@/components/ui/Spinner';
 import { PomodoroCoachPanel } from '@/features/pomodoro/PomodoroCoachPanel';
 import type { PomodoroCoachingTask } from '@/types/pomodoroCoaching';
 import type { Task } from '@/types/task';
+import {
+  getLogsInRange,
+  type MoodEnergyLog,
+} from '@/api/firestore/moodEnergyLogs';
+import { getFirebaseUid } from '@/stores/firebaseUid';
+import { useNdPreferences } from '@/hooks/useNdPreferences';
+import {
+  planPomodoroFromLogs,
+  type PomodoroSessionConfig,
+} from '@/utils/energyAwarePomodoro';
+import {
+  computePomodoroTimerStatus,
+  isGoodEnoughEnabled,
+} from '@/utils/goodEnoughTimerManager';
+import { createShipItCelebration } from '@/utils/shipItCelebrationManager';
 
 type WorkStyle = 'balanced' | 'deep_work' | 'quick_wins' | 'deadline_driven';
 // 'empty' is a dedicated phase for "API returned no sessions to plan". Prior
@@ -83,11 +100,51 @@ export function PomodoroScreen() {
   const [currentTaskIdx, setCurrentTaskIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [sessionLength] = useState(25); // minutes
-  const [breakLength] = useState(5); // minutes
+  // session/break length are now mutable so the ND energy-aware
+  // suggestion can apply itself without forcing a full re-plan.
+  const [sessionLength, setSessionLength] = useState(25); // minutes
+  const [breakLength, setBreakLength] = useState(5); // minutes
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  // Track the work-phase elapsed seconds so the good-enough threshold
+  // works off real elapsed time (timeLeft drains during work).
+  const [workElapsedSeconds, setWorkElapsedSeconds] = useState(0);
 
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  // ND-friendly hooks: energy-aware planning + good-enough release +
+  // Ship-It celebrations. All three derive from the user's NdPreferences
+  // and the recent mood/energy logs — both already synced cross-device.
+  const { prefs: ndPrefs } = useNdPreferences();
+  const [moodLogs, setMoodLogs] = useState<MoodEnergyLog[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const uid = getFirebaseUid();
+        const m = await getLogsInRange(
+          uid,
+          format(subDays(new Date(), 7), 'yyyy-MM-dd'),
+          format(new Date(), 'yyyy-MM-dd'),
+        );
+        setMoodLogs(m);
+      } catch {
+        // No auth / no logs — falls back to classic defaults silently.
+      }
+    })();
+  }, []);
+  const energySuggestion: PomodoroSessionConfig | null = useMemo(() => {
+    if (moodLogs.length === 0) return null;
+    return planPomodoroFromLogs(moodLogs);
+  }, [moodLogs]);
+  const handleApplyEnergySuggestion = useCallback(
+    (config: PomodoroSessionConfig) => {
+      setSessionLength(config.workMinutes);
+      setBreakLength(config.breakMinutes);
+      toast.success(
+        `Applied: ${config.workMinutes}m focus / ${config.breakMinutes}m break`,
+      );
+    },
+    [],
+  );
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -125,6 +182,9 @@ export function PomodoroScreen() {
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
       timerRef.current = setInterval(() => {
+        if (phase === 'work') {
+          setWorkElapsedSeconds((prev) => prev + 1);
+        }
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
@@ -208,8 +268,33 @@ export function PomodoroScreen() {
     setCurrentTaskIdx(0);
     setPhase('work');
     setTimeLeft(sessionLength * 60);
+    setWorkElapsedSeconds(0);
     setIsRunning(true);
     setCompletedTaskIds(new Set());
+  };
+
+  /**
+   * ND-friendly "Good enough — end this session" handler. Only enabled
+   * when ND prefs allow (Focus & Release Mode + good-enough timers, OR
+   * ADHD mode with forgiveness streaks) AND the session is ≥70% elapsed.
+   * Mirrors Android's GoodEnoughTimerManager + ShipItCelebrationManager —
+   * fires a Ship-It celebration and rolls forward into the break.
+   */
+  const handleGoodEnoughShip = () => {
+    clearInterval(timerRef.current);
+    setIsRunning(false);
+    const celebration = createShipItCelebration('GOOD_ENOUGH_SHIP', ndPrefs);
+    if (celebration) {
+      toast.success(celebration.message);
+    } else {
+      // Defensive: prefs may have changed mid-session. Don't blank the
+      // user — a plain confirmation is still better than silence.
+      toast.success('Good enough — moving to break.');
+    }
+    setPhase('break');
+    setTimeLeft(breakLength * 60);
+    setIsRunning(true);
+    setWorkElapsedSeconds(0);
   };
 
   const handleToggleTimer = () => {
@@ -225,6 +310,7 @@ export function PomodoroScreen() {
       setCurrentTaskIdx(0);
       setPhase('work');
       setTimeLeft(sessionLength * 60);
+      setWorkElapsedSeconds(0);
       setIsRunning(true);
     } else {
       setPhase('done');
@@ -259,6 +345,7 @@ export function PomodoroScreen() {
     setCurrentSessionIdx(0);
     setCurrentTaskIdx(0);
     setTimeLeft(0);
+    setWorkElapsedSeconds(0);
     setCompletedTaskIds(new Set());
   };
 
@@ -314,6 +401,18 @@ export function PomodoroScreen() {
       ? Math.max(0, Math.floor((breakLength * 60 - timeLeft) / 60))
       : 0;
 
+  // ND-friendly derivations: gated good-enough release for the current
+  // work block + Ship-It celebration copy for the done summary.
+  const ndGoodEnoughEnabled = isGoodEnoughEnabled(ndPrefs);
+  const workTimerStatus = computePomodoroTimerStatus(
+    {
+      plannedSeconds: sessionLength * 60,
+      elapsedSeconds: workElapsedSeconds,
+    },
+    ndPrefs,
+  );
+  const doneCelebration = createShipItCelebration('NORMAL_COMPLETION', ndPrefs);
+
   return (
     <div className="mx-auto max-w-3xl">
       {/* Header */}
@@ -340,6 +439,8 @@ export function PomodoroScreen() {
         sessionDurationMinutes={sessions.length * sessionLength}
         elapsedBreakMinutes={coachElapsedBreakMinutes}
         breakType="short"
+        energySuggestion={energySuggestion}
+        onApplyEnergySuggestion={handleApplyEnergySuggestion}
       />
 
       {/* IDLE: Setup panel */}
@@ -599,6 +700,23 @@ export function PomodoroScreen() {
               )}
             </Button>
 
+            {phase === 'work' && ndGoodEnoughEnabled && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleGoodEnoughShip}
+                disabled={!workTimerStatus.goodEnoughUnlocked}
+                title={
+                  workTimerStatus.goodEnoughUnlocked
+                    ? 'Call this session good enough and take a break'
+                    : 'Unlocks at 70% elapsed'
+                }
+              >
+                <Rocket className="h-4 w-4" />
+                Good Enough
+              </Button>
+            )}
+
             {phase === 'break' && (
               <Button variant="ghost" size="sm" onClick={handleSkipBreak}>
                 <SkipForward className="h-4 w-4" />
@@ -690,7 +808,7 @@ export function PomodoroScreen() {
             </div>
           </div>
           <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
-            Session Complete!
+            {doneCelebration ? doneCelebration.message : 'Session Complete!'}
           </h2>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
             You completed {completedTaskIds.size} task{completedTaskIds.size !== 1 ? 's' : ''} across{' '}

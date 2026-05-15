@@ -1,4 +1,5 @@
 import { useState, useCallback, memo } from 'react';
+import { Link2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { PriorityBadge } from './PriorityBadge';
 import { DueDateLabel } from './DueDateLabel';
@@ -19,6 +20,21 @@ interface TaskRowProps {
   projectName?: string;
   projectColor?: string;
   showSelection?: boolean;
+  /**
+   * Number of unmet (not-done) blockers gating this task. When `> 0`
+   * the row mutes visually (~40% opacity, matching Android's
+   * `BlockedTaskCard` convention) and shows a "Blocked by N" chip that
+   * opens the dependency editor on click. `0` / undefined → no chip,
+   * full opacity.
+   */
+  blockedByCount?: number;
+  /**
+   * Click handler for the blocker chip. When provided, the chip becomes
+   * a button; clicking forwards to this callback (typically opens the
+   * task editor scrolled to the Organize tab). When omitted, the chip
+   * is decorative.
+   */
+  onBlockerChipClick?: (task: Task) => void;
   className?: string;
 }
 
@@ -34,6 +50,8 @@ export const TaskRow = memo(function TaskRow({
   projectName,
   projectColor,
   showSelection = false,
+  blockedByCount = 0,
+  onBlockerChipClick,
   className = '',
 }: TaskRowProps) {
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -70,11 +88,16 @@ export const TaskRow = memo(function TaskRow({
   const subtaskDone =
     task.subtasks?.filter((s) => s.status === 'done').length ?? 0;
 
+  // Mute the row when blocked by unmet dependencies — mirrors Android's
+  // `BlockedTaskCard` 40% opacity convention so the visual cue is
+  // identical across platforms.
+  const isBlocked = blockedByCount > 0 && !isDone;
+
   return (
     <div
       className={`group relative flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:bg-[var(--color-bg-secondary)] ${
         selected ? 'bg-[var(--color-accent)]/5 border-[var(--color-accent)]/20' : ''
-      } ${className}`}
+      } ${isBlocked ? 'opacity-40' : ''} ${className}`}
       onContextMenu={handleContextMenu}
     >
       {/* Selection checkbox */}
@@ -112,6 +135,38 @@ export const TaskRow = memo(function TaskRow({
 
         {/* Inline badges */}
         <span className="flex shrink-0 items-center gap-2">
+          {/* Blocked-by chip — opens dependency editor on click */}
+          {isBlocked && (
+            <span
+              role={onBlockerChipClick ? 'button' : undefined}
+              tabIndex={onBlockerChipClick ? 0 : undefined}
+              onClick={
+                onBlockerChipClick
+                  ? (e) => {
+                      e.stopPropagation();
+                      onBlockerChipClick(task);
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                onBlockerChipClick
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onBlockerChipClick(task);
+                      }
+                    }
+                  : undefined
+              }
+              className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+              aria-label={`Blocked by ${blockedByCount} task${blockedByCount === 1 ? '' : 's'}`}
+            >
+              <Link2 className="h-3 w-3" aria-hidden="true" />
+              Blocked By {blockedByCount}
+            </span>
+          )}
+
           {/* Subtask count */}
           {subtaskCount > 0 && (
             <Badge

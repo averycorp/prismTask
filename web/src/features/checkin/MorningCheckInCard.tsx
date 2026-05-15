@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Flame, Loader2, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check, ChevronRight, Flame, Loader2, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import {
@@ -24,6 +25,7 @@ export function MorningCheckInCard() {
   const setSetting = useSettingsStore((s) => s.setSetting);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const todayIso = useLogicalToday(startOfDayHour);
+  const navigate = useNavigate();
 
   const [log, setLog] = useState<CheckInLog | null>(null);
   const [recent, setRecent] = useState<CheckInLog[]>([]);
@@ -74,6 +76,15 @@ export function MorningCheckInCard() {
                 {streak.current}d streak
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => navigate('/checkin/history')}
+              className="ml-auto inline-flex items-center gap-0.5 rounded text-[11px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-accent)]"
+              aria-label="View 90-day check-in history"
+            >
+              History
+              <ChevronRight className="h-3 w-3" aria-hidden="true" />
+            </button>
           </div>
           <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
             {log

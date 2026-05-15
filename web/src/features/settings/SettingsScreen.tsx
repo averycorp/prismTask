@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Settings,
   Palette,
@@ -26,6 +27,7 @@ import {
   Wrench,
   Scale,
   Coffee,
+  Brain,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useThemeStore } from '@/stores/themeStore';
@@ -46,6 +48,7 @@ import { LeisureBudgetSection } from '@/features/settings/sections/LeisureBudget
 import { AboutSection } from '@/features/settings/sections/AboutSection';
 import { HelpFeedbackSection } from '@/features/settings/sections/HelpFeedbackSection';
 import { AccessibilitySection } from '@/features/settings/sections/AccessibilitySection';
+import { NdModesSection } from '@/features/settings/sections/NdModesSection';
 import { AiFeaturesSection } from '@/features/settings/sections/AiFeaturesSection';
 import { DebugSection } from '@/features/settings/sections/DebugSection';
 import { DeleteAccountSection } from '@/features/settings/sections/DeleteAccountSection';
@@ -381,6 +384,14 @@ export function SettingsScreen() {
           checked={settings.showMorningCheckIn}
           onChange={(v) => settings.setSetting('showMorningCheckIn', v)}
         />
+        <div className="mt-1 mb-2">
+          <Link
+            to="/checkin/history"
+            className="inline-flex items-center text-sm font-medium text-[var(--color-accent)] hover:underline"
+          >
+            View Check-In Streak History →
+          </Link>
+        </div>
         <div className="mt-2">
           <label className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">
             Upcoming Days
@@ -524,6 +535,14 @@ export function SettingsScreen() {
         title="Leisure Minimum"
       >
         <LeisureBudgetSection />
+      </SettingsSection>
+
+      {/* ND-Friendly Modes — parity audit C.7c */}
+      <SettingsSection
+        icon={<Brain className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="ND-Friendly Modes"
+      >
+        <NdModesSection />
       </SettingsSection>
 
       {/* Accessibility */}
