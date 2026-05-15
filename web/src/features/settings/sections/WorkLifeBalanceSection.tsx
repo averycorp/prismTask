@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   DEFAULT_BALANCE_PREFERENCES,
@@ -19,6 +20,7 @@ import { Button } from '@/components/ui/Button';
  * them via `GenericPreferenceSyncService` without lossy float ↔ int conversion.
  */
 export function WorkLifeBalanceSection() {
+  const navigate = useNavigate();
   const [prefs, setPrefs] = useState<BalancePreferences>(DEFAULT_BALANCE_PREFERENCES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -150,6 +152,25 @@ export function WorkLifeBalanceSection() {
         suffix="%"
         onChange={(v) => update('overloadThresholdPct', v)}
       />
+
+      <button
+        type="button"
+        onClick={() => navigate('/balance/weekly-report')}
+        className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 text-left transition-colors hover:border-[var(--color-accent)]/50"
+      >
+        <span className="flex items-center gap-2">
+          <BarChart3
+            className="h-4 w-4 text-[var(--color-accent)]"
+            aria-hidden="true"
+          />
+          <span className="text-sm font-medium text-[var(--color-text-primary)]">
+            Open Weekly Balance Report
+          </span>
+        </span>
+        <span className="text-xs text-[var(--color-text-secondary)]">
+          Analytics
+        </span>
+      </button>
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving || !dirty || !sumOK}>
