@@ -101,6 +101,7 @@ constructor(
     private val coachmarkController: CoachmarkController,
     private val habitDailyTaskGenerator: HabitDailyTaskGenerator,
     private val restDayRepository: RestDayRepository,
+    private val restDayPreferences: com.averycorp.prismtask.data.preferences.RestDayPreferences,
     private val billingManager: BillingManager,
     private val balanceContributionsProvider: BalanceContributionsProvider
 ) : ViewModel() {
@@ -134,6 +135,29 @@ constructor(
                 restDayRepository.unmarkTodayAsRestDay()
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to unmark rest day", e)
+            }
+        }
+    }
+
+    /**
+     * F4 Item 2 — Low-energy mode toggle. When on, the Today task lists
+     * are filtered to EASY-load tasks only so the user can pick a small
+     * win without the harder items pulling on attention. Distinct from
+     * rest-day (which is a full takeover); both can coexist — rest-day
+     * takes precedence in rendering.
+     *
+     * Principle 6: USER-INVOKED, never auto-detected.
+     */
+    val lowEnergyModeEnabled: StateFlow<Boolean> =
+        restDayPreferences.observeLowEnergyFilterEnabled()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun setLowEnergyModeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                restDayPreferences.setLowEnergyFilterEnabled(enabled)
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to set low-energy mode", e)
             }
         }
     }
@@ -686,8 +710,11 @@ constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allTodayItems: StateFlow<List<TaskEntity>> =
-        combine(todayTasks, plannedTasks) { today, planned ->
-            today + planned
+        combine(todayTasks, plannedTasks, lowEnergyModeEnabled) { today, planned, lowEnergy ->
+            val combined = today + planned
+            if (lowEnergy) {
+                combined.filter { it.cognitiveLoad == com.averycorp.prismtask.domain.model.CognitiveLoad.EASY.name }
+            } else combined
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalTodayCount: StateFlow<Int> = allTodayItems

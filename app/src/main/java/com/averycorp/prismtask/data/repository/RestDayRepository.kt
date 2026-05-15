@@ -116,4 +116,31 @@ constructor(
         )
         restDayDao.deleteByDate(isoDate)
     }
+
+    /**
+     * Mark every date in `from..to` (inclusive) as a rest day. Backs the
+     * Streak-Pause feature (Settings → Forgiveness Streak → Pause): the
+     * user picks a date range, and every day in that range counts as
+     * "kept" in the forgiveness-first streak walk without consuming
+     * grace. Idempotent via the DAO's `INSERT OR IGNORE`.
+     */
+    suspend fun markRangeAsRestDay(from: LocalDate, to: LocalDate) {
+        if (to.isBefore(from)) return
+        val createdAt = System.currentTimeMillis()
+        var d = from
+        while (!d.isAfter(to)) {
+            restDayDao.upsert(RestDayEntity(date = d.toString(), createdAt = createdAt))
+            d = d.plusDays(1)
+        }
+    }
+
+    /** Clear every rest-day marker in `from..to`. Used to cancel an active pause. */
+    suspend fun unmarkRangeAsRestDay(from: LocalDate, to: LocalDate) {
+        if (to.isBefore(from)) return
+        var d = from
+        while (!d.isAfter(to)) {
+            restDayDao.deleteByDate(d.toString())
+            d = d.plusDays(1)
+        }
+    }
 }
