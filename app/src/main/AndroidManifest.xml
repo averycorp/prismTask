@@ -245,6 +245,25 @@
             tools:node="merge"
             tools:replace="android:noHistory,android:excludeFromRecents" />
 
+        <!--
+            Same hardening for Glance's InvisibleActionTrampolineActivity.
+            The library entry is singleInstance with its own taskAffinity
+            but omits excludeFromRecents (unlike its sibling
+            ActionTrampolineActivity which already has it). When the
+            process dies before the trampoline finishes, the system can
+            restore the task from Recents and replay onCreate with a
+            stale Intent whose ACTION_INTENT extra is missing — which
+            triggers an IllegalArgumentException ("List adapter activity
+            trampoline invoked without specifying target intent"). Adding
+            excludeFromRecents removes the Recents restoration vector,
+            matching what Glance already does for ActionTrampolineActivity.
+        -->
+        <activity
+            android:name="androidx.glance.appwidget.action.InvisibleActionTrampolineActivity"
+            android:excludeFromRecents="true"
+            tools:node="merge"
+            tools:replace="android:excludeFromRecents" />
+
         <receiver
             android:name=".widget.QuickAddWidgetReceiver"
             android:enabled="true"
