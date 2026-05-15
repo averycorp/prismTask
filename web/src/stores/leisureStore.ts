@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { leisureApi } from '@/api/leisure';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { endOfLogicalDayMs, startOfLogicalDayMs } from '@/utils/dayBoundary';
 import {
   CUSTOM_CATEGORY_PREFIX,
   LEISURE_CATEGORIES,
@@ -89,19 +91,26 @@ function persistCategoryDisplay(
 }
 
 /**
- * "Today" minutes start-of-day calculation. Web-side simplification: uses
- * the user's local midnight rather than the `startOfDayHour` setting. The
- * Android version honors `startOfDayHour`; bringing parity here would
- * require reading the value out of `useSettingsStore` and is a follow-up.
+ * "Today" minutes start-of-day window — honours the user-configurable
+ * Start-of-Day hour (cross-device synced via
+ * `users/{uid}/prefs/task_behavior_prefs.day_start_hour`). A user with
+ * SoD = 6 who logs a leisure session at 5:30 am should see that session
+ * count toward *yesterday's* total, and one logged at 6:30 am should
+ * count toward today — same shape Android's `DayBoundary` enforces in
+ * `LeisureBudgetTracker`.
+ *
+ * Reads `startOfDayHour` from the settings store at call time so a
+ * cross-device update (e.g. user changes SoD on Android) is picked up
+ * without re-mounting the leisure screen.
  */
 function startOfTodayMillis(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  const hour = useSettingsStore.getState().startOfDayHour;
+  return startOfLogicalDayMs(Date.now(), hour);
 }
 
 function endOfTodayMillis(): number {
-  return startOfTodayMillis() + 24 * 60 * 60 * 1000;
+  const hour = useSettingsStore.getState().startOfDayHour;
+  return endOfLogicalDayMs(Date.now(), hour);
 }
 
 export interface LeisureState {
