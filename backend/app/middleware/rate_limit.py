@@ -33,7 +33,9 @@ class RateLimiter:
         for k in stale:
             del self._requests[k]
 
-    def check(self, request: Request) -> None:
+    def check(self, request: Request, is_admin: bool = False) -> None:
+        if is_admin:
+            return
         now = time.monotonic()
         key = self._client_ip(request)
         with self._lock:
@@ -72,7 +74,9 @@ class DailyAIRateLimiter:
     def _today_key(self) -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    def check(self, user_id: int, tier: str) -> None:
+    def check(self, user_id: int, tier: str, is_admin: bool = False) -> None:
+        if is_admin:
+            return
         limit = self.TIER_LIMITS.get(tier, 0)
         if limit == 0:
             # Defense in depth: the client-side feature gate should keep
@@ -130,7 +134,9 @@ class UserRateLimiter:
         for k in stale:
             del self._requests[k]
 
-    def check(self, user_id: int) -> None:
+    def check(self, user_id: int, is_admin: bool = False) -> None:
+        if is_admin:
+            return
         now = time.monotonic()
         with self._lock:
             if len(self._requests) > 1024:

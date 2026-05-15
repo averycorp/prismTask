@@ -80,9 +80,9 @@ async def chat_stream(
     """
     from app.routers import ai as _ai_pkg
 
-    _ai_pkg.chat_rate_limiter.check(request)
+    _ai_pkg.chat_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     # D12 Gate (a): pre-allocate the IDs we'll use for the persisted rows
     # so we can surface them in the SSE done payload without a second

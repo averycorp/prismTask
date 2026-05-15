@@ -151,7 +151,7 @@ async def habit_correlations(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    correlation_rate_limiter.check(request)
+    correlation_rate_limiter.check(request, is_admin=current_user.is_admin)
 
     today = date.today()
     start = today - timedelta(days=90)
