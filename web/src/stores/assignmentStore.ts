@@ -3,17 +3,24 @@ import type { Unsubscribe } from 'firebase/firestore';
 import {
   getAssignments,
   subscribeToAssignments,
+  createAssignment as remoteCreateAssignment,
+  updateAssignment as remoteUpdateAssignment,
+  deleteAssignment as remoteDeleteAssignment,
+  type AssignmentInput,
 } from '@/api/firestore/assignments';
 import type { Assignment } from '@/types/schoolwork';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 
 /**
  * Zustand slice for the schoolwork-assignment Firestore collection.
- * Mirrors the read-only shape of `courseStore` — Android is the only
- * write path for assignment rows. Today's `SchoolworkTodayCard` reads
- * from this store to surface real "due today" assignments grouped
- * under each course (replacing PR #1365's keyword-substring fallback,
- * audit follow-up F.2).
+ * Today's `SchoolworkTodayCard` reads from this store to surface real
+ * "due today" assignments grouped under each course (replacing PR
+ * #1365's keyword-substring fallback, audit follow-up F.2).
+ *
+ * Parity F.2 follow-up: web is now a full read+write surface. The
+ * editor in `SchoolworkScreen.tsx` drives CRUD via this store; the
+ * SchoolworkTodayCard's `toggleComplete` shortcut also routes through
+ * `toggleComplete()` here so writes are consistent.
  *
  * The Firestore listener mounts inside `courseStore.subscribe()` so the
  * schoolwork surface keeps a single subscribe/unsubscribe lifecycle
@@ -35,6 +42,15 @@ export interface AssignmentState {
   subscribe: (uid: string) => Unsubscribe;
   reset: () => void;
 
+  // CRUD
+  createAssignment: (input: AssignmentInput) => Promise<Assignment>;
+  updateAssignment: (
+    assignmentId: string,
+    patch: Partial<AssignmentInput>,
+  ) => Promise<void>;
+  toggleComplete: (assignmentId: string) => Promise<void>;
+  deleteAssignment: (assignmentId: string) => Promise<void>;
+
   // Selectors
   /** All assignments whose `dueDate` falls in `[startMillis, endMillis)`. */
   dueBetween: (startMillis: number, endMillis: number) => Assignment[];
@@ -42,6 +58,8 @@ export interface AssignmentState {
   activeDueBetween: (startMillis: number, endMillis: number) => Assignment[];
   /** Group assignments by course doc id (the Firestore parent cloud id). */
   groupByCourse: (assignments: Assignment[]) => Map<string, Assignment[]>;
+  /** All assignments for one course (handy for the per-course list view). */
+  forCourse: (courseId: string) => Assignment[];
 }
 
 export const useAssignmentStore = create<AssignmentState>((set, get) => ({
@@ -68,6 +86,64 @@ export const useAssignmentStore = create<AssignmentState>((set, get) => ({
 
   reset: () => set({ assignments: [], isLoading: false, error: null }),
 
+  createAssignment: async (input) => {
+    const uid = getFirebaseUid();
+    try {
+      const assignment = await remoteCreateAssignment(uid, input);
+      set((s) => ({ assignments: [...s.assignments, assignment] }));
+      return assignment;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to create assignment';
+      set({ error: message });
+      throw err;
+    }
+  },
+
+  updateAssignment: async (assignmentId, patch) => {
+    const uid = getFirebaseUid();
+    try {
+      await remoteUpdateAssignment(uid, assignmentId, patch);
+      set((s) => ({
+        assignments: s.assignments.map((a) =>
+          a.id === assignmentId
+            ? { ...a, ...patch, updatedAt: Date.now() }
+            : a,
+        ),
+      }));
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update assignment';
+      set({ error: message });
+      throw err;
+    }
+  },
+
+  toggleComplete: async (assignmentId) => {
+    const current = get().assignments.find((a) => a.id === assignmentId);
+    if (!current) return;
+    const nextCompleted = !current.completed;
+    await get().updateAssignment(assignmentId, {
+      completed: nextCompleted,
+      completedAt: nextCompleted ? Date.now() : null,
+    });
+  },
+
+  deleteAssignment: async (assignmentId) => {
+    const uid = getFirebaseUid();
+    try {
+      await remoteDeleteAssignment(uid, assignmentId);
+      set((s) => ({
+        assignments: s.assignments.filter((a) => a.id !== assignmentId),
+      }));
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to delete assignment';
+      set({ error: message });
+      throw err;
+    }
+  },
+
   dueBetween: (startMillis, endMillis) => {
     return get().assignments.filter((a) => {
       if (a.dueDate == null) return false;
@@ -92,5 +168,9 @@ export const useAssignmentStore = create<AssignmentState>((set, get) => ({
       }
     }
     return map;
+  },
+
+  forCourse: (courseId) => {
+    return get().assignments.filter((a) => a.courseId === courseId);
   },
 }));
