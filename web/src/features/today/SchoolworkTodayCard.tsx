@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { CheckCircle2, Circle, GraduationCap } from 'lucide-react';
 import { useCourseStore } from '@/stores/courseStore';
 import { useAssignmentStore } from '@/stores/assignmentStore';
+import { argbToCss } from '@/features/schoolwork/courseColor';
 import type { Assignment, Course } from '@/types/schoolwork';
 
 /**
@@ -190,12 +191,6 @@ function CourseRow({ course, completed, assignments, onToggle }: CourseRowProps)
       )}
     </li>
   );
-}
-
-/** ARGB int → CSS hex, mirroring SchoolworkCard's color rendering. */
-function argbToCss(color: number): string {
-  if (color === 0) return '#888';
-  return '#' + (color >>> 0).toString(16).padStart(8, '0').slice(2);
 }
 
 interface AssignmentItemProps {
