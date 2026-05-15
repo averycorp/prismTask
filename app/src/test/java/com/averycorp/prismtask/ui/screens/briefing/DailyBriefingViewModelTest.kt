@@ -18,12 +18,18 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
+import java.io.IOException
 
 /**
  * Unit tests for [DailyBriefingViewModel] focused on the cloud_id resolution
@@ -65,6 +71,11 @@ class DailyBriefingViewModelTest {
 
     private fun newViewModel() = DailyBriefingViewModel(api, taskRepository, proFeatureGate, io.mockk.mockk(relaxed = true))
 
+    private fun httpException(code: Int): HttpException {
+        val body = "".toResponseBody("application/json".toMediaType())
+        return HttpException(Response.error<Any>(code, body))
+    }
+
     @Test
     fun generateBriefing_resolvesCloudIdsToLocalLongs() = runTest(dispatcher) {
         coEvery { api.getDailyBriefing(any()) } returns DailyBriefingResponse(
@@ -96,6 +107,63 @@ class DailyBriefingViewModelTest {
         assertEquals(3L, briefing.suggestedOrder[1].taskId)
         // No unresolved entries → pendingSyncTitles empty.
         assertTrue(briefing.pendingSyncTitles.isEmpty())
+    }
+
+    @Test
+    fun generateBriefing_rateLimitHttp429_surfacesActionableError() = runTest(dispatcher) {
+        coEvery { api.getDailyBriefing(any()) } throws httpException(429)
+
+        val vm = newViewModel()
+        vm.generateBriefing(date = "2026-04-30")
+        advanceUntilIdle()
+
+        assertNull(vm.briefing.value)
+        assertEquals(
+            "Daily Briefing limit reached — try again in a few minutes.",
+            vm.error.value
+        )
+    }
+
+    @Test
+    fun generateBriefing_aiFeaturesDisabledHttp451_surfacesActionableError() = runTest(dispatcher) {
+        coEvery { api.getDailyBriefing(any()) } throws httpException(451)
+
+        val vm = newViewModel()
+        vm.generateBriefing(date = "2026-04-30")
+        advanceUntilIdle()
+
+        assertEquals(
+            "AI features are disabled. Turn them on in Settings → AI Features.",
+            vm.error.value
+        )
+    }
+
+    @Test
+    fun generateBriefing_anthropicOutageHttp503_surfacesActionableError() = runTest(dispatcher) {
+        coEvery { api.getDailyBriefing(any()) } throws httpException(503)
+
+        val vm = newViewModel()
+        vm.generateBriefing(date = "2026-04-30")
+        advanceUntilIdle()
+
+        assertEquals(
+            "AI service temporarily unavailable — try again in a moment.",
+            vm.error.value
+        )
+    }
+
+    @Test
+    fun generateBriefing_networkIOException_surfacesNetworkError() = runTest(dispatcher) {
+        coEvery { api.getDailyBriefing(any()) } throws IOException("connection refused")
+
+        val vm = newViewModel()
+        vm.generateBriefing(date = "2026-04-30")
+        advanceUntilIdle()
+
+        assertEquals(
+            "Network error — check your connection and try again.",
+            vm.error.value
+        )
     }
 
     @Test

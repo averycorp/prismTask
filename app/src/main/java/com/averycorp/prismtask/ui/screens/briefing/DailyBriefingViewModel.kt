@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -132,12 +134,30 @@ constructor(
                     pendingSyncTitles = pendingSync.distinct()
                 )
                 cachedDate = targetDate
+            } catch (e: HttpException) {
+                _error.value = mapBriefingHttpError(e.code())
+            } catch (e: IOException) {
+                _error.value = "Network error — check your connection and try again."
             } catch (e: Exception) {
                 _error.value = "Couldn't generate briefing"
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    // Map known backend failure modes to actionable user-facing copy. Anything
+    // we haven't enumerated falls through to the generic message — preserves
+    // current behavior for unexpected codes while making the common cases
+    // (rate limit hit, AI features off, Anthropic outage) self-diagnosing.
+    private fun mapBriefingHttpError(code: Int): String = when (code) {
+        401 -> "Sign in required to use Daily Briefing."
+        403 -> "Daily Briefing requires a Pro subscription."
+        429 -> "Daily Briefing limit reached — try again in a few minutes."
+        451 -> "AI features are disabled. Turn them on in Settings → AI Features."
+        500 -> "Briefing generation failed — please try again."
+        503 -> "AI service temporarily unavailable — try again in a moment."
+        else -> "Couldn't generate briefing (HTTP $code)"
     }
 
     fun refreshBriefing() {
