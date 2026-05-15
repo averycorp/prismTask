@@ -378,7 +378,6 @@ class OnboardingViewModelPreviewModeTest {
             vm.applyTuningSelections(skip = false)
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { ndPreferencesDataStore.setForgivenessStreaks(true) }
             coVerify(exactly = 1) { userPreferencesDataStore.setForgivenessPrefs(any()) }
             coVerify(exactly = 1) { onboardingPreferences.setRestDayPrimed(true) }
         }
@@ -409,7 +408,6 @@ class OnboardingViewModelPreviewModeTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
-        coVerify(exactly = 0) { ndPreferencesDataStore.setForgivenessStreaks(any()) }
         coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
         coVerify(exactly = 0) { onboardingPreferences.setRestDayPrimed(any()) }
     }

@@ -15,9 +15,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,12 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.time.Instant
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
 /**
@@ -43,15 +41,14 @@ import java.util.Calendar
  * - **Name** (required): free-text medication name. Stored verbatim in
  *   [com.averycorp.prismtask.data.local.entity.MedicationDoseEntity.customMedicationName].
  *   The Log button stays disabled until non-blank.
- * - **Time**: defaults to "Now"; tap-and-edit via the embedded
- *   Material 3 [TimePicker]. Stored as wall-clock millis on the
- *   user-chosen date.
+ * - **Time**: defaults to "Now"; tap-and-edit on the three-hand analog
+ *   clock picker. Stored as wall-clock millis on today's date.
  * - **Note** (optional): up to 200 chars of free-form context.
  *
  * The sheet does not own the date — it always logs against today (or
  * the user's logical day per `DayBoundary`, which the repository
- * resolves). The audit explicitly chose to keep the affordance simple;
- * back-dated entries can land in a follow-up if users ask.
+ * resolves). Back-dated entries land via the medication log screen if a
+ * user needs them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,9 +63,10 @@ fun LogCustomDoseSheet(
     val nowCal = remember { Calendar.getInstance() }
     val context = LocalContext.current
     val is24Hour = remember(context) { DateFormat.is24HourFormat(context) }
-    val timeState = rememberTimePickerState(
+    val clockState = rememberAnalogClockState(
         initialHour = nowCal.get(Calendar.HOUR_OF_DAY),
         initialMinute = nowCal.get(Calendar.MINUTE),
+        initialSecond = 0,
         is24Hour = is24Hour
     )
 
@@ -106,20 +104,8 @@ fun LogCustomDoseSheet(
                 style = MaterialTheme.typography.labelLarge
             )
             Spacer(modifier = Modifier.height(4.dp))
-            TimePicker(state = timeState, modifier = Modifier.align(Alignment.CenterHorizontally))
-            Spacer(modifier = Modifier.height(4.dp))
-            // Source-of-truth readout — the dial + AM/PM toggle can mislead
-            // about the picked half-of-day; this label reads from
-            // timeState.hour/timeState.minute, which are exactly what
-            // todayAt(...) below will save.
-            Text(
-                text = "Selected: ${formatPickedTime(
-                    timeState.hour,
-                    timeState.minute,
-                    is24Hour
-                )}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            AnalogClockPicker(
+                state = clockState,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
 
@@ -142,7 +128,7 @@ fun LogCustomDoseSheet(
                 Spacer(modifier = Modifier.height(0.dp))
                 Button(
                     onClick = {
-                        onLog(name.trim(), todayAt(timeState.hour, timeState.minute), note.trim())
+                        onLog(name.trim(), todayAt(clockState.hour, clockState.minute), note.trim())
                     },
                     enabled = name.isNotBlank()
                 ) { Text("Log Dose") }
@@ -159,11 +145,3 @@ private fun todayAt(hour: Int, minute: Int): Long {
     val time = LocalTime.of(hour, minute)
     return LocalDateTime.of(today, time).atZone(zone).toInstant().toEpochMilli()
 }
-
-@Suppress("unused")
-private val previewFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("h:mm a").withZone(ZoneId.systemDefault())
-
-@Suppress("unused")
-private fun Long.previewLabel(): String =
-    previewFormatter.format(Instant.ofEpochMilli(this))
