@@ -262,6 +262,142 @@ describe('nlp utils', () => {
       });
     });
 
+    describe('task mode hashtag extraction', () => {
+      it('extracts #work-mode as WORK and strips from title', () => {
+        const result = parseQuickAdd('Ship the audit #work-mode');
+        expect(result.taskMode).toBe('WORK');
+        expect(result.title).toBe('Ship the audit');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('extracts #play-mode as PLAY', () => {
+        const result = parseQuickAdd('Try a new recipe #play-mode');
+        expect(result.taskMode).toBe('PLAY');
+        expect(result.title).toBe('Try a new recipe');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('extracts #relax-mode as RELAX', () => {
+        const result = parseQuickAdd('Watch a movie #relax-mode');
+        expect(result.taskMode).toBe('RELAX');
+        expect(result.title).toBe('Watch a movie');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('is case-insensitive for mode hashtags', () => {
+        const result = parseQuickAdd('Task #Work-Mode');
+        expect(result.taskMode).toBe('WORK');
+        expect(result.title).toBe('Task');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('matches mode hashtags mid-sentence', () => {
+        const result = parseQuickAdd('Build #play-mode the prototype');
+        expect(result.taskMode).toBe('PLAY');
+        expect(result.title).toBe('Build the prototype');
+      });
+
+      it('last-write-wins when multiple mode hashtags appear', () => {
+        const result = parseQuickAdd('Task #work-mode then #relax-mode');
+        expect(result.taskMode).toBe('RELAX');
+        expect(result.title).toBe('Task then');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('returns null taskMode when no mode hashtag is present', () => {
+        const result = parseQuickAdd('Just a task');
+        expect(result.taskMode).toBeNull();
+      });
+
+      it('does NOT regress generic #work tag (life-category hashtag survives)', () => {
+        // `#work` (LifeCategory) and `#work-mode` (TaskMode) must not
+        // collide. The suffix scan must only consume `#work-mode`.
+        const result = parseQuickAdd('Daily standup #work');
+        expect(result.taskMode).toBeNull();
+        expect(result.tags).toEqual(['work']);
+      });
+
+      it('does NOT eat #mymode as a mode hashtag (only -mode suffix)', () => {
+        const result = parseQuickAdd('Task #mymode');
+        expect(result.taskMode).toBeNull();
+        expect(result.tags).toEqual(['mymode']);
+      });
+    });
+
+    describe('cognitive load hashtag extraction', () => {
+      it('extracts #easy-load as EASY and strips from title', () => {
+        const result = parseQuickAdd('Triage inbox #easy-load');
+        expect(result.cognitiveLoad).toBe('EASY');
+        expect(result.title).toBe('Triage inbox');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('extracts #medium-load as MEDIUM', () => {
+        const result = parseQuickAdd('Write tests #medium-load');
+        expect(result.cognitiveLoad).toBe('MEDIUM');
+        expect(result.title).toBe('Write tests');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('extracts #hard-load as HARD', () => {
+        const result = parseQuickAdd('Design the schema #hard-load');
+        expect(result.cognitiveLoad).toBe('HARD');
+        expect(result.title).toBe('Design the schema');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('is case-insensitive for load hashtags', () => {
+        const result = parseQuickAdd('Task #Hard-Load');
+        expect(result.cognitiveLoad).toBe('HARD');
+        expect(result.title).toBe('Task');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('matches load hashtags mid-sentence', () => {
+        const result = parseQuickAdd('Refactor #medium-load the parser');
+        expect(result.cognitiveLoad).toBe('MEDIUM');
+        expect(result.title).toBe('Refactor the parser');
+      });
+
+      it('last-write-wins when multiple load hashtags appear', () => {
+        const result = parseQuickAdd('Task #easy-load then #hard-load');
+        expect(result.cognitiveLoad).toBe('HARD');
+        expect(result.title).toBe('Task then');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('returns null cognitiveLoad when no load hashtag is present', () => {
+        const result = parseQuickAdd('Just a task');
+        expect(result.cognitiveLoad).toBeNull();
+      });
+
+      it('does NOT eat #myload as a load hashtag (only -load suffix)', () => {
+        const result = parseQuickAdd('Task #myload');
+        expect(result.cognitiveLoad).toBeNull();
+        expect(result.tags).toEqual(['myload']);
+      });
+    });
+
+    describe('combined mode + load hashtags', () => {
+      it('extracts both mode and load hashtags together', () => {
+        const result = parseQuickAdd('Ship feature #work-mode #hard-load');
+        expect(result.taskMode).toBe('WORK');
+        expect(result.cognitiveLoad).toBe('HARD');
+        expect(result.title).toBe('Ship feature');
+        expect(result.tags).toEqual([]);
+      });
+
+      it('extracts mode + load + generic tags + life-category tag together', () => {
+        const result = parseQuickAdd(
+          'Ship feature #work-mode #hard-load #priority #work',
+        );
+        expect(result.taskMode).toBe('WORK');
+        expect(result.cognitiveLoad).toBe('HARD');
+        expect(result.tags).toEqual(['priority', 'work']);
+        expect(result.title).toBe('Ship feature');
+      });
+    });
+
     describe('title cleanup', () => {
       it('cleans up extra whitespace', () => {
         const result = parseQuickAdd('  Buy  milk   #shopping  ');
@@ -309,6 +445,8 @@ describe('nlp utils', () => {
         expect(result.tags).toEqual([]);
         expect(result.project).toBeNull();
         expect(result.recurrenceHint).toBeNull();
+        expect(result.taskMode).toBeNull();
+        expect(result.cognitiveLoad).toBeNull();
       });
 
       it('handles input with only markers', () => {
