@@ -20,8 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.ui.components.settings.SectionHeader
 
-private const val PHILOSOPHY_URL =
-    "https://github.com/averycorp/prismTask/blob/main/docs/PHILOSOPHY.md"
+private const val PHILOSOPHY_URL = "https://averycorp.org"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
