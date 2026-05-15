@@ -1,4 +1,4 @@
-import type { TaskPriority } from '@/types/task';
+import type { CognitiveLoad, TaskMode, TaskPriority } from '@/types/task';
 
 export interface LocalParseResult {
   title: string;
@@ -8,7 +8,33 @@ export interface LocalParseResult {
   tags: string[];
   project: string | null;
   recurrenceHint: string | null;
+  /**
+   * Task mode parsed from `#work-mode` / `#play-mode` / `#relax-mode`
+   * suffix hashtags (see `docs/WORK_PLAY_RELAX.md` § *NLP hashtags*).
+   * `null` if no mode hashtag was present. The `-mode` suffix exists so
+   * `#work` (LifeCategory) and `#work-mode` (TaskMode) don't collide;
+   * `#work` is intentionally NOT consumed here.
+   */
+  taskMode: TaskMode | null;
+  /**
+   * Cognitive load parsed from `#easy-load` / `#medium-load` / `#hard-load`
+   * suffix hashtags (see `docs/COGNITIVE_LOAD.md` § *NLP hashtags*).
+   * `null` if no load hashtag was present.
+   */
+  cognitiveLoad: CognitiveLoad | null;
 }
+
+const TASK_MODE_HASHTAGS: Record<string, TaskMode> = {
+  'work-mode': 'WORK',
+  'play-mode': 'PLAY',
+  'relax-mode': 'RELAX',
+};
+
+const COGNITIVE_LOAD_HASHTAGS: Record<string, CognitiveLoad> = {
+  'easy-load': 'EASY',
+  'medium-load': 'MEDIUM',
+  'hard-load': 'HARD',
+};
 
 function formatDate(d: Date): string {
   return d.toISOString().split('T')[0];
@@ -61,6 +87,8 @@ export function parseQuickAdd(input: string): LocalParseResult {
   let dueDate: string | null = null;
   let dueTime: string | null = null;
   let recurrenceHint: string | null = null;
+  let taskMode: TaskMode | null = null;
+  let cognitiveLoad: CognitiveLoad | null = null;
 
   // Extract priority markers: !! (high), ! (medium), !urgent, !high, !medium, !low, !1-4
   const doubleBang = text.match(/!!/);
@@ -81,6 +109,23 @@ export function parseQuickAdd(input: string): LocalParseResult {
       text = text.replace(priorityMatch[0], '').trim();
     }
   }
+
+  // Extract special-suffix hashtags first so they don't get picked up as
+  // generic tags below. The `-mode` / `-load` suffixes exist specifically
+  // so `#work` (LifeCategory) and `#work-mode` (TaskMode) don't collide.
+  // Last-write-wins for multiple matches, mirroring how the generic tag
+  // list is appended.
+  const modeMatches = text.matchAll(/#(work-mode|play-mode|relax-mode)\b/gi);
+  for (const match of modeMatches) {
+    taskMode = TASK_MODE_HASHTAGS[match[1].toLowerCase()] ?? taskMode;
+  }
+  text = text.replace(/#(?:work-mode|play-mode|relax-mode)\b/gi, '').trim();
+
+  const loadMatches = text.matchAll(/#(easy-load|medium-load|hard-load)\b/gi);
+  for (const match of loadMatches) {
+    cognitiveLoad = COGNITIVE_LOAD_HASHTAGS[match[1].toLowerCase()] ?? cognitiveLoad;
+  }
+  text = text.replace(/#(?:easy-load|medium-load|hard-load)\b/gi, '').trim();
 
   // Extract tags: #tagname
   const tagMatches = text.matchAll(/#(\w[\w-]*)/g);
@@ -250,5 +295,7 @@ export function parseQuickAdd(input: string): LocalParseResult {
     tags,
     project,
     recurrenceHint,
+    taskMode,
+    cognitiveLoad,
   };
 }
