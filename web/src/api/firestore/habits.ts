@@ -80,6 +80,11 @@ function docToHabit(docId: string, data: DocumentData, uid: string): Habit {
     target_count: data.targetFrequency ?? 1,
     active_days_json: data.activeDays ?? null,
     is_active: !data.isArchived,
+    // Android-authored habits carry `isBookable` through Firestore. Web
+    // doesn't write the flag on create/update (see § "Why omission
+    // instead of writing-defaults" below); the field stays undefined for
+    // web-only habits. Parity audit § B.3b.
+    is_bookable: typeof data.isBookable === 'boolean' ? data.isBookable : undefined,
     created_at: timestampToIso(data.createdAt) ?? new Date().toISOString(),
     updated_at: timestampToIso(data.updatedAt) ?? new Date().toISOString(),
     is_built_in: isBuiltIn,

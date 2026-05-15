@@ -74,6 +74,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/habits): port `habit_logs` Firestore collection + bookable-habit
+  UI (parity audit § B.3b). New `web/src/api/firestore/habitLogs.ts` mirrors
+  Android's `HabitLogEntity` push payload (`{ habitCloudId, date, notes,
+  createdAt }`) with CRUD + an `onSnapshot` listener wired through a new
+  `habitLogStore` Zustand store. `useFirestoreSync` now subscribes to
+  `habit_logs` alongside the other thirteen real-time listeners (and resets
+  the store on sign-out). A new `/habits/:id/logs` route renders the
+  per-habit activity history (total / last / average-interval stats +
+  delete-from-row). Habit list context menu gains "Show History" everywhere
+  plus "Book Activity" on `isBookable` habits, which opens a new
+  `HabitBookingDialog` writing to `habit_logs`. The web `Habit` type grows
+  an optional `is_bookable` mirror so Android-authored bookable habits
+  surface the action on web without web ever writing the flag itself
+  (preserves the existing § "Why omission instead of writing-defaults"
+  contract on the habits merge path).
 - feat(web/medication): clinical report export (parity Batch 5 PR-6).
   Client-side `generateClinicalReport` ports Android
   `ClinicalReportGenerator` to web (overview / medications / refill

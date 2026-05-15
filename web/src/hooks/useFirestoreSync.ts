@@ -5,6 +5,7 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
 import { useHabitStore } from '@/stores/habitStore';
+import { useHabitLogStore } from '@/stores/habitLogStore';
 import { useMedicationSlotsStore } from '@/stores/medicationSlotsStore';
 import { useMedicationPreferencesStore } from '@/stores/medicationPreferencesStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -116,6 +117,8 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToWeeklyReviews = useWeeklyReviewsStore(
     (s) => s.subscribeToWeeklyReviews,
   );
+  const subscribeToHabitLogs = useHabitLogStore((s) => s.subscribeToLogs);
+  const resetHabitLogs = useHabitLogStore((s) => s.reset);
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
   const resetBoundaryRules = useBoundaryRulesStore((s) => s.reset);
@@ -154,6 +157,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetFocusLogs();
       resetMedications();
       resetWeeklyReviews();
+      resetHabitLogs();
       return;
     }
 
@@ -203,6 +207,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToFocusLogs, 'focus-release-logs');
     safeSubscribe(subscribeToMedications, 'medications');
     safeSubscribe(subscribeToWeeklyReviews, 'weekly-reviews');
+    safeSubscribe(subscribeToHabitLogs, 'habit-logs');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -244,6 +249,8 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToFocusLogs,
     subscribeToMedications,
     subscribeToWeeklyReviews,
+    subscribeToHabitLogs,
+    resetHabitLogs,
     resetSelfCare,
     resetSlots,
     resetPrefs,
