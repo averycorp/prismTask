@@ -175,6 +175,20 @@ constructor(
         slotCloudId: String
     ): String = "${medCloudId}__${logDate}__$slotCloudId"
 
+    /**
+     * Deterministic doc id for `course_completions`. Collapses two devices
+     * toggling the same (course, day) pair into a single Firestore doc so
+     * the Android push and the web write (which has always used this
+     * shape — see `web/src/api/firestore/courseCompletions.ts`) converge
+     * instead of racing on auto-ids. Same idea as
+     * [tierStateDeterministicDocId]; date is the logical-day midnight
+     * millis already stored on `CourseCompletionEntity.date`.
+     */
+    private fun courseCompletionDeterministicDocId(
+        courseCloudId: String,
+        date: Long
+    ): String = "${courseCloudId}__$date"
+
     suspend fun initialUpload() {
         if (authManager.userId == null) return
         // D8 Item 7 7d — orchestration extracted to
@@ -984,8 +998,12 @@ constructor(
                 try {
                     if (syncMetadataDao.getCloudId(completion.id, "course_completion") != null) continue
                     val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: continue
-                    val docRef = userCollection("course_completions")?.document() ?: continue
-                    docRef.set(SyncMapper.courseCompletionToMap(completion, courseCloudId)).await()
+                    val detId = courseCompletionDeterministicDocId(courseCloudId, completion.date)
+                    val docRef = userCollection("course_completions")?.document(detId) ?: continue
+                    docRef.set(
+                        SyncMapper.courseCompletionToMap(completion, courseCloudId),
+                        SetOptions.merge()
+                    ).await()
                     syncMetadataDao.upsert(
                         SyncMetadataEntity(
                             localId = completion.id,
@@ -1320,6 +1338,29 @@ constructor(
             val tierDoc = collection.document(detId)
             tierDoc.set(payload, SetOptions.merge()).await()
             syncMetadataDao.upsert(meta.copy(cloudId = tierDoc.id, pendingAction = null, lastSyncedAt = System.currentTimeMillis()))
+            return
+        }
+        // Deterministic doc id for course_completions — mirrors web's
+        // `${courseCloudId}__${date}` shape (see
+        // `web/src/api/firestore/courseCompletions.ts`) so two devices
+        // toggling the same (course, day) pair converge on one Firestore
+        // doc instead of racing on an auto-id and producing duplicates
+        // (which the pull-side `(courseId, date)` UNIQUE index would
+        // then collide on).
+        if (meta.entityType == "course_completion") {
+            val completion = schoolworkDao.getAllCompletionsOnce().find { it.id == meta.localId } ?: return
+            val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: return
+            val detId = courseCompletionDeterministicDocId(courseCloudId, completion.date)
+            val payload = SyncMapper.courseCompletionToMap(completion, courseCloudId)
+            val completionDoc = collection.document(detId)
+            completionDoc.set(payload, SetOptions.merge()).await()
+            syncMetadataDao.upsert(
+                meta.copy(
+                    cloudId = completionDoc.id,
+                    pendingAction = null,
+                    lastSyncedAt = System.currentTimeMillis()
+                )
+            )
             return
         }
         val docRef = collection.document()
