@@ -38,6 +38,11 @@ import { useProFeature } from '@/hooks/useProFeature';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import {
+  AnalogClockPicker,
+  formatAnalogClockTime,
+  useAnalogClockState,
+} from '@/components/AnalogClockPicker';
 import { KeyboardShortcutsModal } from '@/components/shared/KeyboardShortcutsModal';
 import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
 import { BatchHistorySection } from '@/features/settings/sections/BatchHistorySection';
@@ -208,6 +213,9 @@ export function SettingsScreen() {
 
   // Keyboard shortcuts
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // Start-of-Day analog clock picker
+  const [startOfDayPickerOpen, setStartOfDayPickerOpen] = useState(false);
 
   const handleExportJson = async () => {
     setExporting('json');
@@ -417,25 +425,35 @@ export function SettingsScreen() {
             scheduled before this time still count toward the prior day.
             Matches Android's DayBoundary setting.
           </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={0}
-              max={23}
-              step={1}
-              value={settings.startOfDayHour}
-              onChange={(e) =>
-                settings.setSetting('startOfDayHour', Number(e.target.value))
-              }
-              className="flex-1"
-              aria-label="Start of day hour"
-            />
-            <span className="w-20 text-right text-sm font-mono font-semibold text-[var(--color-text-primary)]">
-              {String(settings.startOfDayHour).padStart(2, '0')}:00
+          <button
+            type="button"
+            onClick={() => setStartOfDayPickerOpen(true)}
+            aria-label="Set start of day hour"
+            className="inline-flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 text-left text-sm font-mono font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-accent)]/60 hover:bg-[var(--color-bg-card)] focus:border-[var(--color-accent)] focus:outline-none"
+          >
+            <span>
+              {formatStartOfDayLabel(
+                settings.startOfDayHour,
+                settings.timeFormat,
+              )}
             </span>
-          </div>
+            <span className="text-xs font-sans font-normal text-[var(--color-text-secondary)]">
+              Tap to change
+            </span>
+          </button>
         </div>
       </SettingsSection>
+
+      <StartOfDayPickerModal
+        isOpen={startOfDayPickerOpen}
+        onClose={() => setStartOfDayPickerOpen(false)}
+        startOfDayHour={settings.startOfDayHour}
+        is24Hour={settings.timeFormat === '24h'}
+        onSave={(hour) => {
+          settings.setSetting('startOfDayHour', hour);
+          setStartOfDayPickerOpen(false);
+        }}
+      />
 
       {/* Dashboard — Today section order + visibility (parity C.1f) */}
       <SettingsSection
@@ -978,6 +996,96 @@ export function SettingsScreen() {
         featureName="Pro Features"
         featureDescription="Unlock the full power of PrismTask with AI-powered features and advanced tools."
       />
+    </div>
+  );
+}
+
+/**
+ * Render the Start-of-Day hour as the user will see it on the settings
+ * row. The data model is hour-only (0..23), so we surface `HH:00` /
+ * `h:00 AM-PM` — no seconds. The full 3-hand picker still renders in
+ * the modal per the `feedback-time-input-use-clock-not-slider` memory.
+ */
+function formatStartOfDayLabel(hour: number, timeFormat: '12h' | '24h'): string {
+  // Drop the trailing ":ss" suffix from the canonical formatter so the
+  // settings row shows the hour cleanly (data model is hour-only).
+  const full = formatAnalogClockTime(hour, 0, 0, timeFormat === '24h');
+  if (timeFormat === '24h') {
+    return full.replace(/:00$/, ''); // "09:00:00" → "09:00"
+  }
+  return full.replace(/:00 /, ' '); // "9:00:00 AM" → "9:00 AM"
+}
+
+/**
+ * Modal wrapper that hosts the [AnalogClockPicker] for the Start-of-Day
+ * setting. The picker's full 3-hand dial is rendered for parity with
+ * Android (memory: `feedback-time-input-use-clock-not-slider`), but
+ * only the hour is persisted — the data shape stays `Number` (0..23).
+ *
+ * Mirrors PR #1488 on Android (`fix(android/settings): swap day-start
+ * sliders for AnalogClockPicker`).
+ */
+function StartOfDayPickerModal({
+  isOpen,
+  onClose,
+  startOfDayHour,
+  is24Hour,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  startOfDayHour: number;
+  is24Hour: boolean;
+  onSave: (hour: number) => void;
+}) {
+  // Re-key the inner content so opening the modal afresh re-seeds the
+  // hook from the current persisted value (the hook ignores prop changes
+  // after mount).
+  if (!isOpen) return null;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Start of Day" size="sm">
+      <StartOfDayPickerBody
+        startOfDayHour={startOfDayHour}
+        is24Hour={is24Hour}
+        onSave={onSave}
+        onCancel={onClose}
+      />
+    </Modal>
+  );
+}
+
+function StartOfDayPickerBody({
+  startOfDayHour,
+  is24Hour,
+  onSave,
+  onCancel,
+}: {
+  startOfDayHour: number;
+  is24Hour: boolean;
+  onSave: (hour: number) => void;
+  onCancel: () => void;
+}) {
+  const api = useAnalogClockState({
+    initialHour: startOfDayHour,
+    initialMinute: 0,
+    initialSecond: 0,
+    is24Hour,
+  });
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <p className="text-center text-xs text-[var(--color-text-secondary)]">
+        Pick the hour the logical day rolls over. The data model stores
+        the hour only — minute and second are visual.
+      </p>
+      <AnalogClockPicker api={api} />
+      <div className="flex w-full items-center justify-end gap-2 pt-2">
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={() => onSave(api.state.hour)}>
+          Set
+        </Button>
+      </div>
     </div>
   );
 }
