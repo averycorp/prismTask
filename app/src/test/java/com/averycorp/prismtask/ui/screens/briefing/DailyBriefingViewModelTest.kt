@@ -63,7 +63,7 @@ class DailyBriefingViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = DailyBriefingViewModel(api, taskRepository, proFeatureGate)
+    private fun newViewModel() = DailyBriefingViewModel(api, taskRepository, proFeatureGate, io.mockk.mockk(relaxed = true))
 
     @Test
     fun generateBriefing_resolvesCloudIdsToLocalLongs() = runTest(dispatcher) {

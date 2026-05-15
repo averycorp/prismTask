@@ -121,7 +121,8 @@ class ChatViewModelStreamingTest {
         taskBehaviorPreferences = taskBehaviorPreferences,
         userPreferencesDataStore = userPreferencesDataStore,
         naturalLanguageParser = naturalLanguageParser,
-        parsedTaskResolver = parsedTaskResolver
+        parsedTaskResolver = parsedTaskResolver,
+        billingManager = io.mockk.mockk(relaxed = true)
     )
 
     @Test
