@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useProFeature } from '@/hooks/useProFeature';
 import { aiApi } from '@/api/ai';
 import { ClassifyTextModal } from '@/features/eisenhower/ClassifyTextModal';
 import * as firestoreTasks from '@/api/firestore/tasks';
@@ -326,7 +326,7 @@ function DragOverlayCard({ task }: { task: Task }) {
 export function EisenhowerScreen() {
   const { completeTask, updateTask, setSelectedTask } = useTaskStore();
   const { projects, fetchAllProjects } = useProjectStore();
-  const user = useAuthStore((s) => s.user);
+  const { isPro } = useProFeature();
 
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -351,10 +351,6 @@ export function EisenhowerScreen() {
     () => new Map(projects.map((p) => [p.id, { title: p.title }])),
     [projects],
   );
-
-  const isPro =
-    !!user &&
-    ((user.effective_tier ?? user.tier) !== 'FREE' || user.is_admin === true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

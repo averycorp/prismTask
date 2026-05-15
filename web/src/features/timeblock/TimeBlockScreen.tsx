@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { CalendarClock, Sparkles, Lock, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useAuthStore } from '@/stores/authStore';
+import { useProFeature } from '@/hooks/useProFeature';
 import { aiApi, type TimeBlockResponse } from '@/api/ai';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -27,10 +27,7 @@ function todayIsoDate(): string {
 }
 
 export function TimeBlockScreen() {
-  const user = useAuthStore((s) => s.user);
-  const isPro =
-    !!user &&
-    ((user.effective_tier ?? user.tier) !== 'FREE' || user.is_admin === true);
+  const { isPro } = useProFeature();
 
   const [date, setDate] = useState<string>(todayIsoDate());
   const [dayStart, setDayStart] = useState('09:00');

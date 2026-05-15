@@ -13,6 +13,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useBatchStore } from '@/stores/batchStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useProFeature } from '@/hooks/useProFeature';
+import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
 import type { ChatActionPayload } from '@/types/chat';
 import {
   actionLabel,
@@ -31,6 +33,7 @@ const STARTER_PROMPTS: string[] = [
 export function ChatScreen() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const { isPro, showUpgrade, setShowUpgrade } = useProFeature();
   const aiFeaturesEnabled = useSettingsStore((s) => s.aiFeaturesEnabled);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
 
@@ -83,15 +86,32 @@ export function ChatScreen() {
   }, [error, clearError]);
 
   const aiDisabled = !aiFeaturesEnabled;
+  const proDisabled = !isPro;
   const sendDisabled =
-    aiDisabled || isSending || inputText.trim().length === 0;
+    aiDisabled || proDisabled || isSending || inputText.trim().length === 0;
 
   const handleSend = useCallback(() => {
+    if (!isPro) {
+      setShowUpgrade(true);
+      return;
+    }
     if (sendDisabled) return;
     const text = inputText.trim();
     setInputText('');
     void sendMessage(text);
-  }, [sendDisabled, inputText, sendMessage]);
+  }, [isPro, setShowUpgrade, sendDisabled, inputText, sendMessage]);
+
+  const handleStarterPrompt = useCallback(
+    (prompt: string) => {
+      if (!isPro) {
+        setShowUpgrade(true);
+        return;
+      }
+      setInputText('');
+      void sendMessage(prompt);
+    },
+    [isPro, setShowUpgrade, sendMessage],
+  );
 
   const handleActionClick = useCallback(
     async (action: ChatActionPayload) => {
@@ -129,9 +149,10 @@ export function ChatScreen() {
 
   const subtitle = useMemo(() => {
     if (aiDisabled) return 'AI Features Disabled';
+    if (proDisabled) return 'Pro Feature';
     if (!user) return 'General';
     return 'General';
-  }, [aiDisabled, user]);
+  }, [aiDisabled, proDisabled, user]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col bg-[var(--color-bg-primary)]">
@@ -176,6 +197,23 @@ export function ChatScreen() {
         </div>
       )}
 
+      {!aiDisabled && proDisabled && (
+        <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span>
+            AI Coach is a Pro feature.{' '}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setShowUpgrade(true)}
+            >
+              Upgrade to Pro
+            </button>{' '}
+            to start chatting.
+          </span>
+        </div>
+      )}
+
       <div
         ref={listRef}
         className="flex-1 overflow-y-auto px-4 py-3"
@@ -183,11 +221,8 @@ export function ChatScreen() {
       >
         {messages.length === 0 && !isSending && (
           <WelcomeCard
-            disabled={aiDisabled}
-            onStarterPrompt={(prompt) => {
-              setInputText('');
-              void sendMessage(prompt);
-            }}
+            disabled={aiDisabled || proDisabled}
+            onStarterPrompt={handleStarterPrompt}
           />
         )}
 
@@ -213,8 +248,15 @@ export function ChatScreen() {
         value={inputText}
         onChange={setInputText}
         onSend={handleSend}
-        disabled={aiDisabled || isSending}
+        disabled={aiDisabled || proDisabled || isSending}
         sendDisabled={sendDisabled}
+      />
+
+      <ProUpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        featureName="AI Coach"
+        featureDescription="Chat with an AI coach about your tasks, plans, and what feels stuck."
       />
 
       {showDisclosure && (
