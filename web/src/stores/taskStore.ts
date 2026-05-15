@@ -8,6 +8,7 @@ import {
   type TaskCompletion,
 } from '@/api/firestore/taskCompletions';
 import { logicalToday } from '@/utils/dayBoundary';
+import { useSettingsStore } from '@/stores/settingsStore';
 import {
   calculateNextOccurrence,
   parseRecurrenceRule,
@@ -71,6 +72,15 @@ import { getFirebaseUid } from '@/stores/firebaseUid';
 
 function getUid(): string {
   return getFirebaseUid();
+}
+
+/**
+ * Read the user's Start-of-Day hour from the settings store at call
+ * time so the today/overdue/upcoming windows refresh when the user
+ * changes the pref or the value loads from Firestore after sign-in.
+ */
+function getStartOfDayHour(): number {
+  return useSettingsStore.getState().startOfDayHour;
 }
 
 function updateInArray(arr: Task[], id: string, updated: Task): Task[] {
@@ -194,7 +204,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   fetchToday: async () => {
     try {
       const uid = getUid();
-      const todayTasks = await firestoreTasks.getTodayTasks(uid);
+      const todayTasks = await firestoreTasks.getTodayTasks(
+        uid,
+        getStartOfDayHour(),
+      );
       set({ todayTasks });
     } catch (e) {
       set({ error: (e as Error).message });
@@ -204,7 +217,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   fetchOverdue: async () => {
     try {
       const uid = getUid();
-      const overdueTasks = await firestoreTasks.getOverdueTasks(uid);
+      const overdueTasks = await firestoreTasks.getOverdueTasks(
+        uid,
+        getStartOfDayHour(),
+      );
       set({ overdueTasks });
     } catch (e) {
       set({ error: (e as Error).message });
@@ -214,7 +230,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   fetchUpcoming: async (days = 7) => {
     try {
       const uid = getUid();
-      const upcomingTasks = await firestoreTasks.getUpcomingTasks(uid, days);
+      const upcomingTasks = await firestoreTasks.getUpcomingTasks(
+        uid,
+        getStartOfDayHour(),
+        days,
+      );
       set({ upcomingTasks });
     } catch (e) {
       set({ error: (e as Error).message });
