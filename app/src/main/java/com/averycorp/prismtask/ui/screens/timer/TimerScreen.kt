@@ -147,6 +147,7 @@ fun TimerScreen(
             onTogglePomodoroEnabled = viewModel::togglePomodoroEnabled,
             onToggleAutoStartBreaks = viewModel::toggleAutoStartBreaks,
             onToggleAutoStartWork = viewModel::toggleAutoStartWork,
+            onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
             onSetCustomDurationMinutes = viewModel::setCustomDurationMinutes
         )
     }
@@ -165,6 +166,7 @@ private fun TimerContent(
     onTogglePomodoroEnabled: () -> Unit,
     onToggleAutoStartBreaks: () -> Unit,
     onToggleAutoStartWork: () -> Unit,
+    onToggleKeepScreenOn: () -> Unit,
     onSetCustomDurationMinutes: (Int) -> Unit
 ) {
     val colors = LocalPrismColors.current
@@ -295,6 +297,7 @@ private fun TimerContent(
             onTogglePomodoroEnabled = onTogglePomodoroEnabled,
             onToggleAutoStartBreaks = onToggleAutoStartBreaks,
             onToggleAutoStartWork = onToggleAutoStartWork,
+            onToggleKeepScreenOn = onToggleKeepScreenOn,
             onSetCustomDurationMinutes = onSetCustomDurationMinutes
         )
 
@@ -548,6 +551,7 @@ private fun PomodoroSettings(
     onTogglePomodoroEnabled: () -> Unit,
     onToggleAutoStartBreaks: () -> Unit,
     onToggleAutoStartWork: () -> Unit,
+    onToggleKeepScreenOn: () -> Unit,
     onSetCustomDurationMinutes: (Int) -> Unit
 ) {
     val colors = LocalPrismColors.current
@@ -595,6 +599,12 @@ private fun PomodoroSettings(
             description = "Start focus timer automatically after break",
             checked = uiState.autoStartWork,
             onToggle = onToggleAutoStartWork
+        )
+        SettingsToggleRow(
+            label = "Keep Screen On",
+            description = "Prevent the screen from turning off while the timer is running",
+            checked = uiState.keepScreenOn,
+            onToggle = onToggleKeepScreenOn
         )
         SettingsClickableRow(
             label = "Custom Duration",

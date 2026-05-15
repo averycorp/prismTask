@@ -36,7 +36,6 @@ fun FocusTimerScreen(
     val timerCustomSeconds by viewModel.timerCustomDurationSeconds.collectAsStateWithLifecycle()
     val pomodoroAvailableMinutes by viewModel.pomodoroAvailableMinutes.collectAsStateWithLifecycle()
     val pomodoroFocusPreference by viewModel.pomodoroFocusPreference.collectAsStateWithLifecycle()
-    val timerKeepScreenOn by viewModel.timerKeepScreenOn.collectAsStateWithLifecycle()
     val timerBuzzUntilDismissed by viewModel.timerBuzzUntilDismissed.collectAsStateWithLifecycle()
     val timerOverrideVolume by viewModel.timerOverrideVolume.collectAsStateWithLifecycle()
     val timerAlarmVolumePercent by viewModel.timerAlarmVolumePercent.collectAsStateWithLifecycle()
@@ -74,7 +73,6 @@ fun FocusTimerScreen(
                 timerCustomSeconds = timerCustomSeconds,
                 pomodoroAvailableMinutes = pomodoroAvailableMinutes,
                 pomodoroFocusPreference = pomodoroFocusPreference,
-                keepScreenOn = timerKeepScreenOn,
                 buzzUntilDismissed = timerBuzzUntilDismissed,
                 overrideVolume = timerOverrideVolume,
                 alarmVolumePercent = timerAlarmVolumePercent,
@@ -91,7 +89,6 @@ fun FocusTimerScreen(
                 onTimerCustomMinutesChange = viewModel::setTimerCustomDurationMinutes,
                 onPomodoroAvailableMinutesChange = viewModel::setPomodoroAvailableMinutes,
                 onPomodoroFocusPreferenceChange = viewModel::setPomodoroFocusPreference,
-                onKeepScreenOnChange = viewModel::setTimerKeepScreenOn,
                 onBuzzUntilDismissedChange = viewModel::setTimerBuzzUntilDismissed,
                 onOverrideVolumeChange = viewModel::setTimerOverrideVolume,
                 onAlarmVolumePercentChange = viewModel::setTimerAlarmVolumePercent,

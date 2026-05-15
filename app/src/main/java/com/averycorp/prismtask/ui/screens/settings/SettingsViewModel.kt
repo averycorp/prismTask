@@ -618,10 +618,6 @@ constructor(
         .getPomodoroFocusPreference()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TimerPreferences.DEFAULT_FOCUS_PREFERENCE)
 
-    val timerKeepScreenOn: StateFlow<Boolean> = timerPreferences
-        .getKeepScreenOn()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
     val timerBuzzUntilDismissed: StateFlow<Boolean> = timerPreferences
         .getBuzzUntilDismissed()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -706,10 +702,6 @@ constructor(
 
     fun setPomodoroFocusPreference(preference: String) {
         viewModelScope.launch { timerPreferences.setPomodoroFocusPreference(preference) }
-    }
-
-    fun setTimerKeepScreenOn(enabled: Boolean) {
-        viewModelScope.launch { timerPreferences.setKeepScreenOn(enabled) }
     }
 
     fun setTimerBuzzUntilDismissed(enabled: Boolean) {

@@ -491,6 +491,12 @@ constructor(
         }
     }
 
+    fun toggleKeepScreenOn() {
+        viewModelScope.launch {
+            timerPreferences.setKeepScreenOn(!_uiState.value.keepScreenOn)
+        }
+    }
+
     fun setCustomDurationMinutes(minutes: Int) {
         viewModelScope.launch {
             timerPreferences.setCustomDurationSeconds(minutes * 60)
