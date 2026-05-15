@@ -9,6 +9,7 @@ import {
   toggleCourseCompletion as remoteToggleCourseCompletion,
   courseCompletionId,
 } from '@/api/firestore/courseCompletions';
+import { useAssignmentStore } from '@/stores/assignmentStore';
 import type { Course, CourseCompletion } from '@/types/schoolwork';
 
 /**
@@ -67,9 +68,17 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     const unsubCompletions = subscribeToCourseCompletions(uid, (completions) =>
       set({ completions }),
     );
+    // Bundled in here (rather than wired separately in
+    // `useFirestoreSync.ts`) so the schoolwork surface keeps a single
+    // mount/unmount lifecycle. The assignmentStore reset on sign-out
+    // is triggered here too, mirroring the resets useFirestoreSync
+    // performs for other stores.
+    const unsubAssignments = useAssignmentStore.getState().subscribe(uid);
     return () => {
       unsubCourses();
       unsubCompletions();
+      unsubAssignments();
+      useAssignmentStore.getState().reset();
     };
   },
 
