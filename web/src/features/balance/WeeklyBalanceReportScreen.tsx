@@ -22,7 +22,7 @@ import {
   TRACKED_CATEGORIES,
   type BalanceConfig,
 } from '@/utils/balanceTracker';
-import type { LifeCategory } from '@/types/task';
+import type { LifeCategory, TaskMode } from '@/types/task';
 import {
   computeWeeklyBalanceReport,
   computeWeekWindow,
@@ -32,12 +32,18 @@ import {
   type WeeklyBalanceReport,
   type WeeklyWindow,
 } from './weeklyBalanceReport';
+import {
+  computeWeeklyModeReport,
+  modeDeltaPercentPoints,
+  type WeeklyModeReport,
+} from './weeklyModeReport';
+import { TRACKED_MODES } from '@/utils/modeBalanceTracker';
 
 /**
  * Weekly Balance Report (parity audit C.2c) — full-screen analytics view
  * mirroring Android's `WeeklyBalanceReportScreen.kt`.
  *
- * Sections:
+ * LifeCategory sections:
  *  1. Week header with prev/next chevrons.
  *  2. Stacked-bar of weekly ratio across LifeCategory + total tracked.
  *  3. Target vs actual comparison table.
@@ -45,11 +51,24 @@ import {
  *  5. Per-day breakdown (Mon..Sun stacked columns) + overload-day count.
  *  6. 4-week trend per category (mini sparkline bars).
  *
- * Burnout / cognitive-load sections from the Android screen are out of
- * scope for parity item C.2c — the web `burnoutScorer` has a different
- * input shape (breaches + mood logs vs Android's task-derived score) and
- * the cognitive-load engine hasn't been ported yet. Leaving those off
- * keeps the screen scoped and avoids speculative engine work.
+ * Task-Mode sections (Pillar 3 — audit DEFERRED→PROCEED 2026-05-15):
+ *  7. Mode distribution + total tracked.
+ *  8. Mode delta vs last week.
+ *  9. Mode per-day breakdown.
+ * 10. Mode 4-week trend.
+ *
+ * Mode does NOT get a Target-vs-actual subsection: per
+ * `docs/WORK_PLAY_RELAX.md` § *Descriptive, not prescriptive*, mode is
+ * descriptive-only — there are no user-set target ratios and no
+ * overload concept. Skipping the Targets subsection for mode preserves
+ * that invariant on the surface.
+ *
+ * Burnout / cognitive-load sections from the Android screen remain out
+ * of scope — the web `burnoutScorer` has a different input shape
+ * (breaches + mood logs vs Android's task-derived score) and the
+ * cognitive-load engine hasn't been ported yet. The cognitive-load
+ * balance section is explicitly deferred on Android too
+ * (`docs/COGNITIVE_LOAD.md:200–203`).
  */
 
 const CATEGORY_COLOR: Record<Exclude<LifeCategory, 'UNCATEGORIZED'>, string> = {
@@ -64,6 +83,23 @@ const CATEGORY_LABEL: Record<LifeCategory, string> = {
   PERSONAL: 'Personal',
   SELF_CARE: 'Self-Care',
   HEALTH: 'Health',
+  UNCATEGORIZED: 'Uncategorized',
+};
+
+// Mode palette is deliberately distinct from CATEGORY_COLOR so "Work"
+// reads as a different visual entity across the two dimensions — the
+// label collides on purpose (mode answers a different question than
+// life category) but the colors should not.
+const MODE_COLOR: Record<Exclude<TaskMode, 'UNCATEGORIZED'>, string> = {
+  WORK: '#0ea5e9', // sky-500 — output
+  PLAY: '#f59e0b', // amber-500 — enjoyment
+  RELAX: '#10b981', // emerald-500 — restored energy
+};
+
+const MODE_LABEL: Record<TaskMode, string> = {
+  WORK: 'Work',
+  PLAY: 'Play',
+  RELAX: 'Relax',
   UNCATEGORIZED: 'Uncategorized',
 };
 
@@ -106,6 +142,11 @@ export function WeeklyBalanceReportScreen() {
   const report = useMemo<WeeklyBalanceReport>(
     () => computeWeeklyBalanceReport(tasks, config, window.startMs),
     [tasks, config, window.startMs],
+  );
+
+  const modeReport = useMemo<WeeklyModeReport>(
+    () => computeWeeklyModeReport(tasks, window.startMs),
+    [tasks, window.startMs],
   );
 
   const isCurrentWeek = window.startMs === computeWeekWindow().startMs;
@@ -159,15 +200,28 @@ export function WeeklyBalanceReportScreen() {
         </button>
       </div>
 
-      {report.totalTracked === 0 ? (
+      {report.totalTracked === 0 && modeReport.totalTracked === 0 ? (
         <EmptyState />
       ) : (
         <div className="flex flex-col gap-4">
-          <DistributionCard report={report} />
-          <TargetComparisonCard report={report} />
-          <DeltaCard report={report} />
-          <PerDayCard report={report} />
-          <FourWeekTrendCard report={report} />
+          {report.totalTracked > 0 && (
+            <>
+              <DistributionCard report={report} />
+              <TargetComparisonCard report={report} />
+              <DeltaCard report={report} />
+              <PerDayCard report={report} />
+              <FourWeekTrendCard report={report} />
+            </>
+          )}
+          {modeReport.totalTracked > 0 && (
+            <>
+              <ModeSectionHeader />
+              <ModeDistributionCard report={modeReport} />
+              <ModeDeltaCard report={modeReport} />
+              <ModePerDayCard report={modeReport} />
+              <ModeFourWeekTrendCard report={modeReport} />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -501,6 +555,268 @@ function FourWeekTrendCard({ report }: { report: WeeklyBalanceReport }) {
                       style={{
                         height: `${Math.max(4, h)}%`,
                         backgroundColor: CATEGORY_COLOR[cat],
+                        opacity: isLast ? 1 : 0.4,
+                      }}
+                      title={`Week ${i + 1}: ${counts[i] ?? 0}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ─── Mode sections (Pillar 3 — Work / Play / Relax) ───────────────────────
+//
+// Mode is the orthogonal "what does this task produce?" axis (Work →
+// output, Play → enjoyment, Relax → restored energy). Copy is strictly
+// factual — never prescriptive — per
+// `docs/WORK_PLAY_RELAX.md` § *Descriptive, not prescriptive*. There is
+// no Target-vs-actual subsection on purpose; mode targets do not exist
+// as a user-tunable concept.
+
+function ModeSectionHeader() {
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <Scale className="h-4 w-4 text-[var(--color-accent)]" aria-hidden="true" />
+      <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+        Mode
+      </h2>
+      <span className="text-[11px] text-[var(--color-text-secondary)]">
+        Work / Play / Relax
+      </span>
+    </div>
+  );
+}
+
+function ModeDistributionCard({ report }: { report: WeeklyModeReport }) {
+  return (
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Mode Distribution
+        </h2>
+        <span className="text-[11px] text-[var(--color-text-secondary)]">
+          {report.totalTracked} tracked
+        </span>
+      </div>
+      <div
+        className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--color-bg-secondary)]"
+        role="img"
+        aria-label="Task-mode distribution this week"
+      >
+        {TRACKED_MODES.map((mode) => {
+          const pct = (report.currentRatios[mode] ?? 0) * 100;
+          if (pct <= 0) return null;
+          return (
+            <div
+              key={mode}
+              style={{ width: `${pct}%`, backgroundColor: MODE_COLOR[mode] }}
+              title={`${MODE_LABEL[mode]}: ${Math.round(pct)}%`}
+            />
+          );
+        })}
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {TRACKED_MODES.map((mode) => {
+          const pct = Math.round((report.currentRatios[mode] ?? 0) * 100);
+          const count = report.currentCounts[mode] ?? 0;
+          return (
+            <div
+              key={mode}
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-2"
+            >
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: MODE_COLOR[mode] }}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium text-[var(--color-text-primary)]">
+                  {MODE_LABEL[mode]}
+                </div>
+                <div className="text-[11px] text-[var(--color-text-secondary)]">
+                  {count} · {pct}%
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ModeDeltaCard({ report }: { report: WeeklyModeReport }) {
+  const priorTotal = TRACKED_MODES.reduce(
+    (acc, m) => acc + (report.priorCounts[m] ?? 0),
+    0,
+  );
+  return (
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+      <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+        Mode Compared to Last Week
+      </h2>
+      {priorTotal === 0 ? (
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          No tracked completions last week — nothing to compare yet.
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {TRACKED_MODES.map((mode) => {
+            const dpp = modeDeltaPercentPoints(
+              report.currentRatios,
+              report.priorRatios,
+              mode,
+            );
+            const Icon = dpp > 0 ? TrendingUp : dpp < 0 ? TrendingDown : Minus;
+            // Neutral tone for non-zero deltas — mode is descriptive, not
+            // prescriptive, so neither direction is "good" or "bad".
+            const tone =
+              dpp === 0
+                ? 'text-[var(--color-text-secondary)]'
+                : 'text-[var(--color-text-primary)]';
+            return (
+              <div
+                key={mode}
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3"
+              >
+                <div className="mb-1 flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: MODE_COLOR[mode] }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[11px] font-medium text-[var(--color-text-primary)]">
+                    {MODE_LABEL[mode]}
+                  </span>
+                </div>
+                <div className={`flex items-center gap-1 text-sm font-semibold ${tone}`}>
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {dpp > 0 ? '+' : ''}
+                  {dpp}pp
+                </div>
+                <div className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                  {report.currentCounts[mode] ?? 0} this ·{' '}
+                  {report.priorCounts[mode] ?? 0} last
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ModePerDayCard({ report }: { report: WeeklyModeReport }) {
+  const maxTotal = Math.max(1, ...report.perDay.map((d) => d.total));
+  return (
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+      <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+        Mode Per-Day Breakdown
+      </h2>
+      <div className="flex h-32 items-end gap-2">
+        {report.perDay.map((day, i) => (
+          <ModeDayColumn key={i} day={day} maxTotal={maxTotal} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModeDayColumn({
+  day,
+  maxTotal,
+}: {
+  day: WeeklyModeReport['perDay'][number];
+  maxTotal: number;
+}) {
+  const heightPct = day.total > 0 ? (day.total / maxTotal) * 100 : 0;
+  return (
+    <div className="flex flex-1 flex-col items-center gap-1">
+      <div className="flex w-full flex-1 items-end justify-center">
+        <div
+          className="relative w-full overflow-hidden rounded-md bg-[var(--color-bg-secondary)]"
+          style={{ height: `${Math.max(4, heightPct)}%`, minHeight: '4px' }}
+          title={`${day.total} task${day.total === 1 ? '' : 's'}`}
+        >
+          {TRACKED_MODES.map((mode) => {
+            const c = day.counts[mode] ?? 0;
+            if (c === 0 || day.total === 0) return null;
+            return (
+              <div
+                key={mode}
+                style={{
+                  height: `${(c / day.total) * 100}%`,
+                  backgroundColor: MODE_COLOR[mode],
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+      <div className="text-[10px] font-medium text-[var(--color-text-secondary)]">
+        {day.label}
+      </div>
+      <div className="text-[10px] text-[var(--color-text-secondary)]">{day.total}</div>
+    </div>
+  );
+}
+
+function ModeFourWeekTrendCard({ report }: { report: WeeklyModeReport }) {
+  const hasAnyTrend = TRACKED_MODES.some((m) =>
+    report.fourWeekCounts[m].some((v) => v > 0),
+  );
+  if (!hasAnyTrend) return null;
+  return (
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+      <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+        Mode 4-Week Trend
+      </h2>
+      <div className="flex flex-col gap-2">
+        {TRACKED_MODES.map((mode) => {
+          const counts = report.fourWeekCounts[mode];
+          const ratios = report.fourWeekTrend[mode];
+          const thisWk = counts[counts.length - 1] ?? 0;
+          const lastWk = counts[counts.length - 2] ?? 0;
+          const delta =
+            lastWk === 0 && thisWk === 0
+              ? '—'
+              : thisWk > lastWk
+                ? `▲ ${thisWk - lastWk}`
+                : thisWk < lastWk
+                  ? `▼ ${lastWk - thisWk}`
+                  : `= ${thisWk}`;
+          const maxRatio = Math.max(0.01, ...ratios);
+          return (
+            <div key={mode} className="flex items-center gap-3">
+              <div className="w-20 shrink-0">
+                <div
+                  className="text-xs font-medium"
+                  style={{ color: MODE_COLOR[mode] }}
+                >
+                  {MODE_LABEL[mode]}
+                </div>
+                <div className="text-[10px] text-[var(--color-text-secondary)]">
+                  {thisWk} {delta}
+                </div>
+              </div>
+              <div className="flex h-8 flex-1 items-end gap-1">
+                {ratios.map((r, i) => {
+                  const isLast = i === ratios.length - 1;
+                  const h = (r / maxRatio) * 100;
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-sm"
+                      style={{
+                        height: `${Math.max(4, h)}%`,
+                        backgroundColor: MODE_COLOR[mode],
                         opacity: isLast ? 1 : 0.4,
                       }}
                       title={`Week ${i + 1}: ${counts[i] ?? 0}`}
