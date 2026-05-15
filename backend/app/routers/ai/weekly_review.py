@@ -69,9 +69,9 @@ async def weekly_review(
     """
     from app.routers import ai as _ai_pkg
 
-    _ai_pkg.weekly_review_rate_limiter.check(request)
+    _ai_pkg.weekly_review_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     uid = _require_firebase_uid(current_user)
     open_dtos = await _ai_pkg.fetch_incomplete_tasks(uid)

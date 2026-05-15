@@ -36,9 +36,9 @@ async def plan_pomodoro(
     db: AsyncSession = Depends(get_db),
 ):
     from app.routers import ai as _ai_pkg
-    _ai_pkg.ai_rate_limiter.check(request)
+    _ai_pkg.ai_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     tasks = await _get_incomplete_tasks(current_user)
     if not tasks:
@@ -88,9 +88,9 @@ async def pomodoro_coaching(
     trigger are consulted.
     """
     from app.routers import ai as _ai_pkg
-    _ai_pkg.pomodoro_coaching_rate_limiter.check(request)
+    _ai_pkg.pomodoro_coaching_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     try:
         from app.services.ai_productivity import generate_pomodoro_coaching as ai_coaching

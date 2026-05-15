@@ -56,9 +56,9 @@ async def extract_from_text(
     screen enforces the same cap client-side.
     """
     from app.routers import ai as _ai_pkg
-    _ai_pkg.extract_rate_limiter.check(request)
+    _ai_pkg.extract_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     try:
         from app.services.ai_productivity import extract_tasks_from_text as ai_extract
@@ -100,9 +100,9 @@ async def extract_from_file(
     pure suggestion.
     """
     from app.routers import ai as _ai_pkg
-    _ai_pkg.file_extract_rate_limiter.check(request)
+    _ai_pkg.file_extract_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     chunk_size = 1024 * 1024
     contents_buffer = bytearray()
@@ -199,9 +199,9 @@ async def vision_extract_tasks(
     the user has the master AI opt-out enabled.
     """
     from app.routers import ai as _ai_pkg
-    _ai_pkg.vision_extract_rate_limiter.check(request)
+    _ai_pkg.vision_extract_rate_limiter.check(request, is_admin=current_user.is_admin)
     tier = await resolve_effective_tier(current_user, db)
-    daily_ai_rate_limiter.check(current_user.id, tier)
+    daily_ai_rate_limiter.check(current_user.id, tier, is_admin=current_user.is_admin)
 
     try:
         from app.services.ai_productivity import extract_tasks_from_image as ai_vision_extract

@@ -332,7 +332,7 @@ async def parse_import_list(
     Returns 503 if ANTHROPIC_API_KEY is not configured server-side.
     Returns 502 if the Claude call fails.
     """
-    import_parse_rate_limiter.check(current_user.id)
+    import_parse_rate_limiter.check(current_user.id, is_admin=current_user.is_admin)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY") or settings.ANTHROPIC_API_KEY
     if not api_key:
@@ -401,7 +401,7 @@ async def parse_checklist(
     Returns 503 if ANTHROPIC_API_KEY is not configured server-side.
     Returns 502 if the Claude call fails.
     """
-    import_parse_rate_limiter.check(current_user.id)
+    import_parse_rate_limiter.check(current_user.id, is_admin=current_user.is_admin)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY") or settings.ANTHROPIC_API_KEY
     if not api_key:
