@@ -6,6 +6,7 @@ import {
   PartyPopper,
   Activity,
   BarChart3,
+  Pin,
 } from 'lucide-react';
 import { format, parseISO, startOfWeek, subDays, isMonday, isSunday } from 'date-fns';
 import { toast } from 'sonner';
@@ -26,6 +27,7 @@ import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
 import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow';
 import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
+import { PlanForTodaySheet } from '@/features/today/PlanForTodaySheet';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
 import { useLogicalToday } from '@/utils/useLogicalToday';
@@ -86,6 +88,7 @@ export function TodayScreen() {
     loadCollapseState,
   );
   const [editorOpen, setEditorOpen] = useState(false);
+  const [planSheetOpen, setPlanSheetOpen] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   // Track completed tasks for undo
@@ -392,6 +395,26 @@ export function TodayScreen() {
         )}
       </div>
 
+      {/* Plan For Today */}
+      <div className="mb-4">
+        <button
+          onClick={() => setPlanSheetOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3 text-left transition-colors hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-bg-secondary)]"
+          aria-label="Open plan for today sheet"
+        >
+          <Pin className="h-5 w-5 shrink-0 text-[var(--color-accent)]" aria-hidden="true" />
+          <span className="flex-1">
+            <span className="block text-sm font-semibold text-[var(--color-text-primary)]">
+              Plan For Today
+            </span>
+            <span className="block text-xs text-[var(--color-text-secondary)]">
+              Pull undone tasks into today's plan in one batch.
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden="true" />
+        </button>
+      </div>
+
       {/* Habit Chips */}
       {habits.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
@@ -611,6 +634,13 @@ export function TodayScreen() {
           onUpdate={() => loadData()}
         />
       )}
+
+      {/* Plan For Today Sheet */}
+      <PlanForTodaySheet
+        isOpen={planSheetOpen}
+        onClose={() => setPlanSheetOpen(false)}
+        todayIso={settingsStartOfDay.todayIso}
+      />
     </div>
   );
 }
