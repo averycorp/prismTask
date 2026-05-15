@@ -433,43 +433,9 @@ class MainActivity : ComponentActivity() {
             // Start of Day first-launch prompt. Only shown after the user has
             // completed onboarding, and only once. The user can still change the
             // value later from Settings -> Global Defaults -> Start of Day.
-            //
-            // The backfill + gate check are deliberately collapsed into a single
-            // LaunchedEffect body (rather than two LaunchedEffects) so the
-            // backfill's DataStore write always completes before the gate check
-            // reads. Two separate LaunchedEffects would race via Compose's
-            // coroutine scheduling and could let the gate check decide to show
-            // the prompt before the backfill's write took effect.
             var showStartOfDayPrompt by remember { mutableStateOf(false) }
             LaunchedEffect(hasCompletedOnboarding) {
                 if (hasCompletedOnboarding != true) return@LaunchedEffect
-
-                // Migration backfill for v1.4.0 SoD skip-race. Heals any install
-                // that landed in the transitional state
-                // `hasCompletedOnboarding = true` with `hasSetStartOfDay = false`
-                // — either because it shipped before the
-                // `OnboardingViewModel.checkExistingUserAndMaybeSkip` write
-                // reorder fix, or because a variant of the cross-DataStore
-                // observer race slipped through. Guarded implicitly on
-                // `completed == true` via the early-return above, so
-                // mid-onboarding users are untouched.
-                //
-                // TODO(v2.2): remove once the pre-fix install population has
-                // rolled over. The gate check below is still correct on its
-                // own; this backfill just prevents the prompt from showing
-                // during the transition window.
-                val sodSetBefore = taskBehaviorPreferences.getHasSetStartOfDay().first()
-                if (!sodSetBefore) {
-                    taskBehaviorPreferences.setHasSetStartOfDay(true)
-                }
-
-                // Gate check. Kept as defensive coverage for any future path
-                // that lands on MainTabs with `hasCompletedOnboarding = true`
-                // and `hasSetStartOfDay = false` that the backfill above didn't
-                // heal. In the current codebase this branch is unreachable
-                // (the backfill just wrote true), but removing it would couple
-                // the prompt's correctness to the backfill's invariant — better
-                // to keep both.
                 val alreadySet = taskBehaviorPreferences.getHasSetStartOfDay().first()
                 if (!alreadySet) showStartOfDayPrompt = true
             }
