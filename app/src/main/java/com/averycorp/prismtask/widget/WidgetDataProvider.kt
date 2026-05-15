@@ -6,8 +6,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.averycorp.prismtask.data.local.database.PrismTaskDatabase
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+import com.averycorp.prismtask.data.preferences.CustomBrainModePreferences
 import com.averycorp.prismtask.data.preferences.NdPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.ProductivityWidgetThresholds
+import com.averycorp.prismtask.data.preferences.effectiveNdPreferencesFlow
 import com.averycorp.prismtask.data.preferences.taskBehaviorDataStore
 import com.averycorp.prismtask.data.preferences.themePrefsDataStore
 import com.averycorp.prismtask.util.DayBoundary
@@ -191,6 +193,7 @@ object WidgetDataProvider {
         fun database(): PrismTaskDatabase
         fun advancedTuningPreferences(): AdvancedTuningPreferences
         fun ndPreferencesDataStore(): NdPreferencesDataStore
+        fun customBrainModePreferences(): CustomBrainModePreferences
     }
 
     // Reuse the Hilt-provided singleton DB so we share the same
@@ -211,14 +214,19 @@ object WidgetDataProvider {
             .first()
 
     /**
-     * Reads the user's NdPreferences.quietMode flag. Used by widget
-     * empty-state rendering (E4) to decide whether to show a celebratory
-     * emoji or fall back to a neutral glyph.
+     * Reads the user's effective `quietMode` flag (base NdPreferences
+     * with the active [com.averycorp.prismtask.data.preferences
+     * .CustomBrainMode] overlay applied). Used by widget empty-state
+     * rendering (E4) to decide whether to show a celebratory emoji or
+     * fall back to a neutral glyph — a user with quietMode forced on
+     * via an active custom mode sees the neutral glyph immediately,
+     * without having to toggle the base setting.
      */
     suspend fun getQuietMode(context: Context): Boolean =
         try {
-            entryPoint(context).ndPreferencesDataStore()
-                .ndPreferencesFlow
+            val ep = entryPoint(context)
+            ep.ndPreferencesDataStore()
+                .effectiveNdPreferencesFlow(ep.customBrainModePreferences())
                 .first()
                 .quietMode
         } catch (_: Exception) {

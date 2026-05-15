@@ -33,6 +33,7 @@ fun BrainModeScreen(
 ) {
     val ndPrefs by viewModel.ndPrefs.collectAsStateWithLifecycle()
     val customModes by viewModel.customBrainModes.collectAsStateWithLifecycle()
+    val activeName by viewModel.activeCustomBrainModeName.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -72,8 +73,12 @@ fun BrainModeScreen(
             )
             CustomBrainModeSubSection(
                 modes = customModes,
+                activeName = activeName,
                 onAdd = viewModel::addCustomBrainMode,
-                onRemove = viewModel::removeCustomBrainMode
+                onUpdate = viewModel::updateCustomBrainMode,
+                onRemove = viewModel::removeCustomBrainMode,
+                onSetActive = viewModel::setActiveCustomBrainMode,
+                onClearActive = viewModel::clearActiveCustomBrainMode
             )
             Spacer(modifier = Modifier.height(32.dp))
         }

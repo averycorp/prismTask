@@ -459,18 +459,37 @@ constructor(
 
     /**
      * F4 Item 5 — user-defined Brain Modes. The list lives alongside (not
-     * replacing) the 3 built-in toggles. Dispatch is informational v1.
+     * replacing) the 3 built-in toggles. v2 lifts the v1 informational-
+     * only deferral: each mode can carry overlay fields and one mode at
+     * a time can be marked active, in which case its overrides layer
+     * onto the effective ND preferences via `BrainModeResolver`.
      */
     val customBrainModes: StateFlow<List<com.averycorp.prismtask.data.preferences.CustomBrainMode>> =
         customBrainModePreferences.observe()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val activeCustomBrainModeName: StateFlow<String?> =
+        customBrainModePreferences.observeActiveName()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     fun addCustomBrainMode(mode: com.averycorp.prismtask.data.preferences.CustomBrainMode) {
         viewModelScope.launch { customBrainModePreferences.add(mode) }
     }
 
+    fun updateCustomBrainMode(mode: com.averycorp.prismtask.data.preferences.CustomBrainMode) {
+        viewModelScope.launch { customBrainModePreferences.update(mode) }
+    }
+
     fun removeCustomBrainMode(name: String) {
         viewModelScope.launch { customBrainModePreferences.remove(name) }
+    }
+
+    fun setActiveCustomBrainMode(name: String) {
+        viewModelScope.launch { customBrainModePreferences.setActive(name) }
+    }
+
+    fun clearActiveCustomBrainMode() {
+        viewModelScope.launch { customBrainModePreferences.clearActive() }
     }
 
     fun setCompactMode(enabled: Boolean) {
