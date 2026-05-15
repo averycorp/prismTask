@@ -55,6 +55,42 @@ constructor(
         }
     }
 
+    /**
+     * Partial update used by surfaces that only capture energy (the
+     * Today-screen Energy Check-In and the post-Pomodoro prompt). If a
+     * row already exists for `(date, timeOfDay)` — typically written by
+     * the Morning Check-In — only its `energy` is touched; `mood`,
+     * `notes`, and `createdAt` are preserved so a quick energy tap can
+     * never clobber a detailed morning entry. If no row exists, inserts
+     * one with [DEFAULT_MOOD] (neutral 3) so the entity's 1..5
+     * invariant holds.
+     */
+    suspend fun setEnergyForDate(
+        date: Long,
+        energy: Int,
+        timeOfDay: String = "morning"
+    ): Long {
+        val now = System.currentTimeMillis()
+        val existing = dao.getByDate(date).firstOrNull { it.timeOfDay == timeOfDay }
+        return if (existing != null) {
+            dao.update(existing.copy(energy = energy, updatedAt = now))
+            syncTracker.trackUpdate(existing.id, "mood_energy_log")
+            existing.id
+        } else {
+            val id = dao.insert(
+                MoodEnergyLogEntity(
+                    date = date,
+                    mood = DEFAULT_MOOD,
+                    energy = energy,
+                    timeOfDay = timeOfDay,
+                    updatedAt = now
+                )
+            )
+            syncTracker.trackCreate(id, "mood_energy_log")
+            id
+        }
+    }
+
     suspend fun getByDate(date: Long): List<MoodEnergyLogEntity> = dao.getByDate(date)
 
     fun observeRange(start: Long, end: Long): Flow<List<MoodEnergyLogEntity>> =
@@ -78,4 +114,9 @@ constructor(
      */
     suspend fun hasLowMoodSince(moodCeiling: Int, sinceCreatedAtMillis: Long): Boolean =
         dao.countLowMoodSinceOnce(moodCeiling, sinceCreatedAtMillis) > 0
+
+    private companion object {
+        /** Neutral mood used by [setEnergyForDate] when no entry exists yet. */
+        const val DEFAULT_MOOD = 3
+    }
 }

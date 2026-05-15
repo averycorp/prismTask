@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.data.remote.api.PomodoroRequest
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
@@ -24,6 +25,7 @@ import com.averycorp.prismtask.domain.usecase.PomodoroAICoach
 import com.averycorp.prismtask.domain.usecase.PomodoroSessionConfig
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.averycorp.prismtask.notifications.PomodoroTimerService
+import com.averycorp.prismtask.util.DayBoundary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -155,6 +157,7 @@ constructor(
     private val proFeatureGate: ProFeatureGate,
     private val moodEnergyRepository: MoodEnergyRepository,
     private val timerPreferences: TimerPreferences,
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val aiCoach: PomodoroAICoach,
     private val taskTimingRepository: TaskTimingRepository,
     private val billingManager: BillingManager
@@ -182,12 +185,14 @@ constructor(
 
     fun logPostSessionEnergy(energy: Int) {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            moodEnergyRepository.upsertForDate(
-                date = now - (now % (24L * 60 * 60 * 1000)),
-                mood = 3,
+            val dayStartHour = taskBehaviorPreferences.getDayStartHour().first()
+            val todayStart = DayBoundary.startOfCurrentDay(dayStartHour)
+            // setEnergyForDate (not upsertForDate) so that if the user
+            // already logged real mood via the Morning Check-In, we
+            // don't overwrite it with mood=3.
+            moodEnergyRepository.setEnergyForDate(
+                date = todayStart,
                 energy = energy,
-                notes = "post-pomodoro",
                 timeOfDay = "afternoon"
             )
             _showPostSessionEnergyPrompt.value = false
@@ -296,7 +301,8 @@ constructor(
         // config. Users who haven't opted into mood tracking get the
         // classic 25/5 defaults so the feature is invisible to them.
         viewModelScope.launch {
-            val todayStart = System.currentTimeMillis() - 12L * 60 * 60 * 1000
+            val dayStartHour = taskBehaviorPreferences.getDayStartHour().first()
+            val todayStart = DayBoundary.startOfCurrentDay(dayStartHour)
             val logs = moodEnergyRepository.getRange(todayStart, System.currentTimeMillis())
             val current = config.value
             val planned = energyAwarePomodoro.planFromLogs(

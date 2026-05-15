@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,27 +38,37 @@ constructor(
     val state: StateFlow<MoodAnalyticsState> = _state.asStateFlow()
 
     init {
-        refresh()
+        // Observe the repository so newly-logged entries (Morning
+        // Check-In, Today Energy Check-In, post-Pomodoro prompt) refresh
+        // this screen automatically — previously refresh() only fired
+        // from init{} and a return-to-screen showed stale data.
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val windowStart = now - 30L * 24 * 60 * 60 * 1000
+            moodEnergyRepository.observeRange(windowStart, now).collectLatest { logs ->
+                recompute(logs)
+            }
+        }
     }
 
     fun refresh() {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val windowStart = now - 30L * 24 * 60 * 60 * 1000
-            val logs = moodEnergyRepository.getRange(windowStart, now)
-            val tasks = taskRepository.getAllTasksOnce()
-            val observations = buildObservations(logs, tasks)
-            val moodResults = engine.correlateMood(observations)
-            val energyResults = engine.correlateEnergy(observations)
-            val byDay = engine.averageByDay(logs)
-            _state.value = MoodAnalyticsState(
-                logs = logs,
-                observations = observations,
-                moodResults = moodResults,
-                energyResults = energyResults,
-                averageByDay = byDay
-            )
+            recompute(moodEnergyRepository.getRange(windowStart, now))
         }
+    }
+
+    private suspend fun recompute(logs: List<MoodEnergyLogEntity>) {
+        val tasks = taskRepository.getAllTasksOnce()
+        val observations = buildObservations(logs, tasks)
+        _state.value = MoodAnalyticsState(
+            logs = logs,
+            observations = observations,
+            moodResults = engine.correlateMood(observations),
+            energyResults = engine.correlateEnergy(observations),
+            averageByDay = engine.averageByDay(logs)
+        )
     }
 
     private fun buildObservations(
