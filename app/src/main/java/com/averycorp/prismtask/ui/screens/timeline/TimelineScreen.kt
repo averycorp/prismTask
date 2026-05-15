@@ -1023,10 +1023,10 @@ private fun PreviewBlockCard(block: AiScheduleBlock) {
                 )
                 if (block.reason.isNotBlank()) {
                     Text(
-                        text = block.reason,
+                        text = "Why: ${block.reason}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
