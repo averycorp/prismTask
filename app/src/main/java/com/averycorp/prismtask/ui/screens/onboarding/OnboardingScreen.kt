@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +80,8 @@ import androidx.window.layout.FoldingFeature
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.ui.a11y.asHeading
 import com.averycorp.prismtask.ui.a11y.politeLiveRegion
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.ui.screens.auth.EmailAuthSection
 import com.averycorp.prismtask.ui.screens.templates.TemplatePickerContent
 import com.averycorp.prismtask.ui.screens.templates.TemplateSelections
@@ -95,6 +98,7 @@ import com.averycorp.prismtask.ui.theme.prismThemeFonts
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 private const val TOTAL_PAGES = 15
@@ -1835,11 +1839,30 @@ private fun NotificationsPage(viewModel: OnboardingViewModel) {
 // completed onboarding before this page existed. `setStartOfDay` writes
 // the hour, the minute, and `hasSetStartOfDay = true` atomically — exactly
 // the same write the modal does — so the flag flip prevents a double-prompt.
+//
+// Uses `AnalogClockPicker` rather than two sliders so the affordance
+// matches every other time-of-day input in the app per the
+// `feedback-time-input-use-clock-not-slider` memory. Sliders also tripped
+// a single-precision-float bug: `Slider(valueRange = 0f..23f, steps = 22)`
+// snaps to ticks at `i/23f * 23f`, which rounds to `i ± ε` instead of
+// exactly `i`, and `it.toInt()` truncates the `i-ε` case down to `i-1` —
+// the user saw certain hours skipped as they dragged.
 
 @Composable
 private fun DaySetupPage(viewModel: OnboardingViewModel) {
-    val hour by collectAsLocalState(viewModel.startOfDayHour, initial = 4)
-    val minute by collectAsLocalState(viewModel.startOfDayMinute, initial = 0)
+    val clockState = rememberAnalogClockState(
+        initialHour = viewModel.startOfDayHour.value,
+        initialMinute = viewModel.startOfDayMinute.value,
+        is24Hour = false
+    )
+
+    // Push picker edits back to the viewmodel. `drop(1)` skips the initial
+    // emission so we don't re-write the stored value on first composition.
+    LaunchedEffect(clockState) {
+        snapshotFlow { clockState.hour to clockState.minute }
+            .drop(1)
+            .collect { (h, m) -> viewModel.setStartOfDay(h, m) }
+    }
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
@@ -1847,7 +1870,8 @@ private fun DaySetupPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp),
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         AnimatedVisibility(
@@ -1887,32 +1911,7 @@ private fun DaySetupPage(viewModel: OnboardingViewModel) {
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "%02d:%02d %s".format(
-                        if (hour == 0 || hour == 12) 12 else hour % 12,
-                        minute,
-                        if (hour < 12) "AM" else "PM"
-                    ),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Hour", style = MaterialTheme.typography.labelMedium)
-                Slider(
-                    value = hour.toFloat(),
-                    onValueChange = { viewModel.setStartOfDay(it.toInt(), minute) },
-                    valueRange = 0f..23f,
-                    steps = 22
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Minute (5-min steps)", style = MaterialTheme.typography.labelMedium)
-                Slider(
-                    value = (minute / 5).toFloat(),
-                    onValueChange = { viewModel.setStartOfDay(hour, (it.toInt() * 5).coerceIn(0, 55)) },
-                    valueRange = 0f..11f,
-                    steps = 10
-                )
+                AnalogClockPicker(state = clockState)
             }
         }
     }
