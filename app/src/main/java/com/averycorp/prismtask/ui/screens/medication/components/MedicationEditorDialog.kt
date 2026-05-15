@@ -84,15 +84,24 @@ fun MedicationEditorDialog(
     var reminderModeChoice by remember {
         mutableStateOf(reminderModeChoiceFromString(initialReminderMode))
     }
+    val intervalPresets = listOf(120, 240, 360, 480)
     var intervalMinutes by remember {
         mutableStateOf(initialReminderIntervalMinutes ?: 240)
     }
     var customIntervalText by remember(intervalMinutes) {
         mutableStateOf(intervalMinutes.toString())
     }
+    // Custom-mode visibility is explicit state, not derived from
+    // `intervalMinutes !in presets`. The derived shape silently hid the
+    // input field whenever a typed value landed on a preset (120/240/360/480),
+    // trapping users mid-keystroke when typing past those values toward
+    // a higher custom value (e.g. "1200" passes through "120" first).
+    // See `docs/audits/MEDICATION_CUSTOM_INTERVAL_INPUT_AUDIT.md` §
+    // Anti-pattern recommendation #1.
+    var isCustomInterval by remember {
+        mutableStateOf((initialReminderIntervalMinutes ?: 240) !in intervalPresets)
+    }
     var promptDoseAtLog by remember { mutableStateOf(initialPromptDoseAtLog) }
-    val intervalPresets = listOf(120, 240, 360, 480)
-    val isCustomInterval = intervalMinutes !in intervalPresets
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -174,7 +183,10 @@ fun MedicationEditorDialog(
                         intervalPresets.forEach { mins ->
                             val selected = !isCustomInterval && intervalMinutes == mins
                             AssistChip(
-                                onClick = { intervalMinutes = mins },
+                                onClick = {
+                                    intervalMinutes = mins
+                                    isCustomInterval = false
+                                },
                                 label = { Text(formatInterval(mins)) },
                                 colors = if (selected) {
                                     AssistChipDefaults.assistChipColors(
@@ -187,12 +199,7 @@ fun MedicationEditorDialog(
                             )
                         }
                         AssistChip(
-                            onClick = {
-                                if (!isCustomInterval) {
-                                    intervalMinutes = (intervalMinutes + 1).coerceIn(60, 1440)
-                                    customIntervalText = intervalMinutes.toString()
-                                }
-                            },
+                            onClick = { isCustomInterval = true },
                             label = { Text("Custom") },
                             colors = if (isCustomInterval) {
                                 AssistChipDefaults.assistChipColors(

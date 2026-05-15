@@ -114,7 +114,13 @@ private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun IntervalPicker(currentMinutes: Int, onSave: (Int) -> Unit) {
     val presets = listOf(120, 240, 360, 480) // 2h / 4h / 6h / 8h
-    val isCustom = currentMinutes !in presets
+    // Custom-mode visibility is explicit user state, not derived from
+    // `currentMinutes !in presets`. The derived shape silently hid the
+    // input field whenever a typed value landed on a preset (e.g. typing
+    // toward 1200 passes through 120), trapping the user mid-keystroke.
+    // See `docs/audits/MEDICATION_CUSTOM_INTERVAL_INPUT_AUDIT.md` §
+    // Anti-pattern recommendation #1.
+    var isCustom by remember { mutableStateOf(currentMinutes !in presets) }
     var customText by remember(currentMinutes) { mutableStateOf(currentMinutes.toString()) }
 
     Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -122,7 +128,10 @@ private fun IntervalPicker(currentMinutes: Int, onSave: (Int) -> Unit) {
             presets.forEach { mins ->
                 val selected = !isCustom && currentMinutes == mins
                 AssistChip(
-                    onClick = { onSave(mins) },
+                    onClick = {
+                        isCustom = false
+                        onSave(mins)
+                    },
                     label = { Text(formatInterval(mins)) },
                     colors = if (selected) {
                         AssistChipDefaults.assistChipColors(
@@ -135,12 +144,7 @@ private fun IntervalPicker(currentMinutes: Int, onSave: (Int) -> Unit) {
                 )
             }
             AssistChip(
-                onClick = {
-                    if (!isCustom) {
-                        // Bump to a nearby off-preset value to enter custom mode.
-                        onSave((currentMinutes + 1).coerceIn(60, 1440))
-                    }
-                },
+                onClick = { isCustom = true },
                 label = { Text("Custom") },
                 colors = if (isCustom) {
                     AssistChipDefaults.assistChipColors(
