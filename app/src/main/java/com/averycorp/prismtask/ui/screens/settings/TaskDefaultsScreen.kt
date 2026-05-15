@@ -36,6 +36,7 @@ fun TaskDefaultsScreen(
     val firstDayOfWeek by viewModel.firstDayOfWeek.collectAsStateWithLifecycle()
     val dayStartHour by viewModel.dayStartHour.collectAsStateWithLifecycle()
     val dayStartMinute by viewModel.dayStartMinute.collectAsStateWithLifecycle()
+    val taskDefaults by viewModel.taskDefaultPrefs.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -63,11 +64,13 @@ fun TaskDefaultsScreen(
                 dayStartHour = dayStartHour,
                 dayStartMinute = dayStartMinute,
                 urgencyWeights = urgencyWeights,
+                defaultTaskDurationMinutes = taskDefaults.defaultDuration ?: 30,
                 onDefaultSortChange = viewModel::setDefaultSort,
                 onDefaultViewModeChange = viewModel::setDefaultViewMode,
                 onFirstDayOfWeekChange = viewModel::setFirstDayOfWeek,
                 onStartOfDayChange = viewModel::setStartOfDay,
                 onUrgencyWeightsChange = viewModel::setUrgencyWeights,
+                onDefaultTaskDurationChange = viewModel::setDefaultTaskDuration,
                 onResetTaskBehaviorDefaults = viewModel::resetTaskBehaviorDefaults
             )
             Spacer(modifier = Modifier.height(32.dp))

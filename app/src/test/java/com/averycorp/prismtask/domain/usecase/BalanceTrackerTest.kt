@@ -19,14 +19,16 @@ class BalanceTrackerTest {
     private fun task(
         id: Long,
         category: LifeCategory?,
-        dueDate: Long = now - oneDay
+        dueDate: Long = now - oneDay,
+        estimatedDuration: Int? = null
     ): TaskEntity = TaskEntity(
         id = id,
         title = "task $id",
         dueDate = dueDate,
         createdAt = dueDate,
         updatedAt = dueDate,
-        lifeCategory = category?.name
+        lifeCategory = category?.name,
+        estimatedDuration = estimatedDuration
     )
 
     @Test
@@ -274,6 +276,87 @@ class BalanceTrackerTest {
         )
         assertEquals(1, state.totalTracked)
         assertEquals(1f, state.currentRatios[LifeCategory.HEALTH]!!, 0.001f)
+    }
+
+    @Test
+    fun `ratios weight tasks by estimatedDuration when set`() {
+        // 1 WORK task at 120 min vs 2 SELF_CARE tasks at 30 min each → 120 vs 60 min.
+        val tasks = listOf(
+            task(1, LifeCategory.WORK, estimatedDuration = 120),
+            task(2, LifeCategory.SELF_CARE, estimatedDuration = 30),
+            task(3, LifeCategory.SELF_CARE, estimatedDuration = 30)
+        )
+        val state = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc
+        )
+        // WORK = 120 / 180, SELF_CARE = 60 / 180.
+        assertEquals(2f / 3f, state.currentRatios[LifeCategory.WORK]!!, 0.001f)
+        assertEquals(1f / 3f, state.currentRatios[LifeCategory.SELF_CARE]!!, 0.001f)
+        assertEquals(LifeCategory.WORK, state.dominantCategory)
+        // totalTracked remains a count, not minutes.
+        assertEquals(3, state.totalTracked)
+    }
+
+    @Test
+    fun `tasks without estimatedDuration use the configured default`() {
+        // defaultDurationMinutes = 60. 1 WORK at 120 min vs 1 SELF_CARE with no
+        // estimate (counts as 60 min) → 120 vs 60.
+        val tasks = listOf(
+            task(1, LifeCategory.WORK, estimatedDuration = 120),
+            task(2, LifeCategory.SELF_CARE, estimatedDuration = null)
+        )
+        val state = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            defaultDurationMinutes = 60
+        )
+        assertEquals(2f / 3f, state.currentRatios[LifeCategory.WORK]!!, 0.001f)
+        assertEquals(1f / 3f, state.currentRatios[LifeCategory.SELF_CARE]!!, 0.001f)
+    }
+
+    @Test
+    fun `non-positive estimatedDuration falls back to default`() {
+        val tasks = listOf(
+            task(1, LifeCategory.WORK, estimatedDuration = 0),
+            task(2, LifeCategory.SELF_CARE, estimatedDuration = -5),
+            task(3, LifeCategory.HEALTH, estimatedDuration = null)
+        )
+        val state = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc,
+            defaultDurationMinutes = 30
+        )
+        // All three contribute equal weight via the default.
+        assertEquals(1f / 3f, state.currentRatios[LifeCategory.WORK]!!, 0.001f)
+        assertEquals(1f / 3f, state.currentRatios[LifeCategory.SELF_CARE]!!, 0.001f)
+        assertEquals(1f / 3f, state.currentRatios[LifeCategory.HEALTH]!!, 0.001f)
+    }
+
+    @Test
+    fun `overload uses minute-weighted ratio not count`() {
+        // 2 WORK tasks at 60 min each vs 8 SELF_CARE tasks at 5 min each.
+        // Count-based: work = 20%, NOT overloaded.
+        // Minute-based: work = 120/(120+40) = 75%, overloaded.
+        val tasks = (1..2).map {
+            task(it.toLong(), LifeCategory.WORK, estimatedDuration = 60)
+        } + (3..10).map {
+            task(it.toLong(), LifeCategory.SELF_CARE, estimatedDuration = 5)
+        }
+        val state = tracker.compute(
+            allTasks = tasks,
+            config = BalanceConfig(),
+            now = now,
+            timeZone = utc
+        )
+        assertTrue(state.isOverloaded)
+        assertEquals(0.75f, state.currentRatios[LifeCategory.WORK]!!, 0.001f)
     }
 
     @Test

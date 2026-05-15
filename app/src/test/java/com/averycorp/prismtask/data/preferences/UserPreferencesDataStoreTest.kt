@@ -95,7 +95,9 @@ class UserPreferencesDataStoreTest {
         assertEquals(-1L, d.defaultReminderOffset)
         assertNull(d.defaultProjectId)
         assertEquals(StartOfWeek.MONDAY, d.startOfWeek)
-        assertNull(d.defaultDuration)
+        // Free-tier preset: 30 minutes per task. Powers balance + cognitive-load
+        // weighting when a task has no explicit estimatedDuration.
+        assertEquals(30, d.defaultDuration)
         assertEquals(AutoDueDate.NONE, d.autoSetDueDate)
         assertFalse(d.smartDefaultsEnabled)
     }
@@ -124,11 +126,11 @@ class UserPreferencesDataStoreTest {
     }
 
     @Test
-    fun `task defaults nullable project and duration stay null when not set`() = runTest {
+    fun `task defaults nullable project stays null and duration falls back to 30 when not set`() = runTest {
         prefs.setTaskDefaults(TaskDefaults(defaultPriority = 1))
         val d = prefs.taskDefaultsFlow.first()
         assertNull(d.defaultProjectId)
-        assertNull(d.defaultDuration)
+        assertEquals(30, d.defaultDuration)
         assertEquals(1, d.defaultPriority)
     }
 

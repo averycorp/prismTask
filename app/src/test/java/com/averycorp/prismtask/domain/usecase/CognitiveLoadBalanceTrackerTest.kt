@@ -17,14 +17,16 @@ class CognitiveLoadBalanceTrackerTest {
     private fun task(
         id: Long,
         load: CognitiveLoad?,
-        dueDate: Long = now - oneDay
+        dueDate: Long = now - oneDay,
+        estimatedDuration: Int? = null
     ): TaskEntity = TaskEntity(
         id = id,
         title = "task $id",
         dueDate = dueDate,
         createdAt = dueDate,
         updatedAt = dueDate,
-        cognitiveLoad = load?.name
+        cognitiveLoad = load?.name,
+        estimatedDuration = estimatedDuration
     )
 
     @Test
@@ -159,5 +161,38 @@ class CognitiveLoadBalanceTrackerTest {
             leisureSessionTimestamps = listOf(now - 30 * oneDay)
         )
         assertEquals(0, state.totalTracked)
+    }
+
+    @Test
+    fun `cognitive load ratios weight tasks by estimatedDuration`() {
+        // 1 HARD task at 90 min vs 3 EASY tasks at 10 min each → 90 vs 30 min.
+        val tasks = listOf(
+            task(1, CognitiveLoad.HARD, estimatedDuration = 90),
+            task(2, CognitiveLoad.EASY, estimatedDuration = 10),
+            task(3, CognitiveLoad.EASY, estimatedDuration = 10),
+            task(4, CognitiveLoad.EASY, estimatedDuration = 10)
+        )
+        val state = tracker.compute(allTasks = tasks, now = now, timeZone = utc)
+        assertEquals(0.75f, state.currentRatios[CognitiveLoad.HARD]!!, 0.001f)
+        assertEquals(0.25f, state.currentRatios[CognitiveLoad.EASY]!!, 0.001f)
+        // Count-based dominance would say EASY (3 tasks); minute-based says HARD.
+        assertEquals(CognitiveLoad.HARD, state.dominantLoad)
+        assertEquals(4, state.totalTracked)
+    }
+
+    @Test
+    fun `tasks without estimatedDuration use the configured default`() {
+        val tasks = listOf(
+            task(1, CognitiveLoad.HARD, estimatedDuration = 120),
+            task(2, CognitiveLoad.EASY, estimatedDuration = null)
+        )
+        val state = tracker.compute(
+            allTasks = tasks,
+            now = now,
+            timeZone = utc,
+            defaultDurationMinutes = 60
+        )
+        assertEquals(2f / 3f, state.currentRatios[CognitiveLoad.HARD]!!, 0.001f)
+        assertEquals(1f / 3f, state.currentRatios[CognitiveLoad.EASY]!!, 0.001f)
     }
 }

@@ -86,6 +86,23 @@ class LifeCategoryClassifyTextResponse(BaseModel):
     reason: str
 
 
+class EstimateDurationRequest(BaseModel):
+    """Single-task duration estimate from raw text.
+
+    Pro-only Haiku call invoked from `AddEditTaskViewModel` save when the
+    user leaves `estimatedDuration` blank. Free users skip the call and
+    inherit `TaskDefaults.defaultDuration` (preset 30 min).
+    """
+
+    title: str = Field(min_length=1, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=4000)
+
+
+class EstimateDurationResponse(BaseModel):
+    estimated_minutes: int = Field(ge=1, le=480)  # 1 min … 8 hours
+    reason: str = ""
+
+
 # --- Pomodoro ---
 
 
