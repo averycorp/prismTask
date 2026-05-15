@@ -575,6 +575,10 @@ constructor(
         .getProgressStyle()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ring")
 
+    val showProgressPercentage: StateFlow<Boolean> = dashboardPreferences
+        .getShowProgressPercentage()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val completionCountMode: StateFlow<CompletionCountMode> = dashboardPreferences
         .getCompletionCountMode()
         .stateIn(
@@ -930,6 +934,10 @@ constructor(
 
     fun setProgressStyle(style: String) {
         viewModelScope.launch { dashboardPreferences.setProgressStyle(style) }
+    }
+
+    fun setShowProgressPercentage(show: Boolean) {
+        viewModelScope.launch { dashboardPreferences.setShowProgressPercentage(show) }
     }
 
     fun setCompletionCountMode(mode: CompletionCountMode) {

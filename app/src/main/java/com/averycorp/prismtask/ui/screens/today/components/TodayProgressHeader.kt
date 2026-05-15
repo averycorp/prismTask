@@ -73,6 +73,7 @@ internal fun CompactProgressHeader(
     total: Int,
     progress: Float,
     progressStyle: String = "ring",
+    showProgressPercentage: Boolean = false,
     onAnalyticsClick: (() -> Unit)? = null,
     onCompletedClick: (() -> Unit)? = null,
     productivityBadge: @Composable (() -> Unit)? = null,
@@ -188,7 +189,6 @@ internal fun CompactProgressHeader(
                             val radius = diameter / 2f - stroke / 2f
                             val topLeft = Offset(stroke / 2f, stroke / 2f)
                             val arcSize = Size(diameter - stroke, diameter - stroke)
-                            val sweepAngle = animatedProgress.coerceIn(0f, 1f) * 360f
 
                             // Cyberpunk: tick marks outside the mini ring
                             if (attrs.brackets) {
@@ -210,55 +210,40 @@ internal fun CompactProgressHeader(
                                 }
                             }
 
-                            // Track ring — dashed for Matrix
-                            val trackPathEffect = if (attrs.terminal) {
+                            // Always a full ring — the count inside conveys completion,
+                            // not a partial arc sweep. Matrix theme keeps its dashed look.
+                            val ringPathEffect = if (attrs.terminal) {
                                 PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()), 0f)
                             } else {
                                 null
                             }
-                            drawArc(
-                                color = colors.surface,
-                                startAngle = -90f,
-                                sweepAngle = 360f,
-                                useCenter = false,
-                                topLeft = topLeft,
-                                size = arcSize,
-                                style = Stroke(
-                                    width = stroke,
-                                    cap = StrokeCap.Square,
-                                    pathEffect = trackPathEffect
+                            if (attrs.sunset) {
+                                drawArc(
+                                    brush = Brush.sweepGradient(
+                                        colors = listOf(colors.primary, colors.secondary, colors.primary),
+                                        center = Offset(size.width / 2f, size.height / 2f)
+                                    ),
+                                    startAngle = -90f,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    topLeft = topLeft,
+                                    size = arcSize,
+                                    style = Stroke(width = stroke, cap = StrokeCap.Round)
                                 )
-                            )
-
-                            // Progress arc — Synthwave uses gradient
-                            if (sweepAngle > 0f) {
-                                if (attrs.sunset) {
-                                    drawArc(
-                                        brush = Brush.sweepGradient(
-                                            colors = listOf(colors.primary, colors.secondary, colors.primary),
-                                            center = Offset(size.width / 2f, size.height / 2f)
-                                        ),
-                                        startAngle = -90f,
-                                        sweepAngle = sweepAngle,
-                                        useCenter = false,
-                                        topLeft = topLeft,
-                                        size = arcSize,
-                                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                            } else {
+                                drawArc(
+                                    color = barColor,
+                                    startAngle = -90f,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    topLeft = topLeft,
+                                    size = arcSize,
+                                    style = Stroke(
+                                        width = stroke,
+                                        cap = if (attrs.terminal || attrs.brackets) StrokeCap.Square else StrokeCap.Round,
+                                        pathEffect = ringPathEffect
                                     )
-                                } else {
-                                    drawArc(
-                                        color = barColor,
-                                        startAngle = -90f,
-                                        sweepAngle = sweepAngle,
-                                        useCenter = false,
-                                        topLeft = topLeft,
-                                        size = arcSize,
-                                        style = Stroke(
-                                            width = stroke,
-                                            cap = if (attrs.terminal || attrs.brackets) StrokeCap.Square else StrokeCap.Round
-                                        )
-                                    )
-                                }
+                                )
                             }
                         }
                         Text(
@@ -267,6 +252,15 @@ internal fun CompactProgressHeader(
                             fontFamily = fonts,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
+                            color = colors.primary
+                        )
+                    }
+                    if (showProgressPercentage) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val pct = ((animatedProgress.coerceIn(0f, 1f)) * 100f).toInt()
+                        TerminalLabel(
+                            text = "$pct%",
+                            style = MaterialTheme.typography.titleSmall,
                             color = colors.primary
                         )
                     }

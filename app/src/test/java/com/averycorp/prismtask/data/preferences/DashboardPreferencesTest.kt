@@ -105,16 +105,25 @@ class DashboardPreferencesTest {
     }
 
     @Test
+    fun showProgressPercentage_defaultsOff_andRoundTrips() = runTest {
+        assertEquals(false, prefs.getShowProgressPercentage().first())
+        prefs.setShowProgressPercentage(true)
+        assertEquals(true, prefs.getShowProgressPercentage().first())
+    }
+
+    @Test
     fun resetToDefaults_clearsAllOverrides() = runTest {
         prefs.setSectionOrder(listOf("completed"))
         prefs.setHiddenSections(setOf("completed"))
         prefs.setProgressStyle("bar")
         prefs.setCompletionCountMode(CompletionCountMode.TASKS_ONLY)
+        prefs.setShowProgressPercentage(true)
         prefs.resetToDefaults()
 
         assertEquals(DashboardPreferences.DEFAULT_ORDER, prefs.getSectionOrder().first())
         assertEquals(DashboardPreferences.DEFAULT_HIDDEN, prefs.getHiddenSections().first())
         assertEquals("ring", prefs.getProgressStyle().first())
         assertEquals(CompletionCountMode.TASKS_AND_HABITS, prefs.getCompletionCountMode().first())
+        assertEquals(false, prefs.getShowProgressPercentage().first())
     }
 }

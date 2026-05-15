@@ -220,6 +220,7 @@ fun TodayScreen(
     }
 
     val progressStyle by viewModel.progressStyle.collectAsStateWithLifecycle()
+    val showProgressPercentage by viewModel.showProgressPercentage.collectAsStateWithLifecycle()
     val totalForHeader = combinedTotal
     val allTodayDone = remember(overdueTasks, todayTasks, plannedTasks, completedToday, allHabitsCompleted) {
         overdueTasks.isEmpty() && todayTasks.isEmpty() && plannedTasks.isEmpty() && completedToday.isNotEmpty() && allHabitsCompleted
@@ -260,6 +261,7 @@ fun TodayScreen(
                 total = totalForHeader,
                 progress = combinedProgress,
                 progressStyle = progressStyle,
+                showProgressPercentage = showProgressPercentage,
                 onAnalyticsClick = { navController.navigate(PrismTaskRoute.TaskAnalytics.createRoute()) },
                 onCompletedClick = { showCompletedSheet = true },
                 productivityBadge = {
