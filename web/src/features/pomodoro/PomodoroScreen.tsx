@@ -15,7 +15,7 @@ import {
 import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
 
-import { useAuthStore } from '@/stores/authStore';
+import { useProFeature } from '@/hooks/useProFeature';
 import { useTaskStore } from '@/stores/taskStore';
 import { goalsApi } from '@/api/goals';
 import { projectsApi } from '@/api/projects';
@@ -79,11 +79,8 @@ function formatTimer(seconds: number): string {
 }
 
 export function PomodoroScreen() {
-  const user = useAuthStore((s) => s.user);
+  const { isPro } = useProFeature();
   const { completeTask } = useTaskStore();
-  const isPro =
-    !!user &&
-    ((user.effective_tier ?? user.tier) !== 'FREE' || user.is_admin === true);
 
   // Planning state
   const [allTasks, setAllTasks] = useState<Task[]>([]);

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useAuthStore } from '@/stores/authStore';
+import { useProFeature } from '@/hooks/useProFeature';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import * as firestoreTasks from '@/api/firestore/tasks';
 import { upsertWeeklyReview } from '@/api/firestore/weeklyReviews';
@@ -88,10 +88,7 @@ function formatWeekLabel(window: WeeklyWindow): string {
 }
 
 export function WeeklyReviewScreen() {
-  const user = useAuthStore((s) => s.user);
-  const isPro =
-    !!user &&
-    ((user.effective_tier ?? user.tier) !== 'FREE' || user.is_admin === true);
+  const { isPro } = useProFeature();
 
   // Default to the current ongoing week. The user can navigate backward
   // to retrospective weeks via the prev/next buttons.
