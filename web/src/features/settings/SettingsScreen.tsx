@@ -28,6 +28,7 @@ import {
   Scale,
   Coffee,
   Brain,
+  LayoutDashboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useThemeStore } from '@/stores/themeStore';
@@ -40,6 +41,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { KeyboardShortcutsModal } from '@/components/shared/KeyboardShortcutsModal';
 import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
 import { BatchHistorySection } from '@/features/settings/sections/BatchHistorySection';
+import { DashboardSection } from '@/features/settings/sections/DashboardSection';
 import { MedicationSlotEditor } from '@/features/medication/MedicationSlotEditor';
 import { MedicationReminderModeSection } from '@/features/settings/sections/MedicationReminderModeSection';
 import { BoundariesSection } from '@/features/settings/sections/BoundariesSection';
@@ -433,6 +435,14 @@ export function SettingsScreen() {
             </span>
           </div>
         </div>
+      </SettingsSection>
+
+      {/* Dashboard — Today section order + visibility (parity C.1f) */}
+      <SettingsSection
+        icon={<LayoutDashboard className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Dashboard"
+      >
+        <DashboardSection />
       </SettingsSection>
 
       {/* Calendar */}

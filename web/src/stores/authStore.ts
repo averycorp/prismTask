@@ -13,6 +13,7 @@ import { setFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useA11yStore } from '@/stores/a11yStore';
+import { useDashboardStore } from '@/stores/dashboardStore';
 
 /**
  * Tri-state deletion status that gates the authed UI.
@@ -181,6 +182,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
     void useThemeStore.getState().loadFromFirestore(fbUser.uid);
     void useA11yStore.getState().loadFromFirestore(fbUser.uid);
+    void useDashboardStore.getState().load(fbUser.uid);
 
     // Link with FastAPI backend for NLP/AI features
     await ensureBackendAccount(fbUser);
@@ -222,6 +224,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
         void useThemeStore.getState().loadFromFirestore(fbUser.uid);
         void useA11yStore.getState().loadFromFirestore(fbUser.uid);
+        void useDashboardStore.getState().load(fbUser.uid);
 
         // Restore JWT tokens from localStorage
         const accessToken = localStorage.getItem('prismtask_access_token');

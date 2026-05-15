@@ -19,6 +19,7 @@ import { useA11yStore } from '@/stores/a11yStore';
 import { useSelfCareStore } from '@/stores/selfCareStore';
 import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
 import { useTemplateStore } from '@/stores/templateStore';
+import { useDashboardStore } from '@/stores/dashboardStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -86,10 +87,14 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToTaskTemplates = useTemplateStore(
     (s) => s.subscribeToTaskTemplates,
   );
+  const subscribeToDashboardPrefs = useDashboardStore(
+    (s) => s.subscribeToPrefs,
+  );
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
   const resetBoundaryRules = useBoundaryRulesStore((s) => s.reset);
   const resetTaskTemplates = useTemplateStore((s) => s.reset);
+  const resetDashboard = useDashboardStore((s) => s.reset);
   const resetSlots = useMedicationSlotsStore((s) => s.reset);
   const resetPrefs = useMedicationPreferencesStore((s) => s.reset);
   const resetDependencies = useTaskDependencyStore((s) => s.reset);
@@ -112,6 +117,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetSelfCare();
       resetBoundaryRules();
       resetTaskTemplates();
+      resetDashboard();
       return;
     }
 
@@ -155,6 +161,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToSelfCareSteps, 'self-care-steps');
     safeSubscribe(subscribeToBoundaryRules, 'boundary-rules');
     safeSubscribe(subscribeToTaskTemplates, 'task-templates');
+    safeSubscribe(subscribeToDashboardPrefs, 'dashboard-preferences');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -190,6 +197,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToSelfCareSteps,
     subscribeToBoundaryRules,
     subscribeToTaskTemplates,
+    subscribeToDashboardPrefs,
     resetSelfCare,
     resetSlots,
     resetPrefs,
@@ -200,5 +208,6 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     resetNdPrefs,
     resetBoundaryRules,
     resetTaskTemplates,
+    resetDashboard,
   ]);
 }
