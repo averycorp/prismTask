@@ -238,3 +238,105 @@ state. All seven gap claims still hold for the Android target.
 - `docs/.nojekyll` makes docs/ serve raw — a future docs-site PR
   could move PHILOSOPHY.md to a rendered HTML build (the privacy
   policy is already HTML at `/privacy/`). Out of scope.
+
+---
+
+## Phase 3 — Bundle summary
+
+All 7 items shipped in a single PR across 4 commits on
+`worktree-f4-concept-philosophy-gap`:
+
+| Commit | Items | Net LOC | Notes |
+|--------|-------|---------|-------|
+| 874adb55 | §6, §7 | +320 / -14 | About link + onboarding page + audit doc |
+| 89d203dc | §2, §3 | +378 / -2  | Low-energy filter + streak pause |
+| 0a0e115f | §4     | +26 / -20  | "Why:" prefix on AI reasoning surfaces |
+| dc4bc2b3 | §1, §5 | +656 / -4  | Reflection screen + custom Brain Modes |
+
+**Net production LOC**: ~1130 + ~150 (audit doc) ≈ 1280 LOC. Bundle
+sits inside the prompt's ~940–1660 estimate range, well under the
+STOP-PHASE-F-RISK ceiling (1900).
+
+**Per-item closure verdicts** (Phase 4 will repeat in handoff):
+
+| Item | Verdict | LOC | Re-trigger criteria post-shipment |
+|------|---------|-----|-----------------------------------|
+| §1 Reflection | GREEN-SHIPPED | ~330 | MOOT (surface exists now) |
+| §2 Low-energy | GREEN-SHIPPED | ~95  | MOOT |
+| §3 Streak-pause | GREEN-SHIPPED | ~225 | MOOT |
+| §4 AI Why | GREEN-SHIPPED | ~46  | MOOT (3 surfaces labeled) |
+| §5 Custom Brain Modes | GREEN-SHIPPED (additive) | ~230 | MOOT for v1 informational scope; dispatch wiring still ACTIVE re-trigger |
+| §6 PHILOSOPHY link | GREEN-SHIPPED | ~25 | MOOT |
+| §7 Onboarding page | GREEN-SHIPPED | ~70 | MOOT |
+
+**STOPs evaluated** (Phase 0 + during execution):
+
+- STOP-A1 (Item 1 already exists): CLEARED — no Reflection screen
+  found; WeeklyReview/MorningCheckIn don't cover daily end-of-day.
+- STOP-A2 (Cognitive Load missing): CLEARED — classifier present
+  (`domain/model/CognitiveLoad.kt`).
+- STOP-A3 (RestDayRepository conflict): **PIVOTED** — discovered
+  existing `RestDayRepository` + `RestDayDao` (MH-First § G3). Item
+  2 + 3 re-architected to compose with the existing primitive
+  instead of duplicating it. RestDayPreferences is the UI-state
+  layer (pause-window display + low-energy filter pref); actual
+  rest-day marking goes through `markRangeAsRestDay` /
+  `unmarkRangeAsRestDay` (new) on the existing repo.
+- STOP-A4 (AI Why backend expansion): CLEARED — backend already
+  returned `reason` / `rationale` for every targeted surface
+  (Briefing top_priorities, Briefing suggested_order, Pomodoro
+  session). Fix was surface-only.
+- STOP-A5 (BrainMode not hardcoded): CLEARED — 3-toggle dispatch
+  intact across 31 call sites.
+- STOP-A6 (PHILOSOPHY.md exists): CLEARED.
+- STOP-A6b (GitHub Pages configured): CLEARED via `docs/.nojekyll`
+  (PR #1487) — though the chosen URL is the GitHub blob URL
+  (`/blob/main/docs/PHILOSOPHY.md`) which renders markdown
+  natively, sidestepping the raw-md vs rendered-html question.
+- STOP-A7 (PR #1167 onboarding architecture): CLEARED — additive
+  page-13 insertion via existing `OnboardingPageLayout` helper, no
+  architectural change.
+- STOP-PHILOSOPHY-DEP: CLEARED.
+- STOP-PHASE-F-RISK: NOT FIRED.
+- STOP-RE-TRIGGER-FRAMING: HELD (operator override accepted).
+
+**Cross-item dependency realized**: Items 2 + 3 both compose with
+`RestDayRepository`. Item 3 extends the repo with batch range
+markers; Item 2 uses the existing `markTodayAsRestDay` is NOT
+wired (Item 2 is a filter, not a takeover) — instead, Item 2 owns
+its own `lowEnergyFilterEnabled` pref and the Today task stream
+filters in-memory by `cognitiveLoad == EASY`. Both Items default
+off (Principle 7).
+
+**Non-obvious findings** (worth Phase 4 handoff visibility):
+
+1. Item 4 was a **surface-only fix**. The backend AI services
+   already returned reasoning for every surveyed surface
+   (`ai_productivity.py` lines 84, 117, 166, 243, 314, 413, 485,
+   524, 576). Three render sites had inline reason text without an
+   explicit "Why" label, so adding the prefix made the AI explainer
+   discoverable without any backend or wire-protocol change.
+2. The existing `RestDayRepository` + `RestDayDao` (MH-First § G3)
+   already implemented "this day counts as kept" against the
+   forgiveness-first streak core. Items 2 + 3 did NOT duplicate
+   this; instead Item 3 composes by adding a range API on top of
+   the existing single-date primitive.
+3. `OnboardingScreen.kt` is a single 2202-line file with 13 named
+   page composables sharing one `OnboardingPageLayout` helper.
+   Adding Item 7 was a single +50 LOC insert plus +1 to
+   `TOTAL_PAGES` plus +1 shift on the `when (page)` arm — no nav
+   refactor.
+
+**Phase F GREEN-GO posture impact**: POSITIVE. F4 closes 7/7
+items pre-Phase F; nothing new added to F2 buffer; no
+architectural debt.
+
+**F4 final state**: ★ CLOSED 2026-05-15 (one day after concept
+repositioning, all 7 items shipped in a single bundle PR).
+
+---
+
+## Phase 4 — Claude Chat handoff
+
+Emitted as the final tool output of this session (see chat).
+
