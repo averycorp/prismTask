@@ -461,16 +461,6 @@ function Philosophy() {
             ))}
           </div>
         </Reveal>
-        <Reveal delay={200}>
-          <p style={{
-            marginTop: 32, fontFamily: 'Space Grotesk, sans-serif',
-            fontSize: 14, color: '#7A7A83', textAlign: 'center', letterSpacing: 0.1,
-          }}>
-            Read the full philosophy in <a href="PHILOSOPHY.md" style={{
-              color: '#5B47E0', textDecoration: 'none', borderBottom: '1px solid rgba(91,71,224,0.3)',
-            }}>docs/PHILOSOPHY.md</a> — including the "why" and the anti-patterns each principle rules out.
-          </p>
-        </Reveal>
       </div>
     </section>
   );
