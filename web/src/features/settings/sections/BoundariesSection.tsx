@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -6,11 +6,11 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   createRule,
   deleteRule,
-  getRules,
   updateRule,
   type BoundaryRule,
   type BoundaryRuleType,
 } from '@/api/firestore/boundaryRules';
+import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 
 const RULE_OPTIONS: { type: BoundaryRuleType; label: string; hint: string }[] = [
@@ -32,8 +32,11 @@ const RULE_OPTIONS: { type: BoundaryRuleType; label: string; hint: string }[] = 
 ];
 
 export function BoundariesSection() {
-  const [rules, setRules] = useState<BoundaryRule[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Read directly from the live store. The Firestore listener wired
+  // by useFirestoreSync keeps this in sync across devices, so a rule
+  // added on the Android client surfaces here without a page refresh
+  // (parity audit § A.1b).
+  const rules = useBoundaryRulesStore((s) => s.rules);
   const [newType, setNewType] = useState<BoundaryRuleType>('daily_task_cap');
   const [newValue, setNewValue] = useState(12);
   const [newEndHour, setNewEndHour] = useState(18);
@@ -49,18 +52,6 @@ export function BoundariesSection() {
     }
   })();
 
-  useEffect(() => {
-    if (!uid) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: load boundary rules on mount and when uid changes
-    setLoading(true);
-    getRules(uid)
-      .then(setRules)
-      .catch((e) =>
-        toast.error((e as Error).message || 'Failed to load rules'),
-      )
-      .finally(() => setLoading(false));
-  }, [uid]);
-
   const handleCreate = async () => {
     if (!uid) return;
     const label = newLabel.trim() || defaultLabel(newType, newValue, newEndHour);
@@ -72,7 +63,8 @@ export function BoundariesSection() {
         value: newValue,
         secondary_value: newType === 'work_hours_window' ? newEndHour : null,
       });
-      setRules((prev) => [...prev, created]);
+      // Listener will fold this into the store on the next snapshot —
+      // no local mutation needed.
       setNewLabel('');
       toast.success(`Added rule "${created.label}"`);
     } catch (e) {
@@ -86,9 +78,7 @@ export function BoundariesSection() {
     if (!uid) return;
     try {
       await updateRule(uid, rule.id, { enabled });
-      setRules((prev) =>
-        prev.map((r) => (r.id === rule.id ? { ...r, enabled } : r)),
-      );
+      // Listener reconciles — no optimistic local update.
     } catch (e) {
       toast.error((e as Error).message || 'Update failed');
     }
@@ -98,7 +88,7 @@ export function BoundariesSection() {
     if (!uid || !deleteTarget) return;
     try {
       await deleteRule(uid, deleteTarget.id);
-      setRules((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      // Listener reconciles — no optimistic local update.
       toast.success('Rule deleted');
     } catch (e) {
       toast.error((e as Error).message || 'Delete failed');
@@ -122,11 +112,7 @@ export function BoundariesSection() {
         from Today, and the burnout score reacts when they're crossed.
       </p>
 
-      {loading ? (
-        <div className="flex items-center gap-2 py-4 text-[var(--color-text-secondary)]">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading rules…
-        </div>
-      ) : rules.length === 0 ? (
+      {rules.length === 0 ? (
         <p className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-text-secondary)]">
           No rules yet. Add one below.
         </p>

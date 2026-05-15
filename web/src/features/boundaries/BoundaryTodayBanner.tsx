@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Flame, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import { useTaskStore } from '@/stores/taskStore';
+import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
 import { getFirebaseUid } from '@/stores/firebaseUid';
-import { getRules, type BoundaryRule } from '@/api/firestore/boundaryRules';
 import {
   getLogsInRange,
   type MoodEnergyLog,
@@ -19,26 +19,24 @@ import { scoreBurnout, type BurnoutScore } from '@/utils/burnoutScorer';
 export function BoundaryTodayBanner() {
   const todayTasks = useTaskStore((s) => s.todayTasks);
   const overdueTasks = useTaskStore((s) => s.overdueTasks);
+  // Live cache populated by useFirestoreSync — cross-device rule
+  // edits surface here without a page refresh (parity audit § A.1b).
+  const rules = useBoundaryRulesStore((s) => s.rules);
 
-  const [rules, setRules] = useState<BoundaryRule[]>([]);
   const [moodLogs, setMoodLogs] = useState<MoodEnergyLog[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
         const uid = getFirebaseUid();
-        const [r, m] = await Promise.all([
-          getRules(uid),
-          getLogsInRange(
-            uid,
-            format(subDays(new Date(), 7), 'yyyy-MM-dd'),
-            format(new Date(), 'yyyy-MM-dd'),
-          ),
-        ]);
-        setRules(r);
+        const m = await getLogsInRange(
+          uid,
+          format(subDays(new Date(), 7), 'yyyy-MM-dd'),
+          format(new Date(), 'yyyy-MM-dd'),
+        );
         setMoodLogs(m);
       } catch {
-        // No auth / no rules — banner stays quiet.
+        // No auth / no logs — banner falls back to a no-mood scorer.
       }
     })();
   }, []);
