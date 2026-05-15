@@ -19,6 +19,28 @@ internal val Context.notificationDataStore: DataStore<Preferences> by preference
 )
 
 /**
+ * Notification-delivery types whose channel sound and vibration the user
+ * can override per-type. Only the three classes whose channels route
+ * through [com.averycorp.prismtask.notifications.NotificationHelper.Style]
+ * are exposed today; other workers create their own channels and would
+ * need separate plumbing to respect these overrides.
+ */
+enum class NotificationOverrideType {
+    TASK_REMINDERS,
+    TIMER_ALERTS,
+    MEDICATION_REMINDERS
+}
+
+/**
+ * Effective per-type override pair resolved by
+ * [NotificationPreferences.getOverridesForOnce]. When the user has the
+ * type set to "follow phone settings", both fields are false — the
+ * channel then uses Android's defaults instead of the alarm stream and
+ * the long buzz pattern.
+ */
+data class NotificationOverrides(val loud: Boolean, val repeat: Boolean)
+
+/**
  * Persists user-controlled notification settings:
  *  - per-type enable/disable flags for every notification surface,
  *  - a global importance/intrusiveness setting that maps to channel
@@ -55,11 +77,40 @@ class NotificationPreferences(
         // Full-screen heads-up reminder (opens in full-screen over lock screen)
         private val FULL_SCREEN_NOTIFICATIONS_ENABLED = booleanPreferencesKey("full_screen_notifications_enabled")
 
-        // Play reminders at alarm volume (bypasses silent ringer)
+        // Play reminders at alarm volume (bypasses silent ringer).
+        // Legacy global — superseded by the per-type [perTypeVolumeLoud]
+        // family, which falls back to this key so existing users don't
+        // lose behavior on upgrade.
         private val OVERRIDE_VOLUME_ENABLED = booleanPreferencesKey("override_volume_enabled")
 
-        // Use a long, repeating vibration pattern for reminders
+        // Use a long, repeating vibration pattern for reminders.
+        // Legacy global — superseded by the per-type [perTypeVibrationRepeat]
+        // family; same fallback story as [OVERRIDE_VOLUME_ENABLED].
         private val REPEATING_VIBRATION_ENABLED = booleanPreferencesKey("repeating_vibration_enabled")
+
+        // ---- v1.9.x per-type volume / vibration override ----
+        //
+        // Three booleans per delivery type drive a "follow phone settings"
+        // switch plus two app-controlled override flags. When
+        // `<type>_follow_system` is true the notification ignores the app
+        // overrides (channel uses the system defaults the user configures
+        // in Android Settings). When false, the loud/repeat flags decide
+        // whether to route through the alarm stream and use the long buzz
+        // pattern, respectively. Missing keys fall back to the legacy
+        // [OVERRIDE_VOLUME_ENABLED]/[REPEATING_VIBRATION_ENABLED] globals
+        // so an upgrading user inherits their previous behavior until they
+        // explicitly touch a per-type control.
+        private val TASK_FOLLOW_SYSTEM = booleanPreferencesKey("task_reminders_follow_system")
+        private val TASK_VOLUME_LOUD = booleanPreferencesKey("task_reminders_volume_loud")
+        private val TASK_VIBRATION_REPEAT = booleanPreferencesKey("task_reminders_vibration_repeat")
+
+        private val TIMER_FOLLOW_SYSTEM = booleanPreferencesKey("timer_alerts_follow_system")
+        private val TIMER_VOLUME_LOUD = booleanPreferencesKey("timer_alerts_volume_loud")
+        private val TIMER_VIBRATION_REPEAT = booleanPreferencesKey("timer_alerts_vibration_repeat")
+
+        private val MED_FOLLOW_SYSTEM = booleanPreferencesKey("medication_reminders_follow_system")
+        private val MED_VOLUME_LOUD = booleanPreferencesKey("medication_reminders_volume_loud")
+        private val MED_VIBRATION_REPEAT = booleanPreferencesKey("medication_reminders_vibration_repeat")
 
         // Importance / intrusiveness
         private val NOTIFICATION_IMPORTANCE = stringPreferencesKey("notification_importance")
@@ -344,6 +395,120 @@ class NotificationPreferences(
 
     suspend fun getRepeatingVibrationEnabledOnce(): Boolean =
         repeatingVibrationEnabled.first()
+
+    // endregion
+
+    // region Per-type volume / vibration override
+    //
+    // Per delivery-type triple of flags that lets the user pick whether
+    // each notification type follows the phone's settings or uses the
+    // app's overrides (alarm-stream volume, long repeating vibration).
+    //
+    // Resolution falls back to the legacy globals so a user who had
+    // [OVERRIDE_VOLUME_ENABLED] / [REPEATING_VIBRATION_ENABLED] turned on
+    // before this feature shipped keeps their previous behavior until
+    // they touch a per-type control. Once the user explicitly writes a
+    // per-type key, that overrides the legacy fallback.
+
+    private fun followSystemFlow(key: Preferences.Key<Boolean>): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[key] ?: run {
+            // No explicit per-type value yet. If the legacy globals are
+            // both off, follow phone is the natural default (true). If
+            // either legacy global is on, the user previously asked for
+            // an override; preserve that by returning false.
+            val legacyLoud = prefs[OVERRIDE_VOLUME_ENABLED] ?: false
+            val legacyRepeat = prefs[REPEATING_VIBRATION_ENABLED] ?: false
+            !(legacyLoud || legacyRepeat)
+        }
+    }
+
+    private fun loudFlow(key: Preferences.Key<Boolean>): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[key] ?: (prefs[OVERRIDE_VOLUME_ENABLED] ?: false)
+    }
+
+    private fun repeatFlow(key: Preferences.Key<Boolean>): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[key] ?: (prefs[REPEATING_VIBRATION_ENABLED] ?: false)
+    }
+
+    val taskRemindersFollowSystem: Flow<Boolean> = followSystemFlow(TASK_FOLLOW_SYSTEM)
+    val taskRemindersVolumeLoud: Flow<Boolean> = loudFlow(TASK_VOLUME_LOUD)
+    val taskRemindersVibrationRepeat: Flow<Boolean> = repeatFlow(TASK_VIBRATION_REPEAT)
+
+    val timerAlertsFollowSystem: Flow<Boolean> = followSystemFlow(TIMER_FOLLOW_SYSTEM)
+    val timerAlertsVolumeLoud: Flow<Boolean> = loudFlow(TIMER_VOLUME_LOUD)
+    val timerAlertsVibrationRepeat: Flow<Boolean> = repeatFlow(TIMER_VIBRATION_REPEAT)
+
+    val medicationRemindersFollowSystem: Flow<Boolean> = followSystemFlow(MED_FOLLOW_SYSTEM)
+    val medicationRemindersVolumeLoud: Flow<Boolean> = loudFlow(MED_VOLUME_LOUD)
+    val medicationRemindersVibrationRepeat: Flow<Boolean> = repeatFlow(MED_VIBRATION_REPEAT)
+
+    suspend fun setTaskRemindersFollowSystem(enabled: Boolean) {
+        dataStore.edit { it[TASK_FOLLOW_SYSTEM] = enabled }
+    }
+
+    suspend fun setTaskRemindersVolumeLoud(enabled: Boolean) {
+        dataStore.edit { it[TASK_VOLUME_LOUD] = enabled }
+    }
+
+    suspend fun setTaskRemindersVibrationRepeat(enabled: Boolean) {
+        dataStore.edit { it[TASK_VIBRATION_REPEAT] = enabled }
+    }
+
+    suspend fun setTimerAlertsFollowSystem(enabled: Boolean) {
+        dataStore.edit { it[TIMER_FOLLOW_SYSTEM] = enabled }
+    }
+
+    suspend fun setTimerAlertsVolumeLoud(enabled: Boolean) {
+        dataStore.edit { it[TIMER_VOLUME_LOUD] = enabled }
+    }
+
+    suspend fun setTimerAlertsVibrationRepeat(enabled: Boolean) {
+        dataStore.edit { it[TIMER_VIBRATION_REPEAT] = enabled }
+    }
+
+    suspend fun setMedicationRemindersFollowSystem(enabled: Boolean) {
+        dataStore.edit { it[MED_FOLLOW_SYSTEM] = enabled }
+    }
+
+    suspend fun setMedicationRemindersVolumeLoud(enabled: Boolean) {
+        dataStore.edit { it[MED_VOLUME_LOUD] = enabled }
+    }
+
+    suspend fun setMedicationRemindersVibrationRepeat(enabled: Boolean) {
+        dataStore.edit { it[MED_VIBRATION_REPEAT] = enabled }
+    }
+
+    /**
+     * Resolves the effective (loud, repeat) override pair for [type] at
+     * read time. When the user has "follow phone" on for the type, both
+     * are forced to false regardless of the individual flag values —
+     * that's how the helper turns the channel into a "system defaults"
+     * channel that ignores the app's override settings.
+     */
+    suspend fun getOverridesForOnce(type: NotificationOverrideType): NotificationOverrides {
+        val follow: Boolean
+        val loud: Boolean
+        val repeat: Boolean
+        when (type) {
+            NotificationOverrideType.TASK_REMINDERS -> {
+                follow = taskRemindersFollowSystem.first()
+                loud = taskRemindersVolumeLoud.first()
+                repeat = taskRemindersVibrationRepeat.first()
+            }
+            NotificationOverrideType.TIMER_ALERTS -> {
+                follow = timerAlertsFollowSystem.first()
+                loud = timerAlertsVolumeLoud.first()
+                repeat = timerAlertsVibrationRepeat.first()
+            }
+            NotificationOverrideType.MEDICATION_REMINDERS -> {
+                follow = medicationRemindersFollowSystem.first()
+                loud = medicationRemindersVolumeLoud.first()
+                repeat = medicationRemindersVibrationRepeat.first()
+            }
+        }
+        return if (follow) NotificationOverrides(loud = false, repeat = false)
+        else NotificationOverrides(loud = loud, repeat = repeat)
+    }
 
     // endregion
 

@@ -133,4 +133,71 @@ class NotificationPreferencesTest {
         assertTrue(86_400_000L in NotificationPreferences.ALL_REMINDER_OFFSETS)
         assertTrue(NotificationPreferences.OFFSET_NONE in NotificationPreferences.ALL_REMINDER_OFFSETS)
     }
+
+    // region Per-type volume / vibration override
+
+    @Test
+    fun `per-type defaults follow phone with no overrides`() = runTest {
+        assertTrue(prefs.taskRemindersFollowSystem.first())
+        assertEquals(false, prefs.taskRemindersVolumeLoud.first())
+        assertEquals(false, prefs.taskRemindersVibrationRepeat.first())
+        val overrides = prefs.getOverridesForOnce(NotificationOverrideType.TASK_REMINDERS)
+        assertEquals(false, overrides.loud)
+        assertEquals(false, overrides.repeat)
+    }
+
+    @Test
+    fun `legacy global override volume seeds per-type loud and follow-system off`() = runTest {
+        prefs.setOverrideVolumeEnabled(true)
+        // Per-type follow-system inherits "false" because legacy override
+        // implies the user previously opted out of phone defaults.
+        assertEquals(false, prefs.taskRemindersFollowSystem.first())
+        assertEquals(true, prefs.taskRemindersVolumeLoud.first())
+        val overrides = prefs.getOverridesForOnce(NotificationOverrideType.TASK_REMINDERS)
+        assertEquals(true, overrides.loud)
+        assertEquals(false, overrides.repeat)
+    }
+
+    @Test
+    fun `legacy global repeating vibration seeds per-type repeat and follow-system off`() = runTest {
+        prefs.setRepeatingVibrationEnabled(true)
+        assertEquals(false, prefs.timerAlertsFollowSystem.first())
+        assertEquals(true, prefs.timerAlertsVibrationRepeat.first())
+        val overrides = prefs.getOverridesForOnce(NotificationOverrideType.TIMER_ALERTS)
+        assertEquals(false, overrides.loud)
+        assertEquals(true, overrides.repeat)
+    }
+
+    @Test
+    fun `explicit per-type write overrides legacy fallback`() = runTest {
+        prefs.setOverrideVolumeEnabled(true)
+        prefs.setTaskRemindersVolumeLoud(false)
+        // Per-type explicit value wins over the legacy global.
+        assertEquals(false, prefs.taskRemindersVolumeLoud.first())
+    }
+
+    @Test
+    fun `follow-system on forces overrides off at resolution`() = runTest {
+        prefs.setMedicationRemindersFollowSystem(true)
+        prefs.setMedicationRemindersVolumeLoud(true)
+        prefs.setMedicationRemindersVibrationRepeat(true)
+        // Stored values persist (the user can flip follow-system off to
+        // restore them), but the resolved pair is forced to (false, false).
+        assertEquals(true, prefs.medicationRemindersVolumeLoud.first())
+        val overrides = prefs.getOverridesForOnce(NotificationOverrideType.MEDICATION_REMINDERS)
+        assertEquals(false, overrides.loud)
+        assertEquals(false, overrides.repeat)
+    }
+
+    @Test
+    fun `follow-system off surfaces stored overrides`() = runTest {
+        prefs.setTimerAlertsFollowSystem(false)
+        prefs.setTimerAlertsVolumeLoud(true)
+        prefs.setTimerAlertsVibrationRepeat(true)
+        val overrides = prefs.getOverridesForOnce(NotificationOverrideType.TIMER_ALERTS)
+        assertEquals(true, overrides.loud)
+        assertEquals(true, overrides.repeat)
+    }
+
+    // endregion
 }
