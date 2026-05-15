@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -26,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +42,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.averycorp.prismtask.domain.model.SelfCareRoutines
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.formatStartOfDay
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.ui.theme.ThemedSubScreenTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -219,6 +224,22 @@ private fun FloatSliderRow(
     }
 }
 
+/**
+ * Clickable settings row that displays a `hh:mm` time and opens an inline
+ * [AnalogClockPicker] dialog on tap. Replaces the prior two-slider UI,
+ * which exhibited a float-truncation bug — `Slider(valueRange = 0f..23f,
+ * steps = 22)` snaps ticks via `lerp(0f, 23f, i/23f)` in single-precision
+ * float, producing `i ± ε`. `it.toInt()` then truncated `i-ε` down to
+ * `i-1`, so the user saw hours skipped or repeated. Same shape on the
+ * minute slider. See PR #1488 for the equivalent fix in the Onboarding
+ * Start-of-Day picker; this row is the Advanced Tuning twin.
+ *
+ * The [AlertDialog] is inlined here (not extracted into a shared helper)
+ * because a parallel worker is fixing the same bug class in
+ * `NotificationBriefingScreen.kt` — keeping the dialog inline avoids a
+ * merge conflict in `ui/components/`. Deduplication is a follow-up once
+ * both PRs land.
+ */
 @Composable
 private fun TimeRow(
     label: String,
@@ -226,29 +247,52 @@ private fun TimeRow(
     minute: Int,
     onChange: (Int, Int) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    var showPicker by rememberSaveable(label) { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showPicker = true }
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Hour: $hour", style = MaterialTheme.typography.labelSmall)
-                Slider(
-                    value = hour.toFloat(),
-                    onValueChange = { onChange(it.toInt(), minute) },
-                    valueRange = 0f..23f,
-                    steps = 22
+        Text(
+            text = formatStartOfDay(hour, minute),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+
+    if (showPicker) {
+        val clockState = rememberAnalogClockState(
+            initialHour = hour.coerceIn(0, 23),
+            initialMinute = minute.coerceIn(0, 59),
+            is24Hour = false
+        )
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleLarge,
                 )
+            },
+            text = {
+                AnalogClockPicker(state = clockState)
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onChange(clockState.hour, clockState.minute)
+                    showPicker = false
+                }) {
+                    Text("Set")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
             }
-            Spacer(modifier = Modifier.size(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Minute: $minute", style = MaterialTheme.typography.labelSmall)
-                Slider(
-                    value = minute.toFloat(),
-                    onValueChange = { onChange(hour, it.toInt()) },
-                    valueRange = 0f..59f,
-                    steps = 58
-                )
-            }
-        }
+        )
     }
 }
 
