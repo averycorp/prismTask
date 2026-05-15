@@ -63,13 +63,29 @@ export const useAdvancedTuningStore = create<AdvancedTuningState>((set, get) => 
   update: async (uid, patch) => {
     // Merge nested keyword groups field-by-field so a partial keyword
     // patch (e.g. just `taskModeKeywords.work`) doesn't blow away the
-    // other tier strings in local state.
+    // other tier strings in local state. The same field-by-field merge
+    // applies to per-mode forgiveness overrides so a slider tweak on
+    // Play.grace doesn't reset Relax.misses or Work.grace.
     const prev = get().prefs;
     const next: AdvancedTuningPreferences = {
       ...prev,
       forgivenessEnabled: patch.forgivenessEnabled ?? prev.forgivenessEnabled,
       gracePeriodDays: patch.gracePeriodDays ?? prev.gracePeriodDays,
       allowedMisses: patch.allowedMisses ?? prev.allowedMisses,
+      forgivenessByMode: {
+        work: {
+          ...prev.forgivenessByMode.work,
+          ...(patch.forgivenessByMode?.work ?? {}),
+        },
+        play: {
+          ...prev.forgivenessByMode.play,
+          ...(patch.forgivenessByMode?.play ?? {}),
+        },
+        relax: {
+          ...prev.forgivenessByMode.relax,
+          ...(patch.forgivenessByMode?.relax ?? {}),
+        },
+      },
       taskModeKeywords: {
         ...prev.taskModeKeywords,
         ...(patch.taskModeKeywords ?? {}),
@@ -104,6 +120,13 @@ export const useAdvancedTuningStore = create<AdvancedTuningState>((set, get) => 
  * defaults here are identical, so the fallback is a belt-and-suspenders
  * guard against a future divergence rather than a behavioural concern
  * today.
+ *
+ * The returned config carries the user's per-`TaskMode` overrides in
+ * `byMode` (`docs/WORK_PLAY_RELAX.md` § *Streak strictness*). Callers
+ * who don't know about modes (habit + check-in surfaces) pass no
+ * `taskMode` to `calculateStreaks` and `byMode` is simply ignored.
+ * Callers who do thread mode (future task-completion streak surfaces)
+ * get the wider Play / Relax window automatically.
  */
 export function selectForgivenessConfig(
   prefs: AdvancedTuningPreferences,
@@ -112,5 +135,10 @@ export function selectForgivenessConfig(
     enabled: prefs.forgivenessEnabled,
     gracePeriodDays: prefs.gracePeriodDays,
     allowedMisses: prefs.allowedMisses,
+    byMode: {
+      work: { ...prefs.forgivenessByMode.work },
+      play: { ...prefs.forgivenessByMode.play },
+      relax: { ...prefs.forgivenessByMode.relax },
+    },
   };
 }

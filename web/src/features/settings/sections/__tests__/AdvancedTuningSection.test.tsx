@@ -76,10 +76,14 @@ describe('AdvancedTuningSection', () => {
 
   it('renders forgiveness sliders with current values', () => {
     render(<AdvancedTuningSection />);
-    // gracePeriodDays default 7 → "7 days"
-    expect(screen.getByText('7 days')).toBeTruthy();
-    // allowedMisses default 1 → "1 miss"
-    expect(screen.getByText('1 miss')).toBeTruthy();
+    // gracePeriodDays default 7 → "7 days". The screen now also renders
+    // per-mode strictness sliders so we anchor on the base slider's
+    // accessible name to disambiguate.
+    const base = screen.getByLabelText('Grace Window') as HTMLInputElement;
+    expect(base.value).toBe('7');
+    // allowedMisses default 1 → "1 miss" via the base slider.
+    const misses = screen.getByLabelText('Allowed Misses') as HTMLInputElement;
+    expect(misses.value).toBe('1');
   });
 
   it('debounces the gracePeriodDays slider before persisting', () => {
@@ -91,7 +95,11 @@ describe('AdvancedTuningSection', () => {
     // Firestore push waits for the debounce.
     fireEvent.change(slider, { target: { value: '14' } });
     expect(patchMock).not.toHaveBeenCalled();
-    expect(screen.getByText('14 days')).toBeTruthy();
+    // The base slider's local readout updated even though per-mode
+    // sliders may also display "14 days". Check the slider value
+    // directly rather than via getByText to avoid the per-mode
+    // duplicate-text collision.
+    expect(slider.value).toBe('14');
 
     // Advance through the 200ms debounce.
     act(() => {
@@ -151,5 +159,67 @@ describe('AdvancedTuningSection', () => {
     const misses = screen.getByLabelText('Allowed Misses') as HTMLInputElement;
     expect(grace.disabled).toBe(true);
     expect(misses.disabled).toBe(true);
+    // Per-mode sliders also disable when the master switch is off.
+    const playGrace = screen.getByLabelText(
+      'Play grace window',
+    ) as HTMLInputElement;
+    const relaxMisses = screen.getByLabelText(
+      'Relax allowed misses',
+    ) as HTMLInputElement;
+    expect(playGrace.disabled).toBe(true);
+    expect(relaxMisses.disabled).toBe(true);
+  });
+
+  it('renders per-mode strictness sliders with the wider Play / Relax defaults', () => {
+    render(<AdvancedTuningSection />);
+    // Work falls back to the base 7/1 window.
+    const workGrace = screen.getByLabelText(
+      'Work grace window',
+    ) as HTMLInputElement;
+    const workMisses = screen.getByLabelText(
+      'Work allowed misses',
+    ) as HTMLInputElement;
+    expect(workGrace.value).toBe('7');
+    expect(workMisses.value).toBe('1');
+
+    // Play + Relax get the wider 14/2 defaults from
+    // `docs/WORK_PLAY_RELAX.md` § *Streak strictness*.
+    const playGrace = screen.getByLabelText(
+      'Play grace window',
+    ) as HTMLInputElement;
+    const playMisses = screen.getByLabelText(
+      'Play allowed misses',
+    ) as HTMLInputElement;
+    const relaxGrace = screen.getByLabelText(
+      'Relax grace window',
+    ) as HTMLInputElement;
+    const relaxMisses = screen.getByLabelText(
+      'Relax allowed misses',
+    ) as HTMLInputElement;
+    expect(playGrace.value).toBe('14');
+    expect(playMisses.value).toBe('2');
+    expect(relaxGrace.value).toBe('14');
+    expect(relaxMisses.value).toBe('2');
+  });
+
+  it('persists a per-mode slider tweak without clobbering siblings', () => {
+    render(<AdvancedTuningSection />);
+    const playGrace = screen.getByLabelText(
+      'Play grace window',
+    ) as HTMLInputElement;
+    fireEvent.change(playGrace, { target: { value: '21' } });
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(patchMock).toHaveBeenCalledWith('uid-123', {
+      forgivenessByMode: { play: { gracePeriodDays: 21 } },
+    });
+    // Local merge: only Play.grace changed; Play.misses + Work + Relax
+    // all keep their seed values.
+    const prefs = useAdvancedTuningStore.getState().prefs;
+    expect(prefs.forgivenessByMode.play.gracePeriodDays).toBe(21);
+    expect(prefs.forgivenessByMode.play.allowedMisses).toBe(2);
+    expect(prefs.forgivenessByMode.work.gracePeriodDays).toBe(7);
+    expect(prefs.forgivenessByMode.relax.gracePeriodDays).toBe(14);
   });
 });

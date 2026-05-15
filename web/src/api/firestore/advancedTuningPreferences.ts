@@ -59,6 +59,22 @@ const FIELD_FORGIVENESS_ENABLED = 'forgiveness_enabled';
 const FIELD_GRACE_PERIOD_DAYS = 'forgiveness_grace_days';
 const FIELD_ALLOWED_MISSES = 'forgiveness_allowed_misses';
 
+// Per-`TaskMode` forgiveness overrides — Phase 2 item #5 from the web
+// pillars audit (`docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md`). Mirrors
+// the `docs/WORK_PLAY_RELAX.md` § *Streak strictness* table: Work uses
+// the standard window, Play and Relax default to a wider one (14 days /
+// 2 allowed misses). Each mode's grace + miss pair has its own slider
+// in the Settings UI; the values round-trip through Firestore so the
+// user's tuning survives a sign-out. Field names follow the existing
+// `forgiveness_*` namespace with a `_{mode}` suffix so a future Android
+// counterpart can land alongside.
+const FIELD_FG_WORK_GRACE = 'forgiveness_grace_days_work';
+const FIELD_FG_WORK_MISSES = 'forgiveness_allowed_misses_work';
+const FIELD_FG_PLAY_GRACE = 'forgiveness_grace_days_play';
+const FIELD_FG_PLAY_MISSES = 'forgiveness_allowed_misses_play';
+const FIELD_FG_RELAX_GRACE = 'forgiveness_grace_days_relax';
+const FIELD_FG_RELAX_MISSES = 'forgiveness_allowed_misses_relax';
+
 // Task Mode custom keywords (CSV strings; one row per mode).
 // Mirrors `AdvancedTuningPreferences.kt:346-348`.
 const FIELD_MODE_CK_WORK = 'mode_custom_keywords_work';
@@ -86,6 +102,31 @@ export interface CognitiveLoadCustomKeywords {
   hard: string;
 }
 
+/**
+ * Per-`TaskMode` forgiveness override pair. One entry per mode; both
+ * values follow the same 1..30 / 0..5 ranges as the base sliders so
+ * `clampInt` can guard them identically.
+ */
+export interface ForgivenessModeKnobs {
+  gracePeriodDays: number;
+  allowedMisses: number;
+}
+
+/**
+ * Mode-aware forgiveness overrides (`docs/WORK_PLAY_RELAX.md` §
+ * *Streak strictness*). Defaults: Work uses the base 7/1 window; Play
+ * and Relax both get the wider 14/2 window. The user can override each
+ * mode independently from Settings → Advanced Tuning; Uncategorized is
+ * intentionally not overridable — it always falls back to the base
+ * config so the system never auto-upgrades an unknown mode to wider
+ * grace.
+ */
+export interface ForgivenessByMode {
+  work: ForgivenessModeKnobs;
+  play: ForgivenessModeKnobs;
+  relax: ForgivenessModeKnobs;
+}
+
 export interface AdvancedTuningPreferences {
   /** Whether forgiveness-first streak math is enabled. Default `true`. */
   forgivenessEnabled: boolean;
@@ -93,6 +134,11 @@ export interface AdvancedTuningPreferences {
   gracePeriodDays: number;
   /** Misses tolerated inside the window. Slider range 0..5. Default `1`. */
   allowedMisses: number;
+  /**
+   * Per-`TaskMode` overrides. Defaults: Work = 7/1, Play = 14/2,
+   * Relax = 14/2 — see `docs/WORK_PLAY_RELAX.md` § *Streak strictness*.
+   */
+  forgivenessByMode: ForgivenessByMode;
   /** Custom keyword CSVs per Task Mode tier. Default empty strings. */
   taskModeKeywords: TaskModeCustomKeywords;
   /** Custom keyword CSVs per Cognitive Load tier. Default empty strings. */
@@ -108,14 +154,35 @@ export interface AdvancedTuningPatch {
   forgivenessEnabled?: boolean;
   gracePeriodDays?: number;
   allowedMisses?: number;
+  forgivenessByMode?: {
+    work?: Partial<ForgivenessModeKnobs>;
+    play?: Partial<ForgivenessModeKnobs>;
+    relax?: Partial<ForgivenessModeKnobs>;
+  };
   taskModeKeywords?: Partial<TaskModeCustomKeywords>;
   cognitiveLoadKeywords?: Partial<CognitiveLoadCustomKeywords>;
 }
+
+/**
+ * Wider default knobs shared by Play and Relax (`docs/WORK_PLAY_RELAX.md`
+ * § *Streak strictness*). Exported for the Settings UI so the "reset to
+ * wider default" copy and the seed values stay in lockstep with the
+ * streak math.
+ */
+export const DEFAULT_PLAY_RELAX_KNOBS: ForgivenessModeKnobs = {
+  gracePeriodDays: 14,
+  allowedMisses: 2,
+};
 
 export const DEFAULT_ADVANCED_TUNING_PREFERENCES: AdvancedTuningPreferences = {
   forgivenessEnabled: true,
   gracePeriodDays: 7,
   allowedMisses: 1,
+  forgivenessByMode: {
+    work: { gracePeriodDays: 7, allowedMisses: 1 },
+    play: { ...DEFAULT_PLAY_RELAX_KNOBS },
+    relax: { ...DEFAULT_PLAY_RELAX_KNOBS },
+  },
   taskModeKeywords: { work: '', play: '', relax: '' },
   cognitiveLoadKeywords: { easy: '', medium: '', hard: '' },
 };
@@ -140,23 +207,68 @@ function readBool(v: unknown, fallback: boolean): boolean {
 
 function read(data: DocumentData | undefined): AdvancedTuningPreferences {
   if (!data) return DEFAULT_ADVANCED_TUNING_PREFERENCES;
+  const defaults = DEFAULT_ADVANCED_TUNING_PREFERENCES;
   return {
     forgivenessEnabled: readBool(
       data[FIELD_FORGIVENESS_ENABLED],
-      DEFAULT_ADVANCED_TUNING_PREFERENCES.forgivenessEnabled,
+      defaults.forgivenessEnabled,
     ),
     gracePeriodDays: clampInt(
       data[FIELD_GRACE_PERIOD_DAYS],
       1,
       30,
-      DEFAULT_ADVANCED_TUNING_PREFERENCES.gracePeriodDays,
+      defaults.gracePeriodDays,
     ),
     allowedMisses: clampInt(
       data[FIELD_ALLOWED_MISSES],
       0,
       5,
-      DEFAULT_ADVANCED_TUNING_PREFERENCES.allowedMisses,
+      defaults.allowedMisses,
     ),
+    forgivenessByMode: {
+      work: {
+        gracePeriodDays: clampInt(
+          data[FIELD_FG_WORK_GRACE],
+          1,
+          30,
+          defaults.forgivenessByMode.work.gracePeriodDays,
+        ),
+        allowedMisses: clampInt(
+          data[FIELD_FG_WORK_MISSES],
+          0,
+          5,
+          defaults.forgivenessByMode.work.allowedMisses,
+        ),
+      },
+      play: {
+        gracePeriodDays: clampInt(
+          data[FIELD_FG_PLAY_GRACE],
+          1,
+          30,
+          defaults.forgivenessByMode.play.gracePeriodDays,
+        ),
+        allowedMisses: clampInt(
+          data[FIELD_FG_PLAY_MISSES],
+          0,
+          5,
+          defaults.forgivenessByMode.play.allowedMisses,
+        ),
+      },
+      relax: {
+        gracePeriodDays: clampInt(
+          data[FIELD_FG_RELAX_GRACE],
+          1,
+          30,
+          defaults.forgivenessByMode.relax.gracePeriodDays,
+        ),
+        allowedMisses: clampInt(
+          data[FIELD_FG_RELAX_MISSES],
+          0,
+          5,
+          defaults.forgivenessByMode.relax.allowedMisses,
+        ),
+      },
+    },
     taskModeKeywords: {
       work: readString(data[FIELD_MODE_CK_WORK], ''),
       play: readString(data[FIELD_MODE_CK_PLAY], ''),
@@ -215,6 +327,78 @@ export async function patchAdvancedTuningPreferences(
       DEFAULT_ADVANCED_TUNING_PREFERENCES.allowedMisses,
     );
     typeTags[FIELD_ALLOWED_MISSES] = 'int';
+  }
+
+  // Per-mode forgiveness overrides. Each mode is a {grace, misses} pair;
+  // only the touched fields make it into the payload so a slider tweak
+  // on Play.grace doesn't blow away Relax.misses. Clamp ranges match the
+  // base sliders (1..30 / 0..5) so we never push a value Android's
+  // companion field (when it lands) would refuse.
+  if (patch.forgivenessByMode) {
+    const defaults = DEFAULT_ADVANCED_TUNING_PREFERENCES.forgivenessByMode;
+    if (patch.forgivenessByMode.work) {
+      const w = patch.forgivenessByMode.work;
+      if (w.gracePeriodDays !== undefined) {
+        payload[FIELD_FG_WORK_GRACE] = clampInt(
+          w.gracePeriodDays,
+          1,
+          30,
+          defaults.work.gracePeriodDays,
+        );
+        typeTags[FIELD_FG_WORK_GRACE] = 'int';
+      }
+      if (w.allowedMisses !== undefined) {
+        payload[FIELD_FG_WORK_MISSES] = clampInt(
+          w.allowedMisses,
+          0,
+          5,
+          defaults.work.allowedMisses,
+        );
+        typeTags[FIELD_FG_WORK_MISSES] = 'int';
+      }
+    }
+    if (patch.forgivenessByMode.play) {
+      const p = patch.forgivenessByMode.play;
+      if (p.gracePeriodDays !== undefined) {
+        payload[FIELD_FG_PLAY_GRACE] = clampInt(
+          p.gracePeriodDays,
+          1,
+          30,
+          defaults.play.gracePeriodDays,
+        );
+        typeTags[FIELD_FG_PLAY_GRACE] = 'int';
+      }
+      if (p.allowedMisses !== undefined) {
+        payload[FIELD_FG_PLAY_MISSES] = clampInt(
+          p.allowedMisses,
+          0,
+          5,
+          defaults.play.allowedMisses,
+        );
+        typeTags[FIELD_FG_PLAY_MISSES] = 'int';
+      }
+    }
+    if (patch.forgivenessByMode.relax) {
+      const r = patch.forgivenessByMode.relax;
+      if (r.gracePeriodDays !== undefined) {
+        payload[FIELD_FG_RELAX_GRACE] = clampInt(
+          r.gracePeriodDays,
+          1,
+          30,
+          defaults.relax.gracePeriodDays,
+        );
+        typeTags[FIELD_FG_RELAX_GRACE] = 'int';
+      }
+      if (r.allowedMisses !== undefined) {
+        payload[FIELD_FG_RELAX_MISSES] = clampInt(
+          r.allowedMisses,
+          0,
+          5,
+          defaults.relax.allowedMisses,
+        );
+        typeTags[FIELD_FG_RELAX_MISSES] = 'int';
+      }
+    }
   }
 
   if (patch.taskModeKeywords) {
