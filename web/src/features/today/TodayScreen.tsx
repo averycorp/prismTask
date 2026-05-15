@@ -420,9 +420,11 @@ export function TodayScreen() {
                   <button
                     key={habit.id}
                     onClick={async () => {
-                      const today = format(new Date(), 'yyyy-MM-dd');
                       try {
-                        await toggleCompletion(habit.id, today);
+                        await toggleCompletion(
+                          habit.id,
+                          settingsStartOfDayTodayIso,
+                        );
                       } catch {
                         toast.error('Failed to update habit');
                       }

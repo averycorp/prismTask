@@ -9,9 +9,10 @@ import {
   Trash2,
   BarChart3,
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useHabitStore } from '@/stores/habitStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useLogicalToday } from '@/utils/useLogicalToday';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -53,6 +54,13 @@ export function HabitListScreen() {
   const [deleteConfirm, setDeleteConfirm] = useState<Habit | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // SoD-aware logical-today ISO. Toggling a habit at 02:00 with SoD = 4
+  // must write to *yesterday's* logical date so the doc collapses with
+  // any phone-side completion via the same `${habitCloudId}__${date}`
+  // canonical key (see `web/src/api/firestore/habits.ts`).
+  const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  const todayIso = useLogicalToday(startOfDayHour);
+
   useEffect(() => {
     fetchHabits();
   }, [fetchHabits]);
@@ -65,14 +73,13 @@ export function HabitListScreen() {
 
   const handleToggle = useCallback(
     async (habitId: string) => {
-      const today = format(new Date(), 'yyyy-MM-dd');
       try {
-        await toggleCompletion(habitId, today);
+        await toggleCompletion(habitId, todayIso);
       } catch {
         toast.error('Failed to update completion');
       }
     },
-    [toggleCompletion],
+    [toggleCompletion, todayIso],
   );
 
   const handleDelete = useCallback(async () => {
