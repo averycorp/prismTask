@@ -56,11 +56,6 @@ fun AboutSection(
         color = MaterialTheme.colorScheme.onSurface,
         modifier = versionModifier
     )
-    Text(
-        text = "Made by Avery Karlin",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 
     val context = LocalContext.current
     TextButton(
