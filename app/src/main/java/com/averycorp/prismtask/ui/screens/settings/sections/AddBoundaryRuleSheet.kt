@@ -31,9 +31,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +46,8 @@ import com.averycorp.prismtask.domain.model.BoundaryRule
 import com.averycorp.prismtask.domain.model.BoundaryRuleType
 import com.averycorp.prismtask.domain.model.LifeCategory
 import com.averycorp.prismtask.domain.usecase.BoundaryRuleParser
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -518,14 +518,13 @@ private fun DayOfWeekChipRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BoundaryTimePickerDialog(
     initial: LocalTime,
     onDismiss: () -> Unit,
     onConfirm: (LocalTime) -> Unit
 ) {
-    val state = rememberTimePickerState(
+    val clockState = rememberAnalogClockState(
         initialHour = initial.hour,
         initialMinute = initial.minute,
         is24Hour = false
@@ -534,12 +533,12 @@ private fun BoundaryTimePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = {
-                onConfirm(LocalTime.of(state.hour, state.minute))
+                onConfirm(LocalTime.of(clockState.hour, clockState.minute))
             }) { Text("OK") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-        text = { TimePicker(state = state) }
+        text = { AnalogClockPicker(state = clockState) }
     )
 }
