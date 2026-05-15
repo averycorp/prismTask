@@ -48,6 +48,14 @@ cognitive_load_classify_text_rate_limiter = RateLimiter(max_requests=20, window_
 # absorbs a user iterating on a task title and re-pressing Auto.
 life_category_classify_text_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
+# AI urgency scoring (Pro). Fired when a Pro user with the AI-urgency
+# toggle on chooses the URGENCY sort on the Tasks screen. The client
+# debounces and batches up to 50 tasks per call, so 10/min per IP
+# tolerates the user toggling sort modes back and forth without burning
+# Claude budget. The server-side daily AI rate limiter is the real
+# ceiling.
+urgency_score_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
 # Rate limiters for new AI endpoints
 briefing_rate_limiter = RateLimiter(max_requests=1, window_seconds=3600)  # 1 per hour
 weekly_plan_rate_limiter = RateLimiter(max_requests=1, window_seconds=1800)  # 1 per 30 min

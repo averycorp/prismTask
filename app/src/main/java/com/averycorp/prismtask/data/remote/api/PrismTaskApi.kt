@@ -128,6 +128,18 @@ interface PrismTaskApi {
         @Body request: LifeCategoryClassifyTextRequest
     ): LifeCategoryClassifyTextResponse
 
+    /**
+     * Score a batch of up to 50 tasks for urgency (0.0..1.0) via Claude
+     * Haiku. Pro-only; the client gates the call with
+     * `ProFeatureGate.AI_URGENCY` and the per-feature AI-urgency toggle.
+     * Any task missing from the response — or any HTTP failure — must
+     * fall back to the on-device [UrgencyScorer] formula per-task.
+     */
+    @POST("api/v1/ai/urgency/score")
+    suspend fun scoreUrgency(
+        @Body request: UrgencyScoreRequest
+    ): UrgencyScoreResponse
+
     @POST("api/v1/ai/pomodoro-plan")
     suspend fun planPomodoro(
         @Body request: PomodoroRequest

@@ -325,6 +325,107 @@ Respond ONLY with valid JSON (no markdown, no prose):
     raise ValueError(f"Failed to parse AI response: {last_error}")
 
 
+def score_tasks_urgency(
+    tasks: list[dict],
+    today: date,
+    tier: str = "FREE",
+) -> list[dict]:
+    """Score a batch of tasks for urgency (0.0..1.0) using Claude Haiku.
+
+    Each input task dict must include ``id`` (caller-chosen identifier),
+    ``title``, ``priority`` (0..4), and ``created_at`` (ISO). Optional
+    fields: ``description``, ``due_date`` (ISO), ``subtask_count``,
+    ``subtask_completed``.
+
+    Returns a list of ``{"id", "score", "level", "reason"}`` dicts in the
+    SAME order as the input. ``score`` is clamped to ``[0.0, 1.0]`` and
+    ``level`` is one of ``LOW|MEDIUM|HIGH|CRITICAL``. Tasks missing from
+    the AI response (or with invalid scores) are omitted — the caller is
+    responsible for falling back to the on-device urgency formula for any
+    missing ids.
+
+    Raises ``RuntimeError`` when the Anthropic client is unavailable and
+    ``ValueError`` on malformed AI response, mirroring the other AI
+    productivity functions in this module.
+    """
+    client = _get_client()
+    model = get_model("urgency")  # Haiku — same tier as eisenhower/life-category text classify
+    tasks_json = json.dumps(tasks, default=str, indent=2)
+    prompt = f"""You are a productivity assistant. Score each task's URGENCY on a 0.0..1.0 scale.
+
+Urgency means: how much pressure to act NOW, factoring in deadline proximity, explicit priority, age (a stale task that's been sitting around drags more), and subtask progress (a partially-done task with remaining subtasks is more urgent than an untouched one).
+
+Score guide (clamp to [0.0, 1.0]):
+- 0.0..0.25 (LOW): No deadline, low priority, recently created — defer or batch.
+- 0.25..0.55 (MEDIUM): Soft deadline within ~1 week, or moderate priority, or stale — do this week.
+- 0.55..0.80 (HIGH): Due in 0–2 days, or high priority, or significantly overdue — schedule today.
+- 0.80..1.00 (CRITICAL): Overdue beyond a few days, or Urgent priority with a near-term deadline — act immediately.
+
+Rules:
+- A high-priority task with NO due date is rarely CRITICAL — high priority alone caps near 0.7.
+- A no-priority task that's significantly overdue still rises toward HIGH/CRITICAL because the deadline pressure dominates.
+- Priority levels: 0=None, 1=Low, 2=Medium, 3=High, 4=Urgent.
+- "reason" must be 1 short sentence (≤ 100 chars) explaining the dominant factor.
+- Output level MUST be consistent with score:
+  LOW (<0.25), MEDIUM ([0.25,0.55)), HIGH ([0.55,0.80)), CRITICAL (≥0.80).
+
+Tasks:
+{tasks_json}
+
+Today's date: {today.isoformat()}
+
+Respond ONLY with valid JSON (no markdown, no prose):
+[{{"id": "<task id>", "score": 0.72, "level": "HIGH", "reason": "Due tomorrow and high priority"}}]"""
+
+    last_error = None
+    for attempt in range(2):
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = message.content[0].text
+            result = _parse_ai_json(content)
+            if not isinstance(result, list):
+                raise ValueError("Expected a JSON array")
+            valid_levels = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+            cleaned: list[dict] = []
+            for entry in result:
+                if not isinstance(entry, dict):
+                    continue
+                eid = entry.get("id")
+                raw_score = entry.get("score")
+                level = entry.get("level")
+                if eid is None or raw_score is None or level not in valid_levels:
+                    continue
+                try:
+                    score = float(raw_score)
+                except (TypeError, ValueError):
+                    continue
+                # Clamp to [0,1] — the model occasionally drifts to 1.05.
+                score = max(0.0, min(1.0, score))
+                cleaned.append(
+                    {
+                        "id": str(eid),
+                        "score": score,
+                        "level": level,
+                        "reason": str(entry.get("reason", ""))[:200],
+                    }
+                )
+            return cleaned
+        except (json.JSONDecodeError, KeyError, TypeError, IndexError, ValueError) as e:
+            last_error = e
+            logger.error(f"Failed to parse urgency-score response (attempt {attempt + 1}): {e}")
+            if attempt == 0:
+                continue
+            raise ValueError(f"Failed to parse AI response after retry: {e}") from e
+        except Exception as e:
+            logger.error(f"Urgency-score AI error: {type(e).__name__}: {e}")
+            raise
+    raise ValueError(f"Failed to parse AI response: {last_error}")
+
+
 def plan_pomodoro(tasks: list[dict], available_minutes: int, session_length: int, break_length: int, long_break_length: int, focus_preference: str, today: date, tier: str = "FREE") -> dict:
     """Call Claude to generate a Pomodoro focus session plan."""
     client = _get_client()

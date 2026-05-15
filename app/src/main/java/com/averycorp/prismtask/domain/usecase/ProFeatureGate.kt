@@ -60,6 +60,7 @@ constructor(
         AI_CONVERSATIONAL,
         AI_REENGAGEMENT, AI_DAILY_PLANNING,
         AI_BATCH_OPS,
+        AI_URGENCY,
         CLOUD_SYNC,
         ANALYTICS_FULL, ANALYTICS_CORRELATIONS,
         SYLLABUS_IMPORT -> UserTier.PRO
@@ -84,6 +85,15 @@ constructor(
         const val AI_DAILY_PLANNING = "ai_daily_planning"
         const val AI_REENGAGEMENT = "ai_reengagement"
         const val AI_BATCH_OPS = "ai_batch_ops"
+
+        /**
+         * Haiku-determined urgency scoring on the Tasks-screen URGENCY
+         * sort. Free tier uses the on-device [UrgencyScorer] formula;
+         * Pro tier opts in via the per-feature toggle in Settings →
+         * Global Defaults and the batch falls back to the local formula
+         * per-task on any failure.
+         */
+        const val AI_URGENCY = "ai_urgency"
         const val SYLLABUS_IMPORT = "syllabus_import"
 
         /**

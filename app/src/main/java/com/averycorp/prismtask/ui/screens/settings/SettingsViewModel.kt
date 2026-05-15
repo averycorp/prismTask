@@ -294,6 +294,10 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setAiScreenshotImportEnabled(enabled) }
     }
 
+    fun setAiUrgencyFeatureEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesDataStore.setAiUrgencyEnabled(enabled) }
+    }
+
     /** Boundary rules (v1.4.0 V3). */
     val boundaryRules: StateFlow<List<com.averycorp.prismtask.domain.model.BoundaryRule>> =
         boundaryRuleRepository

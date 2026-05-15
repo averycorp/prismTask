@@ -161,6 +161,11 @@ class NaturalLanguageParserTest {
         ): LifeCategoryClassifyTextResponse =
             error("not used in offline parser tests")
 
+        override suspend fun scoreUrgency(
+            request: com.averycorp.prismtask.data.remote.api.UrgencyScoreRequest
+        ): com.averycorp.prismtask.data.remote.api.UrgencyScoreResponse =
+            error("not used in offline parser tests")
+
         override suspend fun planPomodoro(request: PomodoroRequest): PomodoroResponse =
             error("not used in offline parser tests")
 
