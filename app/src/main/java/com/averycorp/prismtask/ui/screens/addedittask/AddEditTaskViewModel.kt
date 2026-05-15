@@ -93,6 +93,7 @@ constructor(
     private val parsedTaskResolver: ParsedTaskResolver,
     private val proFeatureGate: ProFeatureGate,
     private val lifeCategoryRemoteClassifier: LifeCategoryRemoteClassifier,
+    private val durationEstimatorService: com.averycorp.prismtask.data.remote.DurationEstimatorService,
     private val fileExtractionService: FileExtractionService,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -1403,6 +1404,23 @@ constructor(
                     }
                 }
                 pendingSubtasks.clear()
+            }
+
+            // Pro-only: if the user left estimatedDuration blank, fire a
+            // Haiku call asynchronously and patch the task with the result.
+            // Free users keep TaskDefaults.defaultDuration (preset 30 min)
+            // as their per-task fallback for balance + cognitive-load
+            // weighting — no Haiku call. Failures are silent so the user
+            // never sees an "AI couldn't estimate" error in the editor.
+            if (estimatedDuration == null && proFeatureGate.isPro() && trimmedTitle.isNotEmpty()) {
+                viewModelScope.launch {
+                    val result = durationEstimatorService.estimate(trimmedTitle, trimmedDesc)
+                    val minutes = result.getOrNull() ?: return@launch
+                    val current = taskRepository.getTaskByIdOnce(savedId) ?: return@launch
+                    if (current.estimatedDuration == null) {
+                        taskRepository.updateTask(current.copy(estimatedDuration = minutes))
+                    }
+                }
             }
 
             true

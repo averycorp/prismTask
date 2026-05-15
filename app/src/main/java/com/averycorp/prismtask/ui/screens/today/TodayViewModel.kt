@@ -467,8 +467,9 @@ constructor(
             taskRepository.getAllTasks(),
             workLifeBalancePrefs,
             taskBehaviorPreferences.getStartOfDay(),
-            balanceContributions
-        ) { allTasks, prefs, sod, contributions ->
+            balanceContributions,
+            userPreferencesDataStore.taskDefaultsFlow
+        ) { allTasks, prefs, sod, contributions, taskDefaults ->
             val config = BalanceConfig(
                 workTarget = prefs.workTarget / 100f,
                 personalTarget = prefs.personalTarget / 100f,
@@ -482,7 +483,8 @@ constructor(
                 dayStartHour = sod.hour,
                 dayStartMinute = sod.minute,
                 habitContributions = contributions.habits,
-                leisureContributions = contributions.leisure
+                leisureContributions = contributions.leisure,
+                defaultDurationMinutes = taskDefaults.defaultDuration ?: 30
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BalanceState.EMPTY)
 
@@ -497,15 +499,17 @@ constructor(
         combine(
             taskRepository.getAllTasks(),
             taskBehaviorPreferences.getStartOfDay(),
-            balanceContributions
-        ) { allTasks, sod, contributions ->
+            balanceContributions,
+            userPreferencesDataStore.taskDefaultsFlow
+        ) { allTasks, sod, contributions, taskDefaults ->
             cognitiveLoadBalanceTracker.compute(
                 allTasks = allTasks,
                 config = CognitiveLoadBalanceConfig(),
                 dayStartHour = sod.hour,
                 dayStartMinute = sod.minute,
                 habitCompletionTimestamps = contributions.habitTimestamps,
-                leisureSessionTimestamps = contributions.leisureTimestamps
+                leisureSessionTimestamps = contributions.leisureTimestamps,
+                defaultDurationMinutes = taskDefaults.defaultDuration ?: 30
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CognitiveLoadBalanceState.EMPTY)
 

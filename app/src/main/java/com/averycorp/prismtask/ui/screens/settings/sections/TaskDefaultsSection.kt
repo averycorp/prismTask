@@ -32,6 +32,7 @@ import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.UrgencyWeights
 import com.averycorp.prismtask.domain.usecase.UrgencyLevel
 import com.averycorp.prismtask.domain.usecase.UrgencyScorer
+import com.averycorp.prismtask.ui.components.DurationPickerDialog
 import com.averycorp.prismtask.ui.components.StartOfDayPickerDialog
 import com.averycorp.prismtask.ui.components.formatStartOfDay
 import com.averycorp.prismtask.ui.components.settings.AdvancedToggle
@@ -52,15 +53,18 @@ fun TaskDefaultsSection(
     dayStartHour: Int,
     dayStartMinute: Int,
     urgencyWeights: UrgencyWeights,
+    defaultTaskDurationMinutes: Int,
     onDefaultSortChange: (String) -> Unit,
     onDefaultViewModeChange: (String) -> Unit,
     onFirstDayOfWeekChange: (DayOfWeek) -> Unit,
     onStartOfDayChange: (hour: Int, minute: Int) -> Unit,
     onUrgencyWeightsChange: (UrgencyWeights) -> Unit,
+    onDefaultTaskDurationChange: (Int) -> Unit,
     onResetTaskBehaviorDefaults: () -> Unit
 ) {
     var showTaskAdvanced by remember { mutableStateOf(false) }
     var showSodPicker by remember { mutableStateOf(false) }
+    var showDurationPicker by remember { mutableStateOf(false) }
 
     SectionHeader("Global Defaults")
 
@@ -101,6 +105,13 @@ fun TaskDefaultsSection(
         onClick = { showSodPicker = true }
     )
 
+    SettingsRowWithSubtitle(
+        title = "Default Task Length",
+        subtitle = formatDurationSubtitle(defaultTaskDurationMinutes) +
+            " · Powers balance & cognitive-load weighting for tasks without an estimate.",
+        onClick = { showDurationPicker = true }
+    )
+
     if (showSodPicker) {
         StartOfDayPickerDialog(
             initialHour = dayStartHour,
@@ -111,6 +122,17 @@ fun TaskDefaultsSection(
                 onStartOfDayChange(h, m)
             },
             onDismiss = { showSodPicker = false }
+        )
+    }
+
+    if (showDurationPicker) {
+        DurationPickerDialog(
+            initialMinutes = defaultTaskDurationMinutes,
+            onConfirm = { m ->
+                showDurationPicker = false
+                onDefaultTaskDurationChange(m)
+            },
+            onDismiss = { showDurationPicker = false }
         )
     }
 
@@ -197,6 +219,12 @@ fun TaskDefaultsSection(
     }
 
     HorizontalDivider()
+}
+
+private fun formatDurationSubtitle(minutes: Int): String = when {
+    minutes < 60 -> "$minutes min"
+    minutes % 60 == 0 -> "${minutes / 60} hr"
+    else -> "${minutes / 60} hr ${minutes % 60} min"
 }
 
 @Composable

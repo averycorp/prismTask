@@ -56,6 +56,7 @@ from ._common import (  # noqa: F401  (re-export)
     briefing_rate_limiter,
     chat_rate_limiter,
     cognitive_load_classify_text_rate_limiter,
+    duration_estimate_rate_limiter,
     eisenhower_classify_text_rate_limiter,
     extract_rate_limiter,
     file_extract_rate_limiter,

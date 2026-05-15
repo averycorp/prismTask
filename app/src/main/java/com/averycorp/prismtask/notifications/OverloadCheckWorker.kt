@@ -88,13 +88,15 @@ constructor(
         )
         val sod = taskBehaviorPreferences.getStartOfDay().first()
         val contributions = balanceContributionsProvider.snapshot()
+        val defaultDuration = userPreferencesDataStore.taskDefaultsFlow.first().defaultDuration ?: 30
         val balance = BalanceTracker().compute(
             allTasks = tasks,
             config = config,
             dayStartHour = sod.hour,
             dayStartMinute = sod.minute,
             habitContributions = contributions.habits,
-            leisureContributions = contributions.leisure
+            leisureContributions = contributions.leisure,
+            defaultDurationMinutes = defaultDuration
         )
 
         if (!balance.isOverloaded || balance.totalTracked == 0) {

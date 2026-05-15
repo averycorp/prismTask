@@ -434,6 +434,22 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setTaskDefaults(defaults) }
     }
 
+    /**
+     * Per-task fallback duration (minutes) used by the Today balance bar +
+     * cognitive-load tracker when a task has no `estimatedDuration`. Defaults
+     * to 30 min (Free-tier preset). Pro users normally see this overridden
+     * per task by the Haiku auto-estimate, so this row matters most for
+     * Free users.
+     */
+    fun setDefaultTaskDuration(minutes: Int) {
+        val clamped = minutes.coerceIn(5, 480)
+        viewModelScope.launch {
+            userPreferencesDataStore.setTaskDefaults(
+                taskDefaultPrefs.value.copy(defaultDuration = clamped)
+            )
+        }
+    }
+
     fun setSmartDefaultsEnabled(enabled: Boolean) {
         viewModelScope.launch { userPreferencesDataStore.setSmartDefaultsEnabled(enabled) }
     }

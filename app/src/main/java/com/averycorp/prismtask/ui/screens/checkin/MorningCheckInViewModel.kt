@@ -124,8 +124,9 @@ constructor(
             taskRepository.getAllTasks(),
             workLifeBalancePrefs,
             taskBehaviorPreferences.getStartOfDay(),
-            balanceContributions
-        ) { allTasks, prefs, sod, contributions ->
+            balanceContributions,
+            userPreferencesDataStore.taskDefaultsFlow
+        ) { allTasks, prefs, sod, contributions, taskDefaults ->
             val config = BalanceConfig(
                 workTarget = prefs.workTarget / 100f,
                 personalTarget = prefs.personalTarget / 100f,
@@ -139,7 +140,8 @@ constructor(
                 dayStartHour = sod.hour,
                 dayStartMinute = sod.minute,
                 habitContributions = contributions.habits,
-                leisureContributions = contributions.leisure
+                leisureContributions = contributions.leisure,
+                defaultDurationMinutes = taskDefaults.defaultDuration ?: 30
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BalanceState.EMPTY)
 
