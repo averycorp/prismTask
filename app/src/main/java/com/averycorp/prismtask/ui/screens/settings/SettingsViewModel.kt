@@ -103,6 +103,9 @@ constructor(
     // marking via the rest_days DAO.
     private val restDayPreferences: com.averycorp.prismtask.data.preferences.RestDayPreferences,
     private val restDayRepository: com.averycorp.prismtask.data.repository.RestDayRepository,
+    // F4 Item 5 — user-defined Brain Modes (additive; 3 built-in toggles
+    // unchanged, no dispatch refactor).
+    private val customBrainModePreferences: com.averycorp.prismtask.data.preferences.CustomBrainModePreferences,
     // --- Sub-VMs extracted as part of T1.2 refactor ---
     private val themeSettings: ThemeSettingsViewModel,
     private val notificationSettings: NotificationSettingsViewModel,
@@ -452,6 +455,22 @@ constructor(
             }
             restDayPreferences.clearPause()
         }
+    }
+
+    /**
+     * F4 Item 5 — user-defined Brain Modes. The list lives alongside (not
+     * replacing) the 3 built-in toggles. Dispatch is informational v1.
+     */
+    val customBrainModes: StateFlow<List<com.averycorp.prismtask.data.preferences.CustomBrainMode>> =
+        customBrainModePreferences.observe()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addCustomBrainMode(mode: com.averycorp.prismtask.data.preferences.CustomBrainMode) {
+        viewModelScope.launch { customBrainModePreferences.add(mode) }
+    }
+
+    fun removeCustomBrainMode(name: String) {
+        viewModelScope.launch { customBrainModePreferences.remove(name) }
     }
 
     fun setCompactMode(enabled: Boolean) {

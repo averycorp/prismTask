@@ -407,7 +407,13 @@ fun TodayScreen(
                                 taskCount = completedToday.size,
                                 habitCount = habitCompletedCount,
                                 habitTotal = habitTotalCount,
-                                onPlanTomorrow = { viewModel.onShowPlanSheet() }
+                                onPlanTomorrow = { viewModel.onShowPlanSheet() },
+                                onReflect = {
+                                    navController.navigate(
+                                        com.averycorp.prismtask.ui.navigation
+                                            .PrismTaskRoute.EndOfDayReflection.route
+                                    )
+                                }
                             )
                         }
                     }

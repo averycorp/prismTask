@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +29,8 @@ internal fun AllCaughtUpCard(
     taskCount: Int,
     habitCount: Int,
     habitTotal: Int,
-    onPlanTomorrow: () -> Unit
+    onPlanTomorrow: () -> Unit,
+    onReflect: (() -> Unit)? = null
 ) {
     val subtitle = "Everything's done. Seriously, go do something fun."
     Card(
@@ -62,8 +66,15 @@ internal fun AllCaughtUpCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = onPlanTomorrow) {
-                Text("Plan Tomorrow")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onPlanTomorrow) {
+                    Text("Plan Tomorrow")
+                }
+                if (onReflect != null) {
+                    OutlinedButton(onClick = onReflect) {
+                        Text("Reflect")
+                    }
+                }
             }
         }
     }

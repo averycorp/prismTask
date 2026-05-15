@@ -21,6 +21,7 @@ import com.averycorp.prismtask.ui.screens.planner.WeeklyPlannerScreen
 import com.averycorp.prismtask.ui.screens.pomodoro.SmartPomodoroScreen
 import com.averycorp.prismtask.ui.screens.projects.ProjectImportPreviewScreen
 import com.averycorp.prismtask.ui.screens.review.WeeklyReviewDetailScreen
+import com.averycorp.prismtask.ui.screens.reflection.ReflectionScreen
 import com.averycorp.prismtask.ui.screens.review.WeeklyReviewScreen
 import com.averycorp.prismtask.ui.screens.review.WeeklyReviewsListScreen
 import com.averycorp.prismtask.ui.screens.screenshotimport.ScreenshotImportScreen
@@ -75,6 +76,10 @@ internal fun NavGraphBuilder.aiRoutes(
 
     composable(route = PrismTaskRoute.WeeklyReview.route) {
         WeeklyReviewScreen(navController)
+    }
+
+    composable(route = PrismTaskRoute.EndOfDayReflection.route) {
+        ReflectionScreen(navController = navController)
     }
 
     composable(route = PrismTaskRoute.WeeklyReviewsList.route) {
