@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Sun,
   ChevronDown,
@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useHabitStore } from '@/stores/habitStore';
+import { useTaskDependencyStore } from '@/stores/taskDependencyStore';
+import { buildUnmetBlockerCountMap } from '@/features/tasks/dependencyHelpers';
 import { dashboardApi } from '@/api/dashboard';
 import { TaskRow } from '@/components/shared/TaskRow';
 import { Spinner } from '@/components/ui/Spinner';
@@ -49,6 +51,7 @@ function saveCollapseState(state: Record<string, boolean>) {
 export function TodayScreen() {
   const navigate = useNavigate();
   const {
+    tasks: allTasks,
     todayTasks,
     overdueTasks,
     upcomingTasks,
@@ -60,6 +63,9 @@ export function TodayScreen() {
     uncompleteTask,
     setSelectedTask,
   } = useTaskStore();
+
+  // Live edge set from Firestore listener wired in `useFirestoreSync`.
+  const dependencies = useTaskDependencyStore((s) => s.dependencies);
 
   const { projects, fetchAllProjects } = useProjectStore();
 
@@ -89,6 +95,10 @@ export function TodayScreen() {
   );
   const [editorOpen, setEditorOpen] = useState(false);
   const [planSheetOpen, setPlanSheetOpen] = useState(false);
+  // "Show blocked tasks" filter (parity B.12). Default false — mirrors
+  // Android's blocked-task hide behaviour on the Today screen so users
+  // aren't nagged about work they can't act on yet.
+  const [showBlocked, setShowBlocked] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   // Track completed tasks for undo
@@ -223,20 +233,48 @@ export function TodayScreen() {
   const filterPending = (tasks: Task[]) =>
     tasks.filter((t) => !pendingCompletions.has(t.id));
 
+  // One-pass blocker count map shared by the filter + per-row chip.
+  // Recomputed only when `dependencies` or `allTasks` change.
+  const blockerCounts = useMemo(
+    () => buildUnmetBlockerCountMap(dependencies, allTasks),
+    [dependencies, allTasks],
+  );
+  const unmetBlockerCount = (taskId: string): number =>
+    blockerCounts.get(taskId) ?? 0;
+
+  // Hide tasks blocked by unmet dependencies unless the user opts in.
+  const blockedAwareFilter = (t: Task) =>
+    showBlocked || unmetBlockerCount(t.id) === 0;
+
   const activeOverdue = filterPending(
-    overdueTasks.filter((t) => t.status !== 'done'),
+    overdueTasks.filter((t) => t.status !== 'done' && blockedAwareFilter(t)),
   );
   const activeToday = filterPending(
-    todayTasks.filter((t) => t.status !== 'done'),
+    todayTasks.filter((t) => t.status !== 'done' && blockedAwareFilter(t)),
   );
   const activeUpcoming = filterPending(
     upcomingTasks.filter(
       (t) =>
         t.status !== 'done' &&
+        blockedAwareFilter(t) &&
         !activeToday.some((at) => at.id === t.id) &&
         !activeOverdue.some((ao) => ao.id === t.id),
     ),
   );
+
+  // Count of currently-hidden blocked tasks — surfaced in the toggle
+  // label so users can see *why* the toggle exists at a glance.
+  let hiddenBlockedCount = 0;
+  if (!showBlocked) {
+    const seen = new Set<string>();
+    for (const t of [...overdueTasks, ...todayTasks, ...upcomingTasks]) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      if (t.status !== 'done' && unmetBlockerCount(t.id) > 0) {
+        hiddenBlockedCount++;
+      }
+    }
+  }
 
   // Group upcoming by day
   const upcomingByDay = activeUpcoming.reduce<Record<string, Task[]>>(
@@ -511,6 +549,28 @@ export function TodayScreen() {
         <MedicationSlotList />
       </section>
 
+      {/* "Show Blocked Tasks" toggle (parity B.12). Only renders when
+          there's something to reveal — keeps the chrome quiet on days
+          when nothing is blocked. */}
+      {(hiddenBlockedCount > 0 || showBlocked) && (
+        <div className="mb-3 flex items-center justify-end">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+            <input
+              type="checkbox"
+              checked={showBlocked}
+              onChange={(e) => setShowBlocked(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-[var(--color-border)] text-[var(--color-accent)]"
+            />
+            Show Blocked Tasks
+            {!showBlocked && hiddenBlockedCount > 0 && (
+              <span className="rounded-full bg-[var(--color-bg-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-secondary)]">
+                {hiddenBlockedCount} Hidden
+              </span>
+            )}
+          </label>
+        </div>
+      )}
+
       {/* Empty state */}
       {isEmpty && (
         <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 text-center">
@@ -546,6 +606,8 @@ export function TodayScreen() {
                 showProject
                 projectName={projectMap.get(task.project_id)?.title}
                 projectColor={undefined}
+                blockedByCount={unmetBlockerCount(task.id)}
+                onBlockerChipClick={handleTaskClick}
               />
             ))}
         </TaskSection>
@@ -577,6 +639,8 @@ export function TodayScreen() {
                 showProject
                 projectName={projectMap.get(task.project_id)?.title}
                 projectColor={undefined}
+                blockedByCount={unmetBlockerCount(task.id)}
+                onBlockerChipClick={handleTaskClick}
               />
             ))}
         </TaskSection>
@@ -617,6 +681,8 @@ export function TodayScreen() {
                       showProject
                       projectName={projectMap.get(task.project_id)?.title}
                       projectColor={undefined}
+                      blockedByCount={unmetBlockerCount(task.id)}
+                      onBlockerChipClick={handleTaskClick}
                     />
                   ))}
               </div>
