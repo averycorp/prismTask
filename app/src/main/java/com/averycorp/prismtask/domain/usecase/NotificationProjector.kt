@@ -5,6 +5,7 @@ import com.averycorp.prismtask.data.local.dao.HabitDao
 import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationDoseDao
 import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
+import com.averycorp.prismtask.data.local.dao.MedicationSlotOverrideDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.MedicationEntity
@@ -42,7 +43,7 @@ data class ProjectedNotification(
         TASK_REMINDER("Task Reminder"),
         HABIT_DAILY("Habit Reminder (Daily)"),
         HABIT_INTERVAL("Habit Reminder (Interval)"),
-        HABIT_LEGACY_SPECIFIC_TIME("Medication Reminder (Legacy)"),
+        MEDICATION_LEGACY_SPECIFIC_TIME("Medication Reminder (Legacy)"),
         MEDICATION("Medication"),
         MEDICATION_SLOT_CLOCK("Medication (Slot, Clock)"),
         MEDICATION_SLOT_INTERVAL("Medication (Slot, Interval)"),
@@ -51,8 +52,10 @@ data class ProjectedNotification(
         REENGAGEMENT("Re-Engagement Nudge"),
         WEEKLY_HABIT_SUMMARY("Weekly Habit Summary"),
         WEEKLY_TASK_SUMMARY("Weekly Task Summary"),
-        OVERLOAD_CHECK("Overload Check"),
-        WEEKLY_REVIEW("Weekly Review")
+        OVERLOAD_CHECK("Overload Check (Balance)"),
+        COGNITIVE_LOAD_OVERLOAD_CHECK("Overload Check (Cognitive Load)"),
+        WEEKLY_REVIEW("Weekly Review"),
+        WEEKLY_ANALYTICS("Weekly Analytics")
     }
 }
 
@@ -95,6 +98,7 @@ class NotificationProjector @Inject constructor(
     private val medicationDao: MedicationDao,
     private val medicationDoseDao: MedicationDoseDao,
     private val medicationSlotDao: MedicationSlotDao,
+    private val medicationSlotOverrideDao: MedicationSlotOverrideDao,
     private val notificationPreferences: NotificationPreferences,
     private val advancedTuningPreferences: AdvancedTuningPreferences,
     private val medicationPreferences: MedicationPreferences,
@@ -110,7 +114,7 @@ class NotificationProjector @Inject constructor(
             addAll(projectTasks(nowMillis))
             addAll(projectHabitsDaily(nowMillis, horizonEnd))
             addAll(projectHabitsInterval(nowMillis))
-            addAll(projectHabitsLegacySpecificTimes(nowMillis, horizonEnd))
+            addAll(projectMedicationLegacySpecificTimes(nowMillis, horizonEnd))
             addAll(projectMedications(nowMillis, horizonEnd))
             addAll(projectMedicationSlotsClock(nowMillis, horizonEnd))
             addAll(projectMedicationSlotsInterval(nowMillis))
@@ -120,7 +124,9 @@ class NotificationProjector @Inject constructor(
             addAll(projectWeeklyHabitSummary(nowMillis, horizonEnd))
             addAll(projectWeeklyTaskSummary(nowMillis, horizonEnd))
             addAll(projectOverloadCheck(nowMillis, horizonEnd))
+            addAll(projectCognitiveLoadOverloadCheck(nowMillis, horizonEnd))
             addAll(projectWeeklyReview(nowMillis, horizonEnd))
+            addAll(projectWeeklyAnalytics(nowMillis, horizonEnd))
         }
         return candidates
             .filter { it.triggerAtMillis in (nowMillis + 1)..horizonEnd }
@@ -130,6 +136,11 @@ class NotificationProjector @Inject constructor(
     // --- Task reminders -------------------------------------------------
 
     private suspend fun projectTasks(now: Long): List<ProjectedNotification> {
+        // Mirrors NotificationHelper.showTaskReminder, which short-circuits
+        // when the user has disabled the global task-reminders toggle.
+        // Without this gate the log surfaces alarms that will silently
+        // drop at fire time.
+        if (!notificationPreferences.taskRemindersEnabled.first()) return emptyList()
         return taskDao.getIncompleteTasksWithReminders().mapNotNull { task ->
             val dueDate = task.dueDate ?: return@mapNotNull null
             val offset = task.reminderOffset ?: return@mapNotNull null
@@ -200,9 +211,13 @@ class NotificationProjector @Inject constructor(
     /**
      * Legacy specific-times medication path that lives under
      * [HabitReminderScheduler.scheduleSpecificTimes] — only fires when the
-     * global mode is SPECIFIC_TIMES.
+     * global mode is SPECIFIC_TIMES. Despite the underlying scheduler
+     * being named `HabitReminderScheduler`, this iterates the
+     * medication-preferences specific-times set, so the projection
+     * (and its source enum) carry the medication label.
      */
-    private suspend fun projectHabitsLegacySpecificTimes(now: Long, horizonEnd: Long): List<ProjectedNotification> {
+    private suspend fun projectMedicationLegacySpecificTimes(now: Long, horizonEnd: Long): List<ProjectedNotification> {
+        if (!notificationPreferences.medicationRemindersEnabled.first()) return emptyList()
         if (medicationPreferences.getScheduleModeOnce() != MedicationScheduleMode.SPECIFIC_TIMES) {
             return emptyList()
         }
@@ -217,7 +232,7 @@ class NotificationProjector @Inject constructor(
                     triggerAtMillis = trigger,
                     title = "Medication Reminder",
                     body = "Scheduled medication time ($hhmm).",
-                    source = ProjectedNotification.Source.HABIT_LEGACY_SPECIFIC_TIME,
+                    source = ProjectedNotification.Source.MEDICATION_LEGACY_SPECIFIC_TIME,
                     sourceId = null
                 )
             }
@@ -239,6 +254,7 @@ class NotificationProjector @Inject constructor(
      * though the real alarm fires from the slot.
      */
     private suspend fun projectMedications(now: Long, horizonEnd: Long): List<ProjectedNotification> {
+        if (!notificationPreferences.medicationRemindersEnabled.first()) return emptyList()
         val active = medicationDao.getActiveOnce()
         return active.flatMap { med ->
             if (medicationSlotDao.getSlotIdsForMedicationOnce(med.id).isNotEmpty()) {
@@ -267,40 +283,94 @@ class NotificationProjector @Inject constructor(
 
     /**
      * Mirrors [com.averycorp.prismtask.notifications.MedicationClockRescheduler.rescheduleAll]:
-     * walks active slots, resolves the reminder mode against the global
-     * default via [MedicationReminderModeResolver], and projects daily
-     * occurrences at `slot.idealTime` for any slot resolving to CLOCK
-     * mode.
-     *
-     * Linked-medication-name fanout: a slot can link to multiple
-     * medications. We emit one projected row per `(slot, medication)`
-     * pair so the log labels stay specific. Slots with no linked meds
-     * still project one row labelled with the slot name so the user can
-     * verify timing.
+     *  - **Slot-level** alarm at `slot.idealTime` for every slot resolving
+     *    to CLOCK. The fired notification names the slot
+     *    (`"$slotName Medications"`).
+     *  - **Per-(medication, slot)** alarm only when
+     *    [MedicationClockRescheduler.needsPerMedAlarm] is true (override
+     *    diverges from the slot ideal time, OR the medication opts into
+     *    CLOCK while its slot resolves to a non-CLOCK mode). The fired
+     *    notification names the medication. Archived medications are
+     *    skipped: production receivers bail on `med.isArchived`, so
+     *    projecting them would over-report.
      */
     private suspend fun projectMedicationSlotsClock(
         now: Long,
         horizonEnd: Long
     ): List<ProjectedNotification> {
+        if (!notificationPreferences.medicationRemindersEnabled.first()) return emptyList()
         val global = userPreferencesDataStore.medicationReminderModeFlow.first()
         val slots = medicationSlotDao.getActiveOnce()
         if (slots.isEmpty()) return emptyList()
 
+        val activeMeds = medicationDao.getActiveOnce()
+        val overridesByPair = medicationSlotOverrideDao.getAllOnce()
+            .associateBy { it.medicationId to it.slotId }
+        val activeMedById = activeMeds.associateBy { it.id }
+
         return slots.flatMap { slot ->
-            val mode = MedicationReminderModeResolver.resolveReminderMode(
+            val slotMode = MedicationReminderModeResolver.resolveReminderMode(
                 medication = null,
                 slot = slot,
                 global = global
             )
-            if (mode != MedicationReminderMode.CLOCK) return@flatMap emptyList()
-            val firstTrigger = MedicationClockRescheduler.nextTriggerForClock(slot.idealTime, now)
-                ?: return@flatMap emptyList()
-            val occurrences = expandDailyOccurrencesFromAbsolute(firstTrigger, horizonEnd)
-            if (occurrences.isEmpty()) return@flatMap emptyList()
 
-            val medIds = medicationSlotDao.getMedicationIdsForSlotOnce(slot.id)
-            val medsForSlot = medIds.mapNotNull { medicationDao.getByIdOnce(it) }
-            slotProjectionsForSlot(slot, medsForSlot, occurrences)
+            val rows = mutableListOf<ProjectedNotification>()
+
+            if (slotMode == MedicationReminderMode.CLOCK) {
+                val firstTrigger = MedicationClockRescheduler.nextTriggerForClock(slot.idealTime, now)
+                if (firstTrigger != null) {
+                    expandDailyOccurrencesFromAbsolute(firstTrigger, horizonEnd).forEach { trigger ->
+                        rows.add(
+                            ProjectedNotification(
+                                triggerAtMillis = trigger,
+                                title = "${slot.name} Medications",
+                                body = "It's ${slot.idealTime} — time for your ${slot.name} dose.",
+                                source = ProjectedNotification.Source.MEDICATION_SLOT_CLOCK,
+                                sourceId = slot.id
+                            )
+                        )
+                    }
+                }
+            }
+
+            val linkedMedIds = medicationSlotDao.getMedicationIdsForSlotOnce(slot.id)
+            for (medId in linkedMedIds) {
+                val med = activeMedById[medId] ?: continue // skip archived/missing
+                val pairMode = MedicationReminderModeResolver.resolveReminderMode(
+                    medication = med,
+                    slot = slot,
+                    global = global
+                )
+                if (pairMode != MedicationReminderMode.CLOCK) continue
+                val override = overridesByPair[med.id to slot.id]
+                if (
+                    !MedicationClockRescheduler.needsPerMedAlarm(
+                        overrideIdealTime = override?.overrideIdealTime,
+                        slotIdealTime = slot.idealTime,
+                        medReminderMode = med.reminderMode,
+                        slotResolvedMode = slotMode
+                    )
+                ) {
+                    continue
+                }
+                val effectiveTime = override?.overrideIdealTime ?: slot.idealTime
+                val firstTrigger = MedicationClockRescheduler.nextTriggerForClock(effectiveTime, now)
+                    ?: continue
+                expandDailyOccurrencesFromAbsolute(firstTrigger, horizonEnd).forEach { trigger ->
+                    rows.add(
+                        ProjectedNotification(
+                            triggerAtMillis = trigger,
+                            title = med.displayLabel ?: med.name,
+                            body = "It's $effectiveTime — your ${slot.name} dose of ${med.name}.",
+                            source = ProjectedNotification.Source.MEDICATION_SLOT_CLOCK,
+                            sourceId = med.id
+                        )
+                    )
+                }
+            }
+
+            rows
         }
     }
 
@@ -308,24 +378,27 @@ class NotificationProjector @Inject constructor(
      * Mirrors [com.averycorp.prismtask.notifications.MedicationIntervalRescheduler.rescheduleAll]
      * for the slot path: anchors on the most-recent dose row across all
      * medications, falling back to `now` when no dose exists. Projects
-     * one upcoming row per INTERVAL-mode slot. Subsequent rolls depend on
-     * future user logging we can't predict, so only the next fire is
-     * projected.
+     * exactly one upcoming row per INTERVAL-mode slot — the production
+     * receiver fires `showSlotIntervalReminder` once per slot regardless
+     * of how many medications are linked, so per-medication fanout would
+     * over-report. Subsequent rolls depend on future user logging we
+     * can't predict, so only the next fire is projected.
      */
     private suspend fun projectMedicationSlotsInterval(now: Long): List<ProjectedNotification> {
+        if (!notificationPreferences.medicationRemindersEnabled.first()) return emptyList()
         val global = userPreferencesDataStore.medicationReminderModeFlow.first()
         val slots = medicationSlotDao.getActiveOnce()
         if (slots.isEmpty()) return emptyList()
 
         val anchorMillis = medicationDoseDao.getMostRecentDoseAnyOnce()?.takenAt
 
-        return slots.flatMap { slot ->
+        return slots.mapNotNull { slot ->
             val mode = MedicationReminderModeResolver.resolveReminderMode(
                 medication = null,
                 slot = slot,
                 global = global
             )
-            if (mode != MedicationReminderMode.INTERVAL) return@flatMap emptyList()
+            if (mode != MedicationReminderMode.INTERVAL) return@mapNotNull null
             val intervalMinutes = MedicationReminderModeResolver.resolveIntervalMinutes(
                 medication = null,
                 slot = slot,
@@ -335,58 +408,13 @@ class NotificationProjector @Inject constructor(
             val baseMillis = anchorMillis ?: now
             val trigger = maxOf(baseMillis + intervalMillis, now + MIN_LEAD_MILLIS)
 
-            val medIds = medicationSlotDao.getMedicationIdsForSlotOnce(slot.id)
-            val medsForSlot = medIds.mapNotNull { medicationDao.getByIdOnce(it) }
-            if (medsForSlot.isEmpty()) {
-                listOf(
-                    ProjectedNotification(
-                        triggerAtMillis = trigger,
-                        title = "${slot.name} — Heads Up",
-                        body = "Next interval-scheduled dose for ${slot.name}.",
-                        source = ProjectedNotification.Source.MEDICATION_SLOT_INTERVAL,
-                        sourceId = slot.id
-                    )
-                )
-            } else {
-                medsForSlot.map { med ->
-                    ProjectedNotification(
-                        triggerAtMillis = trigger,
-                        title = "${med.displayLabel ?: med.name} — Heads Up",
-                        body = "Next interval-scheduled dose of ${med.name} (${slot.name}).",
-                        source = ProjectedNotification.Source.MEDICATION_SLOT_INTERVAL,
-                        sourceId = med.id
-                    )
-                }
-            }
-        }
-    }
-
-    private fun slotProjectionsForSlot(
-        slot: MedicationSlotEntity,
-        medsForSlot: List<MedicationEntity>,
-        occurrences: List<Long>
-    ): List<ProjectedNotification> {
-        if (medsForSlot.isEmpty()) {
-            return occurrences.map { trigger ->
-                ProjectedNotification(
-                    triggerAtMillis = trigger,
-                    title = "${slot.name} — Heads Up",
-                    body = "Time for your ${slot.name} dose (${slot.idealTime}).",
-                    source = ProjectedNotification.Source.MEDICATION_SLOT_CLOCK,
-                    sourceId = slot.id
-                )
-            }
-        }
-        return occurrences.flatMap { trigger ->
-            medsForSlot.map { med ->
-                ProjectedNotification(
-                    triggerAtMillis = trigger,
-                    title = "${med.displayLabel ?: med.name} — Heads Up",
-                    body = "Time for your ${med.name} dose (${slot.idealTime}, ${slot.name}).",
-                    source = ProjectedNotification.Source.MEDICATION_SLOT_CLOCK,
-                    sourceId = med.id
-                )
-            }
+            ProjectedNotification(
+                triggerAtMillis = trigger,
+                title = "${slot.name} Medications",
+                body = "Tap to log your ${slot.name} dose.",
+                source = ProjectedNotification.Source.MEDICATION_SLOT_INTERVAL,
+                sourceId = slot.id
+            )
         }
     }
 
@@ -396,6 +424,11 @@ class NotificationProjector @Inject constructor(
         now: Long,
         horizonEnd: Long
     ): List<ProjectedNotification> {
+        // Title matches NotificationHelper.showMedicationReminder, which
+        // sets `setContentTitle("$habitName$doseInfo")` — the single-dose
+        // legacy path renders the bare med name with no "— Heads Up"
+        // suffix.
+        val titleName = med.displayLabel ?: med.name
         return clocks.flatMap { hhmm ->
             val first = HabitReminderScheduler.timeStringToNextTrigger(
                 timeStr = hhmm,
@@ -404,7 +437,7 @@ class NotificationProjector @Inject constructor(
             expandDailyOccurrencesFromAbsolute(first, horizonEnd).map { trigger ->
                 ProjectedNotification(
                     triggerAtMillis = trigger,
-                    title = "${med.displayLabel ?: med.name} — Heads Up",
+                    title = titleName,
                     body = "Time for your ${med.name} dose ($hhmm).",
                     source = ProjectedNotification.Source.MEDICATION,
                     sourceId = med.id
@@ -421,7 +454,7 @@ class NotificationProjector @Inject constructor(
         return listOf(
             ProjectedNotification(
                 triggerAtMillis = trigger,
-                title = "${med.displayLabel ?: med.name} — Heads Up",
+                title = med.displayLabel ?: med.name,
                 body = "Next interval-scheduled dose of ${med.name}.",
                 source = ProjectedNotification.Source.MEDICATION,
                 sourceId = med.id
@@ -538,6 +571,28 @@ class NotificationProjector @Inject constructor(
         }
     }
 
+    /**
+     * Cognitive-load overload check piggybacks the same daily slot as
+     * [OverloadCheckWorker] and shares its `overloadAlertsEnabled` toggle —
+     * see [com.averycorp.prismtask.notifications.NotificationWorkerScheduler.applyOverloadCheck].
+     * Projecting only one of the two would under-report the daily check
+     * count by 50%.
+     */
+    private suspend fun projectCognitiveLoadOverloadCheck(now: Long, horizonEnd: Long): List<ProjectedNotification> {
+        if (!notificationPreferences.overloadAlertsEnabled.first()) return emptyList()
+        val schedule = advancedTuningPreferences.getOverloadCheckSchedule().first()
+        val first = nextOccurrenceAt(schedule.hourOfDay, schedule.minute, now)
+        return expandDailyOccurrencesFromAbsolute(first, horizonEnd).map { trigger ->
+            ProjectedNotification(
+                triggerAtMillis = trigger,
+                title = "Cognitive Load Check",
+                body = "Cognitive-load overload check (delivers only when the load score crosses threshold).",
+                source = ProjectedNotification.Source.COGNITIVE_LOAD_OVERLOAD_CHECK,
+                sourceId = null
+            )
+        }
+    }
+
     private suspend fun projectWeeklyReview(now: Long, horizonEnd: Long): List<ProjectedNotification> {
         if (!notificationPreferences.weeklyReviewAutoGenerateEnabled.first()) return emptyList()
         if (!notificationPreferences.weeklyReviewNotificationEnabled.first()) return emptyList()
@@ -555,6 +610,27 @@ class NotificationProjector @Inject constructor(
                 title = "Your Weekly Review Is Ready",
                 body = "Tap to read this week's recap and plan ahead.",
                 source = ProjectedNotification.Source.WEEKLY_REVIEW,
+                sourceId = null
+            )
+        }
+    }
+
+    private suspend fun projectWeeklyAnalytics(now: Long, horizonEnd: Long): List<ProjectedNotification> {
+        if (!notificationPreferences.weeklyAnalyticsNotificationEnabled.first()) return emptyList()
+        val schedule = advancedTuningPreferences.getWeeklySummarySchedule().first()
+        val calendarDow = isoToCalendarDayOfWeek(schedule.dayOfWeek)
+        val first = nextWeeklyOccurrence(
+            calendarDayOfWeek = calendarDow,
+            hour = schedule.analyticsSummaryHour,
+            minute = schedule.analyticsSummaryMinute,
+            now = now
+        )
+        return expandWeeklyOccurrences(first, horizonEnd).map { trigger ->
+            ProjectedNotification(
+                triggerAtMillis = trigger,
+                title = "Weekly Score",
+                body = "Weekly analytics roll-up — content generated when delivered.",
+                source = ProjectedNotification.Source.WEEKLY_ANALYTICS,
                 sourceId = null
             )
         }

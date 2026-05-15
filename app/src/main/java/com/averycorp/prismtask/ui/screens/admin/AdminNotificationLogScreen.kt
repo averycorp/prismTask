@@ -79,13 +79,15 @@ fun AdminNotificationLogScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Projected notifications in the next 7 days (${notifications.size} total). " +
-                    "Covers task and habit reminders, slot-driven medication reminders (CLOCK at " +
-                    "the slot's ideal time, INTERVAL anchored on the most recent dose), legacy " +
-                    "schedule-mode medications with no linked slot, legacy specific-times, and the " +
-                    "periodic workers (briefing, evening summary, re-engagement, weekly habit and " +
-                    "task summaries, overload check, weekly review). Reactive sources — escalation " +
-                    "chains and habit follow-up nags — fire only after an upstream reminder, so they " +
-                    "are not pre-projected.",
+                    "Covers task and habit reminders (gated on the user's global task / medication " +
+                    "reminder toggles), slot-driven medication reminders (CLOCK at the slot's ideal " +
+                    "time plus per-(medication, slot) override alarms, INTERVAL anchored on the most " +
+                    "recent dose), legacy schedule-mode medications with no linked slot, legacy " +
+                    "specific-times, and the periodic workers (briefing, evening summary, " +
+                    "re-engagement, weekly habit / task / analytics summaries, overload check — " +
+                    "balance and cognitive-load — and weekly review). Archived medications are " +
+                    "filtered. Reactive sources — escalation chains and habit follow-up nags — fire " +
+                    "only after an upstream reminder, so they are not pre-projected.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
