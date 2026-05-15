@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.screens.pomodoro
 import android.content.Context
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.TimerPreferences
 import com.averycorp.prismtask.data.remote.api.PomodoroResponse
 import com.averycorp.prismtask.data.remote.api.PomodoroSessionResponse
@@ -49,6 +50,7 @@ class SmartPomodoroViewModelTest {
     private lateinit var api: PrismTaskApi
     private lateinit var proFeatureGate: ProFeatureGate
     private lateinit var timerPreferences: TimerPreferences
+    private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var moodEnergyRepository: MoodEnergyRepository
     private lateinit var aiCoach: PomodoroAICoach
     private lateinit var taskTimingRepository: TaskTimingRepository
@@ -79,6 +81,8 @@ class SmartPomodoroViewModelTest {
         every { timerPreferences.getPomodoroRecapCoachingEnabled() } returns flowOf(false)
         moodEnergyRepository = mockk(relaxed = true)
         coEvery { moodEnergyRepository.getRange(any(), any()) } returns emptyList()
+        taskBehaviorPreferences = mockk(relaxed = true)
+        every { taskBehaviorPreferences.getDayStartHour() } returns flowOf(4)
         aiCoach = mockk(relaxed = true)
         taskTimingRepository = mockk(relaxed = true)
     }
@@ -95,6 +99,7 @@ class SmartPomodoroViewModelTest {
         proFeatureGate,
         moodEnergyRepository,
         timerPreferences,
+        taskBehaviorPreferences,
         aiCoach,
         taskTimingRepository,
         io.mockk.mockk(relaxed = true)

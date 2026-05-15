@@ -126,6 +126,74 @@ class MoodEnergyRepositoryTest {
         assertEquals(3, all.size)
     }
 
+    /*
+     * setEnergyForDate — partial-update path used by the Today-screen
+     * Energy Check-In and post-Pomodoro energy prompt. Must preserve any
+     * mood/notes already captured by the Morning Check-In, so the more
+     * detailed entry never gets clobbered by a quick energy-only tap.
+     */
+
+    @Test
+    fun setEnergyForDate_preservesExistingMoodAndNotes() = runBlocking {
+        val morningId = repo.upsertForDate(
+            date = DAY_1,
+            mood = 5,
+            energy = 2,
+            notes = "Slept great",
+            timeOfDay = "morning"
+        )
+
+        val resultId = repo.setEnergyForDate(
+            date = DAY_1,
+            energy = 4,
+            timeOfDay = "morning"
+        )
+
+        assertEquals("Reuses the morning row id", morningId, resultId)
+        val row = dao.rows.single { it.id == morningId }
+        assertEquals("Mood preserved from morning check-in", 5, row.mood)
+        assertEquals("Energy updated", 4, row.energy)
+        assertEquals("Notes preserved", "Slept great", row.notes)
+        coVerify { syncTracker.trackUpdate(morningId, "mood_energy_log") }
+    }
+
+    @Test
+    fun setEnergyForDate_insertsWithNeutralMoodWhenNoEntryExists() = runBlocking {
+        val id = repo.setEnergyForDate(
+            date = DAY_1,
+            energy = 4,
+            timeOfDay = "morning"
+        )
+
+        val row = dao.rows.single { it.id == id }
+        assertEquals(3, row.mood)
+        assertEquals(4, row.energy)
+        assertEquals(DAY_1, row.date)
+        assertEquals("morning", row.timeOfDay)
+        coVerify { syncTracker.trackCreate(id, "mood_energy_log") }
+    }
+
+    @Test
+    fun setEnergyForDate_doesNotTouchOtherTimeOfDaySlots() = runBlocking {
+        val morningId = repo.upsertForDate(
+            date = DAY_1,
+            mood = 5,
+            energy = 2,
+            timeOfDay = "morning"
+        )
+
+        val afternoonId = repo.setEnergyForDate(
+            date = DAY_1,
+            energy = 4,
+            timeOfDay = "afternoon"
+        )
+
+        assertTrue("Different timeOfDay creates a new row", morningId != afternoonId)
+        val morningRow = dao.rows.single { it.id == morningId }
+        assertEquals("Morning row untouched", 5, morningRow.mood)
+        assertEquals("Morning row untouched", 2, morningRow.energy)
+    }
+
     private companion object {
         // Three midnight-normalized millis on consecutive UTC days.
         const val DAY_1 = 1_745_625_600_000L // 2026-04-26

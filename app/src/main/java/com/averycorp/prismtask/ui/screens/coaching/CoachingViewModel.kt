@@ -6,14 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.entity.TaskEntity
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.repository.CoachingRepository
 import com.averycorp.prismtask.data.repository.CoachingResult
+import com.averycorp.prismtask.data.repository.MoodEnergyRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
+import com.averycorp.prismtask.util.DayBoundary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -33,7 +37,9 @@ class CoachingViewModel
 constructor(
     private val coachingRepository: CoachingRepository,
     private val proFeatureGate: ProFeatureGate,
-    private val billingManager: BillingManager
+    private val billingManager: BillingManager,
+    private val moodEnergyRepository: MoodEnergyRepository,
+    private val taskBehaviorPreferences: TaskBehaviorPreferences
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
 
@@ -90,6 +96,10 @@ constructor(
         _energyPlanLoading.value = true
         viewModelScope.launch {
             coachingRepository.setTodayEnergyLevel(level)
+            // Persist into mood_energy_logs so the value survives across
+            // days and feeds the "View Trends" analytics screen — the
+            // CoachingPreferences DataStore only retains today's value.
+            persistEnergyLevelToMoodLog(level)
             val result = coachingRepository.getEnergyPlan(
                 energyLevel = level,
                 todayTasks = todayTasks,
@@ -116,6 +126,37 @@ constructor(
 
     fun dismissEnergyCheckIn() {
         _showEnergyCheckIn.value = false
+    }
+
+    /**
+     * Mirrors the user's energy-check-in choice into the daily
+     * mood/energy log so it persists across days and shows up in the
+     * "View Trends" analytics screen.
+     *
+     * The card captures energy only (no mood), so we use the partial
+     * [MoodEnergyRepository.setEnergyForDate] path — if the user already
+     * did a Morning Check-In with a real mood value, that mood is left
+     * intact rather than reset to neutral.
+     *
+     * The level → 1..5 mapping is mid-bucket on purpose ("low" means
+     * "noticeably low", not rock-bottom; "high" means "energized", not
+     * peak), so the 1 and 5 ends remain reachable via the Morning
+     * Check-In's 5-emoji scale.
+     */
+    private suspend fun persistEnergyLevelToMoodLog(level: String) {
+        val energyValue = when (level.lowercase()) {
+            "low" -> 2
+            "medium" -> 3
+            "high" -> 4
+            else -> return
+        }
+        val dayStartHour = taskBehaviorPreferences.getDayStartHour().first()
+        val todayStart = DayBoundary.startOfCurrentDay(dayStartHour)
+        moodEnergyRepository.setEnergyForDate(
+            date = todayStart,
+            energy = energyValue,
+            timeOfDay = "morning"
+        )
     }
 
     // endregion
