@@ -1262,12 +1262,129 @@ You can remember up to 15 durable preferences this user expresses about how they
 _CHAT_USER_PREFERENCES_CAP = 15
 
 
-def _format_chat_system_prompt(user_preferences: list[dict] | None) -> str:
-    """Append the rendered preference list onto the base system prompt.
+def _format_current_state_block(current_state: dict | None) -> str:
+    """Render the user's current state into a compact prompt section.
+
+    ``current_state`` arrives from ``context.load_user_context_bundle``
+    with today's task buckets, habit progress, active projects, leisure
+    totals, and medication adherence. Rendered as a Markdown-flavored
+    block the model can pattern-match on. Empty buckets render as a
+    single ``(none)`` line so the AI never has to guess whether a zero
+    means "no data" vs "not loaded".
+    """
+    if not current_state:
+        return ""
+
+    tasks = current_state.get("tasks") or {}
+    habits = current_state.get("habits") or {}
+    projects = current_state.get("projects") or {}
+    leisure = current_state.get("leisure_today") or {}
+    meds = current_state.get("medications_today") or {}
+
+    def _task_line(entry: dict) -> str:
+        bits = [entry.get("title", "")]
+        if entry.get("days_overdue"):
+            bits.append(f"({entry['days_overdue']}d overdue)")
+        pid = entry.get("id")
+        if pid is not None:
+            bits.append(f"#{pid}")
+        return "  - " + " ".join(b for b in bits if b)
+
+    def _render_bucket(label: str, total: int, items: list[dict]) -> list[str]:
+        if total == 0:
+            return [f"- {label}: (none)"]
+        header = f"- {label}: {total}"
+        if not items:
+            return [header]
+        shown = [_task_line(e) for e in items]
+        if len(items) < total:
+            shown.append(f"  - …and {total - len(items)} more")
+        return [header, *shown]
+
+    lines: list[str] = []
+    lines.append("Current State (today = "
+                 f"{current_state.get('today_iso', '?')}):")
+    lines.append("Tasks:")
+    lines.extend(
+        _render_bucket(
+            "Overdue",
+            int(tasks.get("overdue_count", 0) or 0),
+            list(tasks.get("overdue") or []),
+        )
+    )
+    lines.extend(
+        _render_bucket(
+            "Due today",
+            int(tasks.get("due_today_count", 0) or 0),
+            list(tasks.get("due_today") or []),
+        )
+    )
+    lines.extend(
+        _render_bucket(
+            "Planned today",
+            int(tasks.get("planned_today_count", 0) or 0),
+            list(tasks.get("planned_today") or []),
+        )
+    )
+    lines.append(
+        f"- Completed today: {int(tasks.get('completed_today_count', 0) or 0)}"
+    )
+
+    active = int(habits.get("active_count", 0) or 0)
+    done = int(habits.get("completed_today_count", 0) or 0)
+    lines.append(f"Habits: {done}/{active} done today")
+    today_habits = list(habits.get("today") or [])
+    if today_habits:
+        for h in today_habits:
+            check = "✓" if (h.get("count", 0) or 0) >= (h.get("target", 1) or 1) else " "
+            cat = f" [{h['category']}]" if h.get("category") else ""
+            lines.append(
+                f"  - [{check}] {h.get('name', '')}: "
+                f"{h.get('count', 0)}/{h.get('target', 1)}{cat}"
+            )
+    elif active == 0:
+        lines.append("  - (no active habits)")
+
+    active_projects = int(projects.get("active_count", 0) or 0)
+    lines.append(f"Active projects: {active_projects}")
+    for p in (projects.get("active") or []):
+        lines.append(f"  - {p.get('title', '')} #{p.get('id', '')}")
+
+    total_min = int(leisure.get("total_minutes", 0) or 0)
+    by_cat = leisure.get("by_category") or {}
+    if total_min == 0:
+        lines.append("Leisure today: 0 min")
+    else:
+        cats = ", ".join(f"{k} {v}m" for k, v in by_cat.items())
+        lines.append(f"Leisure today: {total_min} min ({cats})")
+
+    slots_taken = int(meds.get("slots_taken", 0) or 0)
+    slots_logged = int(meds.get("slots_logged", 0) or 0)
+    if slots_logged == 0:
+        lines.append("Medications today: (no slots logged)")
+    else:
+        lines.append(
+            f"Medications today: {slots_taken}/{slots_logged} slots taken"
+        )
+
+    return "\n".join(lines)
+
+
+def _format_chat_system_prompt(
+    user_preferences: list[dict] | None,
+    current_state: dict | None = None,
+) -> str:
+    """Append the preference list and (optional) current state onto the base.
 
     Preferences arrive from the chat handler as ``[{"id": str, "text":
     str}, ...]``. The rendered block lets the AI cite ids verbatim when
     emitting ``forget_preference`` without having to invent them.
+
+    ``current_state`` arrives from ``context.load_user_context_bundle``
+    when the chat handler can populate it; when None or the DB load
+    failed, the prompt falls back to the preferences-only shape that
+    predated this feature, so a transient DB hiccup degrades to "no
+    current-state grounding" rather than a 500.
     """
     prefs = user_preferences or []
     if not prefs:
@@ -1280,11 +1397,15 @@ def _format_chat_system_prompt(user_preferences: list[dict] | None) -> str:
             if pid and text:
                 lines.append(f"- [{pid}] {text}")
         rendered = "\n".join(lines) if lines else "(no preferences stored yet)"
-    return (
+    prompt = (
         f"{_CHAT_SYSTEM_PROMPT_BASE}\n\n"
         f"Current stored preferences ({len(prefs)}/{_CHAT_USER_PREFERENCES_CAP}):\n"
         f"{rendered}"
     )
+    state_block = _format_current_state_block(current_state)
+    if state_block:
+        prompt = f"{prompt}\n\n{state_block}"
+    return prompt
 
 
 # Back-compat alias for callers that still want the base prompt without
@@ -1650,6 +1771,7 @@ def generate_chat_response(
     task_context: dict | None = None,
     history: list[dict] | None = None,
     user_preferences: list[dict] | None = None,
+    current_state: dict | None = None,
 ) -> dict:
     """Call Claude Haiku to produce a conversational chat reply + optional actions.
 
@@ -1690,7 +1812,7 @@ def generate_chat_response(
         history,
         user_preferences,
     )
-    system_prompt = _format_chat_system_prompt(user_preferences)
+    system_prompt = _format_chat_system_prompt(user_preferences, current_state)
 
     last_error: Exception | None = None
     for attempt in range(2):
@@ -1726,6 +1848,7 @@ def generate_chat_response_stream(
     task_context: dict | None = None,
     history: list[dict] | None = None,
     user_preferences: list[dict] | None = None,
+    current_state: dict | None = None,
 ) -> Iterator[dict]:
     """Stream a conversational chat reply token-by-token.
 
@@ -1762,7 +1885,7 @@ def generate_chat_response_stream(
         history,
         user_preferences,
     )
-    system_prompt = _format_chat_system_prompt(user_preferences)
+    system_prompt = _format_chat_system_prompt(user_preferences, current_state)
 
     final_message = None
     try:
