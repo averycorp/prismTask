@@ -35,12 +35,83 @@ interface CompletionEntry {
  * Defaults: a single missed day inside a rolling 7-day window is forgiven
  * (the streak "bends" instead of breaking). Two missed days in the window
  * — or any miss with the grace already spent — terminates the run.
+ *
+ * The optional `byMode` field carries per-`TaskMode` overrides so the
+ * streak path can apply a wider grace window to Play / Relax activities
+ * than to Work — see `docs/WORK_PLAY_RELAX.md` § *Streak strictness*.
+ * When `byMode` is omitted (or the mode is missing from it), callers
+ * fall back to the base `gracePeriodDays` + `allowedMisses` fields. The
+ * shape stays backward-compatible: every existing caller that passes a
+ * flat `{enabled, gracePeriodDays, allowedMisses}` keeps working without
+ * change — `byMode` is purely additive.
  */
 export interface ForgivenessConfig {
   enabled: boolean;
   gracePeriodDays: number;
   allowedMisses: number;
+  /**
+   * Optional per-`TaskMode` overrides. Each entry replaces the
+   * `gracePeriodDays` + `allowedMisses` pair for the matching mode while
+   * still respecting the top-level `enabled` flag (the "forgiveness on
+   * / off" master switch is one master switch, not per-mode). Modes not
+   * listed here fall back to the base config — so a single override on
+   * Play does NOT disturb Work or Relax. See `resolveForgivenessForMode`
+   * for the resolution rule callers use.
+   */
+  byMode?: ForgivenessByMode;
 }
+
+/**
+ * Per-`TaskMode` override map. Keys are lowercased mode names so callers
+ * can write `byMode.play` without coercing the `TaskMode` enum into a
+ * specific casing first. Only Work / Play / Relax can be overridden —
+ * `UNCATEGORIZED` always reads the base config (the "lean toward the
+ * restorative read" tie-break shape from `WORK_PLAY_RELAX.md` § *Inference
+ * rules* — an unknown mode never auto-upgrades to wider grace).
+ */
+export interface ForgivenessByMode {
+  work?: ForgivenessKnobs;
+  play?: ForgivenessKnobs;
+  relax?: ForgivenessKnobs;
+}
+
+/**
+ * The two scalar knobs that constitute a forgiveness window. Used as
+ * the value type inside `ForgivenessByMode` so a per-mode override only
+ * has to carry the window + miss count, not the entire config.
+ */
+export interface ForgivenessKnobs {
+  gracePeriodDays: number;
+  allowedMisses: number;
+}
+
+/**
+ * Task mode literal type — mirrors `web/src/types/task.ts`'s `TaskMode`.
+ * Duplicated here so `streaks.ts` doesn't have to depend on `@/types` and
+ * stay portable as a pure utility module. Keep both in sync.
+ */
+export type StreakTaskMode = 'WORK' | 'PLAY' | 'RELAX' | 'UNCATEGORIZED';
+
+/**
+ * Wider default forgiveness knobs for Play / Relax modes
+ * (`docs/WORK_PLAY_RELAX.md` § *Streak strictness*). Doubles both
+ * dimensions of the base default (7 days / 1 miss) — Play and Relax get
+ * a 14-day rolling window with 2 allowed misses by default.
+ *
+ * Rationale: Work tasks tend to have external deadlines or contractual
+ * shape that survives a single off day intact. Play and Relax tasks are
+ * user-chosen and self-paced; tightening their streaks creates
+ * guilt-by-streak, which is exactly the failure mode forgiveness-first
+ * exists to avoid. Doubling both dimensions (rather than just one) gives
+ * a perceptibly wider window without inflating the absorption ratio so
+ * far it stops feeling like a streak.
+ *
+ * The user can override per-mode via Settings → Advanced Tuning.
+ */
+export const DEFAULT_PLAY_RELAX_FORGIVENESS: ForgivenessKnobs = {
+  gracePeriodDays: 14,
+  allowedMisses: 2,
+};
 
 /**
  * Default forgiveness-first knobs. Used when the caller doesn't supply a
@@ -50,12 +121,67 @@ export interface ForgivenessConfig {
  * Exported so consumers can fall back to the same constant when the
  * Advanced Tuning store reports `loaded: false`. See
  * `web/src/stores/advancedTuningStore.ts` for the user-configured path.
+ *
+ * The `byMode` field defaults to Work using the base knobs and Play /
+ * Relax both getting `DEFAULT_PLAY_RELAX_FORGIVENESS`. Existing flat
+ * callers that pass `{enabled, gracePeriodDays, allowedMisses}` keep
+ * working — `byMode` is read only when a `taskMode` is also threaded
+ * through to the streak call.
  */
 export const DEFAULT_FORGIVENESS: ForgivenessConfig = {
   enabled: true,
   gracePeriodDays: 7,
   allowedMisses: 1,
+  byMode: {
+    work: { gracePeriodDays: 7, allowedMisses: 1 },
+    play: { ...DEFAULT_PLAY_RELAX_FORGIVENESS },
+    relax: { ...DEFAULT_PLAY_RELAX_FORGIVENESS },
+  },
 };
+
+/**
+ * Resolve the effective forgiveness knobs for a given task mode. Reads
+ * `byMode[mode]` when present; falls back to the base
+ * `{gracePeriodDays, allowedMisses}` fields otherwise. The top-level
+ * `enabled` flag is always honored — a per-mode override can NOT turn
+ * forgiveness on for one mode while it's off globally.
+ *
+ * `UNCATEGORIZED` (and any falsy / unknown mode) always reads the base
+ * config. The shame-avoidance lean from `WORK_PLAY_RELAX.md` § *Inference
+ * rules* applies here: an unknown mode never auto-upgrades to wider
+ * grace — the system never assumes Play/Relax on the user's behalf.
+ *
+ * Returns a `ForgivenessConfig` (not just knobs) so callers can pass
+ * the result straight into `forgivenessDailyWalk` without further
+ * unwrapping. The `byMode` field on the returned value is intentionally
+ * dropped — once the mode is resolved there's nothing left to walk.
+ */
+export function resolveForgivenessForMode(
+  config: ForgivenessConfig,
+  mode: StreakTaskMode | null | undefined,
+): ForgivenessConfig {
+  if (!mode || mode === 'UNCATEGORIZED' || !config.byMode) {
+    return {
+      enabled: config.enabled,
+      gracePeriodDays: config.gracePeriodDays,
+      allowedMisses: config.allowedMisses,
+    };
+  }
+  const key = mode.toLowerCase() as 'work' | 'play' | 'relax';
+  const override = config.byMode[key];
+  if (!override) {
+    return {
+      enabled: config.enabled,
+      gracePeriodDays: config.gracePeriodDays,
+      allowedMisses: config.allowedMisses,
+    };
+  }
+  return {
+    enabled: config.enabled,
+    gracePeriodDays: override.gracePeriodDays,
+    allowedMisses: override.allowedMisses,
+  };
+}
 
 const SAFETY_CAP = 10_000;
 
@@ -319,6 +445,14 @@ function strictDailyWalk(
  *   the daily forgiveness walk — they extend the run without consuming
  *   the rolling grace cap. Empty by default so existing call sites
  *   behave identically. See `docs/REST_DAY.md` § *The core rule*.
+ * @param taskMode Optional `TaskMode` for the activity. When provided
+ *   and `forgivenessConfig.byMode` carries an override for that mode,
+ *   the streak walk applies the wider window (`docs/WORK_PLAY_RELAX.md`
+ *   § *Streak strictness*). When omitted, missing, or `UNCATEGORIZED`,
+ *   the walk uses the base config — never auto-upgrades to wider grace.
+ *   Habits don't carry a mode in either platform's schema today, so
+ *   habit callers leave this undefined; task-completion streak surfaces
+ *   that ship later will pass the task's mode through.
  */
 export function calculateStreaks(
   completions: CompletionEntry[],
@@ -327,6 +461,7 @@ export function calculateStreaks(
   targetCount: number,
   forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
   restDays: Set<string> = new Set<string>(),
+  taskMode?: StreakTaskMode | null,
 ): StreakData {
   const today = startOfDay(new Date());
   const completionMap = new Map<string, number>();
@@ -380,12 +515,20 @@ export function calculateStreaks(
   // days fold in as kept-by-definition — see the walk's docstring.
   // `forgivenessConfig` carries the per-user grace knobs from
   // Settings → Advanced Tuning; the default mirrors Android.
+  //
+  // Mode-aware leniency (`docs/WORK_PLAY_RELAX.md` § *Streak strictness*):
+  // resolve the config against `taskMode` before walking — Work falls
+  // through to the base knobs, Play / Relax pick up `byMode` overrides
+  // when present. Habit callers (no mode) pass `taskMode=undefined`,
+  // which short-circuits to the base config — habit streak strictness is
+  // unchanged.
+  const resolvedConfig = resolveForgivenessForMode(forgivenessConfig, taskMode);
   const walk = forgivenessDailyWalk(
     completionMap,
     today,
     targetCount,
     activeDays,
-    forgivenessConfig,
+    resolvedConfig,
     restDays,
   );
   const currentStreak = walk.resilientStreak;

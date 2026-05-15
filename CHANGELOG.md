@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/streaks): mode-aware forgiveness window — wider grace for
+  Play / Relax (`docs/WORK_PLAY_RELAX.md` § *Streak strictness*).
+  `ForgivenessConfig` now optionally carries a `byMode` field with
+  per-`TaskMode` overrides; `calculateStreaks` accepts a `taskMode`
+  parameter and resolves the effective config via
+  `resolveForgivenessForMode` before the daily walk. Defaults: Work
+  keeps the standard 7-day / 1-miss window; Play and Relax both
+  default to a wider 14-day / 2-miss window (self-paced activities
+  get more slack so the streak never inflates Work over rest). The
+  Settings → Advanced Tuning section adds three per-mode strictness
+  sub-cards letting the user override each independently; values
+  round-trip cross-device through the existing `advanced_tuning_prefs`
+  Firestore doc (`forgiveness_grace_days_{work,play,relax}` and
+  `forgiveness_allowed_misses_{work,play,relax}` fields). Backward
+  compatible: existing flat `{enabled, gracePeriodDays, allowedMisses}`
+  callers (habit cards, check-in surfaces, the strict / longest walks)
+  see no behaviour change — `byMode` is read only when a `taskMode`
+  is threaded through, and habit callers leave it undefined. Composes
+  cleanly with the rest-day fold from PR #1507 — rest days remain
+  kept-by-definition regardless of mode, and the wider Play window
+  absorbs genuine misses without spending the rest-day budget. Closes
+  Phase 2 item #5 of the Web Pillars + Philosophy audit (PR #1501,
+  `docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md`); the classifier port
+  shipped in PR #1503 unblocked threading a task's mode into the
+  streak path. 15 new parity tests (`streaks.modeAware.test.ts`) plus
+  Settings UI additions cover the standard / wider / per-mode override
+  / fallback / rest-day composition paths.
 - feat(web/today): Rest Day end-to-end — Firestore collection
   (`users/{uid}/restDays/{isoDate}`), `restDayStore` with SoD-aware
   date resolution + idempotent mark/unmark, real-time listener wired

@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
-import type { AdvancedTuningPatch } from '@/api/firestore/advancedTuningPreferences';
+import type {
+  AdvancedTuningPatch,
+  ForgivenessModeKnobs,
+} from '@/api/firestore/advancedTuningPreferences';
 
 /**
  * Settings card for Advanced Tuning — exposes the per-user knobs the
@@ -99,6 +102,44 @@ export function AdvancedTuningSection() {
           disabled={!prefs.forgivenessEnabled}
           hint="How many missed days the grace window tolerates."
           onChange={(v) => patch({ allowedMisses: v })}
+        />
+      </div>
+
+      <Divider />
+
+      {/* Per-mode forgiveness overrides */}
+      <div className="flex flex-col gap-3">
+        <SubHeader label="Streak Strictness by Mode" />
+        <p className="text-[11px] text-[var(--color-text-secondary)]">
+          Per-mode overrides for the forgiveness window. From{' '}
+          <span className="font-mono">docs/WORK_PLAY_RELAX.md</span> §{' '}
+          <em>Streak strictness</em>: Work uses the standard window, Play
+          and Relax default to a wider one. Self-paced activities get more
+          slack so the streak never inflates Work over rest. The base
+          knobs above still apply to Uncategorized tasks and to habit
+          streaks (habits don't carry a mode).
+        </p>
+
+        <ModeStrictnessGroup
+          label="Work"
+          mode="work"
+          knobs={prefs.forgivenessByMode.work}
+          disabled={!prefs.forgivenessEnabled}
+          onChange={(p) => patch({ forgivenessByMode: { work: p } })}
+        />
+        <ModeStrictnessGroup
+          label="Play"
+          mode="play"
+          knobs={prefs.forgivenessByMode.play}
+          disabled={!prefs.forgivenessEnabled}
+          onChange={(p) => patch({ forgivenessByMode: { play: p } })}
+        />
+        <ModeStrictnessGroup
+          label="Relax"
+          mode="relax"
+          knobs={prefs.forgivenessByMode.relax}
+          disabled={!prefs.forgivenessEnabled}
+          onChange={(p) => patch({ forgivenessByMode: { relax: p } })}
         />
       </div>
 
@@ -320,6 +361,61 @@ function KeywordTextarea({
         className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2.5 py-1.5 font-mono text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
       />
     </label>
+  );
+}
+
+function ModeStrictnessGroup({
+  label,
+  mode,
+  knobs,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  mode: 'work' | 'play' | 'relax';
+  knobs: ForgivenessModeKnobs;
+  disabled: boolean;
+  onChange: (p: Partial<ForgivenessModeKnobs>) => void;
+}) {
+  // A small two-slider cluster: window + misses for one mode. The outer
+  // section's `forgivenessEnabled` toggle drives the disabled state
+  // through — when forgiveness is globally off, per-mode tuning has no
+  // effect and the sliders dim accordingly.
+  return (
+    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40 p-2.5">
+      <p
+        className={`mb-2 text-xs font-semibold ${
+          disabled
+            ? 'text-[var(--color-text-secondary)]'
+            : 'text-[var(--color-text-primary)]'
+        }`}
+        aria-label={`${label} streak strictness`}
+      >
+        {label}
+      </p>
+      <SliderRow
+        label={`${label} grace window`}
+        value={knobs.gracePeriodDays}
+        min={1}
+        max={30}
+        suffix={knobs.gracePeriodDays === 1 ? ' day' : ' days'}
+        disabled={disabled}
+        onChange={(v) => onChange({ gracePeriodDays: v })}
+      />
+      <SliderRow
+        label={`${label} allowed misses`}
+        value={knobs.allowedMisses}
+        min={0}
+        max={5}
+        suffix={knobs.allowedMisses === 1 ? ' miss' : ' misses'}
+        disabled={disabled}
+        onChange={(v) => onChange({ allowedMisses: v })}
+      />
+      <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
+        Override only — Uncategorized {mode === 'work' ? 'and habit ' : ''}
+        streaks always read the base knobs above.
+      </p>
+    </div>
   );
 }
 
