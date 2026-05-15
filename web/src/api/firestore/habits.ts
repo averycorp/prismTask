@@ -92,6 +92,17 @@ function docToHabit(docId: string, data: DocumentData, uid: string): Habit {
       typeof data.isDetachedFromTemplate === 'boolean'
         ? data.isDetachedFromTemplate
         : false,
+    // Per-habit Today-skip overrides (parity B.5). Missing → null so the
+    // editor can distinguish "never set" from "explicitly -1". `-1` / `0`
+    // / `>=1` semantics mirror Android `HabitEntity.today_skip_*` columns.
+    today_skip_after_complete_days:
+      typeof data.todaySkipAfterCompleteDays === 'number'
+        ? data.todaySkipAfterCompleteDays
+        : null,
+    today_skip_before_schedule_days:
+      typeof data.todaySkipBeforeScheduleDays === 'number'
+        ? data.todaySkipBeforeScheduleDays
+        : null,
   };
 }
 
@@ -150,9 +161,11 @@ function habitCreateToDoc(data: {
   frequency?: string;
   target_count?: number;
   active_days_json?: string;
+  today_skip_after_complete_days?: number;
+  today_skip_before_schedule_days?: number;
 }): Record<string, unknown> {
   const now = Date.now();
-  return {
+  const doc: Record<string, unknown> = {
     name: data.name,
     description: data.description ?? null,
     icon: data.icon ?? '⭐',
@@ -171,11 +184,21 @@ function habitCreateToDoc(data: {
     // `bookedNote`, `trackBooking`, `trackPreviousPeriod`, `hasLogging`,
     // `showStreak`, `reminderTimesPerDay`, `reminderIntervalMillis`,
     // `nagSuppressionOverrideEnabled`, `nagSuppressionDaysOverride`,
-    // `todaySkipAfterCompleteDays`, `todaySkipBeforeScheduleDays`,
     // `isBuiltIn`, `templateKey`, `sourceVersion`, `isUserModified`,
     // `isDetachedFromTemplate`) are intentionally OMITTED. Android's
     // `SyncMapper.mapToHabit` uses sensible defaults for missing keys.
   };
+  // Per-habit Today-skip overrides. Web exposes these in `HabitModal.tsx`
+  // (parity audit § B.5) — only write when the caller actually supplied
+  // a value so Android-side state stays untouched on creates that don't
+  // touch the override switches.
+  if (data.today_skip_after_complete_days !== undefined) {
+    doc.todaySkipAfterCompleteDays = data.today_skip_after_complete_days;
+  }
+  if (data.today_skip_before_schedule_days !== undefined) {
+    doc.todaySkipBeforeScheduleDays = data.today_skip_before_schedule_days;
+  }
+  return doc;
 }
 
 function habitUpdateToDoc(
@@ -201,6 +224,15 @@ function habitUpdateToDoc(
   if (data.is_user_modified !== undefined) result.isUserModified = data.is_user_modified;
   if (data.is_detached_from_template !== undefined) {
     result.isDetachedFromTemplate = data.is_detached_from_template;
+  }
+  // Per-habit Today-skip overrides (parity B.5). Conditional-include so we
+  // never clobber Android-side values for callers that don't touch the
+  // override switches (mirrors PR #839 pattern).
+  if (data.today_skip_after_complete_days !== undefined) {
+    result.todaySkipAfterCompleteDays = data.today_skip_after_complete_days;
+  }
+  if (data.today_skip_before_schedule_days !== undefined) {
+    result.todaySkipBeforeScheduleDays = data.today_skip_before_schedule_days;
   }
   return result;
 }

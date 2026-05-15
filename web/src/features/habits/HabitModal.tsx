@@ -20,9 +20,86 @@ const COLOR_OPTIONS = [
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_VALUES = [1, 2, 3, 4, 5, 6, 7]; // ISO day of week
 
+const TODAY_SKIP_MAX_DAYS = 30;
+
 interface HabitModalProps {
   habit: Habit | null;
   onClose: () => void;
+}
+
+interface TodaySkipOverrideRowProps {
+  title: string;
+  sliderLabel: string;
+  overrideAriaLabel: string;
+  daysAriaLabel: string;
+  overrideEnabled: boolean;
+  days: number;
+  onOverrideToggle: (enabled: boolean) => void;
+  onDaysChange: (days: number) => void;
+}
+
+/**
+ * Per-habit Today-skip override row (toggle switch + day slider).
+ * Used twice in `HabitModal` for "Hide After Completion" and
+ * "Hide Before Next Schedule". Mirrors the Android UI shape on
+ * `AddEditHabitScreen.kt:747-869`.
+ */
+function TodaySkipOverrideRow({
+  title,
+  sliderLabel,
+  overrideAriaLabel,
+  daysAriaLabel,
+  overrideEnabled,
+  days,
+  onOverrideToggle,
+  onDaysChange,
+}: TodaySkipOverrideRowProps) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="text-sm text-[var(--color-text-primary)]">{title}</span>
+          <span className="text-xs text-[var(--color-text-secondary)]">
+            {overrideEnabled
+              ? 'Override the global setting for this habit'
+              : 'Use the global Today-skip setting'}
+          </span>
+        </div>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={overrideEnabled}
+          onChange={(e) => onOverrideToggle(e.target.checked)}
+          className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--color-border)] transition-colors checked:bg-[var(--color-accent)] relative after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform checked:after:translate-x-4"
+          aria-label={overrideAriaLabel}
+        />
+      </label>
+      {overrideEnabled && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              {sliderLabel}
+            </span>
+            <span className="text-xs font-medium text-[var(--color-accent)]">
+              {days === 0
+                ? 'Disabled for this habit'
+                : `${days} day${days === 1 ? '' : 's'}`}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={TODAY_SKIP_MAX_DAYS}
+            step={1}
+            value={days}
+            onChange={(e) => onDaysChange(parseInt(e.target.value, 10))}
+            className="w-full accent-[var(--color-accent)]"
+            aria-label={daysAriaLabel}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function HabitModal({ habit, onClose }: HabitModalProps) {
@@ -47,6 +124,25 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
       return [1, 2, 3, 4, 5, 6, 7];
     }
   });
+  // Per-habit Today-skip overrides. Mirrors Android `AddEditHabitScreen`
+  // (parity audit § B.5): the override switch maps to a >= 0 stored
+  // value (and -1 when off, meaning "inherit global"). The slider
+  // controls the day count when override is on; 0 means "explicitly
+  // disabled for this habit", 1..30 means "use this many days". Initial
+  // state: switch is on iff the stored value is >= 0 (Android polarity,
+  // see `AddEditHabitViewModel.kt:135` / `:137`).
+  const [skipAfterCompleteOverride, setSkipAfterCompleteOverride] = useState(
+    (habit?.today_skip_after_complete_days ?? -1) >= 0,
+  );
+  const [skipAfterCompleteDays, setSkipAfterCompleteDays] = useState(
+    Math.max(0, habit?.today_skip_after_complete_days ?? 0),
+  );
+  const [skipBeforeScheduleOverride, setSkipBeforeScheduleOverride] = useState(
+    (habit?.today_skip_before_schedule_days ?? -1) >= 0,
+  );
+  const [skipBeforeScheduleDays, setSkipBeforeScheduleDays] = useState(
+    Math.max(0, habit?.today_skip_before_schedule_days ?? 0),
+  );
   const [saving, setSaving] = useState(false);
 
   // Get unique categories from existing habits for autocomplete
@@ -68,6 +164,17 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
 
     setSaving(true);
     try {
+      // Resolve the Today-skip override values to the Android storage
+      // shape: -1 when the override switch is off (inherit global),
+      // otherwise the user-chosen day count (0 = explicitly disabled,
+      // >= 1 = N-day window). Mirrors
+      // `AddEditHabitViewModel.kt:340-350` `effectiveSkip*` resolution.
+      const effectiveSkipAfterComplete = skipAfterCompleteOverride
+        ? skipAfterCompleteDays
+        : -1;
+      const effectiveSkipBeforeSchedule = skipBeforeScheduleOverride
+        ? skipBeforeScheduleDays
+        : -1;
       const data = {
         name: name.trim(),
         description: description.trim() || undefined,
@@ -80,6 +187,8 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
           frequency === 'daily' && activeDays.length < 7
             ? JSON.stringify(activeDays.sort((a, b) => a - b))
             : undefined,
+        today_skip_after_complete_days: effectiveSkipAfterComplete,
+        today_skip_before_schedule_days: effectiveSkipBeforeSchedule,
       };
 
       if (isEditing) {
@@ -282,6 +391,57 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
             </div>
           </div>
         )}
+
+        {/* Today Page Visibility (per-habit overrides; parity audit § B.5). */}
+        {/* Mirrors Android `AddEditHabitScreen` Today-skip section
+            (`app/.../ui/screens/habits/AddEditHabitScreen.kt:747-869`). */}
+        <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40 p-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">
+              Today Page Visibility
+            </span>
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              Hide this habit from the Today screen around recent
+              completions or upcoming scheduled occurrences.
+            </span>
+          </div>
+
+          <TodaySkipOverrideRow
+            title="Hide After Completion"
+            sliderLabel="Hide on Today for"
+            overrideAriaLabel="Override Today-skip after completion"
+            daysAriaLabel="Today-skip days after completion"
+            overrideEnabled={skipAfterCompleteOverride}
+            days={skipAfterCompleteDays}
+            onOverrideToggle={(next) => {
+              setSkipAfterCompleteOverride(next);
+              // Switching on with a 0-day window means "disabled for
+              // this habit" (no effect) — seed to 1 so the slider lands
+              // somewhere useful. Mirrors Android
+              // `AddEditHabitViewModel.kt:279-284`.
+              if (next && skipAfterCompleteDays === 0) {
+                setSkipAfterCompleteDays(1);
+              }
+            }}
+            onDaysChange={setSkipAfterCompleteDays}
+          />
+
+          <TodaySkipOverrideRow
+            title="Hide Before Next Schedule"
+            sliderLabel="Hide if next occurrence within"
+            overrideAriaLabel="Override Today-skip before next schedule"
+            daysAriaLabel="Today-skip days before next schedule"
+            overrideEnabled={skipBeforeScheduleOverride}
+            days={skipBeforeScheduleDays}
+            onOverrideToggle={(next) => {
+              setSkipBeforeScheduleOverride(next);
+              if (next && skipBeforeScheduleDays === 0) {
+                setSkipBeforeScheduleDays(1);
+              }
+            }}
+            onDaysChange={setSkipBeforeScheduleDays}
+          />
+        </div>
       </div>
     </Modal>
   );

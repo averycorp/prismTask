@@ -133,6 +133,13 @@ function stubNoExistingCompletion() {
 
 // ── Android-only fields the web app must NEVER hardcode on write
 //    (otherwise it clobbers state owned by Android UI). ────────────
+// NOTE: `todaySkipAfterCompleteDays` / `todaySkipBeforeScheduleDays`
+// moved out of this list when parity audit § B.5 landed — web's
+// `HabitModal.tsx` now exposes them, so they ARE allowed in the write
+// payload when the caller explicitly supplied a value. The
+// conditional-include semantics still preserve the no-clobber invariant
+// for callers that don't touch the override switches; see the dedicated
+// "today-skip overrides" tests below.
 const ANDROID_ONLY_HABIT_FIELDS = [
   'isBookable',
   'isBooked',
@@ -146,8 +153,6 @@ const ANDROID_ONLY_HABIT_FIELDS = [
   'reminderIntervalMillis',
   'nagSuppressionOverrideEnabled',
   'nagSuppressionDaysOverride',
-  'todaySkipAfterCompleteDays',
-  'todaySkipBeforeScheduleDays',
   'isBuiltIn',
   'templateKey',
   'sourceVersion',
@@ -263,6 +268,40 @@ describe('updateHabit (web → Firestore merge-on-write parity)', () => {
     // Missing-doc path goes through `tx.set(..., {merge:true})`.
     expect(setDocMock).toHaveBeenCalledTimes(1);
     expect(updateDocMock).not.toHaveBeenCalled();
+  });
+
+  // Parity audit § B.5 — web now owns the per-habit Today-skip
+  // overrides (`HabitModal.tsx`). The patch shape must write the
+  // Android column names (`todaySkipAfterCompleteDays` /
+  // `todaySkipBeforeScheduleDays`) only when the caller supplied
+  // them, preserving the no-clobber contract for callers that don't
+  // touch the override switches.
+  it('writes Today-skip overrides when the caller supplies them', async () => {
+    updateDocMock.mockResolvedValueOnce(undefined);
+
+    await updateHabit('uid-1', 'habit-1', {
+      today_skip_after_complete_days: 3,
+      today_skip_before_schedule_days: -1,
+    });
+
+    expect(updateDocMock).toHaveBeenCalledTimes(1);
+    const patch = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(patch.todaySkipAfterCompleteDays).toBe(3);
+    expect(patch.todaySkipBeforeScheduleDays).toBe(-1);
+  });
+
+  it('omits Today-skip overrides when the caller does not touch them', async () => {
+    updateDocMock.mockResolvedValueOnce(undefined);
+
+    await updateHabit('uid-1', 'habit-1', { name: 'Just rename' });
+
+    const patch = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(
+      Object.prototype.hasOwnProperty.call(patch, 'todaySkipAfterCompleteDays'),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(patch, 'todaySkipBeforeScheduleDays'),
+    ).toBe(false);
   });
 });
 
