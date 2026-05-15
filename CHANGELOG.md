@@ -74,6 +74,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(web/settings): "Advanced Tuning" Settings section with forgiveness
+  knobs + Task Mode / Cognitive Load classifier custom keywords
+  (pillars audit Phase 2 item #4 — `docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md`).
+  New `AdvancedTuningSection.tsx` exposes a `gracePeriodDays` slider
+  (1–30, default 7) and an `allowedMisses` slider (0–5, default 1) for
+  the forgiveness-first streak engine, plus six comma-separated keyword
+  textareas (one per Task Mode tier: Work / Play / Relax; one per
+  Cognitive Load tier: Easy / Medium / Hard). Persists to Firestore at
+  `users/{uid}/prefs/advanced_tuning_prefs` using the same field names
+  Android's `AdvancedTuningPreferences.kt` writes
+  (`forgiveness_grace_days`, `forgiveness_allowed_misses`,
+  `mode_custom_keywords_*`, `load_custom_keywords_*`) so cross-device
+  sync round-trips through `GenericPreferenceSyncService` unchanged.
+  `web/src/utils/streaks.ts` and `web/src/utils/checkInStreak.ts` now
+  accept an optional `ForgivenessConfig` parameter and `habitStore` /
+  `MorningCheckInCard` / `CheckInHistoryScreen` read the live config
+  from a new `advancedTuningStore`. Falls back to `DEFAULT_FORGIVENESS`
+  (now exported from `streaks.ts`) when the prefs haven't loaded yet.
+  The Firestore listener is wired in `useFirestoreSync` alongside the
+  other 17 listeners. Coexists with `NdModesSection`'s binary
+  `forgivenessStreaks` toggle (descriptive sliders + macro toggle, not
+  replacement). Keyword fields persist only in this PR; the classifier
+  ports that consume them are tracked separately as Phase 2 items #2
+  and #3 of the same audit.
 - feat(web/habits): port `habit_logs` Firestore collection + bookable-habit
   UI (parity audit § B.3b). New `web/src/api/firestore/habitLogs.ts` mirrors
   Android's `HabitLogEntity` push payload (`{ habitCloudId, date, notes,

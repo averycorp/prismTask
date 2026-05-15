@@ -26,6 +26,7 @@ import { useCheckInLogsStore } from '@/stores/checkInLogsStore';
 import { useFocusReleaseLogsStore } from '@/stores/focusReleaseLogsStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useWeeklyReviewsStore } from '@/stores/weeklyReviewsStore';
+import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -48,6 +49,9 @@ import { useWeeklyReviewsStore } from '@/stores/weeklyReviewsStore';
  * writes (and the backend `weekly_review_generator` cron for the last)
  * surface on web without a manual refresh on the mood / check-in /
  * focus-release / medication / weekly-review screens.
+ * Pillars audit Phase 2 #4 adds `advanced_tuning_prefs` so a slider
+ * tweak on phone (forgiveness grace window, allowed misses, classifier
+ * custom keywords) propagates live to web and vice-versa.
  * `subscribeToAiFeaturesEnabled` is intentionally NOT wired here: the
  * AI-features flag is already pulled imperatively via
  * `settingsStore.loadAiFeaturesFromFirestore` on auth bootstrap, and
@@ -118,6 +122,9 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     (s) => s.subscribeToWeeklyReviews,
   );
   const subscribeToHabitLogs = useHabitLogStore((s) => s.subscribeToLogs);
+  const subscribeToAdvancedTuning = useAdvancedTuningStore(
+    (s) => s.subscribeToPrefs,
+  );
   const resetHabitLogs = useHabitLogStore((s) => s.reset);
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
@@ -135,6 +142,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const resetFocusLogs = useFocusReleaseLogsStore((s) => s.reset);
   const resetMedications = useMedicationsStore((s) => s.reset);
   const resetWeeklyReviews = useWeeklyReviewsStore((s) => s.reset);
+  const resetAdvancedTuning = useAdvancedTuningStore((s) => s.reset);
 
   useEffect(() => {
     if (!uid) {
@@ -158,6 +166,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetMedications();
       resetWeeklyReviews();
       resetHabitLogs();
+      resetAdvancedTuning();
       return;
     }
 
@@ -208,6 +217,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToMedications, 'medications');
     safeSubscribe(subscribeToWeeklyReviews, 'weekly-reviews');
     safeSubscribe(subscribeToHabitLogs, 'habit-logs');
+    safeSubscribe(subscribeToAdvancedTuning, 'advanced-tuning');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -250,6 +260,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToMedications,
     subscribeToWeeklyReviews,
     subscribeToHabitLogs,
+    subscribeToAdvancedTuning,
     resetHabitLogs,
     resetSelfCare,
     resetSlots,
@@ -267,5 +278,6 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     resetFocusLogs,
     resetMedications,
     resetWeeklyReviews,
+    resetAdvancedTuning,
   ]);
 }

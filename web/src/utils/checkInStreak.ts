@@ -1,5 +1,6 @@
 import { addDays, differenceInCalendarDays, parseISO } from 'date-fns';
 import type { CheckInLog } from '@/api/firestore/checkInLogs';
+import { DEFAULT_FORGIVENESS, type ForgivenessConfig } from '@/utils/streaks';
 
 /**
  * Forgiveness-first streak compute for morning check-ins. Mirrors
@@ -12,6 +13,14 @@ import type { CheckInLog } from '@/api/firestore/checkInLogs';
  *
  * The caller supplies a `today` ISO so this function stays pure and
  * testable. Logs can come in any order; we sort internally.
+ *
+ * The `forgivenessConfig` parameter accepts the same per-user
+ * `gracePeriodDays` + `allowedMisses` knobs Settings → Advanced Tuning
+ * exposes. When the config is missing or `enabled: false` we fall back
+ * to a strict "any miss breaks the chain" walk. When `enabled: true`
+ * the `allowedMisses` value caps how many bends we'll tolerate inside
+ * the rolling chain; the previously hardcoded single-bend behaviour is
+ * preserved as the `DEFAULT_FORGIVENESS` default.
  */
 
 export interface StreakResult {
@@ -33,15 +42,23 @@ function isoOnly(iso: string): string {
 export function computeCheckInStreak(
   logs: CheckInLog[],
   todayIso: string,
+  forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
 ): StreakResult {
   const loggedDays = new Set(logs.map((l) => isoOnly(l.date_iso)));
   const today = parseISO(todayIso);
   const loggedToday = loggedDays.has(todayIso);
 
-  // Walk backwards from today; allow a single-miss bend.
+  // Resolve the per-user knobs. When forgiveness is disabled we hold the
+  // walk to a strict "first miss ends the chain" behaviour by capping
+  // `allowedMisses` to 0. When enabled we honour the user's allowance.
+  const allowed = forgivenessConfig.enabled
+    ? Math.max(0, forgivenessConfig.allowedMisses)
+    : 0;
+
+  // Walk backwards from today; allow up to `allowed` bends.
   let cursor = today;
   let streak = 0;
-  let bendUsedSinceLast = false;
+  let bendsUsed = 0;
   let lastChainEnd: string | null = null;
 
   // If the user hasn't logged today, start scanning from yesterday —
@@ -55,10 +72,9 @@ export function computeCheckInStreak(
     if (loggedDays.has(iso)) {
       streak += 1;
       if (lastChainEnd === null) lastChainEnd = iso;
-      bendUsedSinceLast = false;
       cursor = addDays(cursor, -1);
-    } else if (!bendUsedSinceLast) {
-      bendUsedSinceLast = true;
+    } else if (bendsUsed < allowed) {
+      bendsUsed += 1;
       cursor = addDays(cursor, -1);
     } else {
       break;
@@ -69,13 +85,13 @@ export function computeCheckInStreak(
   const sorted = Array.from(loggedDays).sort();
   let longest = 0;
   let run = 0;
-  let bendUsed = false;
+  let longestBends = 0;
   for (let i = 0; i < sorted.length; i += 1) {
     const currentIso = sorted[i];
     const prevIso = sorted[i - 1];
     if (i === 0) {
       run = 1;
-      bendUsed = false;
+      longestBends = 0;
     } else {
       const gap = differenceInCalendarDays(
         parseISO(currentIso),
@@ -83,12 +99,13 @@ export function computeCheckInStreak(
       );
       if (gap === 1) {
         run += 1;
-      } else if (gap === 2 && !bendUsed) {
+      } else if (gap > 1 && longestBends + (gap - 1) <= allowed) {
+        // Forgive up to `allowed` consecutive missed days inside the run.
         run += 1;
-        bendUsed = true;
+        longestBends += gap - 1;
       } else {
         run = 1;
-        bendUsed = false;
+        longestBends = 0;
       }
     }
     if (run > longest) longest = run;

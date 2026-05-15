@@ -42,7 +42,16 @@ export interface ForgivenessConfig {
   allowedMisses: number;
 }
 
-const DEFAULT_FORGIVENESS: ForgivenessConfig = {
+/**
+ * Default forgiveness-first knobs. Used when the caller doesn't supply a
+ * user-configured `ForgivenessConfig` (e.g. signed-out users, or a render
+ * pass that fires before the `advancedTuningStore` listener hydrates).
+ *
+ * Exported so consumers can fall back to the same constant when the
+ * Advanced Tuning store reports `loaded: false`. See
+ * `web/src/stores/advancedTuningStore.ts` for the user-configured path.
+ */
+export const DEFAULT_FORGIVENESS: ForgivenessConfig = {
   enabled: true,
   gracePeriodDays: 7,
   allowedMisses: 1,
@@ -266,6 +275,13 @@ export function calculateStreaks(
   frequency: 'daily' | 'weekly',
   activeDays: number[] | null,
   targetCount: number,
+  /**
+   * Optional per-user forgiveness knobs (Settings → Advanced Tuning).
+   * When omitted the function falls back to the same defaults Android's
+   * `DailyForgivenessStreakCore` ships with, so signed-out users and
+   * mid-bootstrap renders behave identically.
+   */
+  forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
 ): StreakData {
   const today = startOfDay(new Date());
   const completionMap = new Map<string, number>();
@@ -321,7 +337,7 @@ export function calculateStreaks(
     today,
     targetCount,
     activeDays,
-    DEFAULT_FORGIVENESS,
+    forgivenessConfig,
   );
   const currentStreak = walk.resilientStreak;
 

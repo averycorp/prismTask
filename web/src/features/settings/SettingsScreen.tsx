@@ -56,6 +56,7 @@ import { AboutSection } from '@/features/settings/sections/AboutSection';
 import { HelpFeedbackSection } from '@/features/settings/sections/HelpFeedbackSection';
 import { AccessibilitySection } from '@/features/settings/sections/AccessibilitySection';
 import { NdModesSection } from '@/features/settings/sections/NdModesSection';
+import { AdvancedTuningSection } from '@/features/settings/sections/AdvancedTuningSection';
 import { AiFeaturesSection } from '@/features/settings/sections/AiFeaturesSection';
 import { DebugSection } from '@/features/settings/sections/DebugSection';
 import { DeleteAccountSection } from '@/features/settings/sections/DeleteAccountSection';
@@ -571,6 +572,16 @@ export function SettingsScreen() {
         title="ND-Friendly Modes"
       >
         <NdModesSection />
+      </SettingsSection>
+
+      {/* Advanced Tuning — pillars audit Phase 2 item #4. Forgiveness
+          knobs + classifier custom keywords for the three composable
+          pillars (forgiveness-first / task mode / cognitive load). */}
+      <SettingsSection
+        icon={<Wrench className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Advanced Tuning"
+      >
+        <AdvancedTuningSection />
       </SettingsSection>
 
       {/* Accessibility */}
