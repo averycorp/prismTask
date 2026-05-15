@@ -264,6 +264,7 @@ internal fun DetailsTabContent(
             feature = "AI Executive Assistant",
             description = "Unlimited AI task assistance, task breakdown, and energy-adaptive daily planning",
             onUpgrade = { _ -> coachingViewModel.dismissUpgradePrompt() },
+            onRestorePurchase = { coachingViewModel.restorePurchases() },
             onDismiss = { coachingViewModel.dismissUpgradePrompt() }
         )
     }

@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.screens.eisenhower
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.remote.api.EisenhowerCategorization
@@ -13,7 +14,9 @@ import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.EisenhowerQuadrant
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -60,8 +63,12 @@ class EisenhowerViewModel
 constructor(
     private val api: PrismTaskApi,
     private val taskRepository: TaskRepository,
-    private val proFeatureGate: ProFeatureGate
+    private val proFeatureGate: ProFeatureGate,
+    private val billingManager: BillingManager
 ) : ViewModel() {
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
 
     private val _allIncompleteTasks = taskRepository.getIncompleteRootTasks()
@@ -213,6 +220,17 @@ constructor(
                 _uiState.value = EisenhowerUiState.Idle
             }
             else -> Unit
+        }
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                _messages.emit("Purchases restored")
+            } catch (e: Exception) {
+                _messages.emit("Couldn't restore purchases")
+            }
         }
     }
 }

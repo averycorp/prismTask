@@ -90,6 +90,10 @@ fun DailyBriefingScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -130,6 +134,7 @@ fun DailyBriefingScreen(
                         viewModel.dismissUpgradePrompt()
                         navController.navigate("settings/subscription")
                     },
+                    onRestorePurchase = { viewModel.restorePurchases() },
                     onDismiss = {
                         viewModel.dismissUpgradePrompt()
                         navController.popBackStack()

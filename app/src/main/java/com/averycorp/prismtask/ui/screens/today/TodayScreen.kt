@@ -1038,6 +1038,7 @@ fun TodayScreen(
                 upsellFeature = null
                 navController.navigate("settings/subscription")
             },
+            onRestorePurchase = { viewModel.restorePurchases() },
             onDismiss = { upsellFeature = null }
         )
     }
@@ -1123,6 +1124,7 @@ fun TodayScreen(
                     coachingViewModel.dismissUpgradePrompt()
                     navController.navigate("settings/subscription")
                 },
+                onRestorePurchase = { viewModel.restorePurchases() },
                 onDismiss = { coachingViewModel.dismissUpgradePrompt() }
             )
         }

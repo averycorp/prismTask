@@ -14,6 +14,7 @@ import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ChecklistParsedTask
 import com.averycorp.prismtask.domain.usecase.ChecklistParser
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,7 +35,8 @@ constructor(
     private val projectRepository: ProjectRepository,
     private val tagRepository: TagRepository,
     private val checklistParser: ChecklistParser,
-    val proFeatureGate: ProFeatureGate
+    val proFeatureGate: ProFeatureGate,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     val courses: StateFlow<List<CourseEntity>> = repository
         .getActiveCourses()
@@ -225,5 +227,16 @@ constructor(
 
     fun deleteCourse(id: Long) {
         viewModelScope.launch { repository.deleteCourse(id) }
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                _snackbar.emit("Purchases restored")
+            } catch (e: Exception) {
+                _snackbar.emit("Couldn't restore purchases")
+            }
+        }
     }
 }

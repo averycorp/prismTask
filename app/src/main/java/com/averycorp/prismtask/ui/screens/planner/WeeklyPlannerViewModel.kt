@@ -2,6 +2,7 @@ package com.averycorp.prismtask.ui.screens.planner
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
@@ -10,7 +11,9 @@ import com.averycorp.prismtask.data.remote.api.WeeklyPlanRequest
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -66,9 +69,13 @@ constructor(
     private val api: PrismTaskApi,
     private val taskRepository: TaskRepository,
     private val proFeatureGate: ProFeatureGate,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages
 
     private val _config = MutableStateFlow(WeeklyPlanConfig())
     val config: StateFlow<WeeklyPlanConfig> = _config
@@ -262,5 +269,16 @@ constructor(
 
     fun clearError() {
         _error.value = null
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                _messages.emit("Purchases restored")
+            } catch (e: Exception) {
+                _messages.emit("Couldn't restore purchases")
+            }
+        }
     }
 }

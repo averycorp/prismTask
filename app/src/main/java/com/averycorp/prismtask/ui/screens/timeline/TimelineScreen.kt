@@ -629,6 +629,7 @@ fun TimelineScreen(
                         viewModel.dismissUpgradePrompt()
                         navController.navigate("settings/subscription")
                     },
+                    onRestorePurchase = { viewModel.restorePurchases() },
                     onDismiss = { viewModel.dismissUpgradePrompt() }
                 )
             }

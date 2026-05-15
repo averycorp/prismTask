@@ -145,6 +145,10 @@ fun ChatScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.statusMessages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
     // B.4 (D13): handle nav requests emitted by chat actions. start_timer
     // forwards the AI-suggested minutes through the Timer route; the timer
     // screen uses it as a one-shot session override and never persists it.
@@ -176,6 +180,7 @@ fun ChatScreen(
                         viewModel.dismissUpgradePrompt()
                         navController.navigate("settings/subscription")
                     },
+                    onRestorePurchase = { viewModel.restorePurchases() },
                     onDismiss = { viewModel.dismissUpgradePrompt() }
                 )
             }

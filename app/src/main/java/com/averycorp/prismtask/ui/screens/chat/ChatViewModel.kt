@@ -3,6 +3,7 @@ package com.averycorp.prismtask.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.converter.RecurrenceConverter
 import com.averycorp.prismtask.data.local.entity.TaskEntity
@@ -55,7 +56,8 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val naturalLanguageParser: NaturalLanguageParser,
-    private val parsedTaskResolver: ParsedTaskResolver
+    private val parsedTaskResolver: ParsedTaskResolver,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
     val messages: StateFlow<List<ChatMessage>> = chatRepository.messages
@@ -100,6 +102,9 @@ constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _statusMessages = MutableSharedFlow<String>()
+    val statusMessages: SharedFlow<String> = _statusMessages.asSharedFlow()
 
     private val _showUpgradePrompt = MutableStateFlow(false)
     val showUpgradePrompt: StateFlow<Boolean> = _showUpgradePrompt.asStateFlow()
@@ -205,6 +210,17 @@ constructor(
 
     fun dismissUpgradePrompt() {
         _showUpgradePrompt.value = false
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                _statusMessages.emit("Purchases restored")
+            } catch (e: Exception) {
+                _statusMessages.emit("Couldn't restore purchases")
+            }
+        }
     }
 
     fun dismissDisclosure() {
