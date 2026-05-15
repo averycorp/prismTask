@@ -112,6 +112,33 @@ async def _stop_calendar_sync_scheduler() -> None:
         pass
 
 
+@app.on_event("startup")
+async def _start_weekly_review_generator() -> None:
+    """Cron that auto-generates the prior-week WeeklyReview row for every
+    Firebase-linked user. Parity audit C.4b — see
+    ``app/tasks/weekly_review_generator.py``."""
+    try:
+        from app.tasks.weekly_review_generator import start_scheduler
+
+        start_scheduler()
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to start weekly_review_generator: %s", exc
+        )
+
+
+@app.on_event("shutdown")
+async def _stop_weekly_review_generator() -> None:
+    try:
+        from app.tasks.weekly_review_generator import stop_scheduler
+
+        stop_scheduler()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @app.get("/")
 async def health_check():
     return {"status": "healthy", "service": "PrismTask API", "version": API_VERSION}
