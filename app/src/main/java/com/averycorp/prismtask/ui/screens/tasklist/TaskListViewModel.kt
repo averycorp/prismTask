@@ -21,6 +21,7 @@ import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.model.TagFilterMode
 import com.averycorp.prismtask.domain.model.TaskFilter
+import com.averycorp.prismtask.domain.usecase.AiUrgencyResolver
 import com.averycorp.prismtask.domain.usecase.UrgencyScorer
 import com.averycorp.prismtask.ui.components.QuickRescheduleFormatter
 import com.averycorp.prismtask.util.DayBoundary
@@ -29,10 +30,13 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -68,7 +72,7 @@ enum class ViewMode(
     MONTH("Month")
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class TaskListViewModel
 @Inject
@@ -81,7 +85,8 @@ constructor(
     internal val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val sortPreferences: SortPreferences,
     private val userPreferencesDataStore: com.averycorp.prismtask.data.preferences.UserPreferencesDataStore,
-    private val localDateFlow: LocalDateFlow
+    private val localDateFlow: LocalDateFlow,
+    private val aiUrgencyResolver: AiUrgencyResolver
 ) : ViewModel() {
     val swipePrefs: StateFlow<com.averycorp.prismtask.data.preferences.SwipePrefs> =
         userPreferencesDataStore.swipeFlow
@@ -123,6 +128,17 @@ constructor(
     val isLoading: StateFlow<Boolean> = _isLoading
 
     private val _urgencyWeights = MutableStateFlow(UrgencyWeights())
+
+    /**
+     * Cached AI-determined urgency scores keyed by task id. Populated by
+     * [AiUrgencyResolver] when the user is Pro, the AI-urgency toggle
+     * is on, and the URGENCY sort is active. Sort uses
+     * `_aiUrgencyScores.value[id] ?: UrgencyScorer.calculateScore(...)`
+     * so the on-device formula remains the per-task fallback whenever
+     * a score is missing (network failure, partial batch, sort isn't
+     * URGENCY, or the user is Free).
+     */
+    private val _aiUrgencyScores = MutableStateFlow<Map<Long, Float>>(emptyMap())
 
     init {
         try {
@@ -166,6 +182,48 @@ constructor(
                 Log.e("TaskListVM", "Failed to load urgency weights", e)
             }
         }
+        observeAiUrgencyScores()
+    }
+
+    /**
+     * Refresh the AI urgency cache whenever the URGENCY sort is active
+     * and the task set / weights change. Debounced 500ms so a flurry of
+     * task edits (drag-reorder, bulk complete) collapses into a single
+     * Claude call. The resolver itself handles the Pro + master-AI +
+     * per-feature gating and falls back to the on-device formula
+     * per-task on any failure, so a non-Pro user simply gets the local
+     * formula cached here.
+     */
+    private fun observeAiUrgencyScores() {
+        viewModelScope.launch {
+            combine(allRootTasks, _currentSort, _urgencyWeights) { tasks, sort, weights ->
+                Triple(tasks, sort, weights)
+            }
+                .debounce(500)
+                .distinctUntilChanged { old, new ->
+                    old.second == new.second &&
+                        old.third == new.third &&
+                        old.first.map { it.id }.toSet() == new.first.map { it.id }.toSet()
+                }
+                .collect { (tasks, sort, weights) ->
+                    if (sort != SortOption.URGENCY || tasks.isEmpty()) {
+                        _aiUrgencyScores.value = emptyMap()
+                        return@collect
+                    }
+                    val subtaskCounts = subtasksMap.value.mapValues { (_, subs) ->
+                        subs.size to subs.count { it.isCompleted }
+                    }
+                    try {
+                        _aiUrgencyScores.value = aiUrgencyResolver.resolveScores(
+                            tasks = tasks,
+                            weights = weights,
+                            subtaskCounts = subtaskCounts
+                        )
+                    } catch (e: Exception) {
+                        Log.e("TaskListVM", "Failed to resolve AI urgency scores", e)
+                    }
+                }
+        }
     }
 
     private val rootTasks: StateFlow<List<TaskEntity>> = taskRepository
@@ -184,6 +242,15 @@ constructor(
         .getAllTasks()
         .map { tasks -> tasks.filter { it.parentTaskId == null } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Re-emits the same `allRootTasks` value whenever [_aiUrgencyScores]
+     * changes. Plugged into every combine that produces sorted lists so
+     * the sort pipeline re-fires when Haiku-determined scores arrive,
+     * without growing each combine to 6+ arguments.
+     */
+    private val rootTasksReSortTrigger: kotlinx.coroutines.flow.Flow<List<TaskEntity>> =
+        allRootTasks.combine(_aiUrgencyScores) { tasks, _ -> tasks }
 
     val projects: StateFlow<List<ProjectEntity>> = projectRepository
         .getAllProjects()
@@ -249,7 +316,7 @@ constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val filteredTasks: StateFlow<List<TaskEntity>> =
-        combine(allRootTasks, _currentFilter, _currentSort, taskTagsMap) { taskList, filter, sort, tagsMap ->
+        combine(rootTasksReSortTrigger, _currentFilter, _currentSort, taskTagsMap) { taskList, filter, sort, tagsMap ->
             val filtered = applyFilter(taskList, filter, tagsMap)
             sortTasks(filtered, sort)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -287,7 +354,7 @@ constructor(
 
     val groupedTasks: StateFlow<Map<String, List<TaskEntity>>> =
         combine(
-            allRootTasks,
+            rootTasksReSortTrigger,
             _currentFilter,
             _currentSort,
             taskTagsMap,
@@ -306,7 +373,7 @@ constructor(
      */
     val tasksByProject: StateFlow<Map<Long?, List<TaskEntity>>> =
         combine(
-            allRootTasks,
+            rootTasksReSortTrigger,
             _currentFilter,
             _currentSort,
             taskTagsMap,
@@ -933,7 +1000,13 @@ constructor(
                     .thenBy { it.dueDate }
             )
             SortOption.CREATED -> tasks.sortedByDescending { it.createdAt }
-            SortOption.URGENCY -> tasks.sortedByDescending { UrgencyScorer.calculateScore(it, weights = _urgencyWeights.value) }
+            SortOption.URGENCY -> {
+                val aiScores = _aiUrgencyScores.value
+                tasks.sortedByDescending { task ->
+                    aiScores[task.id]
+                        ?: UrgencyScorer.calculateScore(task, weights = _urgencyWeights.value)
+                }
+            }
             SortOption.ALPHABETICAL -> tasks.sortedBy { it.title.lowercase() }
             SortOption.CUSTOM -> tasks.sortedWith(
                 compareBy<TaskEntity> { it.sortOrder }.thenBy { it.id }

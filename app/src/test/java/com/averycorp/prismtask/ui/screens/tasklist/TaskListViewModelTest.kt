@@ -13,6 +13,7 @@ import com.averycorp.prismtask.data.repository.AttachmentRepository
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
+import com.averycorp.prismtask.domain.usecase.AiUrgencyResolver
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -52,6 +53,7 @@ class TaskListViewModelTest {
     private lateinit var sortPreferences: SortPreferences
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
     private lateinit var localDateFlow: LocalDateFlow
+    private lateinit var aiUrgencyResolver: AiUrgencyResolver
 
     @Before
     fun setUp() {
@@ -64,6 +66,15 @@ class TaskListViewModelTest {
         taskBehaviorPreferences = mockk(relaxed = true)
         sortPreferences = mockk(relaxed = true)
         userPreferencesDataStore = mockk(relaxed = true)
+        aiUrgencyResolver = mockk(relaxed = true)
+        // Default behavior: AI urgency disabled -> resolver returns local
+        // scores for whichever tasks the VM passes in. Tests that exercise
+        // the AI path explicitly override this stub.
+        coEvery { aiUrgencyResolver.resolveScores(any(), any(), any(), any()) } answers {
+            @Suppress("UNCHECKED_CAST")
+            val tasks = firstArg<List<TaskEntity>>()
+            tasks.associate { it.id to 0f }
+        }
         // Mock LocalDateFlow so observe() returns a single-emission flow.
         // (Real production flow re-emits forever via internal `delay`; that
         // would keep `runTest`'s scheduler busy. SoD-boundary regression is
@@ -105,7 +116,8 @@ class TaskListViewModelTest {
         taskBehaviorPreferences,
         sortPreferences,
         userPreferencesDataStore,
-        localDateFlow
+        localDateFlow,
+        aiUrgencyResolver
     )
 
     @Test

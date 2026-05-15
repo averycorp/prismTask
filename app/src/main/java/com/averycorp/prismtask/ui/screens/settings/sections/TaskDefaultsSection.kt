@@ -38,6 +38,7 @@ import com.averycorp.prismtask.ui.components.formatStartOfDay
 import com.averycorp.prismtask.ui.components.settings.AdvancedToggle
 import com.averycorp.prismtask.ui.components.settings.SectionHeader
 import com.averycorp.prismtask.ui.components.settings.SettingsRowWithSubtitle
+import com.averycorp.prismtask.ui.components.settings.SettingsToggleRow
 import com.averycorp.prismtask.ui.components.settings.WeightSlider
 import com.averycorp.prismtask.ui.screens.settings.sortLabels
 import com.averycorp.prismtask.ui.screens.settings.viewModeLabels
@@ -53,12 +54,15 @@ fun TaskDefaultsSection(
     dayStartHour: Int,
     dayStartMinute: Int,
     urgencyWeights: UrgencyWeights,
+    showAiUrgencyToggle: Boolean,
+    aiUrgencyEnabled: Boolean,
     defaultTaskDurationMinutes: Int,
     onDefaultSortChange: (String) -> Unit,
     onDefaultViewModeChange: (String) -> Unit,
     onFirstDayOfWeekChange: (DayOfWeek) -> Unit,
     onStartOfDayChange: (hour: Int, minute: Int) -> Unit,
     onUrgencyWeightsChange: (UrgencyWeights) -> Unit,
+    onAiUrgencyEnabledChange: (Boolean) -> Unit,
     onDefaultTaskDurationChange: (Int) -> Unit,
     onResetTaskBehaviorDefaults: () -> Unit
 ) {
@@ -133,6 +137,15 @@ fun TaskDefaultsSection(
                 onDefaultTaskDurationChange(m)
             },
             onDismiss = { showDurationPicker = false }
+        )
+    }
+
+    if (showAiUrgencyToggle) {
+        SettingsToggleRow(
+            title = "AI Urgency Sort",
+            subtitle = "Use Claude to rank the Urgency sort. Falls back to the on-device formula offline.",
+            checked = aiUrgencyEnabled,
+            onCheckedChange = onAiUrgencyEnabledChange
         )
     }
 

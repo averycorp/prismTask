@@ -86,6 +86,54 @@ class LifeCategoryClassifyTextResponse(BaseModel):
     reason: str
 
 
+# --- AI Urgency (Pro) ---
+
+
+class UrgencyScoreInput(BaseModel):
+    """Single task in a batched urgency-scoring request.
+
+    ``id`` is a caller-chosen identifier (the Android client passes the
+    local Room row id as a stringified Long) so the response can be
+    correlated back to the source task without round-tripping through
+    Firestore. ``priority`` follows the standard 0..4 scale (0=None,
+    4=Urgent).
+    """
+
+    id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    due_date: Optional[str] = None  # ISO date (YYYY-MM-DD)
+    priority: int = Field(default=0, ge=0, le=4)
+    created_at: str  # ISO date (YYYY-MM-DD)
+    subtask_count: int = Field(default=0, ge=0, le=999)
+    subtask_completed: int = Field(default=0, ge=0, le=999)
+
+
+class UrgencyScoreRequest(BaseModel):
+    """Batched urgency scoring for up to 50 tasks per call.
+
+    The 50-task cap mirrors the deliberate sort-action ergonomics on the
+    client: a user with more than 50 incomplete tasks shouldn't expect
+    the entire list to be AI-scored on every sort tap. The client is
+    responsible for selecting which window of tasks to score (e.g. the
+    currently-rendered page); any tasks not returned by the AI fall back
+    to the on-device urgency formula on the client side.
+    """
+
+    tasks: list[UrgencyScoreInput] = Field(min_length=1, max_length=50)
+
+
+class UrgencyScoreEntry(BaseModel):
+    id: str
+    score: float = Field(ge=0.0, le=1.0)
+    level: str  # "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+    reason: str
+
+
+class UrgencyScoreResponse(BaseModel):
+    scores: list[UrgencyScoreEntry]
+
+
 class EstimateDurationRequest(BaseModel):
     """Single-task duration estimate from raw text.
 

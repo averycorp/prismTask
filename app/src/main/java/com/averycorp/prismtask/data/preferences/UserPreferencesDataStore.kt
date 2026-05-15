@@ -163,7 +163,14 @@ data class PerFeatureAiPrefs(
     val smartPomodoroEnabled: Boolean = true,
     val weeklyPlannerEnabled: Boolean = true,
     val morningCheckInEnabled: Boolean = true,
-    val screenshotImportEnabled: Boolean = true
+    val screenshotImportEnabled: Boolean = true,
+    /**
+     * Haiku-determined urgency on the Tasks-screen URGENCY sort.
+     * Defaults to true so a Pro user with AI features on automatically
+     * gets the upgraded sort; the on-device formula is the fallback
+     * whenever the toggle is off, the user is Free, or the call fails.
+     */
+    val urgencyEnabled: Boolean = true
 )
 
 /**
@@ -283,6 +290,13 @@ class UserPreferencesDataStore(
         // privacy gate, this just hides the screenshot row in the AI hub.
         val KEY_AI_SCREENSHOT_IMPORT_ENABLED =
             booleanPreferencesKey("ai_screenshot_import_enabled")
+
+        // Haiku-determined urgency on the Tasks-screen URGENCY sort
+        // (Pro). Same per-feature-opt-in shape as the PR #1214 flags;
+        // master AI toggle + Pro tier are the real gates, this just
+        // lets a Pro user fall back to the on-device formula without
+        // turning the whole AI surface off.
+        val KEY_AI_URGENCY_ENABLED = booleanPreferencesKey("ai_urgency_enabled")
 
         // First-run AI chat disclosure (CHAT_QUALITY_AUDIT C.1, Phase 2 #2).
         // Set to true the first time the user dismisses the disclosure
@@ -472,7 +486,8 @@ class UserPreferencesDataStore(
             smartPomodoroEnabled = prefs[KEY_AI_SMART_POMODORO_ENABLED] ?: true,
             weeklyPlannerEnabled = prefs[KEY_AI_WEEKLY_PLANNER_ENABLED] ?: true,
             morningCheckInEnabled = prefs[KEY_AI_MORNING_CHECKIN_ENABLED] ?: true,
-            screenshotImportEnabled = prefs[KEY_AI_SCREENSHOT_IMPORT_ENABLED] ?: true
+            screenshotImportEnabled = prefs[KEY_AI_SCREENSHOT_IMPORT_ENABLED] ?: true,
+            urgencyEnabled = prefs[KEY_AI_URGENCY_ENABLED] ?: true
         )
     }
 
@@ -615,6 +630,10 @@ class UserPreferencesDataStore(
 
     suspend fun setAiScreenshotImportEnabled(enabled: Boolean) {
         dataStore.edit { it[KEY_AI_SCREENSHOT_IMPORT_ENABLED] = enabled }
+    }
+
+    suspend fun setAiUrgencyEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_AI_URGENCY_ENABLED] = enabled }
     }
 
     /**

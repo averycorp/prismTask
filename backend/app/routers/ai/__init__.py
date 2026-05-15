@@ -63,6 +63,7 @@ from ._common import (  # noqa: F401  (re-export)
     life_category_classify_text_rate_limiter,
     pomodoro_coaching_rate_limiter,
     time_block_rate_limiter,
+    urgency_score_rate_limiter,
     vision_extract_rate_limiter,
     weekly_plan_rate_limiter,
     weekly_review_rate_limiter,
@@ -89,6 +90,7 @@ from . import (
     memory,
     pomodoro,
     time_block,
+    urgency,
     weekly_plan,
     weekly_review,
 )
@@ -119,3 +121,4 @@ router.include_router(chat.router)
 router.include_router(chat_stream.router)
 router.include_router(memory.router)
 router.include_router(automation.router)
+router.include_router(urgency.router)

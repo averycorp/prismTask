@@ -48,6 +48,14 @@ cognitive_load_classify_text_rate_limiter = RateLimiter(max_requests=20, window_
 # absorbs a user iterating on a task title and re-pressing Auto.
 life_category_classify_text_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
+# AI urgency scoring (Pro). Fired when a Pro user with the AI-urgency
+# toggle on chooses the URGENCY sort on the Tasks screen. The client
+# debounces and batches up to 50 tasks per call, so 10/min per IP
+# tolerates the user toggling sort modes back and forth without burning
+# Claude budget. The server-side daily AI rate limiter is the real
+# ceiling.
+urgency_score_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
 # Per-task duration estimation — Pro-only Haiku call fired fire-and-forget
 # from AddEditTaskViewModel save when the user leaves estimatedDuration blank.
 # 20/min mirrors the other per-task text-classify limiters (one call per

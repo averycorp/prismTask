@@ -310,6 +310,38 @@ data class LifeCategoryClassifyTextResponse(
 )
 
 /**
+ * Single task in a batched AI urgency-scoring request. `id` is the
+ * stringified local Room row id so the response correlates back to the
+ * source task without a Firestore round-trip. Pro-only on the backend
+ * (`/api/v1/ai/urgency/score`); see [com.averycorp.prismtask.data.remote.UrgencyClassifier].
+ */
+data class UrgencyScoreInputDto(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    @SerializedName("due_date") val dueDate: String? = null,
+    val priority: Int = 0,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("subtask_count") val subtaskCount: Int = 0,
+    @SerializedName("subtask_completed") val subtaskCompleted: Int = 0
+)
+
+data class UrgencyScoreRequest(
+    val tasks: List<UrgencyScoreInputDto>
+)
+
+data class UrgencyScoreEntry(
+    val id: String,
+    val score: Float,
+    val level: String,
+    val reason: String
+)
+
+data class UrgencyScoreResponse(
+    val scores: List<UrgencyScoreEntry>
+)
+
+/**
  * Pro-only per-task duration estimate. Called fire-and-forget from
  * AddEditTaskViewModel save when the user leaves estimatedDuration blank.
  * Free users skip the call entirely and inherit
