@@ -387,7 +387,7 @@ fun SettingsScreen(
                 }
 
                 item {
-                    SettingsGroup(label = "Support") {
+                    SettingsGroup(label = "If You Need Help") {
                         SettingsNavRow(
                             title = "Report a Bug",
                             subtitle = "Tell us what went wrong",
