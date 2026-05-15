@@ -102,7 +102,7 @@ function Nav() {
 // Waitlist relay: every signup POSTs here. formsubmit.co emails each submission
 // to the address baked into the URL and also keeps a per-address dashboard, so
 // the list accumulates automatically with no backend / no Formspree account.
-const WAITLIST_ENDPOINT = 'https://formsubmit.co/ajax/averykarlin3@gmail.com';
+const WAITLIST_ENDPOINT = 'https://formsubmit.co/ajax/support@prismtask.app';
 
 function Hero() {
   const [email, setEmail] = useState('');
@@ -956,18 +956,16 @@ function Footer() {
               { label: 'Themes',    href: '#themes' },
               { label: 'Pricing',   href: '#pricing' },
               { label: 'Widgets',   href: '#features' },
-              { label: 'Changelog', href: 'https://github.com/averycorp/prismTask/blob/main/CHANGELOG.md', external: true },
             ]},
             { title: 'Company', links: [
-              { label: 'About',   href: 'https://github.com/averycorp/prismTask', external: true },
-              { label: 'Contact', href: 'mailto:averykarlin3@gmail.com' },
-              { label: 'Press',   href: 'mailto:averykarlin3@gmail.com?subject=PrismTask%20press%20inquiry' },
+              { label: 'Contact', href: 'mailto:support@prismtask.app' },
+              { label: 'Press',   href: 'mailto:support@prismtask.app?subject=PrismTask%20press%20inquiry' },
             ]},
             { title: 'Resources', links: [
               { label: 'Privacy policy', href: 'privacy-policy.html' },
               { label: 'Terms',          href: 'terms-of-service.html' },
               { label: 'Accessibility',  href: '#wellness' },
-              { label: 'Support',        href: 'mailto:averykarlin3@gmail.com?subject=PrismTask%20support' },
+              { label: 'Support',        href: 'mailto:support@prismtask.app?subject=PrismTask%20support' },
             ]},
           ].map(col => (
             <div key={col.title}>
