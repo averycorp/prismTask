@@ -12,6 +12,11 @@
 
 import { format } from 'date-fns';
 
+import {
+  calendarMidnightOfLogicalDayMs,
+  calendarMidnightOfNextLogicalDayMs,
+} from '@/utils/dayBoundary';
+
 // ── Timestamp helpers ──────────────────────────────────────────
 
 export function timestampToDateStr(millis: number | null | undefined): string | null {
@@ -39,21 +44,35 @@ export function isoToTimestamp(iso: string | null | undefined): number | null {
   return new Date(iso).getTime();
 }
 
-/** Start of today as millis */
-export function startOfTodayMs(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+/**
+ * Calendar midnight of the user's *logical* today.
+ *
+ * Honors `startOfDayHour` so a user opening Today at 02:00 with SoD = 4
+ * sees their previous calendar day's tasks (the day they're still in,
+ * logically), not the next day's. Mirrors Android's
+ * `DayBoundary.calendarMidnightOfCurrentDay`. Required parameter — every
+ * caller has access to the SoD pref via `useSettingsStore`, and a silent
+ * default would re-introduce the bug it was added to fix.
+ */
+export function startOfTodayMs(startOfDayHour: number): number {
+  return calendarMidnightOfLogicalDayMs(Date.now(), startOfDayHour);
 }
 
-/** End of today (start of tomorrow) as millis */
-export function endOfTodayMs(): number {
-  return startOfTodayMs() + 86_400_000;
+/** Calendar midnight of the day after the logical today. */
+export function endOfTodayMs(startOfDayHour: number): number {
+  return calendarMidnightOfNextLogicalDayMs(Date.now(), startOfDayHour);
 }
 
-/** Start of N days from now as millis */
-export function startOfDaysFromNowMs(days: number): number {
-  return startOfTodayMs() + days * 86_400_000;
+/**
+ * Calendar midnight `days` days after the logical today, used as the
+ * upper bound of the "upcoming" window. `days = 1` aligns with
+ * `endOfTodayMs(...)`.
+ */
+export function startOfDaysFromNowMs(
+  days: number,
+  startOfDayHour: number,
+): number {
+  return startOfTodayMs(startOfDayHour) + days * 86_400_000;
 }
 
 // ── Priority helpers ───────────────────────────────────────────

@@ -319,9 +319,12 @@ export async function setTagsForTask(
 
 // ── CRUD operations ──────────────────────────────────────────
 
-export async function getTodayTasks(uid: string): Promise<Task[]> {
-  const todayStart = startOfTodayMs();
-  const todayEnd = endOfTodayMs();
+export async function getTodayTasks(
+  uid: string,
+  startOfDayHour: number,
+): Promise<Task[]> {
+  const todayStart = startOfTodayMs(startOfDayHour);
+  const todayEnd = endOfTodayMs(startOfDayHour);
   const q = query(
     tasksCol(uid),
     where('dueDate', '>=', todayStart),
@@ -332,8 +335,11 @@ export async function getTodayTasks(uid: string): Promise<Task[]> {
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
 }
 
-export async function getOverdueTasks(uid: string): Promise<Task[]> {
-  const todayStart = startOfTodayMs();
+export async function getOverdueTasks(
+  uid: string,
+  startOfDayHour: number,
+): Promise<Task[]> {
+  const todayStart = startOfTodayMs(startOfDayHour);
   const q = query(
     tasksCol(uid),
     where('dueDate', '<', todayStart),
@@ -344,9 +350,13 @@ export async function getOverdueTasks(uid: string): Promise<Task[]> {
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
 }
 
-export async function getUpcomingTasks(uid: string, days = 7): Promise<Task[]> {
-  const todayEnd = endOfTodayMs();
-  const futureEnd = startOfDaysFromNowMs(days + 1);
+export async function getUpcomingTasks(
+  uid: string,
+  startOfDayHour: number,
+  days = 7,
+): Promise<Task[]> {
+  const todayEnd = endOfTodayMs(startOfDayHour);
+  const futureEnd = startOfDaysFromNowMs(days + 1, startOfDayHour);
   const q = query(
     tasksCol(uid),
     where('dueDate', '>=', todayEnd),

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  calendarMidnightOfLogicalDayMs,
+  calendarMidnightOfNextLogicalDayMs,
   clampHour,
   endOfLogicalDayMs,
   logicalToday,
@@ -52,5 +54,39 @@ describe('dayBoundary', () => {
     expect(endOfLogicalDayMs(now, 4) - startOfLogicalDayMs(now, 4)).toBe(
       86_400_000,
     );
+  });
+
+  describe('calendarMidnightOfLogicalDayMs', () => {
+    it('returns local midnight of the calendar date when SoD = 0', () => {
+      const now = new Date(2026, 3, 23, 14, 30);
+      expect(calendarMidnightOfLogicalDayMs(now, 0)).toBe(
+        new Date(2026, 3, 23, 0, 0, 0, 0).getTime(),
+      );
+    });
+
+    it('snaps to midnight of the *previous* calendar date in the pre-SoD window', () => {
+      // 2026-04-23 02:15 with SoD = 4 → logical day is 2026-04-22, so the
+      // calendar-midnight window starts at 2026-04-22 00:00, NOT 2026-04-23 00:00.
+      // This is the bug shape: web was showing tomorrow's tasks before SoD.
+      const now = new Date(2026, 3, 23, 2, 15);
+      expect(calendarMidnightOfLogicalDayMs(now, 4)).toBe(
+        new Date(2026, 3, 22, 0, 0, 0, 0).getTime(),
+      );
+    });
+
+    it('returns midnight of the same calendar date once SoD has passed', () => {
+      const now = new Date(2026, 3, 23, 5, 30);
+      expect(calendarMidnightOfLogicalDayMs(now, 4)).toBe(
+        new Date(2026, 3, 23, 0, 0, 0, 0).getTime(),
+      );
+    });
+
+    it('next-day helper is +24h from current-day helper', () => {
+      const now = new Date(2026, 3, 23, 2, 15);
+      expect(
+        calendarMidnightOfNextLogicalDayMs(now, 4) -
+          calendarMidnightOfLogicalDayMs(now, 4),
+      ).toBe(86_400_000);
+    });
   });
 });
