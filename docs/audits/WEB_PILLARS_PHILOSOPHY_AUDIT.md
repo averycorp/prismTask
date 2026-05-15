@@ -446,12 +446,54 @@ the audit doc itself merged to `main` the same session (2026-05-15):
 - **#8 project streak display** — batches with existing project-port
   audit work; not pillar-blocking.
 
-**Schedule for next audit:**
+**Schedule for next audit** *(superseded by the supplemental bundle
+below for Pillar 3 items; remaining items unchanged)*:
 
-- After items #5 + #7 land, re-audit Pillar 3 RED→YELLOW transition.
-- After #5 lands, re-audit `WORK_PLAY_RELAX.md` § *Streak strictness*
-  coverage end-to-end.
+- Re-audit after backend `#7` AI classify endpoints land.
 - Burnout band, project streak, Daily Essentials, leisure-budget streak
   surfaces remain DEFERRED — re-audit when their feature ports land.
-- Service-worker / web-push gate becomes load-bearing only if web's
+- Service-worker rest-day gate becomes load-bearing only if web's
   notification surface expands. Re-audit at that boundary.
+
+---
+
+## Phase 3 — Supplemental bundle (follow-up workers)
+
+After the initial Phase 2 bundle merged, two more workers fanned out
+to close Pillar 3 fully and to reclassify the parked DEFERRED items as
+PROCEED-with-path per
+[[feedback-no-deferrals-if-not-there-fix-it]]. Both shipped same
+session:
+
+| # | PR | Title | Tests added | Phase 2 item |
+|---|----|----|----|----|
+| E | [#1512](https://github.com/averycorp/prismTask/pull/1512) | `feat(web/streaks): mode-aware forgiveness window — wider grace for Play/Relax` | 15 mode-aware streak + 2 Settings | #5 |
+| F | [#1511](https://github.com/averycorp/prismTask/pull/1511) | `feat(web/balance): Task Mode sections on Today bar + Weekly Balance Report` | 10 tracker + 6 report | DEFERRED → PROCEED |
+
+**Supplemental impact:**
+
+- Web test suite 943 → 976 cases (33 more on top of the initial 73).
+- `ForgivenessConfig` extended with `byMode` overrides. `Play` and
+  `Relax` default to `{gracePeriodDays: 14, allowedMisses: 2}` versus
+  Work's `{7, 1}` — verified against Android by Worker E (read from
+  Android code, not invented).
+- `WeeklyBalanceReportScreen.tsx:47–52` deferral comment updated: mode
+  is no longer out of scope; only Cognitive Load remains
+  cross-platform-deferred per `COGNITIVE_LOAD.md`.
+- Six new Firestore fields on `advanced_tuning_prefs` for per-mode
+  forgiveness overrides.
+
+**Pillar status post-supplement:**
+
+| Pillar | Pre-audit | Post-Phase 2 | Post-supplement |
+|--------|-----------|--------------|-----------------|
+| Forgiveness-First | YELLOW | GREEN | GREEN |
+| Cognitive Load | YELLOW | YELLOW (balance UI cross-platform DEFER) | YELLOW (unchanged — Android still deferred) |
+| Work / Play / Relax | RED | YELLOW | **GREEN** |
+| Rest Day | RED | GREEN | GREEN |
+| Cross-cutting copy | GREEN | GREEN | GREEN |
+
+Web now embodies the three pillars + Rest Day + the descriptive-not-
+prescriptive copy stance end-to-end. The only remaining gap is the
+Cognitive Load balance / Weekly Report load section, **intentionally
+deferred on both platforms** per `COGNITIVE_LOAD.md:200–203`.
