@@ -39,7 +39,7 @@ fun HelpFeedbackSection(
         onClick = {
             val intent = Intent(Intent.ACTION_SENDTO).apply {
                 data = Uri.parse("mailto:")
-                putExtra(Intent.EXTRA_EMAIL, arrayOf("avery.karlin@gmail.com"))
+                putExtra(Intent.EXTRA_EMAIL, arrayOf("support@prismtask.app"))
                 putExtra(
                     Intent.EXTRA_SUBJECT,
                     "PrismTask Feedback — v${BuildConfig.VERSION_NAME}"
