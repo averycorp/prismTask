@@ -9,6 +9,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.entity.TaskTimingEntity
 import com.averycorp.prismtask.data.preferences.TimerPreferences
@@ -25,7 +26,9 @@ import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import com.averycorp.prismtask.notifications.PomodoroTimerService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -153,9 +156,13 @@ constructor(
     private val moodEnergyRepository: MoodEnergyRepository,
     private val timerPreferences: TimerPreferences,
     private val aiCoach: PomodoroAICoach,
-    private val taskTimingRepository: TaskTimingRepository
+    private val taskTimingRepository: TaskTimingRepository,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     private val energyAwarePomodoro = EnergyAwarePomodoro()
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages
 
     private val _energyAwareConfig = MutableStateFlow<PomodoroSessionConfig?>(null)
     val energyAwareConfig: StateFlow<PomodoroSessionConfig?> = _energyAwareConfig
@@ -343,6 +350,17 @@ constructor(
 
     fun dismissUpgradePrompt() {
         _showUpgradePrompt.value = false
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                _messages.emit("Purchases restored")
+            } catch (e: Exception) {
+                _messages.emit("Couldn't restore purchases")
+            }
+        }
     }
 
     // ----- A2 Pomodoro+ AI Coaching -----

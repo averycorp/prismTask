@@ -79,7 +79,7 @@ fun ProUpsellSheet(
     feature: ProGatedFeature,
     currentTier: UserTier,
     onUpgrade: (BillingPeriod) -> Unit,
-    onRestorePurchase: () -> Unit = {},
+    onRestorePurchase: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

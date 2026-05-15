@@ -36,7 +36,7 @@ fun UpgradePrompt(
     feature: String,
     description: String,
     onUpgrade: (BillingPeriod) -> Unit,
-    onRestorePurchase: () -> Unit = {},
+    onRestorePurchase: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -163,7 +163,7 @@ fun ProUpgradePrompt(
     feature: ProFeature,
     currentTier: UserTier = UserTier.FREE,
     onUpgrade: (BillingPeriod) -> Unit,
-    onRestorePurchase: () -> Unit = {},
+    onRestorePurchase: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {

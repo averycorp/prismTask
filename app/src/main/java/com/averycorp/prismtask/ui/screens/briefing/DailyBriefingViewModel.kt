@@ -2,13 +2,16 @@ package com.averycorp.prismtask.ui.screens.briefing
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.remote.api.DailyBriefingRequest
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -48,9 +51,13 @@ class DailyBriefingViewModel
 constructor(
     private val api: PrismTaskApi,
     private val taskRepository: TaskRepository,
-    private val proFeatureGate: ProFeatureGate
+    private val proFeatureGate: ProFeatureGate,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages
 
     private val _briefing = MutableStateFlow<DailyBriefing?>(null)
     val briefing: StateFlow<DailyBriefing?> = _briefing
@@ -159,5 +166,16 @@ constructor(
 
     fun clearError() {
         _error.value = null
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                _messages.emit("Purchases restored")
+            } catch (e: Exception) {
+                _messages.emit("Couldn't restore purchases")
+            }
+        }
     }
 }

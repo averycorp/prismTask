@@ -152,6 +152,9 @@ fun AddEditTaskSheet(
     LaunchedEffect(viewModel) {
         viewModel.errorMessages.collect { snackbarHostState.showSnackbar(it) }
     }
+    LaunchedEffect(coachingViewModel) {
+        coachingViewModel.statusMessages.collect { snackbarHostState.showSnackbar(it) }
+    }
     val subtaskCount by viewModel.subtaskCount.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(
         initialPage = initialTab.coerceIn(0, 2),

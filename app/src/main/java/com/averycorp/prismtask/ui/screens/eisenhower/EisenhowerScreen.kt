@@ -115,6 +115,7 @@ fun EisenhowerScreen(
                         viewModel.dismissUpgradePrompt()
                         navController.navigate("settings/subscription")
                     },
+                    onRestorePurchase = { viewModel.restorePurchases() },
                     onDismiss = { viewModel.dismissUpgradePrompt() }
                 )
             }
@@ -122,6 +123,10 @@ fun EisenhowerScreen(
     }
 
     val isLoading = uiState is EisenhowerUiState.Loading
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     // Also surface Error/Empty via snackbar as a secondary signal; the
     // primary rendering is the screen-level banner below so the user

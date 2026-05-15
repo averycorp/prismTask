@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.averycorp.prismtask.data.billing.BillingManager
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -96,7 +97,8 @@ constructor(
     private val tourCardPreferences: TourCardPreferences,
     private val coachmarkController: CoachmarkController,
     private val habitDailyTaskGenerator: HabitDailyTaskGenerator,
-    private val restDayRepository: RestDayRepository
+    private val restDayRepository: RestDayRepository,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     /**
      * True when the user has marked today (logical, SoD-aware) as a rest
@@ -1321,6 +1323,17 @@ constructor(
                 dailyEssentialsPreferences.markHintSeen()
             } catch (e: Exception) {
                 Log.e("TodayVM", "Failed to dismiss daily essentials hint", e)
+            }
+        }
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                snackbarHostState.showSnackbar("Purchases restored")
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar("Couldn't restore purchases")
             }
         }
     }

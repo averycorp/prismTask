@@ -6,6 +6,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.billing.UserTier
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
@@ -107,7 +108,8 @@ constructor(
     private val sortPreferences: SortPreferences,
     private val aiTimeBlockUseCase: AiTimeBlockUseCase,
     private val proFeatureGate: ProFeatureGate,
-    private val taskBehaviorPreferences: TaskBehaviorPreferences
+    private val taskBehaviorPreferences: TaskBehaviorPreferences,
+    private val billingManager: BillingManager
 ) : ViewModel() {
     val userTier: StateFlow<UserTier> = proFeatureGate.userTier
 
@@ -624,6 +626,17 @@ constructor(
                 _scheduleUiState.value = AiScheduleUiState.Idle
             }
             else -> Unit
+        }
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            try {
+                billingManager.restorePurchases()
+                snackbarHostState.showSnackbar("Purchases restored")
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar("Couldn't restore purchases")
+            }
         }
     }
 }

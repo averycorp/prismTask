@@ -146,6 +146,7 @@ fun SchoolworkScreen(
                         showUpgradePrompt = false
                         navController.navigate("settings/subscription")
                     },
+                    onRestorePurchase = { viewModel.restorePurchases() },
                     onDismiss = { showUpgradePrompt = false }
                 )
             }

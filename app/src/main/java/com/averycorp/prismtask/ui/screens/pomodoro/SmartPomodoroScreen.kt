@@ -95,10 +95,15 @@ fun SmartPomodoroScreen(
                         viewModel.dismissUpgradePrompt()
                         navController.navigate("settings/subscription")
                     },
+                    onRestorePurchase = { viewModel.restorePurchases() },
                     onDismiss = { viewModel.dismissUpgradePrompt() }
                 )
             }
         )
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
     // Error state also gets a snackbar as a secondary signal. Primary
