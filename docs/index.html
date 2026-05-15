@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO -->
+    <title>PrismTask — Smart Task Management</title>
+    <meta name="description" content="Smart task management with AI-powered NLP, habit tracking, and productivity analytics. Organize your work and life with PrismTask." />
+    <meta name="theme-color" content="#6366f1" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PrismTask — Smart Task Management" />
+    <meta property="og:description" content="Smart task management with AI-powered NLP, habit tracking, and productivity analytics." />
+    <meta property="og:site_name" content="PrismTask" />
+    <meta property="og:image" content="/favicon.svg" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="PrismTask — Smart Task Management" />
+    <meta name="twitter:description" content="Smart task management with AI-powered NLP, habit tracking, and productivity analytics." />
+
+    <!-- Favicon & PWA -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Preload critical assets -->
+    <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
+
+    <!-- Per-theme Google Fonts. Loaded with display=swap so FOIT never
+         blocks interaction. `preconnect` keeps the TLS handshake off
+         the critical path. Eight families cover the four shipped
+         themes (see web/src/theme/themes.ts). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Audiowide&family=Rajdhani:wght@400;500;600;700&family=Monoton&family=Share+Tech+Mono&family=VT323&family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:ital,wght@0,400..700;1,400..700&display=swap"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
