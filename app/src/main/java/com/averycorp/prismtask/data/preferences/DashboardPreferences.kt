@@ -3,6 +3,7 @@ package com.averycorp.prismtask.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -27,6 +28,7 @@ constructor(
         private val PROGRESS_STYLE = stringPreferencesKey("progress_style")
         private val COLLAPSED_SECTIONS = stringSetPreferencesKey("collapsed_sections")
         private val COMPLETION_COUNT_MODE = stringPreferencesKey("completion_count_mode")
+        private val SHOW_PROGRESS_PERCENTAGE = booleanPreferencesKey("show_progress_percentage")
 
         val DEFAULT_ORDER = listOf(
             "progress",
@@ -76,6 +78,16 @@ constructor(
         }
     }
 
+    fun getShowProgressPercentage(): Flow<Boolean> = context.dashboardDataStore.data.map { prefs ->
+        prefs[SHOW_PROGRESS_PERCENTAGE] ?: false
+    }
+
+    suspend fun setShowProgressPercentage(show: Boolean) {
+        context.dashboardDataStore.edit { prefs ->
+            prefs[SHOW_PROGRESS_PERCENTAGE] = show
+        }
+    }
+
     suspend fun setSectionCollapsed(sectionKey: String, collapsed: Boolean) {
         context.dashboardDataStore.edit { prefs ->
             val current = prefs[COLLAPSED_SECTIONS] ?: DEFAULT_COLLAPSED
@@ -108,6 +120,7 @@ constructor(
             prefs.remove(PROGRESS_STYLE)
             prefs.remove(COLLAPSED_SECTIONS)
             prefs.remove(COMPLETION_COUNT_MODE)
+            prefs.remove(SHOW_PROGRESS_PERCENTAGE)
         }
     }
 }

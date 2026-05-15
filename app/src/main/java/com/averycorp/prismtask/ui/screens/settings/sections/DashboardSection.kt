@@ -14,6 +14,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,10 +37,12 @@ import com.averycorp.prismtask.ui.screens.settings.sectionLabels
 @Composable
 fun DashboardSection(
     progressStyle: String,
+    showProgressPercentage: Boolean,
     completionCountMode: CompletionCountMode,
     sectionOrder: List<String>,
     hiddenSections: Set<String>,
     onProgressStyleChange: (String) -> Unit,
+    onShowProgressPercentageChange: (Boolean) -> Unit,
     onCompletionCountModeChange: (CompletionCountMode) -> Unit,
     onHiddenSectionsChange: (Set<String>) -> Unit,
     onSectionOrderChange: (List<String>) -> Unit,
@@ -66,6 +69,31 @@ fun DashboardSection(
                 )
             )
         }
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onShowProgressPercentageChange(!showProgressPercentage) }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Show Percentage",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "Display a percent-complete label next to the progress ring.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = showProgressPercentage,
+            onCheckedChange = onShowProgressPercentageChange
+        )
     }
 
     Spacer(modifier = Modifier.height(12.dp))

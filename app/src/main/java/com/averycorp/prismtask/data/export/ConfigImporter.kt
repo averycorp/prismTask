@@ -130,6 +130,8 @@ internal class ConfigImporter(
             }
             dashboard.get("progressStyle")?.takeIf { !it.isJsonNull }?.asString
                 ?.let { dashboardPreferences.setProgressStyle(it) }
+            dashboard.get("showProgressPercentage")?.takeIf { !it.isJsonNull }
+                ?.let { dashboardPreferences.setShowProgressPercentage(it.asBoolean) }
             dashboard.getAsJsonArray("collapsedSections")?.forEach { elem ->
                 if (!elem.isJsonNull) {
                     dashboardPreferences.setSectionCollapsed(elem.asString, true)
