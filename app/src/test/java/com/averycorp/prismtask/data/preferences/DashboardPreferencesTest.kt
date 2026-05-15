@@ -32,9 +32,19 @@ class DashboardPreferencesTest {
 
     @Test
     fun setSectionOrder_roundTrips() = runTest {
-        val custom = listOf("completed", "overdue", "progress")
+        val custom = DashboardPreferences.DEFAULT_ORDER.reversed()
         prefs.setSectionOrder(custom)
         assertEquals(custom, prefs.getSectionOrder().first())
+    }
+
+    @Test
+    fun getSectionOrder_appendsKeysAddedAfterUserCustomized() = runTest {
+        // Simulate an older install whose stored order predates "habits" being a toggleable section.
+        val legacy = DashboardPreferences.DEFAULT_ORDER.filterNot { it == "habits" }
+        prefs.setSectionOrder(legacy)
+
+        val resolved = prefs.getSectionOrder().first()
+        assertEquals(legacy + "habits", resolved)
     }
 
     @Test
