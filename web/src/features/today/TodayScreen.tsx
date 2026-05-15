@@ -22,7 +22,6 @@ import { Spinner } from '@/components/ui/Spinner';
 import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task } from '@/types/task';
 import type { DashboardSummary } from '@/types/api';
-import { MedicationSlotList } from '@/features/daily-essentials/MedicationSlotList';
 import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
 import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
@@ -385,7 +384,7 @@ export function TodayScreen() {
               />
             );
           case 'daily_essentials':
-            return <DailyEssentialsSection key={sectionKey} />;
+            return null;
           case 'habits':
             return (
               <HabitChipsSection
@@ -780,21 +779,6 @@ function PlanMoreSection({ onClick }: { onClick: () => void }) {
         />
       </button>
     </div>
-  );
-}
-
-/**
- * Daily Essentials slot — currently just the medication slot list.
- * Extracted for dashboard-order parity.
- */
-function DailyEssentialsSection() {
-  return (
-    <section className="mb-4 flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-        Medications
-      </h3>
-      <MedicationSlotList />
-    </section>
   );
 }
 
