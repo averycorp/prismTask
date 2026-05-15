@@ -35,9 +35,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -281,7 +278,11 @@ fun AddEditHabitScreen(
 
             // Frequency
             SectionLabel("Frequency")
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 val periods = listOf(
                     "daily" to "Daily",
                     "weekly" to "Weekly",
@@ -290,12 +291,12 @@ fun AddEditHabitScreen(
                     "bimonthly" to "Bimonthly",
                     "quarterly" to "Quarterly"
                 )
-                periods.forEachIndexed { index, (value, label) ->
-                    SegmentedButton(
+                periods.forEach { (value, label) ->
+                    FilterChip(
                         selected = viewModel.frequencyPeriod == value,
                         onClick = { viewModel.onFrequencyPeriodChange(value) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = periods.size)
-                    ) { Text(label, style = MaterialTheme.typography.labelSmall) }
+                        label = { Text(label, maxLines = 1, softWrap = false) }
+                    )
                 }
             }
 
