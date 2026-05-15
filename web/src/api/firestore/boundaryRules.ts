@@ -4,9 +4,11 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   type DocumentData,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
@@ -128,4 +130,24 @@ export async function updateRule(
 
 export async function deleteRule(uid: string, id: string): Promise<void> {
   await deleteDoc(ruleDoc(uid, id));
+}
+
+// ── Real-time listener ───────────────────────────────────────
+
+/**
+ * Subscribe to the user's boundary-rule collection. Wired from
+ * `useFirestoreSync` so cross-device edits (Android adds a work-hours
+ * window, web should reflect it immediately in the Today banner +
+ * Settings list without a refresh). Closes parity audit § A.1b for
+ * `boundaryRules` — the firestore module already has full CRUD, only
+ * the live-listener piece was missing.
+ */
+export function subscribeToRules(
+  uid: string,
+  callback: (rules: BoundaryRule[]) => void,
+): Unsubscribe {
+  const q = query(rulesCol(uid), orderBy('createdAt', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => docToRule(d.id, d.data())));
+  });
 }

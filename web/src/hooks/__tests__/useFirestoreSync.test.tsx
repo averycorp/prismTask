@@ -20,6 +20,7 @@ const {
   subscribeToAllPhasesMock,
   subscribeToAllRisksMock,
   subscribeToAllAnchorsMock,
+  subscribeToRulesMock,
   unsubTasks,
   unsubProjects,
   unsubTags,
@@ -32,6 +33,7 @@ const {
   unsubPhases,
   unsubRisks,
   unsubAnchors,
+  unsubRules,
 } = vi.hoisted(() => {
   const unsubTasks = vi.fn();
   const unsubProjects = vi.fn();
@@ -45,6 +47,7 @@ const {
   const unsubPhases = vi.fn();
   const unsubRisks = vi.fn();
   const unsubAnchors = vi.fn();
+  const unsubRules = vi.fn();
   return {
     subscribeToTasksMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
@@ -82,6 +85,9 @@ const {
     subscribeToAllAnchorsMock: vi.fn<
       (uid: string, cb: (data: unknown) => void) => () => void
     >(() => unsubAnchors),
+    subscribeToRulesMock: vi.fn<
+      (uid: string, cb: (data: unknown) => void) => () => void
+    >(() => unsubRules),
     unsubTasks,
     unsubProjects,
     unsubTags,
@@ -94,6 +100,7 @@ const {
     unsubPhases,
     unsubRisks,
     unsubAnchors,
+    unsubRules,
   };
 });
 
@@ -176,6 +183,12 @@ vi.mock('@/api/firestore/externalAnchors', async () => {
   >('@/api/firestore/externalAnchors');
   return { ...actual, subscribeToAllAnchors: subscribeToAllAnchorsMock };
 });
+vi.mock('@/api/firestore/boundaryRules', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/api/firestore/boundaryRules')
+  >('@/api/firestore/boundaryRules');
+  return { ...actual, subscribeToRules: subscribeToRulesMock };
+});
 vi.mock('@/lib/firebase', () => ({ firestore: { __mock: true } }));
 
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
@@ -193,11 +206,13 @@ import { useTaskDependencyStore } from '@/stores/taskDependencyStore';
 import { useProjectPhaseStore } from '@/stores/projectPhaseStore';
 import { useProjectRiskStore } from '@/stores/projectRiskStore';
 import { useExternalAnchorStore } from '@/stores/externalAnchorStore';
+import { useBoundaryRulesStore } from '@/stores/boundaryRulesStore';
 import {
   DEFAULT_REMINDER_MODE_PREFERENCES,
   type MedicationReminderModePreferences,
 } from '@/api/firestore/medicationPreferences';
 import type { MedicationSlotDef } from '@/api/firestore/medicationSlots';
+import type { BoundaryRule } from '@/api/firestore/boundaryRules';
 import type { Task } from '@/types/task';
 import type { TaskDependency } from '@/types/taskDependency';
 import type { ProjectPhase } from '@/types/projectPhase';
@@ -217,6 +232,7 @@ const ALL_SUBSCRIBES = [
   subscribeToAllPhasesMock,
   subscribeToAllRisksMock,
   subscribeToAllAnchorsMock,
+  subscribeToRulesMock,
 ] as const;
 
 const ALL_UNSUBS = [
@@ -232,6 +248,7 @@ const ALL_UNSUBS = [
   unsubPhases,
   unsubRisks,
   unsubAnchors,
+  unsubRules,
 ] as const;
 
 function resetAllMocks() {
@@ -249,6 +266,7 @@ function resetAllMocks() {
   subscribeToAllPhasesMock.mockReturnValue(unsubPhases);
   subscribeToAllRisksMock.mockReturnValue(unsubRisks);
   subscribeToAllAnchorsMock.mockReturnValue(unsubAnchors);
+  subscribeToRulesMock.mockReturnValue(unsubRules);
 }
 
 function resetStores() {
@@ -269,6 +287,7 @@ function resetStores() {
   useProjectPhaseStore.setState({ phases: [] });
   useProjectRiskStore.setState({ risks: [] });
   useExternalAnchorStore.setState({ anchors: [] });
+  useBoundaryRulesStore.setState({ rules: [] });
 }
 
 describe('useFirestoreSync', () => {
@@ -277,7 +296,7 @@ describe('useFirestoreSync', () => {
     resetStores();
   });
 
-  it('subscribes to all 11 entity types when uid is set', () => {
+  it('subscribes to all tracked entity types when uid is set', () => {
     renderHook(() => useFirestoreSync('uid-A'));
 
     for (const m of ALL_SUBSCRIBES) {
@@ -515,6 +534,49 @@ describe('useFirestoreSync', () => {
     callback([anchor]);
 
     expect(useExternalAnchorStore.getState().anchors).toEqual([anchor]);
+  });
+
+  // Parity audit § A.1b — boundary rules now stream live from Firestore.
+  it('a remote boundary-rules snapshot updates the boundary-rules store', () => {
+    renderHook(() => useFirestoreSync('uid-A'));
+
+    const callback = subscribeToRulesMock.mock.calls[0]?.[1] as unknown as (
+      rules: BoundaryRule[],
+    ) => void;
+    const rule: BoundaryRule = {
+      id: 'br1',
+      type: 'daily_task_cap',
+      label: 'Max 12',
+      value: 12,
+      secondary_value: null,
+      enabled: true,
+      created_at: 0,
+      updated_at: 0,
+    };
+    callback([rule]);
+
+    expect(useBoundaryRulesStore.getState().rules).toEqual([rule]);
+  });
+
+  it('resets the boundary-rules cache on sign-out', () => {
+    useBoundaryRulesStore.setState({
+      rules: [
+        {
+          id: 'br-prev',
+          type: 'daily_task_cap',
+          label: 'Stale',
+          value: 5,
+          secondary_value: null,
+          enabled: true,
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
+    });
+
+    renderHook(() => useFirestoreSync(null));
+
+    expect(useBoundaryRulesStore.getState().rules).toEqual([]);
   });
 
   it('a failed subscription does not block the remaining listeners', () => {
