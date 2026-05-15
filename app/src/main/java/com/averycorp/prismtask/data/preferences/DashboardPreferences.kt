@@ -30,6 +30,7 @@ constructor(
         val DEFAULT_ORDER = listOf(
             "progress",
             "daily_essentials",
+            "habits",
             "overdue",
             "today_tasks",
             "plan_more",
@@ -43,7 +44,11 @@ constructor(
     }
 
     fun getSectionOrder(): Flow<List<String>> = context.dashboardDataStore.data.map { prefs ->
-        prefs[SECTION_ORDER]?.split(",")?.filter { it.isNotBlank() } ?: DEFAULT_ORDER
+        val stored = prefs[SECTION_ORDER]?.split(",")?.filter { it.isNotBlank() } ?: return@map DEFAULT_ORDER
+        // Append any sections added to DEFAULT_ORDER after the user customized their order,
+        // so newly introduced toggles (e.g. "habits") still surface in settings.
+        val missing = DEFAULT_ORDER.filterNot { it in stored }
+        if (missing.isEmpty()) stored else stored + missing
     }
 
     fun getHiddenSections(): Flow<Set<String>> = context.dashboardDataStore.data.map { prefs ->

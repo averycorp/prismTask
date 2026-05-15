@@ -22,6 +22,7 @@ internal val sectionLabels = mapOf(
     "overdue" to "From Earlier",
     "today_tasks" to "Today Tasks",
     "daily_essentials" to "Daily Essentials",
+    "habits" to "Habits",
     "plan_more" to "Plan More",
     "completed" to "Completed"
 )
