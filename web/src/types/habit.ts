@@ -23,6 +23,22 @@ export interface Habit {
   source_version?: number;
   is_user_modified?: boolean;
   is_detached_from_template?: boolean;
+  /**
+   * Per-habit override for the Today-screen "skip if completed within N
+   * days" window (parity B.5). Mirrors Android
+   * `HabitEntity.today_skip_after_complete_days`
+   * (`data/local/entity/HabitEntity.kt`). `-1` = inherit the global
+   * Today-skip default; `0` = explicitly disabled for this habit; `>=1` =
+   * use this many days as the window. Missing values are treated as `-1`.
+   */
+  today_skip_after_complete_days?: number | null;
+  /**
+   * Per-habit override for the Today-screen "skip if next scheduled
+   * occurrence is within N days" window. Mirrors Android
+   * `HabitEntity.today_skip_before_schedule_days`. Same `-1` / `0` /
+   * `>=1` semantics as `today_skip_after_complete_days`.
+   */
+  today_skip_before_schedule_days?: number | null;
 }
 
 export interface HabitCreate {
@@ -34,6 +50,8 @@ export interface HabitCreate {
   frequency?: HabitFrequency;
   target_count?: number;
   active_days_json?: string;
+  today_skip_after_complete_days?: number;
+  today_skip_before_schedule_days?: number;
 }
 
 export interface HabitUpdate {
@@ -51,6 +69,10 @@ export interface HabitUpdate {
   source_version?: number;
   is_user_modified?: boolean;
   is_detached_from_template?: boolean;
+  /** -1 / 0 / >=1 — see `Habit.today_skip_after_complete_days` (parity B.5). */
+  today_skip_after_complete_days?: number;
+  /** -1 / 0 / >=1 — see `Habit.today_skip_before_schedule_days`. */
+  today_skip_before_schedule_days?: number;
 }
 
 export interface HabitCompletion {

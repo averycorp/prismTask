@@ -140,6 +140,77 @@ const TASK_MODE_OPTIONS: { value: TaskMode | ''; label: string }[] = [
   { value: 'RELAX', label: 'Relax' },
 ];
 
+interface FocusReleaseOverrideRowProps {
+  title: string;
+  enabledLabel: string;
+  disabledLabel: string;
+  overrideAriaLabel: string;
+  valueAriaLabel: string;
+  placeholder: string;
+  min: number;
+  max: number;
+  overrideEnabled: boolean;
+  value: string;
+  onOverrideToggle: (enabled: boolean) => void;
+  onValueChange: (raw: string) => void;
+}
+
+/**
+ * Focus-Release per-task override row (toggle switch + number input).
+ * Used twice in the Schedule tab for the Good-Enough Timer minutes
+ * override and the max-revisions override. Mirrors Android `TaskEntity`
+ * `good_enough_minutes_override` / `max_revisions_override` semantics:
+ * the override is tri-state on the wire (`null` clears, `int` sets,
+ * `undefined` leaves Android-side state alone).
+ */
+function FocusReleaseOverrideRow({
+  title,
+  enabledLabel,
+  disabledLabel,
+  overrideAriaLabel,
+  valueAriaLabel,
+  placeholder,
+  min,
+  max,
+  overrideEnabled,
+  value,
+  onOverrideToggle,
+  onValueChange,
+}: FocusReleaseOverrideRowProps) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="text-sm text-[var(--color-text-primary)]">{title}</span>
+          <span className="text-xs text-[var(--color-text-secondary)]">
+            {overrideEnabled ? enabledLabel : disabledLabel}
+          </span>
+        </div>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={overrideEnabled}
+          onChange={(e) => onOverrideToggle(e.target.checked)}
+          className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--color-border)] transition-colors checked:bg-[var(--color-accent)] relative after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform checked:after:translate-x-4"
+          aria-label={overrideAriaLabel}
+        />
+      </label>
+      {overrideEnabled && (
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
+          aria-label={valueAriaLabel}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function TaskEditor({
   onClose,
   onUpdate,
@@ -203,6 +274,20 @@ export default function TaskEditor({
   // Reward / output mode (Work / Play / Relax). Same omit-on-empty
   // semantics as lifeCategory + cognitiveLoad.
   const [taskMode, setTaskMode] = useState<TaskMode | ''>('');
+  // Focus-Release per-task overrides (parity audit § B.8). Each is a
+  // tri-state on the wire: `null` = clear the override (fall back to
+  // global default), a positive integer = use this value, and
+  // `undefined` = leave the Android-side field alone (the
+  // conditional-include writer enforces the third state). The editor
+  // models the active state with an Override-checkbox + number input
+  // pattern that mirrors the Android UI shape on `AddEditHabitScreen`
+  // for the today-skip fields.
+  const [goodEnoughOverrideEnabled, setGoodEnoughOverrideEnabled] =
+    useState(false);
+  const [goodEnoughMinutes, setGoodEnoughMinutes] = useState<string>('');
+  const [maxRevisionsOverrideEnabled, setMaxRevisionsOverrideEnabled] =
+    useState(false);
+  const [maxRevisions, setMaxRevisions] = useState<string>('');
 
   // Subtasks
   const [subtasks, setSubtasks] = useState<Task[]>([]);
@@ -241,6 +326,10 @@ export default function TaskEditor({
       setLifeCategory('');
       setCognitiveLoad('');
       setTaskMode('');
+      setGoodEnoughOverrideEnabled(false);
+      setGoodEnoughMinutes('');
+      setMaxRevisionsOverrideEnabled(false);
+      setMaxRevisions('');
       return;
     }
     if (!task) return;
@@ -260,6 +349,14 @@ export default function TaskEditor({
     setLifeCategory((task.life_category as LifeCategory | null) ?? '');
     setCognitiveLoad((task.cognitive_load as CognitiveLoad | null) ?? '');
     setTaskMode((task.task_mode as TaskMode | null) ?? '');
+    // Focus-Release overrides: null/undefined on the task → toggle off;
+    // any concrete int → toggle on. Parity audit § B.8.
+    const ge = task.good_enough_minutes_override;
+    setGoodEnoughOverrideEnabled(typeof ge === 'number');
+    setGoodEnoughMinutes(typeof ge === 'number' ? String(ge) : '');
+    const mr = task.max_revisions_override;
+    setMaxRevisionsOverrideEnabled(typeof mr === 'number');
+    setMaxRevisions(typeof mr === 'number' ? String(mr) : '');
     if (task.recurrence_json) {
       try {
         const rule = JSON.parse(task.recurrence_json);
@@ -460,6 +557,44 @@ export default function TaskEditor({
     setTaskMode(v);
     // Same omit-on-null semantics as the other orthogonal dimensions.
     autoSave({ taskMode: v === '' ? null : v });
+  };
+
+  // Focus-Release per-task overrides (parity audit § B.8). Toggling the
+  // override off writes `null` to clear the field; toggling on with an
+  // empty input is a no-op until the user picks a value, since we
+  // don't want to clobber Android with `0` mid-edit.
+  const handleGoodEnoughOverrideToggle = (enabled: boolean) => {
+    setGoodEnoughOverrideEnabled(enabled);
+    if (!enabled) {
+      setGoodEnoughMinutes('');
+      autoSave({ good_enough_minutes_override: null });
+    }
+  };
+
+  const handleGoodEnoughMinutesChange = (raw: string) => {
+    setGoodEnoughMinutes(raw);
+    if (!goodEnoughOverrideEnabled) return;
+    const parsed = parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      autoSave({ good_enough_minutes_override: parsed });
+    }
+  };
+
+  const handleMaxRevisionsOverrideToggle = (enabled: boolean) => {
+    setMaxRevisionsOverrideEnabled(enabled);
+    if (!enabled) {
+      setMaxRevisions('');
+      autoSave({ max_revisions_override: null });
+    }
+  };
+
+  const handleMaxRevisionsChange = (raw: string) => {
+    setMaxRevisions(raw);
+    if (!maxRevisionsOverrideEnabled) return;
+    const parsed = parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      autoSave({ max_revisions_override: parsed });
+    }
   };
 
   const handleCreate = async () => {
@@ -1026,6 +1161,58 @@ export default function TaskEditor({
                     className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
                   />
                 </div>
+
+                {/* Focus-Release per-task overrides (parity audit § B.8). */}
+                {/* Mirrors Android TaskEntity.good_enough_minutes_override
+                    + .max_revisions_override; only surface on existing
+                    tasks, since the override has no meaning during the
+                    initial create + no auto-save loop to thread it
+                    through yet (mirrors how Subtasks render only in
+                    edit mode). */}
+                {!isCreate && (
+                  <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40 p-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                        Focus & Release Overrides
+                      </span>
+                      <span className="text-xs text-[var(--color-text-secondary)]">
+                        Per-task overrides for the Good-Enough Timer and
+                        anti-rework guard. Leave off to inherit the
+                        global defaults from your ND preferences.
+                      </span>
+                    </div>
+
+                    <FocusReleaseOverrideRow
+                      title="Good-Enough Timer Minutes"
+                      enabledLabel="Override the global Good-Enough threshold"
+                      disabledLabel="Use the global Good-Enough threshold"
+                      overrideAriaLabel="Override Good-Enough Timer minutes"
+                      valueAriaLabel="Good-Enough Timer minutes value"
+                      placeholder="e.g. 25"
+                      min={1}
+                      max={240}
+                      overrideEnabled={goodEnoughOverrideEnabled}
+                      value={goodEnoughMinutes}
+                      onOverrideToggle={handleGoodEnoughOverrideToggle}
+                      onValueChange={handleGoodEnoughMinutesChange}
+                    />
+
+                    <FocusReleaseOverrideRow
+                      title="Max Revisions"
+                      enabledLabel="Override the global revision limit"
+                      disabledLabel="Use the global revision limit"
+                      overrideAriaLabel="Override max revisions"
+                      valueAriaLabel="Max revisions value"
+                      placeholder="e.g. 3"
+                      min={1}
+                      max={20}
+                      overrideEnabled={maxRevisionsOverrideEnabled}
+                      value={maxRevisions}
+                      onOverrideToggle={handleMaxRevisionsOverrideToggle}
+                      onValueChange={handleMaxRevisionsChange}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

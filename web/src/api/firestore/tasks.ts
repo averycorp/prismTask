@@ -79,6 +79,18 @@ function docToTask(docId: string, data: DocumentData, uid: string): Task {
     progress_percent:
       typeof data.progressPercent === 'number' ? data.progressPercent : null,
     phase_id: typeof data.phaseId === 'string' ? data.phaseId : null,
+    // Focus-Release per-task overrides. Android stores them as nullable
+    // Int columns (see `TaskEntity.good_enough_minutes_override` and
+    // `TaskEntity.max_revisions_override`). Round-tripping these is
+    // parity audit § B.8.
+    good_enough_minutes_override:
+      typeof data.goodEnoughMinutesOverride === 'number'
+        ? data.goodEnoughMinutesOverride
+        : null,
+    max_revisions_override:
+      typeof data.maxRevisionsOverride === 'number'
+        ? data.maxRevisionsOverride
+        : null,
   };
 }
 
@@ -293,6 +305,16 @@ function taskUpdateToDoc(
   // task again); omit leaves it alone.
   if (data.phase_id !== undefined) doc.phaseId = data.phase_id;
   if (data.progress_percent !== undefined) doc.progressPercent = data.progress_percent;
+  // Focus-Release per-task overrides (parity audit § B.8). `null` clears
+  // the override (the global default takes over again on next read);
+  // `undefined` leaves Android-side state alone — same omit-on-undefined
+  // merge contract as the Roadmap fields above.
+  if (data.good_enough_minutes_override !== undefined) {
+    doc.goodEnoughMinutesOverride = data.good_enough_minutes_override;
+  }
+  if (data.max_revisions_override !== undefined) {
+    doc.maxRevisionsOverride = data.max_revisions_override;
+  }
   return doc;
 }
 

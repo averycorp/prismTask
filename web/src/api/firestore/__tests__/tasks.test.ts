@@ -232,6 +232,30 @@ describe('updateTask merge-write payload shape', () => {
     expect(payload.taskMode).toBeNull();
   });
 
+  // Parity audit § B.8 — web TaskEditor now exposes Focus-Release
+  // per-task overrides. They must round-trip through the conditional-
+  // include write path so a user without the section open never
+  // clobbers Android-side values.
+  it('writes Focus-Release overrides when explicitly set on update', async () => {
+    await updateTask('uid-1', 'task-1', {
+      good_enough_minutes_override: 25,
+      max_revisions_override: 3,
+    });
+    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.goodEnoughMinutesOverride).toBe(25);
+    expect(payload.maxRevisionsOverride).toBe(3);
+  });
+
+  it('clears Focus-Release overrides (explicit null) so the global default takes over', async () => {
+    await updateTask('uid-1', 'task-1', {
+      good_enough_minutes_override: null,
+      max_revisions_override: null,
+    });
+    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.goodEnoughMinutesOverride).toBeNull();
+    expect(payload.maxRevisionsOverride).toBeNull();
+  });
+
   it('writes userOverrodeQuadrant: true alongside an explicit eisenhower_quadrant move', async () => {
     await updateTask('uid-1', 'task-1', {
       eisenhower_quadrant: 'Q1',

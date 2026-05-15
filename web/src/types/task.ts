@@ -64,6 +64,20 @@ export interface Task {
    * from the Roadmap surface; carried through Firestore as `phaseId`.
    */
   phase_id?: string | null;
+  /**
+   * Focus-Release per-task override: Good-Enough Timer threshold in
+   * minutes. `null` / undefined = use the global default from
+   * `ndPreferencesStore`. Mirrors Android
+   * `TaskEntity.good_enough_minutes_override`. Parity audit § B.8.
+   */
+  good_enough_minutes_override?: number | null;
+  /**
+   * Focus-Release per-task override: max number of revisions before
+   * the anti-rework guard kicks in. `null` / undefined = use the
+   * global default. Mirrors Android `TaskEntity.max_revisions_override`.
+   * Parity audit § B.8.
+   */
+  max_revisions_override?: number | null;
 }
 
 export interface TaskCreate {
@@ -133,6 +147,14 @@ export interface TaskUpdate {
   phase_id?: string | null;
   /** Fractional progress 0..100 inclusive; `null` clears it. */
   progress_percent?: number | null;
+  /**
+   * Focus-Release per-task overrides (parity audit § B.8). `null`
+   * clears the override (fall back to global default); `undefined`
+   * leaves the field untouched (omit-on-undefined merge). See
+   * `Task.good_enough_minutes_override` / `Task.max_revisions_override`.
+   */
+  good_enough_minutes_override?: number | null;
+  max_revisions_override?: number | null;
 }
 
 /** Mirrors the Android `LifeCategory` enum (`domain/model/LifeCategory.kt`). */
