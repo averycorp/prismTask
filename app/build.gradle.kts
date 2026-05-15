@@ -43,7 +43,7 @@ android {
         // (Cyberpunk scanlines, Synthwave sunset, Matrix phosphor, Void
         // editorial). Toggle this flag back to false to disable every
         // GlanceAppWidget receiver in one place.
-        buildConfigField("boolean", "WIDGETS_ENABLED", "true")
+        buildConfigField("boolean", "WIDGETS_ENABLED", "false")
     }
 
     val keystorePath = System.getenv("KEYSTORE_PATH")
