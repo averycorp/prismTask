@@ -88,6 +88,15 @@ export function LoginScreen() {
           </p>
         </div>
 
+        {/* Alpha-testing notice */}
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-400"
+        >
+          <span className="font-semibold">Alpha:</span> This site is in alpha
+          testing — features may change or break, and data may be reset.
+        </div>
+
         {/* Google Sign-In (primary) */}
         <Button
           type="button"
