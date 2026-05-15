@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Settings,
   Palette,
@@ -383,6 +384,14 @@ export function SettingsScreen() {
           checked={settings.showMorningCheckIn}
           onChange={(v) => settings.setSetting('showMorningCheckIn', v)}
         />
+        <div className="mt-1 mb-2">
+          <Link
+            to="/checkin/history"
+            className="inline-flex items-center text-sm font-medium text-[var(--color-accent)] hover:underline"
+          >
+            View Check-In Streak History →
+          </Link>
+        </div>
         <div className="mt-2">
           <label className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">
             Upcoming Days

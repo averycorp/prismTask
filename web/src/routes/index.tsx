@@ -53,6 +53,7 @@ const FocusReleaseScreen = lazy(() => import('@/features/focus/FocusReleaseScree
 const ChatScreen = lazy(() => import('@/features/chat/ChatScreen').then(m => ({ default: m.ChatScreen })));
 const LeisurePoolScreen = lazy(() => import('@/features/leisure/LeisurePoolScreen').then(m => ({ default: m.LeisurePoolScreen })));
 const SelfCareScreen = lazy(() => import('@/features/selfcare/SelfCareScreen').then(m => ({ default: m.SelfCareScreen })));
+const CheckInHistoryScreen = lazy(() => import('@/features/checkin/CheckInHistoryScreen').then(m => ({ default: m.CheckInHistoryScreen })));
 
 function LazyRoute({ Component, fallback }: { Component: ComponentType; fallback?: React.ReactNode }) {
   return (
@@ -139,6 +140,7 @@ const routes: RouteObject[] = [
       { path: 'chat', element: <LazyRoute Component={ChatScreen} /> },
       { path: 'leisure', element: <LazyRoute Component={LeisurePoolScreen} /> },
       { path: 'self-care', element: <LazyRoute Component={SelfCareScreen} /> },
+      { path: 'checkin/history', element: <LazyRoute Component={CheckInHistoryScreen} /> },
     ],
   },
 
