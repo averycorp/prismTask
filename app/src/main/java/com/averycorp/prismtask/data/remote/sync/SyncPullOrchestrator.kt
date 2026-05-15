@@ -687,15 +687,51 @@ constructor(
                 ?: return@pullCollection false
             if (localId == null) {
                 val completion = SyncMapper.mapToCourseCompletion(data, courseLocalId = courseLocalId, cloudId = cloudId)
-                val newId = schoolworkDao.insertCompletion(completion)
-                syncMetadataDao.upsert(
-                    SyncMetadataEntity(
-                        localId = newId,
-                        entityType = "course_completion",
-                        cloudId = cloudId,
-                        lastSyncedAt = System.currentTimeMillis()
+                // Natural-key dedup by (courseId, date). Android historically
+                // wrote course_completions with auto-random Firestore ids
+                // while web (`courseCompletions.ts`) uses the deterministic
+                // `${courseCloudId}__${date}` shape — so a same-day toggle on
+                // both platforms produces two cloud docs for the same
+                // `(course, date)` pair. Without dedup, the second pull would
+                // collide with the local UNIQUE(date, course_id) index on
+                // CourseCompletionEntity (the REPLACE strategy would delete
+                // the existing row, churn its PK, and leave stale
+                // sync_metadata). Mirror the habit_completion dedup at lines
+                // 366-377: adopt the existing local row and rebind it to the
+                // new cloud_id, applying last-write-wins on the payload.
+                val existingByNaturalKey =
+                    schoolworkDao.getCompletionOnce(completion.date, courseLocalId)
+                if (existingByNaturalKey != null) {
+                    syncMetadataDao.upsert(
+                        SyncMetadataEntity(
+                            localId = existingByNaturalKey.id,
+                            entityType = "course_completion",
+                            cloudId = cloudId,
+                            lastSyncedAt = System.currentTimeMillis()
+                        )
                     )
-                )
+                    val remoteUpdatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
+                    if (remoteUpdatedAt > existingByNaturalKey.updatedAt) {
+                        schoolworkDao.updateCompletion(
+                            SyncMapper.mapToCourseCompletion(
+                                data,
+                                localId = existingByNaturalKey.id,
+                                courseLocalId = courseLocalId,
+                                cloudId = cloudId
+                            )
+                        )
+                    }
+                } else {
+                    val newId = schoolworkDao.insertCompletion(completion)
+                    syncMetadataDao.upsert(
+                        SyncMetadataEntity(
+                            localId = newId,
+                            entityType = "course_completion",
+                            cloudId = cloudId,
+                            lastSyncedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
             } else {
                 val localCompletion = schoolworkDao.getCompletionById(localId)
                 val remoteUpdatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L
