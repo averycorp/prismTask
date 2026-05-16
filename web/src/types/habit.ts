@@ -1,4 +1,40 @@
-export type HabitFrequency = 'daily' | 'weekly';
+/**
+ * Habit frequency period. Mirrors Android `HabitEntity.frequencyPeriod`
+ * (`data/local/entity/HabitEntity.kt`). Android's
+ * `AddEditHabitScreen.kt:285-300` exposes all six values in its
+ * segmented chooser, and `HabitListScreen.kt:71-86` splits them into a
+ * "Daily" bucket (`daily`) and a "Recurring" bucket (everything else)
+ * via a segmented filter at the top of the list.
+ *
+ * Web previously narrowed this to `'daily' | 'weekly'`, which collapsed
+ * Android-created fortnightly/monthly/bimonthly/quarterly habits into
+ * `daily` at read time (see `mapFrequency` in `api/firestore/habits.ts`)
+ * and offered no way to express the recurring cadence in the web
+ * editor. Widening here restores cross-platform parity.
+ */
+export type HabitFrequency =
+  | 'daily'
+  | 'weekly'
+  | 'fortnightly'
+  | 'monthly'
+  | 'bimonthly'
+  | 'quarterly';
+
+/**
+ * The five non-daily frequencies that Android groups under the
+ * "Recurring" filter tab on the Habits screen.
+ */
+export const RECURRING_FREQUENCIES: readonly HabitFrequency[] = [
+  'weekly',
+  'fortnightly',
+  'monthly',
+  'bimonthly',
+  'quarterly',
+] as const;
+
+export function isRecurringFrequency(frequency: HabitFrequency): boolean {
+  return frequency !== 'daily';
+}
 
 export interface Habit {
   id: string;

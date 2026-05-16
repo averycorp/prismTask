@@ -632,7 +632,12 @@ function WeeklyHabitSummary() {
     if (!habit.is_active) continue;
     const habitCompletions = completions[habit.id] || [];
 
-    if (habit.frequency === 'weekly') {
+    if (habit.frequency !== 'daily') {
+      // Treat every non-daily frequency as a single-bucket "did the
+      // user hit target in last week?" check. Matches the weekly-style
+      // surfacing used elsewhere on web (see `habitStore.getTodayProgress`
+      // / `streaks.ts`); period-aware windows for fortnightly/monthly/
+      // bimonthly/quarterly are a follow-up.
       totalDue++;
       let weekCount = 0;
       for (const c of habitCompletions) {

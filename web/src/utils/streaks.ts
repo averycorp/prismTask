@@ -10,6 +10,7 @@ import {
   parseISO,
   startOfDay,
 } from 'date-fns';
+import type { HabitFrequency } from '@/types/habit';
 
 export interface StreakData {
   currentStreak: number;
@@ -456,7 +457,7 @@ function strictDailyWalk(
  */
 export function calculateStreaks(
   completions: CompletionEntry[],
-  frequency: 'daily' | 'weekly',
+  frequency: HabitFrequency,
   activeDays: number[] | null,
   targetCount: number,
   forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
@@ -497,7 +498,12 @@ export function calculateStreaks(
     if (dayTotals[idx] < dayTotals[worstDayIdx]) worstDayIdx = idx;
   }
 
-  if (frequency === 'weekly') {
+  if (frequency !== 'daily') {
+    // Fortnightly / monthly / bimonthly / quarterly currently use the
+    // weekly bucket math as their default. This keeps newly-typed
+    // frequencies functional (correct list filtering, no crashes,
+    // sensible streaks) without a deeper rewrite of the period math.
+    // Refining each period's window is a follow-up — see TODO.
     return calculateWeeklyStreaks(
       completionMap,
       targetCount,

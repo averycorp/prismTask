@@ -6,6 +6,63 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import type { Habit, HabitFrequency } from '@/types/habit';
 
+/**
+ * Frequency options shown in the editor's segmented chooser. Order +
+ * labels mirror Android's `AddEditHabitScreen.kt:285-300`. The set is
+ * exhaustive across `HabitFrequency`.
+ */
+const FREQUENCY_OPTIONS: ReadonlyArray<{ value: HabitFrequency; label: string }> = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'fortnightly', label: 'Fortnightly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'bimonthly', label: 'Bimonthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+];
+
+/**
+ * Per-frequency upper bound on `target_count`. Mirrors Android's
+ * `maxTarget` table at `AddEditHabitScreen.kt:316-324`.
+ */
+function maxTargetForFrequency(frequency: HabitFrequency): number {
+  switch (frequency) {
+    case 'weekly':
+      return 7;
+    case 'fortnightly':
+      return 14;
+    case 'monthly':
+      return 30;
+    case 'bimonthly':
+      return 60;
+    case 'quarterly':
+      return 90;
+    default:
+      return 10;
+  }
+}
+
+/**
+ * Label fragment for the "How many times per X?" / "Target per X"
+ * prompts. Mirrors Android's `targetLabel` switch at
+ * `AddEditHabitScreen.kt:307-315`.
+ */
+function periodNounForFrequency(frequency: HabitFrequency): string {
+  switch (frequency) {
+    case 'weekly':
+      return 'week';
+    case 'fortnightly':
+      return 'fortnight';
+    case 'monthly':
+      return 'month';
+    case 'bimonthly':
+      return '2 months';
+    case 'quarterly':
+      return 'quarter';
+    default:
+      return 'day';
+  }
+}
+
 const EMOJI_OPTIONS = [
   '💪', '📚', '🧘', '💧', '🏃', '🎯', '📝', '🎨',
   '🎸', '💤', '🍎', '🧠', '❤️', '🌟', '🔥', '✨',
@@ -314,24 +371,36 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
           </datalist>
         </div>
 
-        {/* Frequency */}
+        {/* Frequency — 6 options matching Android
+            `AddEditHabitScreen.kt:285-300`. `daily` keeps the legacy
+            "Active Days" picker below for weekday-only habits; the five
+            recurring values surface under the "Recurring" tab on the
+            list screen. */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-[var(--color-text-primary)]">
             Frequency
           </label>
-          <div className="flex gap-2">
-            {(['daily', 'weekly'] as const).map((f) => (
+          <div className="flex flex-wrap gap-2">
+            {FREQUENCY_OPTIONS.map(({ value, label }) => (
               <button
-                key={f}
+                key={value}
                 type="button"
-                onClick={() => setFrequency(f)}
+                onClick={() => {
+                  setFrequency(value);
+                  // Clamp target_count to the new period's max — mirrors
+                  // Android `onFrequencyPeriodChange` at
+                  // `AddEditHabitViewModel.kt:175-194`.
+                  setTargetCount((prev) =>
+                    Math.min(prev, maxTargetForFrequency(value)),
+                  );
+                }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  frequency === f
+                  frequency === value
                     ? 'bg-[var(--color-accent)] text-white'
                     : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                 }`}
               >
-                {f === 'daily' ? 'Daily' : 'Weekly'}
+                {label}
               </button>
             ))}
           </div>
@@ -340,7 +409,7 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
         {/* Target Count */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-[var(--color-text-primary)]">
-            How many times per {frequency === 'daily' ? 'day' : 'week'}?
+            How many times per {periodNounForFrequency(frequency)}?
           </label>
           <div className="flex items-center gap-3">
             <button
@@ -355,7 +424,11 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
             </span>
             <button
               type="button"
-              onClick={() => setTargetCount(Math.min(99, targetCount + 1))}
+              onClick={() =>
+                setTargetCount(
+                  Math.min(maxTargetForFrequency(frequency), targetCount + 1),
+                )
+              }
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
             >
               +
