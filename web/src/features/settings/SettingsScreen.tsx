@@ -566,7 +566,26 @@ export function SettingsScreen() {
         <LeisureBudgetSection />
       </SettingsSection>
 
-      {/* ND-Friendly Modes — parity audit C.7c */}
+      {/* Brain Mode — dedicated sub-screen with master switch + curated
+          ND-friendly bundle (parity unit 21 of 23). */}
+      <SettingsSection
+        icon={<Brain className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Brain Mode"
+      >
+        <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
+          Master switch plus a curated bundle of ND-friendly tuning:
+          UI complexity, forgiveness streaks, focus release, ship-it
+          celebrations, and energy-aware suggestions.
+        </p>
+        <Link
+          to="/settings/brain-mode"
+          className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)]"
+        >
+          Open Brain Mode →
+        </Link>
+      </SettingsSection>
+
+      {/* ND-Friendly Modes — parity audit C.7c (granular sub-settings) */}
       <SettingsSection
         icon={<Brain className="h-5 w-5 text-[var(--color-accent)]" />}
         title="ND-Friendly Modes"
