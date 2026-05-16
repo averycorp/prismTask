@@ -12,6 +12,7 @@ import {
   CalendarClock,
   CalendarDays,
   Sparkles,
+  MessageSquare,
   TrendingUp,
   BarChart3,
   ClipboardPaste,
@@ -44,6 +45,7 @@ const MORE_SECTIONS: readonly NavSection[] = [
     items: [
       { to: '/calendar', icon: Calendar, label: 'Calendar' },
       { to: '/briefing', icon: Sparkles, label: 'Briefing' },
+      { to: '/chat', icon: MessageSquare, label: 'AI Coach' },
       { to: '/eisenhower', icon: LayoutGrid, label: 'Eisenhower' },
       { to: '/planner', icon: CalendarDays, label: 'Planner' },
       { to: '/timeblock', icon: CalendarClock, label: 'Time Block' },

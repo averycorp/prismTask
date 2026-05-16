@@ -15,9 +15,25 @@ export interface ChatActionDispatchDeps {
     data: Record<string, unknown>,
   ) => Promise<unknown>;
   completeTask: (taskId: string) => Promise<unknown>;
+  uncompleteTask?: (taskId: string) => Promise<unknown>;
   deleteTask: (taskId: string) => Promise<unknown>;
+  /** Read the current task to snapshot pre-mutation state for undo. */
+  getTaskById?: (taskId: string) => { due_date?: string | null } | null;
   setPendingBatchCommand: (cmd: string | null) => void;
   navigate: (to: string) => void;
+}
+
+/**
+ * Snackbar metadata for destructive chip actions. When `undoLabel` is
+ * non-null, ChatScreen renders an Undo button on the success toast that
+ * calls `undoAction`. Non-destructive actions (`start_timer`,
+ * `create_task`, `breakdown`) leave it null. Mirrors Android
+ * `ChatActionResult` (`ChatViewModel.kt:120-124`).
+ */
+export interface ChatActionResult {
+  message: string;
+  undoLabel?: string;
+  undoAction?: () => Promise<void> | void;
 }
 
 /** User-visible label rendered on the chip. */
@@ -130,30 +146,60 @@ export function resolveDateIsoForChat(
 }
 
 /**
- * Execute the action. Returns `{ message }` for the chip toast or `null`
- * when no toast should be surfaced (e.g. `batch_command` navigates away —
- * BatchPreviewScreen owns the next user-visible signal).
+ * Execute the action. Returns a `ChatActionResult` for the chip toast or
+ * `null` when no toast should be surfaced (e.g. `batch_command` navigates
+ * away — BatchPreviewScreen owns the next user-visible signal).
+ *
+ * Destructive ops (`complete`, `reschedule`, `reschedule_batch`) carry a
+ * non-null `undoAction` so the ChatScreen toast renders an Undo button —
+ * parity with Android `ChatViewModel.handle*` (`ChatViewModel.kt:535-620`).
+ * `archive` maps to `deleteTask` on web (no archive flag yet) which is not
+ * reversible by the task store, so we omit Undo there.
  */
 export async function executeChatAction(
   action: ChatActionPayload,
   deps: ChatActionDispatchDeps,
-): Promise<{ message: string } | null> {
+): Promise<ChatActionResult | null> {
   switch (action.type) {
     case 'complete': {
       if (!action.task_id) return null;
-      await deps.completeTask(action.task_id);
-      return { message: 'Task Completed' };
+      const taskId = action.task_id;
+      await deps.completeTask(taskId);
+      return {
+        message: 'Task Completed',
+        undoLabel: deps.uncompleteTask ? 'Undo' : undefined,
+        undoAction: deps.uncompleteTask
+          ? () => {
+              void deps.uncompleteTask!(taskId);
+            }
+          : undefined,
+      };
     }
     case 'reschedule': {
       if (!action.task_id) return null;
+      const taskId = action.task_id;
+      const originalDue = deps.getTaskById?.(taskId)?.due_date ?? null;
       const due = resolveDateIsoForChat(action.to);
-      await deps.updateTask(action.task_id, { due_date: due });
-      return { message: 'Task Rescheduled' };
+      await deps.updateTask(taskId, { due_date: due });
+      return {
+        message: 'Task Rescheduled',
+        undoLabel: 'Undo',
+        undoAction: () => {
+          void deps.updateTask(taskId, { due_date: originalDue });
+        },
+      };
     }
     case 'reschedule_batch': {
       const ids = action.task_ids?.filter(Boolean) ?? [];
       if (ids.length === 0) return null;
       const due = resolveDateIsoForChat(action.to);
+      // Snapshot pre-mutation due dates BEFORE we mutate so Undo can
+      // restore each task even if some succeed and some fail. Mirrors
+      // Android `handleRescheduleBatch` (`ChatViewModel.kt:557-601`).
+      const originalDues = new Map<string, string | null>();
+      for (const id of ids) {
+        originalDues.set(id, deps.getTaskById?.(id)?.due_date ?? null);
+      }
       let succeeded = 0;
       let failed = 0;
       for (const id of ids) {
@@ -170,12 +216,28 @@ export async function executeChatAction(
           : succeeded === 0
           ? 'Reschedule Failed'
           : `Rescheduled ${succeeded} of ${ids.length} Tasks (${failed} Failed)`;
-      return { message };
+      // Only offer Undo when at least one task moved.
+      if (succeeded === 0) return { message };
+      return {
+        message,
+        undoLabel: 'Undo',
+        undoAction: async () => {
+          for (const id of ids) {
+            try {
+              await deps.updateTask(id, { due_date: originalDues.get(id) ?? null });
+            } catch {
+              // Swallow per-task failures so one bad row doesn't abort the
+              // rest of the rollback.
+            }
+          }
+        },
+      };
     }
     case 'archive': {
       if (!action.task_id) return null;
       // Web has no explicit archive flag; deletion is the equivalent
-      // user-visible outcome.
+      // user-visible outcome. deleteTask is not undoable through the task
+      // store on web (Firestore delete is permanent), so no Undo button.
       await deps.deleteTask(action.task_id);
       return { message: 'Task Archived' };
     }
