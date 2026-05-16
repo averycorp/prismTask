@@ -3,33 +3,27 @@ import {
   FileText,
   CalendarDays,
   FolderKanban,
-  Trash2,
   Copy,
   Loader2,
   Check,
-  Plus,
-  GripVertical,
-  X,
   Save,
-  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Drawer } from '@/components/ui/Drawer';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
-import { Checkbox } from '@/components/ui/Checkbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { aiLifeCategoryClassifyText } from '@/api/ai/chat';
-import { DependencyEditor } from '@/features/tasks/DependencyEditor';
-import { ClassificationChipRow } from '@/features/tasks/ClassificationChipRow';
-import { PRIORITY_CONFIG } from '@/utils/priority';
 import { formatRelative } from '@/utils/dates';
 import { classifyTaskMode } from '@/utils/taskModeClassifier';
 import { classifyCognitiveLoad } from '@/utils/cognitiveLoadClassifier';
+import { DetailsTab } from '@/features/tasks/tabs/DetailsTab';
+import { ScheduleTab } from '@/features/tasks/tabs/ScheduleTab';
+import { OrganizeTab, TAG_COLORS } from '@/features/tasks/tabs/OrganizeTab';
 import type {
   CognitiveLoad,
   LifeCategory,
@@ -71,149 +65,12 @@ const TABS = [
   },
 ];
 
-const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
-  { value: 'todo', label: 'To Do' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
-const REMINDER_OPTIONS = [
-  { value: '', label: 'No Reminder' },
-  { value: '15', label: '15 Minutes Before' },
-  { value: '30', label: '30 Minutes Before' },
-  { value: '60', label: '1 Hour Before' },
-  { value: '120', label: '2 Hours Before' },
-  { value: '1440', label: '1 Day Before' },
-];
-
-const RECURRENCE_TYPES = [
-  { value: '', label: 'None' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Biweekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'weekdays', label: 'Weekdays' },
-];
-
-const WEEKDAYS: { idx: number; label: string }[] = [
-  { idx: 1, label: 'Mon' },
-  { idx: 2, label: 'Tue' },
-  { idx: 3, label: 'Wed' },
-  { idx: 4, label: 'Thu' },
-  { idx: 5, label: 'Fri' },
-  { idx: 6, label: 'Sat' },
-  { idx: 0, label: 'Sun' },
-];
-
-const TAG_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308',
-  '#84cc16', '#22c55e', '#14b8a6', '#06b6d4',
-  '#3b82f6', '#6366f1', '#a855f7', '#ec4899',
-];
-
-// Mirrors Android's `LifeCategory` enum; values must match `LifeCategory.kt`
-// so the Work-Life Balance engine on Android picks them up unchanged.
-const LIFE_CATEGORY_OPTIONS: { value: LifeCategory | ''; label: string }[] = [
-  { value: '', label: 'Uncategorized' },
-  { value: 'WORK', label: 'Work' },
-  { value: 'PERSONAL', label: 'Personal' },
-  { value: 'SELF_CARE', label: 'Self-Care' },
-  { value: 'HEALTH', label: 'Health' },
-];
-
-// Mirrors Android's `CognitiveLoad` enum; values must match
-// `CognitiveLoad.kt` so the start-friction classifier on Android picks
-// them up unchanged. See `docs/COGNITIVE_LOAD.md`.
-const COGNITIVE_LOAD_OPTIONS: { value: CognitiveLoad | ''; label: string }[] = [
-  { value: '', label: 'Uncategorized' },
-  { value: 'EASY', label: 'Easy' },
-  { value: 'MEDIUM', label: 'Medium' },
-  { value: 'HARD', label: 'Hard' },
-];
-
-// Mirrors Android's `TaskMode` enum; values must match `TaskMode.kt`
-// so the Work / Play / Relax classifier on Android picks them up
-// unchanged. See `docs/WORK_PLAY_RELAX.md`.
-const TASK_MODE_OPTIONS: { value: TaskMode | ''; label: string }[] = [
-  { value: '', label: 'Uncategorized' },
-  { value: 'WORK', label: 'Work' },
-  { value: 'PLAY', label: 'Play' },
-  { value: 'RELAX', label: 'Relax' },
-];
-
-interface FocusReleaseOverrideRowProps {
-  title: string;
-  enabledLabel: string;
-  disabledLabel: string;
-  overrideAriaLabel: string;
-  valueAriaLabel: string;
-  placeholder: string;
-  min: number;
-  max: number;
-  overrideEnabled: boolean;
-  value: string;
-  onOverrideToggle: (enabled: boolean) => void;
-  onValueChange: (raw: string) => void;
-}
-
 /**
- * Focus-Release per-task override row (toggle switch + number input).
- * Used twice in the Schedule tab for the Good-Enough Timer minutes
- * override and the max-revisions override. Mirrors Android `TaskEntity`
- * `good_enough_minutes_override` / `max_revisions_override` semantics:
- * the override is tri-state on the wire (`null` clears, `int` sets,
- * `undefined` leaves Android-side state alone).
+ * TaskEditor — 3-tab orchestrator (Details / Schedule / Organize).
+ * Mirrors Android `addedittask/AddEditTaskScreen.kt`. Owns the form
+ * state, debounced auto-save, and all save/delete/duplicate
+ * orchestration; the tabs themselves are presentational.
  */
-function FocusReleaseOverrideRow({
-  title,
-  enabledLabel,
-  disabledLabel,
-  overrideAriaLabel,
-  valueAriaLabel,
-  placeholder,
-  min,
-  max,
-  overrideEnabled,
-  value,
-  onOverrideToggle,
-  onValueChange,
-}: FocusReleaseOverrideRowProps) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="flex items-center justify-between gap-3">
-        <div className="flex flex-col">
-          <span className="text-sm text-[var(--color-text-primary)]">{title}</span>
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            {overrideEnabled ? enabledLabel : disabledLabel}
-          </span>
-        </div>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={overrideEnabled}
-          onChange={(e) => onOverrideToggle(e.target.checked)}
-          className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--color-border)] transition-colors checked:bg-[var(--color-accent)] relative after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform checked:after:translate-x-4"
-          aria-label={overrideAriaLabel}
-        />
-      </label>
-      {overrideEnabled && (
-        <input
-          type="number"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(e) => onValueChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-32 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-          aria-label={valueAriaLabel}
-        />
-      )}
-    </div>
-  );
-}
-
 export default function TaskEditor({
   onClose,
   onUpdate,
@@ -239,8 +96,7 @@ export default function TaskEditor({
   const [deleting, setDeleting] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [duplicateSubtasks, setDuplicateSubtasks] = useState(true);
-  // Claude-backed Life Category auto-classify (parity Batch 3 D.1c —
-  // mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude`).
+  // Auto-classify busy flags
   const [lifeCategoryAutoBusy, setLifeCategoryAutoBusy] = useState(false);
   // On-device keyword classifier Auto buttons for TaskMode +
   // CognitiveLoad. Classifier calls are synchronous; the busy flag
@@ -248,6 +104,7 @@ export default function TaskEditor({
   // LifeCategory Claude button.
   const [taskModeAutoBusy, setTaskModeAutoBusy] = useState(false);
   const [cognitiveLoadAutoBusy, setCognitiveLoadAutoBusy] = useState(false);
+  // Zustand v5 stable selector — primitive value, no fresh object refs.
   const aiFeaturesEnabled = useSettingsStore((s) => s.aiFeaturesEnabled);
 
   // Form state
@@ -263,7 +120,8 @@ export default function TaskEditor({
   const [recurrenceType, setRecurrenceType] = useState('');
   const [recurrenceInterval, setRecurrenceInterval] = useState(1);
   const [recurrenceDaysOfWeek, setRecurrenceDaysOfWeek] = useState<number[]>([]);
-  const [recurrenceAfterCompletion, setRecurrenceAfterCompletion] = useState(false);
+  const [recurrenceAfterCompletion, setRecurrenceAfterCompletion] =
+    useState(false);
   const [recurrenceEndMode, setRecurrenceEndMode] = useState<
     'never' | 'after' | 'on'
   >('never');
@@ -271,26 +129,9 @@ export default function TaskEditor({
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
   const [reminderOffset, setReminderOffset] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
-  // Work-Life Balance category. Empty string means "leave unset" — we omit
-  // the field from the Firestore payload so Android's auto-classifier can
-  // still operate. Only when the user explicitly picks a category do we
-  // write it (parity audit § Surface 3 / T-S2).
   const [lifeCategory, setLifeCategory] = useState<LifeCategory | ''>('');
-  // Cognitive load (start-friction). Same omit-on-empty semantics as
-  // lifeCategory — the Firestore writer omits the field when value is
-  // empty/null so Android-side state isn't clobbered.
   const [cognitiveLoad, setCognitiveLoad] = useState<CognitiveLoad | ''>('');
-  // Reward / output mode (Work / Play / Relax). Same omit-on-empty
-  // semantics as lifeCategory + cognitiveLoad.
   const [taskMode, setTaskMode] = useState<TaskMode | ''>('');
-  // Focus-Release per-task overrides (parity audit § B.8). Each is a
-  // tri-state on the wire: `null` = clear the override (fall back to
-  // global default), a positive integer = use this value, and
-  // `undefined` = leave the Android-side field alone (the
-  // conditional-include writer enforces the third state). The editor
-  // models the active state with an Override-checkbox + number input
-  // pattern that mirrors the Android UI shape on `AddEditHabitScreen`
-  // for the today-skip fields.
   const [goodEnoughOverrideEnabled, setGoodEnoughOverrideEnabled] =
     useState(false);
   const [goodEnoughMinutes, setGoodEnoughMinutes] = useState<string>('');
@@ -358,8 +199,6 @@ export default function TaskEditor({
     setLifeCategory((task.life_category as LifeCategory | null) ?? '');
     setCognitiveLoad((task.cognitive_load as CognitiveLoad | null) ?? '');
     setTaskMode((task.task_mode as TaskMode | null) ?? '');
-    // Focus-Release overrides: null/undefined on the task → toggle off;
-    // any concrete int → toggle on. Parity audit § B.8.
     const ge = task.good_enough_minutes_override;
     setGoodEnoughOverrideEnabled(typeof ge === 'number');
     setGoodEnoughMinutes(typeof ge === 'number' ? String(ge) : '');
@@ -403,7 +242,7 @@ export default function TaskEditor({
           setTimeout(() => setSaved(false), 2000);
           onUpdate?.();
         } catch {
-          toast.error('Failed to save changes');
+          toast.error('Failed to Save Changes');
         } finally {
           setSaving(false);
         }
@@ -412,9 +251,7 @@ export default function TaskEditor({
     [isCreate, task, updateTask, onUpdate],
   );
 
-  // Persist recurrence changes via auto-save. Rebuilds the JSON blob any
-  // time any recurrence-related control moves so the saved shape stays
-  // in sync with what the user sees.
+  // Persist recurrence changes via auto-save.
   useEffect(() => {
     if (isCreate || !task) return;
     let recurrenceJson: string | undefined;
@@ -437,7 +274,6 @@ export default function TaskEditor({
       recurrenceJson = '';
     }
     autoSave({ recurrence_json: recurrenceJson });
-    // Intentionally omit autoSave from deps — it's stable within a session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isCreate,
@@ -457,6 +293,7 @@ export default function TaskEditor({
     };
   }, []);
 
+  // ---- Field change handlers (debounced auto-save) ----
   const handleTitleChange = (v: string) => {
     setTitle(v);
     autoSave({ title: v });
@@ -484,33 +321,48 @@ export default function TaskEditor({
 
   const handleDueTimeChange = (v: string) => {
     setDueTime(v);
-    // Persist the wall-clock time so Android receives the same value on
-    // its next sync. Empty string clears the time; the firestore writer
-    // anchors `HH:mm` to the current `due_date` to produce the millis
-    // representation Android stores in `tasks.due_time`.
     autoSave({ due_time: v === '' ? null : v });
+  };
+
+  const handlePlannedDateChange = (v: string) => {
+    setPlannedDate(v);
+    autoSave({ planned_date: v || undefined } as TaskUpdate);
+  };
+
+  const handleNotesChange = (v: string) => {
+    setNotes(v);
+    autoSave({ notes: v } as TaskUpdate);
+  };
+
+  const handleDurationChange = (v: string) => {
+    setDuration(v);
+    const minutes = parseInt(v, 10);
+    autoSave({
+      estimated_duration:
+        Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
+    } as TaskUpdate);
+  };
+
+  const handleReminderOffsetChange = (v: string) => {
+    setReminderOffset(v);
+    // Reminder is local-only on web today; auto-save fires when a real
+    // field is wired up server-side (parity note above the input).
   };
 
   const handleLifeCategoryChange = (v: LifeCategory | '') => {
     setLifeCategory(v);
-    // Always pass the value through — selecting "Uncategorized" maps to
-    // `null` so the Android-side classifier can take over again.
     autoSave({ lifeCategory: v === '' ? null : v });
   };
 
-  // Parity Batch 3 D.1c. Mirrors Android
-  // `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude`
-  // (`app/.../AddEditTaskViewModel.kt:714-738`). Fire-and-forget call to
-  // `/ai/life-category/classify_text`. On any failure (AI off, network,
-  // 429, 451, 5xx, garbage response, UNCATEGORIZED result) the current
-  // chip stays — Auto never blanks a real selection.
   const handleLifeCategoryAutoClick = useCallback(async () => {
     if (!title.trim()) {
-      toast.error('Enter a title before auto-classifying');
+      toast.error('Enter a Title Before Auto-Classifying');
       return;
     }
     if (!aiFeaturesEnabled) {
-      toast.error('AI Features are off — enable them in Settings to auto-classify');
+      toast.error(
+        'AI Features Are Off — Enable Them in Settings to Auto-Classify',
+      );
       return;
     }
     if (lifeCategoryAutoBusy) return;
@@ -522,30 +374,25 @@ export default function TaskEditor({
         title: titleSnapshot,
         description: descriptionSnapshot.trim() || undefined,
       });
-      // Race-guard: if the user kept typing during the call, don't
-      // overwrite stale input. Matches Android's snapshot check.
       if (title !== titleSnapshot || description !== descriptionSnapshot) {
         return;
       }
       const next = result.category as LifeCategory | 'UNCATEGORIZED';
       if (next === 'UNCATEGORIZED' || !next) {
-        toast.success("AI couldn't pick — keeping your current choice");
+        toast.success("AI Couldn't Pick — Keeping Your Current Choice");
         return;
       }
       if (next === lifeCategory) {
-        toast.success('Already a match');
+        toast.success('Already a Match');
         return;
       }
       handleLifeCategoryChange(next as LifeCategory);
       toast.success(`Set Life Category: ${next.replace('_', '-')}`);
     } catch {
-      toast.error('Auto-classify failed — try again later');
+      toast.error('Auto-Classify Failed — Try Again Later');
     } finally {
       setLifeCategoryAutoBusy(false);
     }
-    // handleLifeCategoryChange + setLifeCategory are stable closures over
-    // setState — intentionally omitted from deps to avoid re-creating this
-    // callback on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     title,
@@ -557,58 +404,46 @@ export default function TaskEditor({
 
   const handleCognitiveLoadChange = (v: CognitiveLoad | '') => {
     setCognitiveLoad(v);
-    // Same semantics as lifeCategory — empty => null lets the Android
-    // CognitiveLoadClassifier take over again on the next save.
     autoSave({ cognitiveLoad: v === '' ? null : v });
   };
 
   const handleTaskModeChange = (v: TaskMode | '') => {
     setTaskMode(v);
-    // Same omit-on-null semantics as the other orthogonal dimensions.
     autoSave({ taskMode: v === '' ? null : v });
   };
 
-  // On-device Auto buttons for TaskMode + CognitiveLoad. Synchronous,
-  // keyword-only — mirrors the Android local-classifier fallback. The
-  // backend AI endpoints (`/ai/task-mode/classify_text`,
-  // `/ai/cognitive-load/classify_text`) don't exist yet; once they do,
-  // this handler can grow the same fire-and-forget upgrade shape that
-  // `handleLifeCategoryAutoClick` uses today.
   const handleTaskModeAutoClick = useCallback(() => {
     if (!title.trim()) {
-      toast.error('Enter a title before auto-classifying');
+      toast.error('Enter a Title Before Auto-Classifying');
       return;
     }
     if (taskModeAutoBusy) return;
     setTaskModeAutoBusy(true);
-    // The brief async wrapper lets the spinner render at all — a purely
-    // synchronous classify call would finish before paint and look like
-    // nothing happened. setTimeout(0) yields one frame.
     setTimeout(() => {
       try {
         const next = classifyTaskMode(title, description.trim() || null);
         if (next === 'UNCATEGORIZED') {
-          toast.success("Couldn't auto-classify — keeping your current choice");
+          toast.success("Couldn't Auto-Classify — Keeping Your Current Choice");
           return;
         }
         if (next === taskMode) {
-          toast.success('Already a match');
+          toast.success('Already a Match');
           return;
         }
         handleTaskModeChange(next);
-        toast.success(`Set Task Mode: ${next.charAt(0)}${next.slice(1).toLowerCase()}`);
+        toast.success(
+          `Set Task Mode: ${next.charAt(0)}${next.slice(1).toLowerCase()}`,
+        );
       } finally {
         setTaskModeAutoBusy(false);
       }
     }, 0);
-    // handleTaskModeChange is a stable closure over setState — intentionally
-    // omitted from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, taskMode, taskModeAutoBusy]);
 
   const handleCognitiveLoadAutoClick = useCallback(() => {
     if (!title.trim()) {
-      toast.error('Enter a title before auto-classifying');
+      toast.error('Enter a Title Before Auto-Classifying');
       return;
     }
     if (cognitiveLoadAutoBusy) return;
@@ -617,15 +452,17 @@ export default function TaskEditor({
       try {
         const next = classifyCognitiveLoad(title, description.trim() || null);
         if (next === 'UNCATEGORIZED') {
-          toast.success("Couldn't auto-classify — keeping your current choice");
+          toast.success("Couldn't Auto-Classify — Keeping Your Current Choice");
           return;
         }
         if (next === cognitiveLoad) {
-          toast.success('Already a match');
+          toast.success('Already a Match');
           return;
         }
         handleCognitiveLoadChange(next);
-        toast.success(`Set Cognitive Load: ${next.charAt(0)}${next.slice(1).toLowerCase()}`);
+        toast.success(
+          `Set Cognitive Load: ${next.charAt(0)}${next.slice(1).toLowerCase()}`,
+        );
       } finally {
         setCognitiveLoadAutoBusy(false);
       }
@@ -633,10 +470,6 @@ export default function TaskEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, cognitiveLoad, cognitiveLoadAutoBusy]);
 
-  // Focus-Release per-task overrides (parity audit § B.8). Toggling the
-  // override off writes `null` to clear the field; toggling on with an
-  // empty input is a no-op until the user picks a value, since we
-  // don't want to clobber Android with `0` mid-edit.
   const handleGoodEnoughOverrideToggle = (enabled: boolean) => {
     setGoodEnoughOverrideEnabled(enabled);
     if (!enabled) {
@@ -671,14 +504,20 @@ export default function TaskEditor({
     }
   };
 
+  const handleProjectChange = (id: string | null) => {
+    setProjectId(id);
+    autoSave({ project_id: id } as TaskUpdate);
+  };
+
+  // ---- Create / delete / duplicate orchestration ----
   const handleCreate = async () => {
     if (!title.trim()) {
-      toast.error('Title is required');
+      toast.error('Title Is Required');
       return;
     }
     const targetProjectId = projectId || projects[0]?.id;
     if (!targetProjectId) {
-      toast.error('No project available. Create a project first.');
+      toast.error('No Project Available. Create a Project First.');
       return;
     }
     setSaving(true);
@@ -694,11 +533,11 @@ export default function TaskEditor({
         cognitiveLoad: cognitiveLoad || undefined,
         taskMode: taskMode || undefined,
       });
-      toast.success('Task created');
+      toast.success('Task Created');
       onUpdate?.();
       onClose();
     } catch {
-      toast.error('Failed to create task');
+      toast.error('Failed to Create Task');
     } finally {
       setSaving(false);
     }
@@ -709,11 +548,11 @@ export default function TaskEditor({
     setDeleting(true);
     try {
       await deleteTask(task.id);
-      toast.success('Task deleted');
+      toast.success('Task Deleted');
       onUpdate?.();
       onClose();
     } catch {
-      toast.error('Failed to delete task');
+      toast.error('Failed to Delete Task');
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -731,7 +570,6 @@ export default function TaskEditor({
         priority: task.priority,
       });
 
-      // Duplicate subtasks if option selected
       if (duplicateSubtasks && subtasks.length > 0) {
         for (const subtask of subtasks) {
           await createSubtask(newTask.id, {
@@ -742,11 +580,11 @@ export default function TaskEditor({
         }
       }
 
-      toast.success('Task duplicated');
+      toast.success('Task Duplicated');
       setDuplicateOpen(false);
       onUpdate?.();
     } catch {
-      toast.error('Failed to duplicate task');
+      toast.error('Failed to Duplicate Task');
     }
   };
 
@@ -758,10 +596,9 @@ export default function TaskEditor({
       });
       setSubtasks((prev) => [...prev, subtask]);
       setNewSubtaskTitle('');
-      // Re-fetch to get updated parent
       await fetchTask(task.id);
     } catch {
-      toast.error('Failed to add subtask');
+      toast.error('Failed to Add Subtask');
     }
   };
 
@@ -775,7 +612,7 @@ export default function TaskEditor({
         ),
       );
     } catch {
-      toast.error('Failed to update subtask');
+      toast.error('Failed to Update Subtask');
     }
   };
 
@@ -784,7 +621,7 @@ export default function TaskEditor({
       await deleteTask(subtaskId);
       setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
     } catch {
-      toast.error('Failed to delete subtask');
+      toast.error('Failed to Delete Subtask');
     }
   };
 
@@ -799,7 +636,7 @@ export default function TaskEditor({
       setNewTagName('');
       setShowNewTag(false);
     } catch {
-      toast.error('Failed to create tag');
+      toast.error('Failed to Create Tag');
     }
   };
 
@@ -827,15 +664,13 @@ export default function TaskEditor({
     </div>
   );
 
-  const subtasksDone = subtasks.filter((s) => s.status === 'done').length;
-  const subtaskProgress =
-    subtasks.length > 0
-      ? Math.round((subtasksDone / subtasks.length) * 100)
-      : 0;
-
   return (
     <>
-      <Drawer isOpen onClose={onClose} title={drawerTitle as unknown as string}>
+      <Drawer
+        isOpen
+        onClose={onClose}
+        title={drawerTitle as unknown as string}
+      >
         <div className="flex h-full flex-col">
           <Tabs
             tabs={TABS}
@@ -845,683 +680,99 @@ export default function TaskEditor({
           />
 
           <div className="flex-1 overflow-y-auto">
-            {/* Details Tab */}
             {activeTab === 'details' && (
-              <div className="flex flex-col gap-4">
-                {/* Title */}
-                <div>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => handleTitleChange(e.target.value)}
-                    placeholder="Task title..."
-                    className="w-full border-none bg-transparent text-lg font-semibold text-[var(--color-text-primary)] outline-none placeholder-[var(--color-text-secondary)]"
-                    autoFocus={isCreate}
-                  />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Description
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => handleDescriptionChange(e.target.value)}
-                    placeholder="Add description..."
-                    rows={3}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  />
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Priority
-                  </label>
-                  <div className="flex gap-2">
-                    {([1, 2, 3, 4] as TaskPriority[]).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => handlePriorityChange(p)}
-                        className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-                          priority === p
-                            ? 'border-current'
-                            : 'border-[var(--color-border)]'
-                        }`}
-                        style={{
-                          color:
-                            priority === p
-                              ? PRIORITY_CONFIG[p].color
-                              : 'var(--color-text-secondary)',
-                          backgroundColor:
-                            priority === p
-                              ? PRIORITY_CONFIG[p].bgColor
-                              : 'transparent',
-                        }}
-                      >
-                        {PRIORITY_CONFIG[p].label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Status
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) =>
-                      handleStatusChange(e.target.value as TaskStatus)
-                    }
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Subtasks */}
-                {!isCreate && (
-                  <div>
-                    <div className="mb-2 flex items-center justify-between">
-                      <label className="text-xs font-medium text-[var(--color-text-secondary)]">
-                        Subtasks
-                      </label>
-                      {subtasks.length > 0 && (
-                        <span className="text-xs text-[var(--color-text-secondary)]">
-                          {subtasksDone}/{subtasks.length}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Subtask progress bar */}
-                    {subtasks.length > 0 && (
-                      <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-secondary)]">
-                        <div
-                          className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-300"
-                          style={{ width: `${subtaskProgress}%` }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Subtask list */}
-                    <div className="flex flex-col gap-1">
-                      {subtasks.map((subtask) => (
-                        <div
-                          key={subtask.id}
-                          className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--color-bg-secondary)]"
-                        >
-                          <GripVertical className="h-3 w-3 shrink-0 cursor-grab text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-100" />
-                          <Checkbox
-                            checked={subtask.status === 'done'}
-                            onChange={() => handleToggleSubtask(subtask)}
-                          />
-                          <span
-                            className={`flex-1 text-sm ${
-                              subtask.status === 'done'
-                                ? 'text-[var(--color-text-secondary)] line-through'
-                                : 'text-[var(--color-text-primary)]'
-                            }`}
-                          >
-                            {subtask.title}
-                          </span>
-                          <button
-                            onClick={() => handleDeleteSubtask(subtask.id)}
-                            className="shrink-0 text-[var(--color-text-secondary)] opacity-0 hover:text-red-500 group-hover:opacity-100 transition-colors"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Add subtask input */}
-                    <div className="mt-1 flex items-center gap-2">
-                      <Plus className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
-                      <input
-                        type="text"
-                        value={newSubtaskTitle}
-                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleAddSubtask();
-                        }}
-                        placeholder="Add subtask..."
-                        className="flex-1 border-none bg-transparent py-1 text-sm text-[var(--color-text-primary)] outline-none placeholder-[var(--color-text-secondary)]"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+              <DetailsTab
+                isCreate={isCreate}
+                title={title}
+                onTitleChange={handleTitleChange}
+                description={description}
+                onDescriptionChange={handleDescriptionChange}
+                priority={priority}
+                onPriorityChange={handlePriorityChange}
+                status={status}
+                onStatusChange={handleStatusChange}
+                subtasks={subtasks}
+                newSubtaskTitle={newSubtaskTitle}
+                onNewSubtaskTitleChange={setNewSubtaskTitle}
+                onAddSubtask={handleAddSubtask}
+                onToggleSubtask={handleToggleSubtask}
+                onDeleteSubtask={handleDeleteSubtask}
+              />
             )}
 
-            {/* Schedule Tab */}
             {activeTab === 'schedule' && (
-              <div className="flex flex-col gap-4">
-                {/* Due Date */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => handleDueDateChange(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  />
-                </div>
-
-                {/* Due Time */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Due Time (Optional)
-                  </label>
-                  <input
-                    type="time"
-                    value={dueTime}
-                    onChange={(e) => handleDueTimeChange(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  />
-                </div>
-
-                {/* Planned Date (plan-for-a-specific-day) */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Planned Date (Optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={plannedDate}
-                    onChange={(e) => {
-                      setPlannedDate(e.target.value);
-                      autoSave({ planned_date: e.target.value || undefined } as TaskUpdate);
-                    }}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  />
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    Surfaces this task on the Today screen for the chosen day,
-                    independent of the due date.
-                  </p>
-                </div>
-
-                {/* Reminder */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Reminder
-                  </label>
-                  <select
-                    value={reminderOffset}
-                    onChange={(e) => setReminderOffset(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    {REMINDER_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {reminderOffset && (
-                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                      Web notifications are local-only — reminders don't fire
-                      on Android until cross-device reminder scheduling lands.
-                    </p>
-                  )}
-                </div>
-
-                {/* Recurrence */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Recurrence
-                  </label>
-                  <select
-                    value={recurrenceType}
-                    onChange={(e) => setRecurrenceType(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    {RECURRENCE_TYPES.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  {recurrenceType && (
-                    <div className="mt-2">
-                      <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                        Every
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          value={recurrenceInterval}
-                          onChange={(e) =>
-                            setRecurrenceInterval(parseInt(e.target.value) || 1)
-                          }
-                          className="w-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                        />
-                        <span className="text-sm text-[var(--color-text-secondary)]">
-                          {recurrenceType === 'daily'
-                            ? 'day(s)'
-                            : recurrenceType === 'weekly'
-                              ? 'week(s)'
-                              : recurrenceType === 'monthly'
-                                ? 'month(s)'
-                                : 'year(s)'}
-                        </span>
-                      </div>
-
-                      {(recurrenceType === 'weekly' ||
-                        recurrenceType === 'biweekly') && (
-                        <div className="mt-2">
-                          <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                            Days
-                          </label>
-                          <div className="flex gap-1">
-                            {WEEKDAYS.map(({ idx, label }) => {
-                              const selected = recurrenceDaysOfWeek.includes(idx);
-                              return (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() =>
-                                    setRecurrenceDaysOfWeek((prev) =>
-                                      prev.includes(idx)
-                                        ? prev.filter((d) => d !== idx)
-                                        : [...prev, idx],
-                                    )
-                                  }
-                                  className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
-                                    selected
-                                      ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
-                                      : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                                  }`}
-                                  aria-pressed={selected}
-                                >
-                                  {label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* After-completion flag */}
-                      <label className="mt-2 flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
-                        <input
-                          type="checkbox"
-                          checked={recurrenceAfterCompletion}
-                          onChange={(e) =>
-                            setRecurrenceAfterCompletion(e.target.checked)
-                          }
-                          className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-accent)]"
-                        />
-                        Schedule next occurrence from when I complete this
-                        one (not from the due date)
-                      </label>
-
-                      {/* End condition */}
-                      <div className="mt-3">
-                        <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                          Ends
-                        </label>
-                        <div className="flex flex-col gap-1.5">
-                          {(
-                            [
-                              { key: 'never', label: 'Never' },
-                              { key: 'after', label: 'After N occurrences' },
-                              { key: 'on', label: 'On a specific date' },
-                            ] as const
-                          ).map(({ key, label }) => (
-                            <label
-                              key={key}
-                              className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]"
-                            >
-                              <input
-                                type="radio"
-                                name="recurrence-end"
-                                checked={recurrenceEndMode === key}
-                                onChange={() => setRecurrenceEndMode(key)}
-                                className="text-[var(--color-accent)]"
-                              />
-                              {label}
-                            </label>
-                          ))}
-                        </div>
-                        {recurrenceEndMode === 'after' && (
-                          <input
-                            type="number"
-                            min={1}
-                            value={recurrenceEndAfter}
-                            onChange={(e) =>
-                              setRecurrenceEndAfter(
-                                Math.max(1, Number(e.target.value) || 1),
-                              )
-                            }
-                            className="mt-1 w-24 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                          />
-                        )}
-                        {recurrenceEndMode === 'on' && (
-                          <input
-                            type="date"
-                            value={recurrenceEndDate}
-                            onChange={(e) =>
-                              setRecurrenceEndDate(e.target.value)
-                            }
-                            className="mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 py-1 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Duration */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Estimated Duration (Minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    placeholder="e.g. 30"
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  />
-                </div>
-
-                {/* Focus-Release per-task overrides (parity audit § B.8). */}
-                {/* Mirrors Android TaskEntity.good_enough_minutes_override
-                    + .max_revisions_override; only surface on existing
-                    tasks, since the override has no meaning during the
-                    initial create + no auto-save loop to thread it
-                    through yet (mirrors how Subtasks render only in
-                    edit mode). */}
-                {!isCreate && (
-                  <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40 p-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                        Focus & Release Overrides
-                      </span>
-                      <span className="text-xs text-[var(--color-text-secondary)]">
-                        Per-task overrides for the Good-Enough Timer and
-                        anti-rework guard. Leave off to inherit the
-                        global defaults from your ND preferences.
-                      </span>
-                    </div>
-
-                    <FocusReleaseOverrideRow
-                      title="Good-Enough Timer Minutes"
-                      enabledLabel="Override the global Good-Enough threshold"
-                      disabledLabel="Use the global Good-Enough threshold"
-                      overrideAriaLabel="Override Good-Enough Timer minutes"
-                      valueAriaLabel="Good-Enough Timer minutes value"
-                      placeholder="e.g. 25"
-                      min={1}
-                      max={240}
-                      overrideEnabled={goodEnoughOverrideEnabled}
-                      value={goodEnoughMinutes}
-                      onOverrideToggle={handleGoodEnoughOverrideToggle}
-                      onValueChange={handleGoodEnoughMinutesChange}
-                    />
-
-                    <FocusReleaseOverrideRow
-                      title="Max Revisions"
-                      enabledLabel="Override the global revision limit"
-                      disabledLabel="Use the global revision limit"
-                      overrideAriaLabel="Override max revisions"
-                      valueAriaLabel="Max revisions value"
-                      placeholder="e.g. 3"
-                      min={1}
-                      max={20}
-                      overrideEnabled={maxRevisionsOverrideEnabled}
-                      value={maxRevisions}
-                      onOverrideToggle={handleMaxRevisionsOverrideToggle}
-                      onValueChange={handleMaxRevisionsChange}
-                    />
-                  </div>
-                )}
-              </div>
+              <ScheduleTab
+                isCreate={isCreate}
+                dueDate={dueDate}
+                onDueDateChange={handleDueDateChange}
+                dueTime={dueTime}
+                onDueTimeChange={handleDueTimeChange}
+                plannedDate={plannedDate}
+                onPlannedDateChange={handlePlannedDateChange}
+                reminderOffset={reminderOffset}
+                onReminderOffsetChange={handleReminderOffsetChange}
+                recurrenceType={recurrenceType}
+                onRecurrenceTypeChange={setRecurrenceType}
+                recurrenceInterval={recurrenceInterval}
+                onRecurrenceIntervalChange={setRecurrenceInterval}
+                recurrenceDaysOfWeek={recurrenceDaysOfWeek}
+                onRecurrenceDaysOfWeekChange={setRecurrenceDaysOfWeek}
+                recurrenceAfterCompletion={recurrenceAfterCompletion}
+                onRecurrenceAfterCompletionChange={setRecurrenceAfterCompletion}
+                recurrenceEndMode={recurrenceEndMode}
+                onRecurrenceEndModeChange={setRecurrenceEndMode}
+                recurrenceEndAfter={recurrenceEndAfter}
+                onRecurrenceEndAfterChange={setRecurrenceEndAfter}
+                recurrenceEndDate={recurrenceEndDate}
+                onRecurrenceEndDateChange={setRecurrenceEndDate}
+                duration={duration}
+                onDurationChange={handleDurationChange}
+              />
             )}
 
-            {/* Organize Tab */}
             {activeTab === 'organize' && (
-              <div className="flex flex-col gap-4">
-                {/* Project */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Project
-                  </label>
-                  <select
-                    value={projectId || ''}
-                    onChange={(e) =>
-                      setProjectId(e.target.value || null)
-                    }
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    <option value="">No Project</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Life Category (Work-Life Balance) */}
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
-                      Life Category
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => void handleLifeCategoryAutoClick()}
-                      disabled={
-                        lifeCategoryAutoBusy ||
-                        !aiFeaturesEnabled ||
-                        !title.trim()
-                      }
-                      aria-label="Auto-classify Life Category with AI"
-                      title={
-                        !aiFeaturesEnabled
-                          ? 'AI Features are off — enable them in Settings'
-                          : !title.trim()
-                          ? 'Enter a title first'
-                          : 'Auto-classify with AI'
-                      }
-                      className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/20 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {lifeCategoryAutoBusy ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3 w-3" />
-                      )}
-                      Auto
-                    </button>
-                  </div>
-                  <select
-                    value={lifeCategory}
-                    onChange={(e) =>
-                      handleLifeCategoryChange(
-                        (e.target.value as LifeCategory | '') || '',
-                      )
-                    }
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  >
-                    {LIFE_CATEGORY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    Powers the Work-Life Balance dashboard. Tap Auto to let
-                    Claude classify the task from its title + description.
-                  </p>
-                </div>
-
-                {/* Cognitive Load (start-friction) — chip-row parity with
-                    Android Organize tab. UNCATEGORIZED == no chip selected. */}
-                <ClassificationChipRow<CognitiveLoad>
-                  label="Cognitive Load"
-                  value={cognitiveLoad}
-                  options={COGNITIVE_LOAD_OPTIONS.filter(
-                    (o): o is { value: CognitiveLoad; label: string } => o.value !== '',
-                  )}
-                  onChange={handleCognitiveLoadChange}
-                  onAutoClick={handleCognitiveLoadAutoClick}
-                  autoBusy={cognitiveLoadAutoBusy}
-                  autoDisabled={!title.trim()}
-                  autoTooltip={
-                    !title.trim()
-                      ? 'Enter a title first'
-                      : 'Auto-classify from keywords'
-                  }
-                  autoAriaLabel="Auto-classify Cognitive Load"
-                  helperText="How hard is it to start? Independent of duration, importance, and reward type. Tap Auto to classify from the title + description."
-                />
-
-                {/* Task Mode (Work / Play / Relax) — chip-row parity with
-                    Android Organize tab. UNCATEGORIZED == no chip selected. */}
-                <ClassificationChipRow<TaskMode>
-                  label="Task Mode"
-                  value={taskMode}
-                  options={TASK_MODE_OPTIONS.filter(
-                    (o): o is { value: TaskMode; label: string } => o.value !== '',
-                  )}
-                  onChange={handleTaskModeChange}
-                  onAutoClick={handleTaskModeAutoClick}
-                  autoBusy={taskModeAutoBusy}
-                  autoDisabled={!title.trim()}
-                  autoTooltip={
-                    !title.trim()
-                      ? 'Enter a title first'
-                      : 'Auto-classify from keywords'
-                  }
-                  autoAriaLabel="Auto-classify Task Mode"
-                  helperText="What kind of output does this produce? Orthogonal to Life Category and Cognitive Load. Tap Auto to classify from the title + description."
-                />
-
-
-                {/* Dependencies / Blockers (parity B.12 — mirrors Android
-                    `OrganizeTab.kt :: BlockersSection`). Only meaningful
-                    once the task has a stable id, so suppress in create
-                    mode and show a hint instead. */}
-                {selectedTask ? (
-                  <DependencyEditor taskId={selectedTask.id} />
-                ) : (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                      Blockers
-                    </label>
-                    <p className="text-xs italic text-[var(--color-text-secondary)]">
-                      Save the task first to add blockers.
-                    </p>
-                  </div>
-                )}
-
-                {/* Tags */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Tags
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        onClick={() => toggleTag(tag.id)}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                          taskTagIds.includes(tag.id)
-                            ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
-                            : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]'
-                        }`}
-                      >
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{
-                            backgroundColor: tag.color || 'var(--color-accent)',
-                          }}
-                        />
-                        {tag.name}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setShowNewTag(!showNewTag)}
-                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-                    >
-                      <Plus className="h-3 w-3" />
-                      New Tag
-                    </button>
-                  </div>
-
-                  {/* New tag form */}
-                  {showNewTag && (
-                    <div className="mt-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
-                      <input
-                        type="text"
-                        value={newTagName}
-                        onChange={(e) => setNewTagName(e.target.value)}
-                        placeholder="Tag name..."
-                        className="mb-2 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-bg-card)] px-2 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCreateTag();
-                        }}
-                      />
-                      <div className="mb-2 flex flex-wrap gap-1.5">
-                        {TAG_COLORS.map((c) => (
-                          <button
-                            key={c}
-                            onClick={() => setNewTagColor(c)}
-                            className={`h-6 w-6 rounded-full transition-transform ${
-                              newTagColor === c
-                                ? 'scale-110 ring-2 ring-offset-1'
-                                : ''
-                            }`}
-                            style={{
-                              backgroundColor: c,
-                              outlineColor: c,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowNewTag(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button size="sm" onClick={handleCreateTag}>
-                          Create
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                    Notes
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add notes..."
-                    rows={4}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                  />
-                </div>
-              </div>
+              <OrganizeTab
+                isCreate={isCreate}
+                selectedTask={selectedTask}
+                projects={projects}
+                projectId={projectId}
+                onProjectChange={handleProjectChange}
+                tags={tags}
+                taskTagIds={taskTagIds}
+                onToggleTag={toggleTag}
+                showNewTag={showNewTag}
+                onToggleNewTag={() => setShowNewTag(!showNewTag)}
+                newTagName={newTagName}
+                newTagColor={newTagColor}
+                onNewTagNameChange={setNewTagName}
+                onNewTagColorChange={setNewTagColor}
+                onCreateTag={handleCreateTag}
+                lifeCategory={lifeCategory}
+                onLifeCategoryChange={handleLifeCategoryChange}
+                onLifeCategoryAutoClick={() => void handleLifeCategoryAutoClick()}
+                lifeCategoryAutoBusy={lifeCategoryAutoBusy}
+                aiFeaturesEnabled={aiFeaturesEnabled}
+                taskMode={taskMode}
+                onTaskModeChange={handleTaskModeChange}
+                onTaskModeAutoClick={handleTaskModeAutoClick}
+                taskModeAutoBusy={taskModeAutoBusy}
+                cognitiveLoad={cognitiveLoad}
+                onCognitiveLoadChange={handleCognitiveLoadChange}
+                onCognitiveLoadAutoClick={handleCognitiveLoadAutoClick}
+                cognitiveLoadAutoBusy={cognitiveLoadAutoBusy}
+                goodEnoughOverrideEnabled={goodEnoughOverrideEnabled}
+                goodEnoughMinutes={goodEnoughMinutes}
+                onGoodEnoughOverrideToggle={handleGoodEnoughOverrideToggle}
+                onGoodEnoughMinutesChange={handleGoodEnoughMinutesChange}
+                maxRevisionsOverrideEnabled={maxRevisionsOverrideEnabled}
+                maxRevisions={maxRevisions}
+                onMaxRevisionsOverrideToggle={handleMaxRevisionsOverrideToggle}
+                onMaxRevisionsChange={handleMaxRevisionsChange}
+                notes={notes}
+                onNotesChange={handleNotesChange}
+                title={title}
+                onRequestDelete={() => setDeleteOpen(true)}
+              />
             )}
           </div>
 
@@ -1533,7 +784,7 @@ export default function TaskEditor({
                   Cancel
                 </Button>
                 <Button onClick={handleCreate} loading={saving}>
-                  Create Task
+                  Save Task
                 </Button>
               </div>
             ) : (
@@ -1560,9 +811,14 @@ export default function TaskEditor({
                           tags: taskTagIds,
                           subtasks: subtasks.map((s) => s.title),
                           recurrence_json: recurrenceType
-                            ? JSON.stringify({ type: recurrenceType, interval: recurrenceInterval })
+                            ? JSON.stringify({
+                                type: recurrenceType,
+                                interval: recurrenceInterval,
+                              })
                             : undefined,
-                          estimated_duration: duration ? parseInt(duration) : undefined,
+                          estimated_duration: duration
+                            ? parseInt(duration)
+                            : undefined,
                         })
                       }
                     >
@@ -1570,14 +826,6 @@ export default function TaskEditor({
                       Save as Template
                     </Button>
                   )}
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
                 </div>
                 {task && (
                   <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
@@ -1602,7 +850,6 @@ export default function TaskEditor({
         loading={deleting}
       />
 
-      {/* Duplicate dialog */}
       <ConfirmDialog
         isOpen={duplicateOpen}
         onClose={() => setDuplicateOpen(false)}
@@ -1611,7 +858,9 @@ export default function TaskEditor({
         message={
           <div className="flex flex-col gap-3">
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Create a copy of &ldquo;{task?.title}&rdquo; with the same description, priority, project, and tags. The due date will be cleared.
+              Create a copy of &ldquo;{task?.title}&rdquo; with the same
+              description, priority, project, and tags. The due date will be
+              cleared.
             </p>
             {subtasks.length > 0 && (
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
@@ -1621,7 +870,8 @@ export default function TaskEditor({
                   onChange={(e) => setDuplicateSubtasks(e.target.checked)}
                   className="rounded border-[var(--color-border)]"
                 />
-                Include {subtasks.length} subtask{subtasks.length === 1 ? '' : 's'}
+                Include {subtasks.length} Subtask
+                {subtasks.length === 1 ? '' : 's'}
               </label>
             )}
           </div>
