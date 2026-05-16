@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
+  History,
   Sparkles,
   X,
   Lock,
@@ -235,6 +237,16 @@ export function WeeklyReviewScreen() {
             Pro adds AI insights
           </span>
         )}
+        <div className="ml-auto">
+          <Link
+            to="/weekly-review/history"
+            className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-accent)]"
+            aria-label="View History"
+          >
+            <History className="h-4 w-4" />
+            History
+          </Link>
+        </div>
       </div>
 
       {/* Week selector */}
@@ -297,12 +309,20 @@ export function WeeklyReviewScreen() {
         </>
       )}
 
-      {/* Action footer for Pro users: manual re-run */}
-      {uiState.kind !== 'loading' && uiState.kind !== 'idle' && isPro && (
+      {/* Action footer: manual generate / re-run. Available to Free users
+          too — they get a fresh local recompute + a persisted Firestore
+          row so cross-device pulls land the same week's snapshot. */}
+      {uiState.kind !== 'loading' && uiState.kind !== 'idle' && (
         <div className="mt-6 flex justify-end">
-          <Button variant="ghost" size="sm" onClick={runReview}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={runReview}
+            disabled={!allTasks}
+            aria-label="Generate Now"
+          >
             <Sparkles className="h-4 w-4" />
-            Re-run Review
+            Generate Now
           </Button>
         </div>
       )}
