@@ -73,6 +73,11 @@ test.describe('PrismTheme variant picker', () => {
       localStorage.setItem('prismtask_theme_key', 'CYBERPUNK');
     });
     await page.goto('/login');
+    // PrismThemeProvider applies the theme in a `useEffect`, so the CSS
+    // custom property lands a tick after first paint. Wait on the
+    // `data-theme` attribute that `applyThemeToDocument` sets in the
+    // same call — once it's there, the CSS var is also set.
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'CYBERPUNK');
     const accent1 = await page.evaluate(() =>
       getComputedStyle(document.documentElement)
         .getPropertyValue('--color-accent')
@@ -88,6 +93,7 @@ test.describe('PrismTheme variant picker', () => {
       localStorage.setItem('prismtask_theme_key', 'SYNTHWAVE');
     });
     await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'SYNTHWAVE');
     const accent2 = await page.evaluate(() =>
       getComputedStyle(document.documentElement)
         .getPropertyValue('--color-accent')
@@ -95,6 +101,5 @@ test.describe('PrismTheme variant picker', () => {
         .toUpperCase(),
     );
     expect(accent2).toBe('#FF2D87');
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'SYNTHWAVE');
   });
 });
