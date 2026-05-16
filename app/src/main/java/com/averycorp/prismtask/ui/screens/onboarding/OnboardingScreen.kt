@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -103,6 +104,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableColumn
 
 private const val TOTAL_PAGES = 15
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
@@ -473,8 +475,10 @@ private fun SmartTasksPage() {
     var animStarted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { animStarted = true }
 
-    val tasks = remember { listOf("Buy Groceries", "Finish Report", "Call Dentist") }
-    val checked = remember { mutableStateOf(setOf<Int>()) }
+    var tasks by remember {
+        mutableStateOf(listOf("Buy Groceries", "Finish Report", "Call Dentist"))
+    }
+    var checked by remember { mutableStateOf(setOf<String>()) }
     val projects = remember {
         listOf(
             Triple("\ud83c\udfaf", "Launch V2", 0.7f),
@@ -491,25 +495,33 @@ private fun SmartTasksPage() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-            tasks.forEachIndexed { index, task ->
+            ReorderableColumn(
+                list = tasks,
+                onSettle = { fromIndex, toIndex ->
+                    tasks = tasks.toMutableList().apply {
+                        add(toIndex, removeAt(fromIndex))
+                    }
+                },
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) { index, task, isDragging ->
                 AnimatedVisibility(
                     visible = animStarted,
                     enter = fadeIn(tween(300, delayMillis = index * 150)) +
                         slideInVertically(tween(300, delayMillis = index * 150)) { it }
                 ) {
-                    val isChecked = index in checked.value
+                    val isChecked = task in checked
+                    val elevation = if (isDragging) 6.dp else 0.dp
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .shadow(elevation, MaterialTheme.shapes.medium)
+                            .longPressDraggableHandle()
                             .toggleable(
                                 value = isChecked,
                                 role = Role.Checkbox,
                                 onValueChange = { nowChecked ->
-                                    checked.value = if (nowChecked) {
-                                        checked.value + index
-                                    } else {
-                                        checked.value - index
-                                    }
+                                    checked = if (nowChecked) checked + task else checked - task
                                 }
                             ),
                         colors = CardDefaults.cardColors(
