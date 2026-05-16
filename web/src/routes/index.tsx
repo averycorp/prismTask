@@ -62,6 +62,12 @@ const CheckInHistoryScreen = lazy(() => import('@/features/checkin/CheckInHistor
 const WeeklyBalanceReportScreen = lazy(() => import('@/features/balance/WeeklyBalanceReportScreen').then(m => ({ default: m.WeeklyBalanceReportScreen })));
 const BoundaryRulesListScreen = lazy(() => import('@/features/boundaries/BoundaryRulesListScreen').then(m => ({ default: m.BoundaryRulesListScreen })));
 const BoundaryRuleEditScreen = lazy(() => import('@/features/boundaries/BoundaryRuleEditScreen').then(m => ({ default: m.BoundaryRuleEditScreen })));
+const NotificationsHub = lazy(() => import('@/features/settings/sections/Notifications/NotificationsHub').then(m => ({ default: m.NotificationsHub })));
+const NotificationsProfilesScreen = lazy(() => import('@/features/settings/sections/Notifications/ProfilesScreen').then(m => ({ default: m.ProfilesScreen })));
+const NotificationsSoundScreen = lazy(() => import('@/features/settings/sections/Notifications/SoundScreen').then(m => ({ default: m.SoundScreen })));
+const NotificationsVibrationScreen = lazy(() => import('@/features/settings/sections/Notifications/VibrationScreen').then(m => ({ default: m.VibrationScreen })));
+const NotificationsQuietHoursScreen = lazy(() => import('@/features/settings/sections/Notifications/QuietHoursScreen').then(m => ({ default: m.QuietHoursScreen })));
+const NotificationsEscalationScreen = lazy(() => import('@/features/settings/sections/Notifications/EscalationScreen').then(m => ({ default: m.EscalationScreen })));
 
 function LazyRoute({ Component, fallback }: { Component: ComponentType; fallback?: React.ReactNode }) {
   return (
@@ -158,6 +164,12 @@ const routes: RouteObject[] = [
       { path: 'boundaries', element: <LazyRoute Component={BoundaryRulesListScreen} /> },
       { path: 'boundaries/new', element: <LazyRoute Component={BoundaryRuleEditScreen} /> },
       { path: 'boundaries/:id', element: <LazyRoute Component={BoundaryRuleEditScreen} /> },
+      { path: 'settings/notifications', element: <LazyRoute Component={NotificationsHub} fallback={<SettingsSkeleton />} /> },
+      { path: 'settings/notifications/profiles', element: <LazyRoute Component={NotificationsProfilesScreen} fallback={<SettingsSkeleton />} /> },
+      { path: 'settings/notifications/sound', element: <LazyRoute Component={NotificationsSoundScreen} fallback={<SettingsSkeleton />} /> },
+      { path: 'settings/notifications/vibration', element: <LazyRoute Component={NotificationsVibrationScreen} fallback={<SettingsSkeleton />} /> },
+      { path: 'settings/notifications/quiet-hours', element: <LazyRoute Component={NotificationsQuietHoursScreen} fallback={<SettingsSkeleton />} /> },
+      { path: 'settings/notifications/escalation', element: <LazyRoute Component={NotificationsEscalationScreen} fallback={<SettingsSkeleton />} /> },
     ],
   },
 

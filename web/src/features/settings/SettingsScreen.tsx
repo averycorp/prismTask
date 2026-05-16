@@ -714,10 +714,29 @@ export function SettingsScreen() {
         </div>
       </SettingsSection>
 
+      {/* Notifications Hub — profile / sound / vibration / quiet hours /
+          escalation sub-screens. Mirrors Android's
+          `NotificationsScreen.kt` sub-section fan-out. */}
+      <SettingsSection
+        icon={<Bell className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Notifications Hub"
+      >
+        <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
+          Tune the active notification profile: sound, vibration, quiet
+          hours, and the escalation chain.
+        </p>
+        <Link
+          to="/settings/notifications"
+          className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)]"
+        >
+          Open Notifications Hub →
+        </Link>
+      </SettingsSection>
+
       {/* Notifications */}
       <SettingsSection
         icon={<Bell className="h-5 w-5 text-[var(--color-accent)]" />}
-        title="Notifications"
+        title="Browser Notifications"
       >
         {isNotificationSupported() ? (
           <div className="flex flex-col gap-3">
