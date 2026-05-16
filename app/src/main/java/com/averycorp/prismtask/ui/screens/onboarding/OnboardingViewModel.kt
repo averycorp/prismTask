@@ -645,6 +645,9 @@ constructor(
         applyRoutineSelection("morning", selections)
         applyRoutineSelection("bedtime", selections)
         applyRoutineSelection("housework", selections)
+        applyRoutineSelection("workday", selections)
+        applyRoutineSelection("winddown", selections)
+        applyRoutineSelection("errands", selections)
     }
 
     private suspend fun applyRoutineSelection(routineType: String, selections: TemplateSelections) {

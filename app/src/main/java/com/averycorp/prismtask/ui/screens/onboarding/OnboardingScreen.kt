@@ -823,28 +823,17 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
-        // Hide template sections whose owning Life Mode is off (toggled on the
+        // Hide Self-Care + Housework when their Life Mode is off (toggled on the
         // prior LifeModesPage). Settings "Browse Templates" still shows everything.
-        // Leisure intentionally excluded: post Leisure Budget v2.0 (PR #1278) the
-        // picker no longer has a Leisure section — that pool is seeded via
-        // LeisurePoolScreen — so Self-Care + Housework are the only mode gates.
-        if (!selfCareEnabled && !houseworkEnabled) {
-            Text(
-                text = "No template sections — Self-Care and Housework are both off. Tap Next to skip.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 24.dp)
-            )
-        } else {
-            TemplatePickerContent(
-                state = selections,
-                onChange = viewModel::updateTemplateSelections,
-                modifier = Modifier.fillMaxWidth(),
-                showSelfCare = selfCareEnabled,
-                showHousework = houseworkEnabled
-            )
-        }
+        // Work-Day Setup, Wind-Down, and Errands have no corresponding Life Mode
+        // gate and always render, so the picker is never empty.
+        TemplatePickerContent(
+            state = selections,
+            onChange = viewModel::updateTemplateSelections,
+            modifier = Modifier.fillMaxWidth(),
+            showSelfCare = selfCareEnabled,
+            showHousework = houseworkEnabled
+        )
     }
 }
 

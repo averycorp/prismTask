@@ -78,6 +78,30 @@ fun TemplatePickerContent(
                 routineTypes = listOf("housework" to "Housework")
             )
         }
+        RoutineSectionCard(
+            emoji = "\uD83D\uDCBC",
+            title = "Work-Day Setup",
+            subtitle = "Get your work day started",
+            state = state,
+            onChange = onChange,
+            routineTypes = listOf("workday" to "Work-Day Setup")
+        )
+        RoutineSectionCard(
+            emoji = "\uD83C\uDF19",
+            title = "Wind-Down",
+            subtitle = "Transition into evening",
+            state = state,
+            onChange = onChange,
+            routineTypes = listOf("winddown" to "Wind-Down")
+        )
+        RoutineSectionCard(
+            emoji = "\uD83D\uDED2",
+            title = "Errands",
+            subtitle = "Common weekly errands",
+            state = state,
+            onChange = onChange,
+            routineTypes = listOf("errands" to "Errands")
+        )
     }
 }
 

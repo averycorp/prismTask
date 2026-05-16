@@ -75,6 +75,9 @@ object SelfCareRoutines {
         "morning" -> morningSteps
         "medication" -> medicationSteps
         "housework" -> houseworkSteps
+        "workday" -> workdaySteps
+        "winddown" -> winddownSteps
+        "errands" -> errandsSteps
         else -> bedtimeSteps
     }
 
@@ -82,6 +85,9 @@ object SelfCareRoutines {
         "morning" -> morningTiers
         "medication" -> medicationTiers
         "housework" -> houseworkTiers
+        "workday" -> workdayTiers
+        "winddown" -> winddownTiers
+        "errands" -> errandsTiers
         else -> bedtimeTiers
     }
 
@@ -89,6 +95,9 @@ object SelfCareRoutines {
         "morning" -> morningTierOrder
         "medication" -> medicationTierOrder
         "housework" -> houseworkTierOrder
+        "workday" -> workdayTierOrder
+        "winddown" -> winddownTierOrder
+        "errands" -> errandsTierOrder
         else -> bedtimeTierOrder
     }
 
@@ -97,6 +106,9 @@ object SelfCareRoutines {
         val phaseOrder = when (routineType) {
             "morning" -> listOf("Skincare", "Hygiene", "Grooming")
             "housework" -> listOf("Kitchen", "Living Areas", "Bathroom", "Laundry")
+            "workday" -> listOf("Review", "Plan", "Communicate")
+            "winddown" -> listOf("Environment", "Tidy", "Reflect")
+            "errands" -> listOf("Essentials", "Logistics", "Bulk")
             else -> listOf("Wash", "Skincare", "Hygiene", "Sleep")
         }
         return phaseOrder.map { phaseName ->
@@ -158,6 +170,69 @@ object SelfCareRoutines {
     )
 
     val houseworkTierOrder = listOf("quick", "regular", "deep")
+
+    // --- Work-Day Setup ---
+
+    val workdayTiers = listOf(
+        RoutineTier("quick", "Quick", "~5 min", 0xFFF59E0B),
+        RoutineTier("standard", "Standard", "~12 min", 0xFF3B82F6),
+        RoutineTier("deep", "Deep", "~25 min", 0xFF6366F1)
+    )
+
+    val workdaySteps = listOf(
+        RoutineStep("wd_review_open", "Review Yesterday's Open Tasks", "~3 min", "quick", phase = "Review"),
+        RoutineStep("wd_check_calendar", "Check Today's Calendar", "~2 min", "quick", phase = "Review"),
+        RoutineStep("wd_pick_top3", "Pick Top 3 Priorities", "~3 min", "standard", phase = "Plan"),
+        RoutineStep("wd_block_focus", "Block Focus Time", "~2 min", "standard", phase = "Plan"),
+        RoutineStep("wd_triage_email", "Triage Email Inbox", "~5 min", "standard", phase = "Communicate"),
+        RoutineStep("wd_weekly_goals", "Skim Weekly Goals", "~3 min", "deep", phase = "Review"),
+        RoutineStep("wd_project_boards", "Glance Project Boards", "~5 min", "deep", phase = "Plan"),
+        RoutineStep("wd_notifications", "Clear Notifications", "~3 min", "deep", phase = "Communicate")
+    )
+
+    val workdayTierOrder = listOf("quick", "standard", "deep")
+
+    // --- Wind-Down ---
+
+    val winddownTiers = listOf(
+        RoutineTier("light", "Light", "~10 min", 0xFF10B981),
+        RoutineTier("solid", "Solid", "~20 min", 0xFF3B82F6),
+        RoutineTier("full", "Full", "~35 min", 0xFF8B5CF6)
+    )
+
+    val winddownSteps = listOf(
+        RoutineStep("wind_dnd", "Phone On Do Not Disturb", "~1 min", "light", phase = "Environment"),
+        RoutineStep("wind_dim_lights", "Dim The Lights", "~1 min", "light", phase = "Environment"),
+        RoutineStep("wind_clothes", "Set Out Clothes For Tomorrow", "~3 min", "solid", phase = "Tidy"),
+        RoutineStep("wind_tidy", "Tidy Main Living Space", "~10 min", "solid", phase = "Tidy"),
+        RoutineStep("wind_gratitude", "Note One Thing You're Grateful For", "~2 min", "solid", phase = "Reflect"),
+        RoutineStep("wind_journal", "Journal A Few Sentences", "~10 min", "full", phase = "Reflect"),
+        RoutineStep("wind_read", "Read A Few Pages", "~10 min", "full", phase = "Reflect"),
+        RoutineStep("wind_stretch", "Stretch Or Breathwork", "~5 min", "full", phase = "Environment")
+    )
+
+    val winddownTierOrder = listOf("light", "solid", "full")
+
+    // --- Errands ---
+
+    val errandsTiers = listOf(
+        RoutineTier("quick", "Quick", "~30 min", 0xFFF59E0B),
+        RoutineTier("regular", "Regular", "~60 min", 0xFF3B82F6),
+        RoutineTier("full", "Full", "~90+ min", 0xFF8B5CF6)
+    )
+
+    val errandsSteps = listOf(
+        RoutineStep("er_groceries", "Grocery Run", "~25 min", "quick", phase = "Essentials"),
+        RoutineStep("er_pharmacy", "Refill Prescriptions Or Pharmacy", "~10 min", "quick", phase = "Essentials"),
+        RoutineStep("er_bank", "Bank Or ATM", "~10 min", "regular", phase = "Logistics"),
+        RoutineStep("er_shipping", "Post Office Or Shipping", "~15 min", "regular", phase = "Logistics"),
+        RoutineStep("er_pickup", "Pickup Or Dropoff (Dry Cleaning, Library)", "~15 min", "regular", phase = "Logistics"),
+        RoutineStep("er_bulk", "Bulk Shopping (Costco, Etc.)", "~45 min", "full", phase = "Bulk"),
+        RoutineStep("er_car", "Car Care (Gas, Wash, Service)", "~20 min", "full", phase = "Bulk"),
+        RoutineStep("er_home", "Home Or Garden Supplies", "~20 min", "full", phase = "Bulk")
+    )
+
+    val errandsTierOrder = listOf("quick", "regular", "full")
 
     val isMedicationType: (String) -> Boolean = { it == "medication" }
 
