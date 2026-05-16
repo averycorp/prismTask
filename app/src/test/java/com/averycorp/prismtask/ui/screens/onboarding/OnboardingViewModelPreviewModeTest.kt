@@ -353,33 +353,41 @@ class OnboardingViewModelPreviewModeTest {
     }
 
     @Test
-    fun `applyTuningSelections writes ND mode and check-in for lose-track-of-time`() =
+    fun `applyTuningSelections writes check-in cadence for lose-track-of-time and leaves adhdMode untouched`() =
         runTest(dispatcher) {
+            // Post-`fix/onboarding-tuning-mode-cascade` (audit findings #2 + #6):
+            // TuningPage no longer cascades into parent ND-mode flags.
+            // BrainModePage owns `adhdMode`; TuningPage only sets the
+            // cadence sub-knob.
             val vm = newViewModel()
             vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
 
             vm.applyTuningSelections(skip = false)
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { ndPreferencesDataStore.setAdhdMode(true) }
             coVerify(exactly = 1) { ndPreferencesDataStore.setCheckInIntervalMinutes(25) }
-            // Untouched modes stay untouched.
+            // Parent ND-mode flags are intentionally NOT written.
+            coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
             coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
             coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
             coVerify(exactly = 0) { userPreferencesDataStore.setCompactMode(any()) }
         }
 
     @Test
-    fun `applyTuningSelections writes forgiveness and rest-day priming for low-energy`() =
+    fun `applyTuningSelections writes rest-day priming for low-energy and leaves forgiveness untouched`() =
         runTest(dispatcher) {
+            // Post-`fix/onboarding-tuning-mode-cascade` (audit finding #6):
+            // HabitsPage owns `ForgivenessPrefs.enabled`; TuningPage only
+            // sets the rest-day priming flag.
             val vm = newViewModel()
             vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS)
 
             vm.applyTuningSelections(skip = false)
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { userPreferencesDataStore.setForgivenessPrefs(any()) }
             coVerify(exactly = 1) { onboardingPreferences.setRestDayPrimed(true) }
+            // Forgiveness pref is intentionally NOT written.
+            coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
         }
 
     @Test
@@ -398,6 +406,130 @@ class OnboardingViewModelPreviewModeTest {
         }
 
     @Test
+    fun `applyTuningSelections writes reduce-animations and muted-palette for fewer-animations and leaves calmMode untouched`() =
+        runTest(dispatcher) {
+            // Post-`fix/onboarding-tuning-mode-cascade` (audit finding #2):
+            // BrainModePage owns `calmMode`; TuningPage only sets the two
+            // sub-flags.
+            val vm = newViewModel()
+            vm.toggleTuningOption(
+                OnboardingPreferenceMapper.TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS
+            )
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { ndPreferencesDataStore.setReduceAnimations(true) }
+            coVerify(exactly = 1) { ndPreferencesDataStore.setMutedColorPalette(true) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
+        }
+
+    @Test
+    fun `applyTuningSelections writes good-enough timers for over-polish and leaves focusReleaseMode untouched`() =
+        runTest(dispatcher) {
+            // Post-`fix/onboarding-tuning-mode-cascade` (audit finding #2):
+            // BrainModePage owns `focusReleaseMode`; TuningPage only sets
+            // the good-enough-timer sub-flag.
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVER_POLISH)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { ndPreferencesDataStore.setGoodEnoughTimersEnabled(true) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
+        }
+
+    // ── Regression: TuningPage must not override BrainMode / Forgiveness opt-outs ──
+    //
+    // These tests pin findings #2 + #6 of the onboarding overlap audit
+    // (`docs/audits/ONBOARDING_OVERLAP_AUDIT.md`). Each one mirrors the
+    // failure scenario the audit identified: the user explicitly opts OUT
+    // of a parent flag on an earlier page, then picks the matching tuning
+    // option on TuningPage. After the fix, `applyTuningSelections` must
+    // NOT touch the parent flag — only the sub-flag(s) TuningPage uniquely
+    // owns. If a future refactor re-adds the cascade write, these tests
+    // turn red.
+
+    @Test
+    fun `regression #2 - LOSE_TRACK_OF_TIME never writes adhdMode parent flag`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            // User picks the matching tuning option on page 10 after opting
+            // out of adhdMode on BrainModePage (page 9). We can't observe
+            // the BrainModePage write directly here — we just verify the
+            // post-fix invariant: setAdhdMode is not called.
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        }
+
+    @Test
+    fun `regression #2 - FEWER_ANIMATIONS_QUIETER_COLORS never writes calmMode parent flag`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.toggleTuningOption(
+                OnboardingPreferenceMapper.TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS
+            )
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
+        }
+
+    @Test
+    fun `regression #2 - OVER_POLISH never writes focusReleaseMode parent flag`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVER_POLISH)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
+        }
+
+    @Test
+    fun `regression #6 - LOW_ENERGY_DAYS never writes ForgivenessPrefs parent flag`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
+        }
+
+    @Test
+    fun `regression #2 + #6 - selecting every option still never touches parent flags`() =
+        runTest(dispatcher) {
+            // The "kitchen-sink" multi-select case. Even if the user picks
+            // every tuning option, none of the four parent flags get
+            // written by TuningPage.
+            val vm = newViewModel()
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVERWHELMED_BY_LONG_LISTS)
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOSE_TRACK_OF_TIME)
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.LOW_ENERGY_DAYS)
+            vm.toggleTuningOption(
+                OnboardingPreferenceMapper.TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS
+            )
+            vm.toggleTuningOption(OnboardingPreferenceMapper.TuningOption.OVER_POLISH)
+
+            vm.applyTuningSelections(skip = false)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setCalmMode(any()) }
+            coVerify(exactly = 0) { ndPreferencesDataStore.setFocusReleaseMode(any()) }
+            coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
+        }
+
+    @Test
     fun `preview mode skips applyTuningSelections writes`() = runTest(dispatcher) {
         val vm = newViewModel()
         vm.setPreviewMode(true)
@@ -408,6 +540,7 @@ class OnboardingViewModelPreviewModeTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        coVerify(exactly = 0) { ndPreferencesDataStore.setCheckInIntervalMinutes(any()) }
         coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
         coVerify(exactly = 0) { onboardingPreferences.setRestDayPrimed(any()) }
     }
