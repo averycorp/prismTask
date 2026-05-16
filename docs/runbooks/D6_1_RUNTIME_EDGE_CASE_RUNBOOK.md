@@ -1,8 +1,7 @@
 # D6#1 — Runtime Device-State Edge Case Runbook
 
-**Audit:** `docs/audits/AUTOMATED_EDGE_CASE_TESTING_AUDIT.md` (the
-parallel test-infrastructure slice, already shipped via PRs
-#879/#882/#885/#886) + this bundle's audit at
+**Audit:** Parallel test-infrastructure slice already shipped via PRs
+#879/#882/#885/#886 (audit doc archived) + this bundle's audit at
 `docs/audits/D5_D6_FINISH_BUNDLE_AUDIT.md` §6.
 **Phase F gate:** No (non-blocking but recommended).
 **Owner:** Avery (operator); AVD-runnable subset can engage Cowork or
@@ -16,7 +15,7 @@ NLP runbooks).
 
 ## Why this runbook exists
 
-The audit at `AUTOMATED_EDGE_CASE_TESTING_AUDIT.md` shipped Tier A
+The automated-edge-case-testing audit (archived) shipped Tier A
 infrastructure (sync state-machine fuzzer + DayBoundary→TimeProvider
 injection) on 2026-04-28 via PRs #879 / #882 / #885 / #886. That work
 covers happy-path-bias reduction in the test suite.

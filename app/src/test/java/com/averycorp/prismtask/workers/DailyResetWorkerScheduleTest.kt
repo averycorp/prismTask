@@ -12,7 +12,7 @@ import java.util.TimeZone
 /**
  * Pure-JVM unit tests for [DailyResetWorker.computeNextDelayMs] — the
  * delay-arithmetic helper extracted in PR-A2 of the automated edge-case
- * testing audit (`docs/audits/AUTOMATED_EDGE_CASE_TESTING_AUDIT.md`).
+ * testing audit.
  *
  * Pinning timezone to UTC for every test that needs timezone determinism;
  * util.DayBoundary uses `Calendar.getInstance()`, which reads the JVM

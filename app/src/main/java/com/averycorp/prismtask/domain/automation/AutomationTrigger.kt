@@ -31,8 +31,8 @@ sealed class AutomationTrigger(val type: String) {
     /**
      * Wall-clock trigger. [hour] / [minute] are 24h local time. The engine's
      * [AutomationTimeTickWorker] enqueues a [AutomationEvent.TimeTick] at
-     * 1-minute granularity (per `AUTOMATION_MINUTE_CADENCE_PHASE_2_AUDIT.md`);
-     * matching rules fire on exact `hour`/`minute` equality, so the rule
+     * 1-minute granularity; matching rules fire on exact `hour`/`minute`
+     * equality, so the rule
      * lands within ~1 minute of its target time on awake devices. Doze
      * may defer firings to the next maintenance window on sleeping
      * devices — see worker kdoc for caveats.

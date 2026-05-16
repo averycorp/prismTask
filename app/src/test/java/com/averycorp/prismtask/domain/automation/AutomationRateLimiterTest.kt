@@ -13,9 +13,8 @@ import org.junit.Test
 /**
  * Unit coverage for [AutomationRateLimiter]. The existing five execution
  * caps (per-rule daily, global hourly, AI daily) plus the new mental-health
- * class cap (per-task notify, Option C of
- * `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md`) all flow
- * through `canFire` — this test asserts they (a) compose cleanly,
+ * class cap (per-task notify) all flow through `canFire` —
+ * this test asserts they (a) compose cleanly,
  * (b) bypass when their precondition is absent, and (c) block with a
  * specific reason string when they fire.
  */

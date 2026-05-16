@@ -11,8 +11,7 @@ import androidx.room.PrimaryKey
  * "Log time" entries, Pomodoro session completions, and explicit timer
  * stops all land here.
  *
- * Path 2 of `docs/audits/ANALYTICS_C4_C5_TIME_TRACKING_DESIGN.md` —
- * the data layer underneath the analytics time-tracking aggregator (C4)
+ * Data layer underneath the analytics time-tracking aggregator (C4)
  * and bar chart (C5). `cloud_id` is included from the start so cross-device
  * sync can be wired in P2-D as a follow-up without a schema migration.
  *

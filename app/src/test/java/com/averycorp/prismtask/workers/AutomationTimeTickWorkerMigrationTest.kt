@@ -21,8 +21,7 @@ import org.robolectric.annotation.Config
 /**
  * Migration regression-gate for the
  * [AutomationTimeTickWorker]'s `PeriodicWork(15min)` →
- * per-minute OneTimeWork chain swap (Path C, per
- * `AUTOMATION_MINUTE_CADENCE_PHASE_2_AUDIT.md`).
+ * per-minute OneTimeWork chain swap (minute-cadence Phase 2, Path C).
  *
  * The migration relies on WorkManager treating
  * [AutomationTimeTickWorker.UNIQUE_WORK_NAME] as a dedup key regardless

@@ -30,8 +30,8 @@ interface AutomationLogDao {
     /**
      * Count prior firings of [ruleId] in the window that fired at least
      * one notify action against the same [taskId]. Backs the per-task
-     * notify soft cap (7th engine safety mechanism — see
-     * `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md` Option C).
+     * notify soft cap (7th engine safety mechanism, mental-health
+     * guardrails Option C).
      *
      * `taskMarkerComma` and `taskMarkerBrace` are pre-built LIKE patterns
      * (`%"taskId":<n>,%` and `%"taskId":<n>}%`) — the OR covers both

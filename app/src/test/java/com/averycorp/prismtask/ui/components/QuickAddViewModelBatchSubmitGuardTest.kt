@@ -38,8 +38,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Locks in the re-entry guard added in
- * `docs/audits/BATCH_OPERATIONS_DOUBLE_RUN_AUDIT.md` (A4 / A5).
+ * Locks in the batch-operations double-run re-entry guard (A4 / A5).
  *
  * Without the guard, two synchronous `onSubmit()` calls (a Compose
  * double-tap or Send-then-IME-Done combo) emit twice on

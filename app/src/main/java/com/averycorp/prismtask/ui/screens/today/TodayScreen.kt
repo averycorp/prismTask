@@ -536,7 +536,7 @@ fun TodayScreen(
                     // Quick action chips — STANDARD+
                     // Horizontally scrollable so the row scales as more AI
                     // entry points are added without breaking small-screen
-                    // layout. See docs/audits/AI_TODAY_ACCESS_AUDIT.md.
+                    // layout.
                     item(key = "quick_actions") {
                         val chipColors = AssistChipDefaults.assistChipColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,

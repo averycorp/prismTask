@@ -807,11 +807,10 @@ constructor(
     }
 
     /**
-     * P2-D of the analytics C4/C5 time-tracking work
-     * (`docs/audits/ANALYTICS_C4_C5_TIME_TRACKING_DESIGN.md`, Path 2). When a
-     * focus session completes, write a `TaskTimingEntity` per session task so
-     * the analytics time-tracking chart picks up Pomodoro work without the
-     * user having to log it manually from the Schedule tab.
+     * P2-D of the analytics C4/C5 time-tracking work. When a focus session
+     * completes, write a `TaskTimingEntity` per session task so the analytics
+     * time-tracking chart picks up Pomodoro work without the user having to
+     * log it manually from the Schedule tab.
      *
      * Allocation strategy: each task gets credited its planned
      * `allocatedMinutes`. If the sum diverges from the actual session length

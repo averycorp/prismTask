@@ -718,11 +718,11 @@ class RtdnEvent(Base):
     Notifications.
 
     Every Pub/Sub Push payload from Google's RTDN feed is captured here
-    keyed by ``pubsub_message_id`` for redelivery idempotency. Per
-    ``docs/audits/BILLING_SCHEMA_AUDIT.md`` (option B), this table
-    stands alone: ``users.tier`` + ``services/billing.py`` remain the
-    entitlement source of truth, and event-to-user correlation happens
-    at processing time via the Play Developer API rather than via a FK.
+    keyed by ``pubsub_message_id`` for redelivery idempotency. Per the
+    billing-schema audit (option B), this table stands alone:
+    ``users.tier`` + ``services/billing.py`` remain the entitlement
+    source of truth, and event-to-user correlation happens at processing
+    time via the Play Developer API rather than via a FK.
 
     The table is append-only at the application layer — there is no
     UPDATE or DELETE code path. ``processed`` and ``processing_error``

@@ -1866,8 +1866,7 @@ val MIGRATION_63_64 = object : Migration(63, 64) {
  * v64 → v65 — Adds `task_timings` table for per-task time-tracking entries.
  *
  * One row per logged interval; multiple per task. Used by the analytics
- * time-tracking aggregator (slice C4) and bar chart (slice C5) — see
- * `docs/audits/ANALYTICS_C4_C5_TIME_TRACKING_DESIGN.md` (Path 2).
+ * time-tracking aggregator (slice C4) and bar chart (slice C5).
  *
  * `cloud_id` is included from the start so cross-device sync (P2-D
  * follow-up) does not require a second migration.

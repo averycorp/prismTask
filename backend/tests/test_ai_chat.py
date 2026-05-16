@@ -681,12 +681,12 @@ class TestChatEndpoint:
 class TestChatSystemPromptFramingCanary:
     """Regression guard for the chat system prompt's mental-health framing.
 
-    Per ``docs/audits/CHAT_SYSTEM_PROMPT_AUDIT.md`` (variant B). The audit
-    rewrote ``_CHAT_SYSTEM_PROMPT_BASE`` to add forgiveness-first posture
+    The chat-system-prompt audit (variant B) rewrote
+    ``_CHAT_SYSTEM_PROMPT_BASE`` to add forgiveness-first posture
     and explicit anti-shame / anti-comparison rules. These checks fail
     loudly if a future edit dilutes the framing back toward
-    productivity-as-virtue language. Update intentionally — re-run the
-    audit if you're changing what these strings assert.
+    productivity-as-virtue language. Update intentionally — re-audit the
+    prompt if you're changing what these strings assert.
     """
 
     def test_prompt_carries_forgiveness_first_posture(self):

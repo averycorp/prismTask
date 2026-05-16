@@ -266,9 +266,8 @@ its own break notification; it deliberately uses strict semantics.
   timestamps through `DayBoundary` for new code (see **Open questions**
   before relying on this on the existing streak path).
 - Default `show_streak` to off for any new built-in unless you have
-  evidence the streak surface adds clarity (e.g.,
-  `BUILT_IN_HABIT_STREAKS_AUDIT.md` for the v65 → v66 enable
-  migration).
+  evidence the streak surface adds clarity (the v65 → v66 enable
+  migration is the precedent).
 - Write copy following the **Copy guidelines** above.
 - Don't add a new break notification — follow the anti-pattern above.
 - Mirror the algorithm change on the web side in `streaks.ts` and add

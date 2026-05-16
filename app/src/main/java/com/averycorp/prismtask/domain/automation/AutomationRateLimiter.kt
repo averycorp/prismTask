@@ -19,8 +19,7 @@ import javax.inject.Singleton
  *    fire more than [MAX_NOTIFIES_PER_TASK_PER_DAY] notify actions
  *    against the same task in a 24h window. Scoped per (rule, task) —
  *    distinct rules each firing one notify against the same task are
- *    fine (medication-escalation use case). See Option C of
- *    `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md`.
+ *    fine (medication-escalation use case).
  *
  * Defaults below are intentionally conservative; the per-rule cap is
  * overridable via JSON `"maxFiresPerDay": N` on the rule's trigger blob.

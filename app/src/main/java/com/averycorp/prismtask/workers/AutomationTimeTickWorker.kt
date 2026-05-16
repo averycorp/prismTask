@@ -35,8 +35,6 @@ import java.util.concurrent.TimeUnit
  * window. This is platform behavior, not a bug; the cadence change
  * delivers <1-min latency only on awake devices.
  *
- * Scope rationale at
- * `docs/audits/AUTOMATION_MINUTE_CADENCE_PHASE_2_AUDIT.md`.
  */
 @HiltWorker
 class AutomationTimeTickWorker @AssistedInject constructor(
@@ -71,8 +69,8 @@ class AutomationTimeTickWorker @AssistedInject constructor(
          * — same idiom as [DailyResetWorker.computeNextDelayMs] when
          * `now` lands on the SoD instant.
          *
-         * Pattern mirrors `DailyResetWorker.computeNextDelayMs` per audit
-         * `AUTOMATION_MINUTE_CADENCE_PHASE_2_AUDIT.md` § B.2.
+         * Pattern mirrors `DailyResetWorker.computeNextDelayMs`
+         * (minute-cadence Phase 2 § B.2).
          */
         @JvmStatic
         @JvmOverloads

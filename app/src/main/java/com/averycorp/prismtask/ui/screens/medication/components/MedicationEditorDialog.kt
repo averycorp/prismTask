@@ -254,8 +254,7 @@ fun MedicationEditorDialog(
             // duplicate-name `SQLiteConstraintException` crash that PR
             // #1141 originally guarded against here is mitigated upstream
             // by `MedicationViewModel.addMedication`'s `getByNameOnce`
-            // pre-flight + outer try/catch — see
-            // `docs/audits/ALLOW_UNSCHEDULED_MEDICATION_AUDIT.md`.
+            // pre-flight + outer try/catch.
             Button(
                 onClick = {
                     onConfirm(

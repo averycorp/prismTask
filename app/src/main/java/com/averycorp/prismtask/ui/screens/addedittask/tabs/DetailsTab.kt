@@ -249,9 +249,7 @@ internal fun DetailsTabContent(
 
     // Coaching AI failure (inline). Pre-fix the VM set _errorMessage on
     // CoachingResult.Error but no UI consumed it, so AI/backend failures
-    // looked like silent no-ops on Help Me Start / Break It Down. See
-    // docs/audits/AUTO_BUTTON_AI_FAILURE_AND_UPGRADE_MESSAGES_AUDIT.md
-    // (items #4, #5).
+    // looked like silent no-ops on Help Me Start / Break It Down.
     CoachingErrorCard(
         message = coachingErrorMessage,
         onDismiss = { coachingViewModel.dismissError() }
