@@ -135,55 +135,62 @@ fun OnboardingScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize()
-        ) { page ->
-            when (page) {
-                0 -> WelcomePage(viewModel = viewModel)
-                1 -> HowWeThinkPage()
-                2 -> ThemePickerPage(viewModel = viewModel)
-                3 -> SmartTasksPage()
-                4 -> NaturalLanguagePage()
-                5 -> HabitsPage(viewModel = viewModel)
-                6 -> LifeModesPage(viewModel = viewModel)
-                7 -> TemplatesPage(viewModel = viewModel)
-                8 -> BrainModePage(viewModel = viewModel)
-                9 -> TuningPage(viewModel = viewModel)
-                10 -> AccessibilityPage(viewModel = viewModel)
-                11 -> PrivacyPage(viewModel = viewModel)
-                12 -> NotificationsPage(viewModel = viewModel)
-                13 -> DaySetupPage(viewModel = viewModel)
-                LAST_PAGE_INDEX -> SetupPage(
-                    viewModel = viewModel,
-                    onComplete = {
-                        viewModel.completeOnboarding()
-                        onComplete()
-                    }
-                )
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> WelcomePage(viewModel = viewModel)
+                    1 -> HowWeThinkPage()
+                    2 -> ThemePickerPage(viewModel = viewModel)
+                    3 -> SmartTasksPage()
+                    4 -> NaturalLanguagePage()
+                    5 -> HabitsPage(viewModel = viewModel)
+                    6 -> LifeModesPage(viewModel = viewModel)
+                    7 -> TemplatesPage(viewModel = viewModel)
+                    8 -> BrainModePage(viewModel = viewModel)
+                    9 -> TuningPage(viewModel = viewModel)
+                    10 -> AccessibilityPage(viewModel = viewModel)
+                    11 -> PrivacyPage(viewModel = viewModel)
+                    12 -> NotificationsPage(viewModel = viewModel)
+                    13 -> DaySetupPage(viewModel = viewModel)
+                    LAST_PAGE_INDEX -> SetupPage(
+                        viewModel = viewModel,
+                        onComplete = {
+                            viewModel.completeOnboarding()
+                            onComplete()
+                        }
+                    )
+                }
             }
-        }
 
-        // Skip button — available until the final setup page.
-        if (pagerState.currentPage < LAST_PAGE_INDEX) {
-            TextButton(
-                onClick = {
-                    coroutineScope.launch { pagerState.animateScrollToPage(LAST_PAGE_INDEX) }
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 48.dp, end = 16.dp)
-            ) {
-                Text("Skip")
+            // Skip button — available until the final setup page.
+            if (pagerState.currentPage < LAST_PAGE_INDEX) {
+                TextButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(LAST_PAGE_INDEX) }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 48.dp, end = 16.dp)
+                ) {
+                    Text("Skip")
+                }
             }
         }
 
         // Bottom controls — hidden on the final page which carries its own.
+        // Sits below the pager in flow so dots + buttons never overlap page text.
         if (pagerState.currentPage < LAST_PAGE_INDEX) {
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
                     .padding(bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -223,7 +230,9 @@ fun OnboardingScreen(
                 // Navigation buttons
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
                 ) {
                     if (pagerState.currentPage > 0) {
                         TextButton(
@@ -297,12 +306,7 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 32.dp)
-                // Bottom padding clears the parent OnboardingScreen's BottomCenter
-                // overlay (page dots + Back/Next buttons, ~110dp). Without it, the
-                // EmailAuthSection's "Create Account" button + "Already have an
-                // account?" toggle land under the overlay and the Next button
-                // intercepts the taps even at full scroll.
-                .padding(top = 64.dp, bottom = 160.dp)
+                .padding(top = 64.dp, bottom = 24.dp)
         ) {
             Text(
                 text = "\uD83D\uDD73",
@@ -840,7 +844,7 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 140.dp)
+            .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1113,7 +1117,7 @@ private fun TuningPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1488,7 +1492,7 @@ private fun LifeModesPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1649,7 +1653,7 @@ private fun AccessibilityPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1744,7 +1748,7 @@ private fun PrivacyPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1826,7 +1830,7 @@ private fun NotificationsPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1973,7 +1977,7 @@ private fun DaySetupPage(viewModel: OnboardingViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 140.dp)
+            .padding(top = 60.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -2131,7 +2135,7 @@ private fun ThemePickerPage(viewModel: OnboardingViewModel) {
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
-                .padding(top = 72.dp, bottom = 140.dp),
+                .padding(top = 72.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
