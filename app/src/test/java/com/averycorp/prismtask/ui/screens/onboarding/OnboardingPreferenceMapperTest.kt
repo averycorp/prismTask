@@ -11,6 +11,13 @@ import org.junit.Test
 /**
  * Mental-Health-First § G6: covers every option in isolation, multi-select
  * combinations, and the "None of these" override.
+ *
+ * Post-`fix/onboarding-tuning-mode-cascade` (audit findings #2 + #6): the
+ * mapper no longer carries `adhdMode`, `calmMode`, `focusReleaseMode`, or
+ * `forgivenessStreaks` fields. Those parent flags are owned by BrainModePage
+ * (page 9) and HabitsPage Forgiveness Switch (page 6) respectively, and were
+ * removed here so TuningPage can't silently override an opt-out on the
+ * earlier pages.
  */
 class OnboardingPreferenceMapperTest {
 
@@ -26,13 +33,9 @@ class OnboardingPreferenceMapperTest {
     @Test
     fun `Result EMPTY has no flags set and no check-in interval`() {
         val r = Result.EMPTY
-        assertFalse(r.adhdMode)
-        assertFalse(r.calmMode)
-        assertFalse(r.focusReleaseMode)
         assertFalse(r.reduceAnimations)
         assertFalse(r.mutedColorPalette)
         assertFalse(r.goodEnoughTimers)
-        assertFalse(r.forgivenessStreaks)
         assertFalse(r.compactMode)
         assertFalse(r.primeRestDay)
         assertNull(r.checkInIntervalMinutes)
@@ -45,53 +48,64 @@ class OnboardingPreferenceMapperTest {
         val r = OnboardingPreferenceMapper.resolve(setOf(TuningOption.OVERWHELMED_BY_LONG_LISTS))
         assertTrue(r.compactMode)
         // Verify nothing else flipped.
-        assertFalse(r.adhdMode)
-        assertFalse(r.calmMode)
-        assertFalse(r.focusReleaseMode)
-        assertFalse(r.forgivenessStreaks)
+        assertFalse(r.reduceAnimations)
+        assertFalse(r.mutedColorPalette)
+        assertFalse(r.goodEnoughTimers)
         assertFalse(r.primeRestDay)
         assertNull(r.checkInIntervalMinutes)
     }
 
     @Test
-    fun `lose track of time maps to ADHD mode plus 25-min check-in`() {
+    fun `lose track of time maps to 25-min check-in only`() {
+        // Post-audit-#2: parent `adhdMode` is no longer written by TuningPage.
+        // BrainModePage owns that flag.
         val r = OnboardingPreferenceMapper.resolve(setOf(TuningOption.LOSE_TRACK_OF_TIME))
-        assertTrue(r.adhdMode)
         assertEquals(25, r.checkInIntervalMinutes)
-        assertFalse(r.calmMode)
-        assertFalse(r.focusReleaseMode)
         assertFalse(r.compactMode)
+        assertFalse(r.reduceAnimations)
+        assertFalse(r.mutedColorPalette)
+        assertFalse(r.goodEnoughTimers)
+        assertFalse(r.primeRestDay)
     }
 
     @Test
-    fun `low-energy days maps to forgiveness streaks plus rest-day priming`() {
+    fun `low-energy days maps to rest-day priming only`() {
+        // Post-audit-#6: parent `ForgivenessPrefs.enabled` is no longer written
+        // by TuningPage. HabitsPage owns that flag.
         val r = OnboardingPreferenceMapper.resolve(setOf(TuningOption.LOW_ENERGY_DAYS))
-        assertTrue(r.forgivenessStreaks)
         assertTrue(r.primeRestDay)
-        assertFalse(r.adhdMode)
-        assertFalse(r.calmMode)
-        assertFalse(r.focusReleaseMode)
+        assertFalse(r.compactMode)
+        assertFalse(r.reduceAnimations)
+        assertFalse(r.mutedColorPalette)
+        assertFalse(r.goodEnoughTimers)
+        assertNull(r.checkInIntervalMinutes)
     }
 
     @Test
-    fun `fewer animations maps to calm mode reduce animations and muted palette`() {
+    fun `fewer animations maps to reduce animations and muted palette`() {
+        // Post-audit-#2: parent `calmMode` is no longer written by TuningPage.
         val r = OnboardingPreferenceMapper.resolve(
             setOf(TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS)
         )
-        assertTrue(r.calmMode)
         assertTrue(r.reduceAnimations)
         assertTrue(r.mutedColorPalette)
-        assertFalse(r.adhdMode)
-        assertFalse(r.focusReleaseMode)
+        assertFalse(r.compactMode)
+        assertFalse(r.goodEnoughTimers)
+        assertFalse(r.primeRestDay)
+        assertNull(r.checkInIntervalMinutes)
     }
 
     @Test
-    fun `over-polish maps to focus and release plus good enough timers`() {
+    fun `over-polish maps to good-enough timers only`() {
+        // Post-audit-#2: parent `focusReleaseMode` is no longer written by
+        // TuningPage.
         val r = OnboardingPreferenceMapper.resolve(setOf(TuningOption.OVER_POLISH))
-        assertTrue(r.focusReleaseMode)
         assertTrue(r.goodEnoughTimers)
-        assertFalse(r.adhdMode)
-        assertFalse(r.calmMode)
+        assertFalse(r.compactMode)
+        assertFalse(r.reduceAnimations)
+        assertFalse(r.mutedColorPalette)
+        assertFalse(r.primeRestDay)
+        assertNull(r.checkInIntervalMinutes)
     }
 
     // ── None-of-these override ──────────────────────────────────────────────
@@ -124,17 +138,16 @@ class OnboardingPreferenceMapperTest {
         val r = OnboardingPreferenceMapper.resolve(
             setOf(TuningOption.LOSE_TRACK_OF_TIME, TuningOption.LOW_ENERGY_DAYS)
         )
-        assertTrue(r.adhdMode)
         assertEquals(25, r.checkInIntervalMinutes)
-        assertTrue(r.forgivenessStreaks)
         assertTrue(r.primeRestDay)
-        assertFalse(r.calmMode)
-        assertFalse(r.focusReleaseMode)
         assertFalse(r.compactMode)
+        assertFalse(r.reduceAnimations)
+        assertFalse(r.mutedColorPalette)
+        assertFalse(r.goodEnoughTimers)
     }
 
     @Test
-    fun `all five real options selected yields every default`() {
+    fun `all five real options selected yields every sub-flag default`() {
         val r = OnboardingPreferenceMapper.resolve(
             setOf(
                 TuningOption.OVERWHELMED_BY_LONG_LISTS,
@@ -144,13 +157,9 @@ class OnboardingPreferenceMapperTest {
                 TuningOption.OVER_POLISH
             )
         )
-        assertTrue(r.adhdMode)
-        assertTrue(r.calmMode)
-        assertTrue(r.focusReleaseMode)
         assertTrue(r.reduceAnimations)
         assertTrue(r.mutedColorPalette)
         assertTrue(r.goodEnoughTimers)
-        assertTrue(r.forgivenessStreaks)
         assertTrue(r.compactMode)
         assertTrue(r.primeRestDay)
         assertEquals(25, r.checkInIntervalMinutes)
@@ -158,21 +167,20 @@ class OnboardingPreferenceMapperTest {
     }
 
     @Test
-    fun `over-polish plus low-energy combines focus-release and forgiveness`() {
+    fun `over-polish plus low-energy combines good-enough timers and rest-day priming`() {
         val r = OnboardingPreferenceMapper.resolve(
             setOf(TuningOption.OVER_POLISH, TuningOption.LOW_ENERGY_DAYS)
         )
-        assertTrue(r.focusReleaseMode)
         assertTrue(r.goodEnoughTimers)
-        assertTrue(r.forgivenessStreaks)
         assertTrue(r.primeRestDay)
-        assertFalse(r.adhdMode)
-        assertFalse(r.calmMode)
         assertFalse(r.compactMode)
+        assertFalse(r.reduceAnimations)
+        assertFalse(r.mutedColorPalette)
+        assertNull(r.checkInIntervalMinutes)
     }
 
     @Test
-    fun `overwhelmed plus calm does not touch ADHD or forgiveness flags`() {
+    fun `overwhelmed plus fewer-animations sets compact and animation sub-flags`() {
         val r = OnboardingPreferenceMapper.resolve(
             setOf(
                 TuningOption.OVERWHELMED_BY_LONG_LISTS,
@@ -180,12 +188,10 @@ class OnboardingPreferenceMapperTest {
             )
         )
         assertTrue(r.compactMode)
-        assertTrue(r.calmMode)
         assertTrue(r.reduceAnimations)
         assertTrue(r.mutedColorPalette)
-        assertFalse(r.adhdMode)
-        assertFalse(r.forgivenessStreaks)
-        assertFalse(r.focusReleaseMode)
+        assertFalse(r.goodEnoughTimers)
+        assertFalse(r.primeRestDay)
         assertNull(r.checkInIntervalMinutes)
     }
 }

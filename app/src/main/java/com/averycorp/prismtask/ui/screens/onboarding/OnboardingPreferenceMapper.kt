@@ -28,16 +28,16 @@ object OnboardingPreferenceMapper {
         /** "I get overwhelmed by long task lists" → compact list defaults. */
         OVERWHELMED_BY_LONG_LISTS,
 
-        /** "I lose track of time often" → ADHD Mode + 25-min check-in. */
+        /** "I lose track of time often" → 25-min check-in interval. */
         LOSE_TRACK_OF_TIME,
 
-        /** "I have low-energy days often" → forgiveness streaks + rest-day priming. */
+        /** "I have low-energy days often" → rest-day priming. */
         LOW_ENERGY_DAYS,
 
-        /** "I prefer fewer animations and quieter colors" → Calm Mode. */
+        /** "I prefer fewer animations and quieter colors" → reduce-animations + muted palette. */
         FEWER_ANIMATIONS_QUIETER_COLORS,
 
-        /** "I tend to over-polish my work" → Focus & Release Mode. */
+        /** "I tend to over-polish my work" → good-enough timers. */
         OVER_POLISH,
 
         /** Single-select sentinel — clears the other picks. */
@@ -51,17 +51,22 @@ object OnboardingPreferenceMapper {
      * The mapper never emits `false` for a flag — it only opts INTO a default.
      * Skipping the step or picking [TuningOption.NONE_OF_THESE] yields the
      * zero value (no writes), preserving today's hardcoded defaults.
+     *
+     * Scope (post-2026-05 onboarding overlap audit, findings #2 + #6 of
+     * `docs/audits/ONBOARDING_OVERLAP_AUDIT.md`): the parent ND-mode flags
+     * (`adhdMode`, `calmMode`, `focusReleaseMode`) and `forgivenessStreaks`
+     * are intentionally absent. Those parent flags are owned by BrainModePage
+     * (page 9) and the HabitsPage Forgiveness Switch (page 6); cascading
+     * them from TuningPage silently overrode users who explicitly opted OUT
+     * on the earlier pages.
      */
     data class Result(
-        // ND-mode flags
-        val adhdMode: Boolean = false,
-        val calmMode: Boolean = false,
-        val focusReleaseMode: Boolean = false,
-        // ND sub-flags layered on top of the mode toggles
+        // ND sub-flags. These are owned by TuningPage alone (no parent-page
+        // counterpart writes them), so writing them here doesn't conflict
+        // with any earlier user choice.
         val reduceAnimations: Boolean = false,
         val mutedColorPalette: Boolean = false,
         val goodEnoughTimers: Boolean = false,
-        val forgivenessStreaks: Boolean = false,
         // ADHD check-in interval (null = no change). 25 = matches NdPreferences default.
         val checkInIntervalMinutes: Int? = null,
         // Compact list default for "overwhelmed by long lists".
@@ -95,13 +100,9 @@ object OnboardingPreferenceMapper {
         if (selections.isEmpty()) return Result.EMPTY
         if (TuningOption.NONE_OF_THESE in selections) return Result.EMPTY
 
-        var adhd = false
-        var calm = false
-        var focusRelease = false
         var reduceAnimations = false
         var mutedColorPalette = false
         var goodEnoughTimers = false
-        var forgivenessStreaks = false
         var checkInMinutes: Int? = null
         var compactMode = false
         var primeRestDay = false
@@ -112,20 +113,25 @@ object OnboardingPreferenceMapper {
                     compactMode = true
                 }
                 TuningOption.LOSE_TRACK_OF_TIME -> {
-                    adhd = true
+                    // Parent `adhdMode` is intentionally not written — see
+                    // the [Result] KDoc. Only the check-in cadence sub-flag.
                     checkInMinutes = 25
                 }
                 TuningOption.LOW_ENERGY_DAYS -> {
-                    forgivenessStreaks = true
+                    // Parent `ForgivenessPrefs.enabled` is intentionally not
+                    // written — see the [Result] KDoc. Only the rest-day
+                    // priming flag.
                     primeRestDay = true
                 }
                 TuningOption.FEWER_ANIMATIONS_QUIETER_COLORS -> {
-                    calm = true
+                    // Parent `calmMode` is intentionally not written — see
+                    // the [Result] KDoc. Only the two sub-flags.
                     reduceAnimations = true
                     mutedColorPalette = true
                 }
                 TuningOption.OVER_POLISH -> {
-                    focusRelease = true
+                    // Parent `focusReleaseMode` is intentionally not written —
+                    // see the [Result] KDoc. Only the good-enough-timer flag.
                     goodEnoughTimers = true
                 }
                 TuningOption.NONE_OF_THESE -> {
@@ -135,13 +141,9 @@ object OnboardingPreferenceMapper {
         }
 
         return Result(
-            adhdMode = adhd,
-            calmMode = calm,
-            focusReleaseMode = focusRelease,
             reduceAnimations = reduceAnimations,
             mutedColorPalette = mutedColorPalette,
             goodEnoughTimers = goodEnoughTimers,
-            forgivenessStreaks = forgivenessStreaks,
             checkInIntervalMinutes = checkInMinutes,
             compactMode = compactMode,
             primeRestDay = primeRestDay

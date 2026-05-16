@@ -394,6 +394,17 @@ constructor(
      * hardcoded defaults untouched. Per the audit hard rule: the user must
      * NOT be forced to disclose anything.
      *
+     * Scope (post-2026-05 onboarding overlap audit, findings #2 + #6 of
+     * `docs/audits/ONBOARDING_OVERLAP_AUDIT.md`): TuningPage writes ONLY the
+     * behavior sub-flags and small tuning knobs it uniquely owns —
+     * `reduceAnimations`, `mutedColorPalette`, `goodEnoughTimers`,
+     * `compactMode`, `primeRestDay`, and `checkInIntervalMinutes`. It does
+     * NOT touch the parent ND-mode flags (`adhdMode`, `calmMode`,
+     * `focusReleaseMode`) or `ForgivenessPrefs.enabled`. Those are owned by
+     * the BrainModePage (page 9) and the HabitsPage Forgiveness Switch
+     * (page 6) respectively. Cascading them from here silently overrode
+     * users who had explicitly opted OUT on the earlier pages.
+     *
      * No-op when the resolved [OnboardingPreferenceMapper.Result] is empty
      * (skip / "None of these" / empty pick), and a no-op in preview mode.
      */
@@ -403,28 +414,13 @@ constructor(
             val result = OnboardingPreferenceMapper.resolve(_tuningSelections.value)
             if (result.isNoOp) return@ifNotPreview
             viewModelScope.launch {
-                // ND-mode cascades: setAdhdMode(true) flips ADHD sub-flags ON
-                // wholesale, including check-in interval (default 25). We
-                // call the cascade first so the explicit sub-flag writes
-                // below land last and win if they disagree.
-                if (result.adhdMode) ndPreferencesDataStore.setAdhdMode(true)
-                if (result.calmMode) ndPreferencesDataStore.setCalmMode(true)
-                if (result.focusReleaseMode) ndPreferencesDataStore.setFocusReleaseMode(true)
-
-                // Explicit sub-flag overrides. These are written even if the
-                // parent cascade ran above, so a future mapping that only
-                // wants the sub-flag (no full cascade) still works.
+                // Explicit sub-flag writes only. The parent ND-mode flags
+                // (adhdMode / calmMode / focusReleaseMode) and
+                // ForgivenessPrefs.enabled are intentionally NOT touched
+                // here — see the KDoc above for the rationale.
                 if (result.reduceAnimations) ndPreferencesDataStore.setReduceAnimations(true)
                 if (result.mutedColorPalette) ndPreferencesDataStore.setMutedColorPalette(true)
                 if (result.goodEnoughTimers) ndPreferencesDataStore.setGoodEnoughTimersEnabled(true)
-                if (result.forgivenessStreaks) {
-                    // Forgiveness-first streak behavior is owned by the global
-                    // `ForgivenessPrefs.enabled` — the ND-side mirror was
-                    // removed in PR #1415 as a dead phantom (audit R6).
-                    // Flipping the global pref is the only write the streak
-                    // calculators react to.
-                    userPreferencesDataStore.setForgivenessPrefs(ForgivenessPrefs(enabled = true))
-                }
                 result.checkInIntervalMinutes?.let {
                     ndPreferencesDataStore.setCheckInIntervalMinutes(it)
                 }
