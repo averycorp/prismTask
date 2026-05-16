@@ -3,7 +3,7 @@ import type { TaskMode } from '@/types/task';
 /**
  * Fast, offline keyword-based classifier that guesses a TaskMode for a task
  * from its title + optional description. Mirrors Android's
- * `TaskModeClassifier.kt` (parity audit § Phase 2 #3 — WEB_PILLARS_PHILOSOPHY_AUDIT).
+ * `TaskModeClassifier.kt`.
  *
  * Matching rules:
  *  - Case-insensitive.

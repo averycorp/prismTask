@@ -13,8 +13,7 @@ import androidx.room.PrimaryKey
  * domain layer surfaces a blocked task as
  * `TaskState.BlockedByDependency` rather than `Overdue` so the
  * forgiveness-first streak does not break on a transitively-stalled
- * task (P6 in
- * `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md`).
+ * task.
  *
  * The unique `(blocker, blocked)` index prevents duplicate edges; the
  * write-time [com.averycorp.prismtask.domain.usecase.DependencyCycleGuard]

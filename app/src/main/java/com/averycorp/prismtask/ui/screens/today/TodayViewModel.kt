@@ -606,8 +606,7 @@ constructor(
      * fallback; the inner flow emits the SoD-correct value synchronously
      * on subscription so the initial is effectively never observed.
      *
-     * See `docs/audits/UTIL_DAYBOUNDARY_SWEEP_AUDIT.md` § 1 for the bug
-     * this structure replaces and PR #798 for the helper origin.
+     * See PR #798 for the helper origin.
      */
     private val dayStart: StateFlow<Long> = localDateFlow
         .observe(taskBehaviorPreferences.getStartOfDay())

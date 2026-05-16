@@ -9,8 +9,7 @@ import type {
 
 /**
  * Settings card for Advanced Tuning — exposes the per-user knobs the
- * three composable philosophy pillars depend on (Phase 2 item #4 from
- * `docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md`):
+ * three composable philosophy pillars depend on:
  *
  *   1. Forgiveness streak knobs — `gracePeriodDays` (1..30) and
  *      `allowedMisses` (0..5). The streak math in `streaks.ts` and

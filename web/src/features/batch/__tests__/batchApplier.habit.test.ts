@@ -7,8 +7,6 @@ import type { BatchUndoLogEntry, ProposedMutation } from '@/types/batch';
  * writes through the natural-key doc id `${habitId}__${dateLocal}` so two
  * devices running the same batch on the same day collapse onto one
  * Firestore doc rather than producing siblings.
- *
- * See `docs/audits/WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md`.
  */
 
 const {

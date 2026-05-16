@@ -332,8 +332,7 @@ constructor(
      * date picker or NLP "today"), which write dueDate at 00:00 local.
      *
      * Backed by [LocalDateFlow] so the value advances reactively at every
-     * SoD boundary crossing — not just on preference change. See
-     * `docs/audits/UTIL_DAYBOUNDARY_SWEEP_AUDIT.md` § 3 and PR #798.
+     * SoD boundary crossing — not just on preference change (PR #798).
      *
      * Bug history: a previous SoD-anchored projection (now removed) used
      * `date.atTime(sod.hour, sod.minute)` which sat *after* calendar

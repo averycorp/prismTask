@@ -15,8 +15,7 @@ import org.junit.runner.RunWith
 /**
  * Migration test for v72 → v73 — PrismTask-timeline-class scope, PR-1.
  * Adds `project_phases` + `project_risks` tables and `tasks.phase_id` /
- * `tasks.progress_percent` columns. See
- * `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md`.
+ * `tasks.progress_percent` columns.
  */
 @RunWith(AndroidJUnit4::class)
 class Migration72To73Test {

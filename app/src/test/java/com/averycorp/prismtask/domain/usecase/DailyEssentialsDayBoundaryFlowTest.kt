@@ -22,8 +22,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * Regression gate for `DailyEssentialsUseCase`'s SoD-boundary fix
- * (`docs/audits/UTIL_DAYBOUNDARY_SWEEP_AUDIT.md` § 5).
+ * Regression gate for `DailyEssentialsUseCase`'s SoD-boundary fix.
  *
  * **Phase-5 (GREEN) form** — assertion encodes the bug-fixed state.
  * Reconstructs the post-migration shape from `observeToday()`:

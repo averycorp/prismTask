@@ -242,10 +242,10 @@ export default function TaskEditor({
   // Claude-backed Life Category auto-classify (parity Batch 3 D.1c —
   // mirrors Android `AddEditTaskViewModel.tryUpgradeLifeCategoryWithClaude`).
   const [lifeCategoryAutoBusy, setLifeCategoryAutoBusy] = useState(false);
-  // On-device keyword classifier Auto buttons for TaskMode + CognitiveLoad
-  // (parity audit WEB_PILLARS_PHILOSOPHY_AUDIT § Phase 2 #2). Classifier
-  // calls are synchronous; the busy flag exists so we can paint a brief
-  // spinner for parity with the LifeCategory Claude button.
+  // On-device keyword classifier Auto buttons for TaskMode +
+  // CognitiveLoad. Classifier calls are synchronous; the busy flag
+  // exists so we can paint a brief spinner for parity with the
+  // LifeCategory Claude button.
   const [taskModeAutoBusy, setTaskModeAutoBusy] = useState(false);
   const [cognitiveLoadAutoBusy, setCognitiveLoadAutoBusy] = useState(false);
   const aiFeaturesEnabled = useSettingsStore((s) => s.aiFeaturesEnabled);

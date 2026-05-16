@@ -19,9 +19,9 @@ import { format } from 'date-fns';
  * aggregated stats plus an optional AI-generated narrative payload.
  *
  * Doc id is the ISO `YYYY-MM-DD` of the review week's Monday (Pattern A
- * canonical-row scheme — see `WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md`),
- * so a re-run of the aggregation worker over the same week is naturally
- * idempotent. Android's `cloud_id` column populates from this id on pull.
+ * canonical-row scheme), so a re-run of the aggregation worker over the
+ * same week is naturally idempotent. Android's `cloud_id` column
+ * populates from this id on pull.
  */
 
 const COLLECTION = 'weekly_reviews';

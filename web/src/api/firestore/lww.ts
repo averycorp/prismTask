@@ -12,8 +12,7 @@ import { firestore } from '@/lib/firebase';
  * Without a guard, `updateDoc({ ..., updatedAt: Date.now() })` happily
  * overwrites a newer Android-side write when the web client's wall
  * clock is behind, because Firestore's default merge semantics don't
- * compare timestamps. Mirrors Android's `SyncMapper` LWW contract
- * (`docs/audits/PARITY_BATCH_6_SYNC_HARDENING_AUDIT.md` § A.2): the
+ * compare timestamps. Mirrors Android's `SyncMapper` LWW contract: the
  * push side runs a transactional read of `updatedAt`, and the write
  * aborts when the remote value is strictly newer than the local
  * `updatedAt` the client wants to push.

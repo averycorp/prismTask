@@ -600,8 +600,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     // SoD-anchored day bounds for due-date labels. Tracks the
                     // user's logical date via LocalDateFlow so cards re-key at
-                    // every Start-of-Day boundary crossing — see
-                    // docs/audits/TODAY_LABEL_SOD_BOUNDARY_AUDIT.md.
+                    // every Start-of-Day boundary crossing.
                     val logicalDate by localDateFlow
                         .observe(taskBehaviorPreferences.getStartOfDay())
                         .collectAsStateWithLifecycle(initialValue = java.time.LocalDate.now())

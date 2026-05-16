@@ -39,8 +39,7 @@ have to rewrite the boilerplate every time.
   know the convention. Use inline `(GREEN)` / `(YELLOW)` / `(RED)` /
   `(DEFERRED)` tags after item titles, and only promote `Premise
   verification` to a subheader when the premise is wrong (which is the
-  load-bearing case worth flagging). Token-usage rationale:
-  `docs/audits/TOKEN_USAGE_EFFICIENCY_AUDIT.md`.
+  load-bearing case worth flagging).
 
 ## Phase 1 — Audit (single doc)
 

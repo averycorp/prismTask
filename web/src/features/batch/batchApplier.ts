@@ -70,8 +70,7 @@ function habitCompletionsCol(uid: string) {
  * Mirrors `web/src/api/firestore/habits.ts habitCompletionId`. Doc id =
  * `${habitCloudId}__${completedDateLocal}` so two devices completing
  * the same habit on the same logical day collapse into one Firestore
- * doc rather than producing siblings. See
- * `docs/audits/WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md`.
+ * doc rather than producing siblings.
  */
 function habitCompletionId(habitCloudId: string, completedDateLocal: string): string {
   return `${habitCloudId}__${completedDateLocal}`;
@@ -591,7 +590,7 @@ async function undoHabitEntry(
         // Re-create with the original doc id via `setDoc(merge=true)`
         // so the round-trip is idempotent (a second SKIP→undo doesn't
         // produce a fresh sibling) and so undo respects the canonical-
-        // row dedup contract — see WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md.
+        // row dedup contract.
         await setDoc(
           doc(firestore, 'users', uid, 'habit_completions', d.id),
           d.data,

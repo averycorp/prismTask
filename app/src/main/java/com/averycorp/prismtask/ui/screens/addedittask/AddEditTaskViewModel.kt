@@ -1316,8 +1316,7 @@ constructor(
             // pipeline Quick Add uses so the form picks up `tomorrow`, `#tag`,
             // `@project`, `!priority`, and recurrence hints typed into the
             // title field. Manual picks always win — NLP fills only fields
-            // the user left empty. See
-            // docs/audits/NLP_FOR_ALL_TASK_ADDITIONS_AUDIT.md for the design.
+            // the user left empty.
             val existing = existingTask
             if (existing == null) {
                 enrichWithNlp(title.trim())?.let { applyNlpEnrichment(it) }

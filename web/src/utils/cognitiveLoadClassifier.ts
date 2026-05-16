@@ -3,7 +3,7 @@ import type { CognitiveLoad } from '@/types/task';
 /**
  * Fast, offline keyword-based classifier that guesses a CognitiveLoad for a
  * task from its title + optional description. Mirrors Android's
- * `CognitiveLoadClassifier.kt` (parity audit § Phase 2 #3 — WEB_PILLARS_PHILOSOPHY_AUDIT).
+ * `CognitiveLoadClassifier.kt`.
  *
  * Matching rules:
  *  - Case-insensitive.
