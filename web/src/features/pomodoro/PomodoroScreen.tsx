@@ -31,6 +31,7 @@ import {
   getLogsInRange,
   type MoodEnergyLog,
 } from '@/api/firestore/moodEnergyLogs';
+import { createLog as createFocusReleaseLog } from '@/api/firestore/focusReleaseLogs';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useNdPreferences } from '@/hooks/useNdPreferences';
 import {
@@ -107,6 +108,12 @@ export function PomodoroScreen() {
   const [workElapsedSeconds, setWorkElapsedSeconds] = useState(0);
 
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  // Wall-clock timestamp when the current work block started. Used so the
+  // ND "Good Enough" ship handler can persist a focus_release_logs entry
+  // with accurate planned/actual minutes + started_at/ended_at, matching
+  // Android's `FocusReleaseLogEntity` shape. Reset whenever a new work
+  // block begins (start / next-session / skip break).
+  const workStartedAtRef = useRef<number | null>(null);
 
   // ND-friendly hooks: energy-aware planning + good-enough release +
   // Ship-It celebrations. All three derive from the user's NdPreferences
@@ -190,6 +197,9 @@ export function PomodoroScreen() {
             if (phase === 'work') {
               toast('Work session complete! Take a break.', { duration: 3000 });
               setPhase('break');
+              // Work block done — clear the work-start anchor so the next
+              // ND ship handler doesn't carry the previous block's start.
+              workStartedAtRef.current = null;
               return breakLength * 60;
             } else if (phase === 'break') {
               // Move to next session
@@ -199,6 +209,7 @@ export function PomodoroScreen() {
                 setCurrentTaskIdx(0);
                 toast('Break over! Starting next session.', { duration: 3000 });
                 setPhase('work');
+                workStartedAtRef.current = Date.now();
                 return sessionLength * 60;
               } else {
                 setPhase('done');
@@ -266,6 +277,7 @@ export function PomodoroScreen() {
     setPhase('work');
     setTimeLeft(sessionLength * 60);
     setWorkElapsedSeconds(0);
+    workStartedAtRef.current = Date.now();
     setIsRunning(true);
     setCompletedTaskIds(new Set());
   };
@@ -275,7 +287,14 @@ export function PomodoroScreen() {
    * when ND prefs allow (Focus & Release Mode + good-enough timers, OR
    * ADHD mode with forgiveness streaks) AND the session is ≥70% elapsed.
    * Mirrors Android's GoodEnoughTimerManager + ShipItCelebrationManager —
-   * fires a Ship-It celebration and rolls forward into the break.
+   * fires a Ship-It celebration, persists a `focus_release_logs` row with
+   * release_state = 'good_enough' (matching Android's
+   * `FocusReleaseLogEntity`), and rolls forward into the break.
+   *
+   * The Firestore write is fire-and-forget so a flaky network never
+   * blocks the user from continuing into their break. The real-time
+   * listener wired in `useFirestoreSync` will reconcile the cache when
+   * the doc lands.
    */
   const handleGoodEnoughShip = () => {
     clearInterval(timerRef.current);
@@ -288,10 +307,42 @@ export function PomodoroScreen() {
       // user — a plain confirmation is still better than silence.
       toast.success('Good enough — moving to break.');
     }
+
+    // Persist a focus_release_logs entry so the ship counts toward
+    // ND analytics + cross-device history. Errors are swallowed —
+    // we never want a write failure to derail the break.
+    const startedAt = workStartedAtRef.current ?? Date.now();
+    const endedAt = Date.now();
+    const actualMinutes = Math.max(1, Math.round(workElapsedSeconds / 60));
+    const taskTitleSnapshot = currentTask?.title ?? '';
+    const taskId = currentTask?.task_id ?? null;
+    void (async () => {
+      try {
+        // getFirebaseUid throws "Not authenticated" when signed-out;
+        // catch swallows it so local-only sessions still ship cleanly.
+        const uid = getFirebaseUid();
+        await createFocusReleaseLog(uid, {
+          task_id: taskId,
+          task_title_snapshot: taskTitleSnapshot,
+          planned_minutes: sessionLength,
+          actual_minutes: actualMinutes,
+          release_state: 'good_enough',
+          note: 'Pomodoro Good Enough Ship',
+          started_at: startedAt,
+          ended_at: endedAt,
+        });
+      } catch {
+        // Silent — listener will pick the row up next session if it
+        // lands later. Better to keep the user moving than to surface
+        // a noisy toast for a sync issue.
+      }
+    })();
+
     setPhase('break');
     setTimeLeft(breakLength * 60);
     setIsRunning(true);
     setWorkElapsedSeconds(0);
+    workStartedAtRef.current = null;
   };
 
   const handleToggleTimer = () => {
@@ -308,6 +359,7 @@ export function PomodoroScreen() {
       setPhase('work');
       setTimeLeft(sessionLength * 60);
       setWorkElapsedSeconds(0);
+      workStartedAtRef.current = Date.now();
       setIsRunning(true);
     } else {
       setPhase('done');
@@ -343,6 +395,7 @@ export function PomodoroScreen() {
     setCurrentTaskIdx(0);
     setTimeLeft(0);
     setWorkElapsedSeconds(0);
+    workStartedAtRef.current = null;
     setCompletedTaskIds(new Set());
   };
 
