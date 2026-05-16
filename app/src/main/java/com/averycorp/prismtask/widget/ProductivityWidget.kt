@@ -8,7 +8,6 @@ import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
@@ -21,15 +20,14 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.Text
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.data.preferences.ProductivityWidgetThresholds
+import com.averycorp.prismtask.widget.launch.WidgetLaunchAction
 
 /**
  * Productivity Score widget. Shows today's 0-100 score with a trend.
@@ -37,6 +35,10 @@ import com.averycorp.prismtask.data.preferences.ProductivityWidgetThresholds
  * Adapts to two size breakpoints:
  * - Small (2x2): just the big score number + trend arrow
  * - Large (3x2+): score + completed/total counts + trend details + yesterday's score
+ *
+ * Tap deep-links to the in-app analytics surface via
+ * [WidgetLaunchAction.OpenInsights] so users land directly on the
+ * productivity dashboard rather than the default tab.
  */
 class ProductivityWidget : GlanceAppWidget() {
     companion object {
@@ -79,58 +81,53 @@ private fun ProductivityContent(
     thresholds: ProductivityWidgetThresholds
 ) {
     val isLarge = size.width >= 200.dp
-    val scoreColor = when {
-        data.score >= thresholds.greenScore -> palette.scoreGreen
-        data.score >= thresholds.orangeScore -> palette.scoreOrange
-        else -> palette.scoreRed
-    }
-    val scoreBgColor = when {
-        data.score >= thresholds.greenScore -> palette.scoreGreenBg
-        data.score >= thresholds.orangeScore -> palette.scoreOrangeBg
-        else -> palette.scoreRedBg
-    }
-    val trendArrow = when {
-        data.trendPoints > 0 -> "↑"
-        data.trendPoints < 0 -> "↓"
-        else -> "–"
-    }
-    val trendLabel = when {
-        data.trendPoints > 0 -> "↑ ${data.trendPoints} pts"
-        data.trendPoints < 0 -> "↓ ${-data.trendPoints} pts"
-        else -> "– no change"
-    }
-    val yesterdayScore = (data.score - data.trendPoints).coerceIn(0, 100)
-    val openApp = Intent(context, MainActivity::class.java).apply {
+    val openInsights = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenInsights.wireId)
     }
 
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .cornerRadius(palette.widgetCornerRadius)
-            .background(palette.surfaceBackground)
-            .padding(12.dp)
-            .clickable(actionStartActivity(openApp)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalAlignment = Alignment.CenterHorizontally
+    WidgetScaffold(
+        palette = palette,
+        isLarge = isLarge,
+        title = "Productivity",
+        outerAction = actionStartActivity(openInsights)
     ) {
-        Text(
-            text = "Productivity",
-            style = WidgetTextStyles.captionMedium(palette.onSurfaceVariant)
-        )
-        Spacer(modifier = GlanceModifier.height(4.dp))
-
         if (data.total == 0) {
-            Text(
-                text = "0",
-                style = WidgetTextStyles.scoreLargeThemed(palette, palette.onSurfaceVariant)
+            // Forgiveness-first: don't shame the user with a "0" badge; show a
+            // neutral empty state instead. This matches Principle 1 + 2 (no
+            // streak-reset shame, no end-of-day judgment framing).
+            WidgetEmptyState(
+                emoji = "✨",
+                message = "Start Your Day!",
+                palette = palette
             )
-            Spacer(modifier = GlanceModifier.height(4.dp))
-            Text(
-                text = "Start Your Day!",
-                style = WidgetTextStyles.caption(palette.onSurfaceVariant)
-            )
-        } else if (isLarge) {
+            return@WidgetScaffold
+        }
+
+        Spacer(modifier = GlanceModifier.height(4.dp))
+        val scoreColor = when {
+            data.score >= thresholds.greenScore -> palette.scoreGreen
+            data.score >= thresholds.orangeScore -> palette.scoreOrange
+            else -> palette.scoreRed
+        }
+        val scoreBgColor = when {
+            data.score >= thresholds.greenScore -> palette.scoreGreenBg
+            data.score >= thresholds.orangeScore -> palette.scoreOrangeBg
+            else -> palette.scoreRedBg
+        }
+        val trendArrow = when {
+            data.trendPoints > 0 -> "↑"
+            data.trendPoints < 0 -> "↓"
+            else -> "–"
+        }
+        val trendLabel = when {
+            data.trendPoints > 0 -> "↑ ${data.trendPoints} pts"
+            data.trendPoints < 0 -> "↓ ${-data.trendPoints} pts"
+            else -> "– no change"
+        }
+        val yesterdayScore = (data.score - data.trendPoints).coerceIn(0, 100)
+
+        if (isLarge) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -165,23 +162,28 @@ private fun ProductivityContent(
                 }
             }
         } else {
-            Box(
-                modifier = GlanceModifier
-                    .size(70.dp)
-                    .cornerRadius(35.dp)
-                    .background(scoreBgColor),
-                contentAlignment = Alignment.Center
+            Column(
+                modifier = GlanceModifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(
+                    modifier = GlanceModifier
+                        .size(70.dp)
+                        .cornerRadius(35.dp)
+                        .background(scoreBgColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = data.score.toString(),
+                        style = WidgetTextStyles.scoreLargeThemed(palette, scoreColor)
+                    )
+                }
+                Spacer(modifier = GlanceModifier.height(6.dp))
                 Text(
-                    text = data.score.toString(),
-                    style = WidgetTextStyles.scoreLargeThemed(palette, scoreColor)
+                    text = "$trendArrow ${data.completed}/${data.total}",
+                    style = WidgetTextStyles.captionMedium(palette.onSurface)
                 )
             }
-            Spacer(modifier = GlanceModifier.height(6.dp))
-            Text(
-                text = "$trendArrow ${data.completed}/${data.total}",
-                style = WidgetTextStyles.captionMedium(palette.onSurface)
-            )
         }
     }
 }
