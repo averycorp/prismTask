@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.averycorp.prismtask.data.local.entity.TaskEntity
+import com.averycorp.prismtask.data.preferences.TitleLengthLimit
 import com.averycorp.prismtask.data.preferences.UrgencyWeights
 import com.averycorp.prismtask.domain.usecase.UrgencyLevel
 import com.averycorp.prismtask.domain.usecase.UrgencyScorer
@@ -57,6 +59,7 @@ fun TaskDefaultsSection(
     showAiUrgencyToggle: Boolean,
     aiUrgencyEnabled: Boolean,
     defaultTaskDurationMinutes: Int,
+    titleLengthLimit: TitleLengthLimit,
     onDefaultSortChange: (String) -> Unit,
     onDefaultViewModeChange: (String) -> Unit,
     onFirstDayOfWeekChange: (DayOfWeek) -> Unit,
@@ -64,6 +67,8 @@ fun TaskDefaultsSection(
     onUrgencyWeightsChange: (UrgencyWeights) -> Unit,
     onAiUrgencyEnabledChange: (Boolean) -> Unit,
     onDefaultTaskDurationChange: (Int) -> Unit,
+    onTitleLengthEnabledChange: (Boolean) -> Unit,
+    onTitleLengthMaxChange: (Int) -> Unit,
     onResetTaskBehaviorDefaults: () -> Unit
 ) {
     var showTaskAdvanced by remember { mutableStateOf(false) }
@@ -114,6 +119,12 @@ fun TaskDefaultsSection(
         subtitle = formatDurationSubtitle(defaultTaskDurationMinutes) +
             " · Powers balance & cognitive-load weighting for tasks without an estimate.",
         onClick = { showDurationPicker = true }
+    )
+
+    TitleLengthLimitControl(
+        limit = titleLengthLimit,
+        onEnabledChange = onTitleLengthEnabledChange,
+        onLimitChange = onTitleLengthMaxChange
     )
 
     if (showSodPicker) {
@@ -232,6 +243,59 @@ fun TaskDefaultsSection(
     }
 
     HorizontalDivider()
+}
+
+/**
+ * Toggle row + inline slider for the title-length cap. When the toggle is off,
+ * the slider is hidden and inputs accept any length. The slider snaps to
+ * [TitleLengthLimit.STEP]-character increments and clamps to the
+ * [TitleLengthLimit.MIN_LIMIT]..[TitleLengthLimit.MAX_LIMIT] band.
+ */
+@Composable
+private fun TitleLengthLimitControl(
+    limit: TitleLengthLimit,
+    onEnabledChange: (Boolean) -> Unit,
+    onLimitChange: (Int) -> Unit
+) {
+    val enabled = limit.limit != null
+    val displayLimit = limit.limit ?: TitleLengthLimit.DEFAULT_LIMIT
+    var localLimit by remember(displayLimit) { mutableFloatStateOf(displayLimit.toFloat()) }
+
+    SettingsToggleRow(
+        title = "Limit Task Title Length",
+        subtitle = if (enabled) {
+            "Caps task and subtask titles at ${limit.limit} characters."
+        } else {
+            "No limit on task or subtask title length."
+        },
+        checked = enabled,
+        onCheckedChange = onEnabledChange
+    )
+    AnimatedVisibility(visible = enabled) {
+        Column(modifier = Modifier.padding(bottom = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Slider(
+                    value = localLimit,
+                    onValueChange = { localLimit = it },
+                    onValueChangeFinished = {
+                        val snapped = (localLimit / TitleLengthLimit.STEP).toInt() * TitleLengthLimit.STEP
+                        onLimitChange(
+                            snapped.coerceIn(TitleLengthLimit.MIN_LIMIT, TitleLengthLimit.MAX_LIMIT)
+                        )
+                    },
+                    valueRange = TitleLengthLimit.MIN_LIMIT.toFloat()..TitleLengthLimit.MAX_LIMIT.toFloat(),
+                    steps = ((TitleLengthLimit.MAX_LIMIT - TitleLengthLimit.MIN_LIMIT) / TitleLengthLimit.STEP) - 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${localLimit.toInt()}",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.width(40.dp)
+                )
+            }
+        }
+    }
 }
 
 private fun formatDurationSubtitle(minutes: Int): String = when {

@@ -43,6 +43,7 @@ fun TaskDefaultsScreen(
     val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
     val taskDefaults by viewModel.taskDefaultPrefs.collectAsStateWithLifecycle()
     val quickAddPrefs by viewModel.quickAddPrefs.collectAsStateWithLifecycle()
+    val titleLengthLimit by viewModel.titleLengthLimit.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -74,6 +75,7 @@ fun TaskDefaultsScreen(
                 showAiUrgencyToggle = isPro && aiMasterPrefs.enabled,
                 aiUrgencyEnabled = perFeatureAiPrefs.urgencyEnabled,
                 defaultTaskDurationMinutes = taskDefaults.defaultDuration ?: 30,
+                titleLengthLimit = titleLengthLimit,
                 onDefaultSortChange = viewModel::setDefaultSort,
                 onDefaultViewModeChange = viewModel::setDefaultViewMode,
                 onFirstDayOfWeekChange = viewModel::setFirstDayOfWeek,
@@ -81,6 +83,8 @@ fun TaskDefaultsScreen(
                 onUrgencyWeightsChange = viewModel::setUrgencyWeights,
                 onAiUrgencyEnabledChange = viewModel::setAiUrgencyFeatureEnabled,
                 onDefaultTaskDurationChange = viewModel::setDefaultTaskDuration,
+                onTitleLengthEnabledChange = viewModel::setMaxTaskTitleLengthEnabled,
+                onTitleLengthMaxChange = viewModel::setMaxTaskTitleLength,
                 onResetTaskBehaviorDefaults = viewModel::resetTaskBehaviorDefaults
             )
 

@@ -22,12 +22,21 @@ data class TemplateSelections(
     val bedtimeTier: String? = null,
     val bedtimeCustomStepIds: Set<String>? = null,
     val houseworkTier: String? = null,
-    val houseworkCustomStepIds: Set<String>? = null
+    val houseworkCustomStepIds: Set<String>? = null,
+    val workdayTier: String? = null,
+    val workdayCustomStepIds: Set<String>? = null,
+    val winddownTier: String? = null,
+    val winddownCustomStepIds: Set<String>? = null,
+    val errandsTier: String? = null,
+    val errandsCustomStepIds: Set<String>? = null
 ) {
     fun tierFor(routineType: String): String? = when (routineType) {
         "morning" -> morningTier
         "bedtime" -> bedtimeTier
         "housework" -> houseworkTier
+        "workday" -> workdayTier
+        "winddown" -> winddownTier
+        "errands" -> errandsTier
         else -> null
     }
 
@@ -35,6 +44,9 @@ data class TemplateSelections(
         "morning" -> morningCustomStepIds
         "bedtime" -> bedtimeCustomStepIds
         "housework" -> houseworkCustomStepIds
+        "workday" -> workdayCustomStepIds
+        "winddown" -> winddownCustomStepIds
+        "errands" -> errandsCustomStepIds
         else -> null
     }
 
@@ -74,6 +86,9 @@ data class TemplateSelections(
         "morning" -> copy(morningTier = tier, morningCustomStepIds = null)
         "bedtime" -> copy(bedtimeTier = tier, bedtimeCustomStepIds = null)
         "housework" -> copy(houseworkTier = tier, houseworkCustomStepIds = null)
+        "workday" -> copy(workdayTier = tier, workdayCustomStepIds = null)
+        "winddown" -> copy(winddownTier = tier, winddownCustomStepIds = null)
+        "errands" -> copy(errandsTier = tier, errandsCustomStepIds = null)
         else -> this
     }
 
@@ -89,6 +104,9 @@ data class TemplateSelections(
             "morning" -> copy(morningCustomStepIds = next)
             "bedtime" -> copy(bedtimeCustomStepIds = next)
             "housework" -> copy(houseworkCustomStepIds = next)
+            "workday" -> copy(workdayCustomStepIds = next)
+            "winddown" -> copy(winddownCustomStepIds = next)
+            "errands" -> copy(errandsCustomStepIds = next)
             else -> this
         }
     }

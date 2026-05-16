@@ -43,7 +43,7 @@ constructor(
     fun commit() {
         val snapshot = _selections.value
         viewModelScope.launch {
-            listOf("morning", "bedtime", "housework").forEach { routineType ->
+            listOf("morning", "bedtime", "housework", "workday", "winddown", "errands").forEach { routineType ->
                 val stepIds = snapshot.effectiveStepIds(routineType)
                 if (stepIds.isNotEmpty()) {
                     selfCareRepository.seedSelfCareSteps(routineType, stepIds.toList())

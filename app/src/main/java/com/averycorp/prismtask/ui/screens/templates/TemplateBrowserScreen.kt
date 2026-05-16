@@ -46,7 +46,10 @@ fun TemplateBrowserScreen(
 
     val totalSelected = selections.effectiveStepIds("morning").size +
         selections.effectiveStepIds("bedtime").size +
-        selections.effectiveStepIds("housework").size
+        selections.effectiveStepIds("housework").size +
+        selections.effectiveStepIds("workday").size +
+        selections.effectiveStepIds("winddown").size +
+        selections.effectiveStepIds("errands").size
 
     Scaffold(
         topBar = {

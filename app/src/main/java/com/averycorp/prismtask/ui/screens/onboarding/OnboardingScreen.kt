@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -64,12 +65,14 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
@@ -471,6 +474,9 @@ private fun SmartTasksPage() {
     var animStarted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { animStarted = true }
 
+    val tasks = remember { listOf("Buy groceries", "Finish report", "Call dentist") }
+    val checked = remember { mutableStateOf(setOf<Int>()) }
+
     OnboardingPageLayout(
         emoji = "\u2705",
         headline = "Organize Everything",
@@ -480,14 +486,27 @@ private fun SmartTasksPage() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-            listOf("Buy groceries", "Finish report", "Call dentist").forEachIndexed { index, task ->
+            tasks.forEachIndexed { index, task ->
                 AnimatedVisibility(
                     visible = animStarted,
                     enter = fadeIn(tween(300, delayMillis = index * 150)) +
                         slideInVertically(tween(300, delayMillis = index * 150)) { it }
                 ) {
+                    val isChecked = index in checked.value
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = isChecked,
+                                role = Role.Checkbox,
+                                onValueChange = { nowChecked ->
+                                    checked.value = if (nowChecked) {
+                                        checked.value + index
+                                    } else {
+                                        checked.value - index
+                                    }
+                                }
+                            ),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -500,10 +519,39 @@ private fun SmartTasksPage() {
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                            )
+                                    .then(
+                                        if (isChecked) {
+                                            Modifier.background(MaterialTheme.colorScheme.primary)
+                                        } else {
+                                            Modifier.border(
+                                                2.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isChecked) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(task, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = task,
+                                style = MaterialTheme.typography.bodyLarge,
+                                textDecoration = if (isChecked) TextDecoration.LineThrough else null,
+                                color = if (isChecked) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
                         }
                     }
                 }
@@ -785,12 +833,6 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
             LaunchedEffect(Unit) { flow.collect { state.value = it } }
             state
         }
-    val leisureEnabled by viewModel.leisureEnabled
-        .let { flow ->
-            val state = remember { mutableStateOf(true) }
-            LaunchedEffect(Unit) { flow.collect { state.value = it } }
-            state
-        }
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
@@ -829,26 +871,17 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
-        // Hide template sections whose owning Life Mode is off (toggled on the
+        // Hide Self-Care + Housework when their Life Mode is off (toggled on the
         // prior LifeModesPage). Settings "Browse Templates" still shows everything.
-        if (!selfCareEnabled && !houseworkEnabled && !leisureEnabled) {
-            Text(
-                text = "No template sections — every Life Mode is off. Tap Next to skip.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 24.dp)
-            )
-        } else {
-            TemplatePickerContent(
-                state = selections,
-                onChange = viewModel::updateTemplateSelections,
-                modifier = Modifier.fillMaxWidth(),
-                showLeisure = leisureEnabled,
-                showSelfCare = selfCareEnabled,
-                showHousework = houseworkEnabled
-            )
-        }
+        // Work-Day Setup, Wind-Down, and Errands have no corresponding Life Mode
+        // gate and always render, so the picker is never empty.
+        TemplatePickerContent(
+            state = selections,
+            onChange = viewModel::updateTemplateSelections,
+            modifier = Modifier.fillMaxWidth(),
+            showSelfCare = selfCareEnabled,
+            showHousework = houseworkEnabled
+        )
     }
 }
 

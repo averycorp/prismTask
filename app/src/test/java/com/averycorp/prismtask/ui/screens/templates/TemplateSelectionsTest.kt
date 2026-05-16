@@ -106,4 +106,23 @@ class TemplateSelectionsTest {
         val s = TemplateSelections()
         assertEquals(emptySet<String>(), s.effectiveStepIds("nonsense"))
     }
+
+    @Test
+    fun newRoutineTypes_areWiredThroughTierAndStepToggles() {
+        // Guard that workday / winddown / errands are wired into every
+        // when-branch (tierFor, customStepIdsFor, withTier, withStepToggled,
+        // effectiveStepIds) — forgetting one branch on a single type would
+        // silently break that template section.
+        for (routineType in listOf("workday", "winddown", "errands")) {
+            val firstTier = SelfCareRoutines.getTierOrder(routineType).first()
+            val withTier = TemplateSelections().withTier(routineType, firstTier)
+            assertEquals(firstTier, withTier.tierFor(routineType))
+            assertTrue(withTier.effectiveStepIds(routineType).isNotEmpty())
+
+            val firstStepId = SelfCareRoutines.getSteps(routineType).first().id
+            val toggled = TemplateSelections().withStepToggled(routineType, firstStepId)
+            assertEquals(setOf(firstStepId), toggled.customStepIdsFor(routineType))
+            assertEquals(setOf(firstStepId), toggled.effectiveStepIds(routineType))
+        }
+    }
 }

@@ -122,7 +122,13 @@ internal fun LazyListScope.reorderableTaskItemWithSubtasks(
                     subtasks = subtasks,
                     tags = tags,
                     attachmentCount = attachmentCount,
-                    onToggleComplete = { viewModel.onToggleComplete(task.id, task.isCompleted) },
+                    onToggleComplete = {
+                        if (task.isCompleted) {
+                            viewModel.onToggleComplete(task.id, true)
+                        } else {
+                            viewModel.onCompleteTaskWithUndo(task.id)
+                        }
+                    },
                     onClick = { onTaskClick(task.id) },
                     onAddSubtaskClick = {
                         onExpandChange(expandedTaskIds + task.id)
@@ -322,7 +328,13 @@ internal fun LazyListScope.taskItemWithSubtasks(
                     subtasks = subtasks,
                     tags = tags,
                     attachmentCount = attachmentCount,
-                    onToggleComplete = { viewModel.onToggleComplete(task.id, task.isCompleted) },
+                    onToggleComplete = {
+                        if (task.isCompleted) {
+                            viewModel.onToggleComplete(task.id, true)
+                        } else {
+                            viewModel.onCompleteTaskWithUndo(task.id)
+                        }
+                    },
                     onClick = { onTaskClick(task.id) },
                     onLongClick = { viewModel.onEnterMultiSelect(task.id) },
                     onAddSubtaskClick = {
@@ -505,7 +517,13 @@ internal fun LazyListScope.draggableTaskItemWithSubtasks(
                 subtasks = subtasks,
                 tags = tags,
                 attachmentCount = attachmentCount,
-                onToggleComplete = { viewModel.onToggleComplete(task.id, task.isCompleted) },
+                onToggleComplete = {
+                    if (task.isCompleted) {
+                        viewModel.onToggleComplete(task.id, true)
+                    } else {
+                        viewModel.onCompleteTaskWithUndo(task.id)
+                    }
+                },
                 onClick = { onTaskClick(task.id) },
                 onLongClick = { viewModel.onEnterMultiSelect(task.id) },
                 onAddSubtaskClick = {

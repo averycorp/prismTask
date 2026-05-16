@@ -121,6 +121,23 @@ constructor(
                 com.averycorp.prismtask.data.preferences.EditorFieldRows()
             )
 
+    /**
+     * Live cap on task / subtask title length, sourced from Settings → Global
+     * Defaults. `limit == null` means the user has disabled the cap entirely.
+     * Enforcement only runs on freshly typed input ([onTitleChange],
+     * [addPendingSubtask]); over-cap titles already in the database read
+     * back as-is.
+     */
+    val titleLengthLimit: StateFlow<com.averycorp.prismtask.data.preferences.TitleLengthLimit> =
+        taskBehaviorPreferences.getTitleLengthLimit()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.TitleLengthLimit(
+                    com.averycorp.prismtask.data.preferences.TitleLengthLimit.DEFAULT_LIMIT
+                )
+            )
+
     private val _errorMessages = MutableSharedFlow<String>()
     val errorMessages: SharedFlow<String> = _errorMessages.asSharedFlow()
 
@@ -570,8 +587,10 @@ constructor(
                 )
 
     fun onTitleChange(value: String) {
-        title = value
-        if (value.isNotBlank()) titleError = false
+        val capped = com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer
+            .enforce(value, titleLengthLimit.value.limit)
+        title = capped
+        if (capped.isNotBlank()) titleError = false
     }
 
     fun onDescriptionChange(value: String) {
@@ -905,10 +924,11 @@ constructor(
      * flushes them to the database.
      */
     fun addPendingSubtask(title: String): Long {
-        val trimmed = title.trim()
-        if (trimmed.isEmpty()) return -1L
+        val capped = com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer
+            .enforce(title.trim(), titleLengthLimit.value.limit)
+        if (capped.isEmpty()) return -1L
         val id = nextPendingSubtaskId++
-        pendingSubtasks.add(PendingSubtask(id = id, title = trimmed))
+        pendingSubtasks.add(PendingSubtask(id = id, title = capped))
         return id
     }
 

@@ -272,6 +272,7 @@ fun AddEditTaskSheet(
                 }
 
                 // Title field (large, always visible above tabs)
+                val titleLengthLimit by viewModel.titleLengthLimit.collectAsStateWithLifecycle()
                 OutlinedTextField(
                     value = viewModel.title,
                     onValueChange = viewModel::onTitleChange,
@@ -284,11 +285,11 @@ fun AddEditTaskSheet(
                     },
                     textStyle = MaterialTheme.typography.titleLarge,
                     isError = viewModel.titleError,
-                    supportingText = if (viewModel.titleError) {
-                        { Text("Title is required") }
-                    } else {
-                        null
-                    },
+                    supportingText = TitleSupportingText(
+                        hasError = viewModel.titleError,
+                        currentLength = viewModel.title.length,
+                        limit = titleLengthLimit.limit
+                    ),
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()

@@ -83,6 +83,7 @@ fun QuickAddBar(
     val continuousActive by viewModel.continuousModeActive.collectAsStateWithLifecycle()
     val partialTranscript by viewModel.voicePartialText.collectAsStateWithLifecycle()
     val quickAddMaxLines by viewModel.quickAddMaxLines.collectAsStateWithLifecycle()
+    val titleLengthLimit by viewModel.titleLengthLimit.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val voiceAvailable = remember { viewModel.voiceInputManager.isAvailable() }
@@ -349,6 +350,19 @@ fun QuickAddBar(
                 parsedPreview?.let { parsed ->
                     ParsedPreview(parsed)
                 }
+            }
+
+            if (com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer
+                    .shouldShowCounter(inputText.length, titleLengthLimit.limit)
+            ) {
+                Text(
+                    text = "${inputText.length} / ${titleLengthLimit.limit}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(top = 2.dp, end = 4.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))

@@ -33,9 +33,11 @@ import com.averycorp.prismtask.domain.model.SelfCareRoutines
 
 /**
  * Stateless template picker, rendered inside the onboarding flow and the
- * Settings "Browse templates" screen. All four sections (Music, Flex,
- * Self-Care Morning + Bedtime, Housework) default to "nothing selected" — the
- * user opts into any templates they want and hits Next / Add to commit.
+ * Settings "Browse templates" screen. Self-Care (morning + bedtime) and
+ * Housework sections default to "nothing selected" — the user opts into any
+ * templates they want and hits Next / Add to commit. Leisure templates were
+ * retired in Leisure Budget v2.0 (PR #1278); that pool is now seeded via
+ * LeisurePoolScreen.
  *
  * [state] and [onChange] are hoisted so the caller owns persistence; this
  * composable only drives UI state (expansion, customize toggle).
@@ -49,7 +51,6 @@ fun TemplatePickerContent(
     state: TemplateSelections,
     onChange: (TemplateSelections) -> Unit,
     modifier: Modifier = Modifier,
-    showLeisure: Boolean = true,
     showSelfCare: Boolean = true,
     showHousework: Boolean = true
 ) {
@@ -57,12 +58,6 @@ fun TemplatePickerContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Leisure Budget v2.0 \u2014 Templates picker no longer seeds music
-        // / flex / language slots; the new pool is populated via
-        // LeisurePoolScreen. showLeisure stays in the signature for
-        // backwards-compat with callers that pass it explicitly, but is
-        // now a no-op so the templates browser doesn't accidentally
-        // surface a half-deleted UI surface.
         if (showSelfCare) {
             RoutineSectionCard(
                 emoji = "\uD83C\uDF05",
@@ -83,11 +78,32 @@ fun TemplatePickerContent(
                 routineTypes = listOf("housework" to "Housework")
             )
         }
+        RoutineSectionCard(
+            emoji = "\uD83D\uDCBC",
+            title = "Work-Day Setup",
+            subtitle = "Get your work day started",
+            state = state,
+            onChange = onChange,
+            routineTypes = listOf("workday" to "Work-Day Setup")
+        )
+        RoutineSectionCard(
+            emoji = "\uD83C\uDF19",
+            title = "Wind-Down",
+            subtitle = "Transition into evening",
+            state = state,
+            onChange = onChange,
+            routineTypes = listOf("winddown" to "Wind-Down")
+        )
+        RoutineSectionCard(
+            emoji = "\uD83D\uDED2",
+            title = "Errands",
+            subtitle = "Common weekly errands",
+            state = state,
+            onChange = onChange,
+            routineTypes = listOf("errands" to "Errands")
+        )
     }
 }
-
-// Leisure Budget v2.0: v1.x LeisureSectionCard removed alongside the
-// rest of the v1.x slot model.
 
 @Composable
 private fun RoutineSectionCard(

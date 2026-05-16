@@ -282,8 +282,9 @@ constructor(
      * is created if missing. Idempotent: existing stepIds are skipped and
      * the method is safe to call repeatedly.
      *
-     * Accepted [routineType] values: "morning", "bedtime", "housework".
-     * "medication" has no default steps and is a no-op.
+     * Accepted [routineType] values: "morning", "bedtime", "housework",
+     * "workday", "winddown", "errands". "medication" has no default steps
+     * and is a no-op.
      */
     suspend fun seedSelfCareTier(routineType: String, tier: String) {
         val source = SelfCareRoutines.getSteps(routineType)
@@ -1023,6 +1024,9 @@ constructor(
             "morning" -> MORNING_HABIT_NAME
             "medication" -> MEDICATION_HABIT_NAME
             "housework" -> HOUSEWORK_HABIT_NAME
+            "workday" -> WORKDAY_HABIT_NAME
+            "winddown" -> WINDDOWN_HABIT_NAME
+            "errands" -> ERRANDS_HABIT_NAME
             else -> BEDTIME_HABIT_NAME
         }
         val existing = habitDao.getHabitByName(name)
@@ -1032,23 +1036,34 @@ constructor(
             "morning" -> "\u2600\uFE0F"
             "medication" -> "\uD83D\uDC8A"
             "housework" -> "\uD83C\uDFE0"
+            "workday" -> "\uD83D\uDCBC"
+            "winddown" -> "\uD83C\uDF19"
+            "errands" -> "\uD83D\uDED2"
             else -> "\uD83C\uDF19"
         }
         val color = when (routineType) {
             "morning" -> "#F59E0B"
             "medication" -> "#EF4444"
             "housework" -> "#10B981"
+            "workday" -> "#3B82F6"
+            "winddown" -> "#6366F1"
+            "errands" -> "#F97316"
             else -> "#8B5CF6"
         }
         val category = when (routineType) {
             "medication" -> "Medication"
             "housework" -> "Housework"
+            "workday" -> "Work"
+            "errands" -> "Errands"
             else -> "Self-Care"
         }
         val desc = when (routineType) {
             "morning" -> "Complete morning self-care routine"
             "medication" -> "Take all daily medications"
             "housework" -> "Complete daily housework routine"
+            "workday" -> "Set up your work day"
+            "winddown" -> "Transition into a calm evening"
+            "errands" -> "Complete your weekly errands"
             else -> "Complete bedtime self-care routine"
         }
 
@@ -1056,8 +1071,12 @@ constructor(
             "morning" -> "builtin_morning_selfcare"
             "medication" -> "builtin_medication"
             "housework" -> "builtin_housework"
+            "workday" -> "builtin_workday_setup"
+            "winddown" -> "builtin_winddown"
+            "errands" -> "builtin_errands"
             else -> "builtin_bedtime_selfcare"
         }
+        val frequencyPeriod = if (routineType == "errands") "weekly" else "daily"
         val id = habitDao.insert(
             HabitEntity(
                 name = name,
@@ -1066,7 +1085,7 @@ constructor(
                 color = color,
                 category = category,
                 targetFrequency = 1,
-                frequencyPeriod = "daily",
+                frequencyPeriod = frequencyPeriod,
                 isBuiltIn = true,
                 templateKey = templateKey,
                 showStreak = true
@@ -1128,6 +1147,9 @@ constructor(
         const val BEDTIME_HABIT_NAME = "Bedtime Self-Care"
         const val MEDICATION_HABIT_NAME = "Medication"
         const val HOUSEWORK_HABIT_NAME = "Housework"
+        const val WORKDAY_HABIT_NAME = "Work-Day Setup"
+        const val WINDDOWN_HABIT_NAME = "Wind-Down"
+        const val ERRANDS_HABIT_NAME = "Errands"
         private const val GLOBAL_MED_REMINDER_REQUEST_CODE = 500_000
 
         private fun parseDurationSeconds(duration: String): Int {
