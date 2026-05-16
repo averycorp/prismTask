@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { Clock, Plus, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Checkbox } from '@/components/ui/Checkbox';
+import {
+  AnalogClockPicker,
+  useAnalogClockState,
+} from '@/components/AnalogClockPicker';
 import {
   createMedication,
   updateMedication,
@@ -77,7 +82,13 @@ interface FormState {
   tier: string;
   scheduleMode: MedicationScheduleMode;
   timesOfDay: Set<string>;
-  specificTimesRaw: string;
+  /**
+   * Sorted list of `HH:mm` strings for SPECIFIC_TIMES. Each entry is
+   * the output of the per-time AnalogClockPicker — never free-form
+   * text. We keep the list in canonical order so re-renders and saves
+   * are deterministic.
+   */
+  specificTimes: string[];
   intervalHours: string;
   dosesPerDay: string;
   pillCount: string;
@@ -90,6 +101,33 @@ interface FormState {
   promptDoseAtLog: boolean;
 }
 
+const TIME_REGEX = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Parse the medication's stored `specific_times` CSV into a sorted,
+ * de-duped list of `HH:mm` strings. Invalid entries are dropped
+ * silently — this is the *read* path, not user input.
+ */
+function parseStoredSpecificTimes(raw: string | null): string[] {
+  if (raw === null) return [];
+  const tokens = raw
+    .split(/[,\s]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  const ok = new Set<string>();
+  for (const t of tokens) {
+    if (TIME_REGEX.test(t)) {
+      const [h, m] = t.split(':');
+      ok.add(`${h.padStart(2, '0')}:${m}`);
+    }
+  }
+  return [...ok].sort();
+}
+
+function formatHm(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 function initialState(initial: MedicationDoc | null): FormState {
   if (initial === null) {
     return {
@@ -99,7 +137,7 @@ function initialState(initial: MedicationDoc | null): FormState {
       tier: 'essential',
       scheduleMode: 'TIMES_OF_DAY',
       timesOfDay: new Set(['morning']),
-      specificTimesRaw: '',
+      specificTimes: [],
       intervalHours: '8',
       dosesPerDay: '1',
       pillCount: '',
@@ -125,7 +163,7 @@ function initialState(initial: MedicationDoc | null): FormState {
     tier: initial.tier,
     scheduleMode: initial.schedule_mode,
     timesOfDay: timeSet,
-    specificTimesRaw: initial.specific_times ?? '',
+    specificTimes: parseStoredSpecificTimes(initial.specific_times),
     intervalHours:
       initial.interval_millis !== null
         ? String(Math.round(initial.interval_millis / (60 * 60 * 1000)))
@@ -145,32 +183,6 @@ function initialState(initial: MedicationDoc | null): FormState {
   };
 }
 
-const TIME_REGEX = /^([01]?\d|2[0-3]):[0-5]\d$/;
-
-function parseSpecificTimes(raw: string): {
-  cleaned: string | null;
-  invalid: string[];
-} {
-  const tokens = raw
-    .split(/[,\s]+/)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
-  if (tokens.length === 0) return { cleaned: null, invalid: [] };
-  const invalid: string[] = [];
-  const ok: string[] = [];
-  for (const t of tokens) {
-    if (TIME_REGEX.test(t)) {
-      // Normalise "9:00" → "09:00" so Android's CSV parser doesn't choke
-      // on single-digit hours.
-      const [h, m] = t.split(':');
-      ok.push(`${h.padStart(2, '0')}:${m}`);
-    } else {
-      invalid.push(t);
-    }
-  }
-  return { cleaned: ok.length > 0 ? ok.join(',') : null, invalid };
-}
-
 export function MedicationEditorDialog({
   isOpen,
   uid,
@@ -187,6 +199,7 @@ export function MedicationEditorDialog({
   // medication's fields into the create form.
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- form-init: re-seed form when modal opens / editing row changes
       setForm(initialState(initial));
       setErrors({});
     }
@@ -250,13 +263,12 @@ export function MedicationEditorDialog({
           .join(',');
       }
     } else if (form.scheduleMode === 'SPECIFIC_TIMES') {
-      const parsed = parseSpecificTimes(form.specificTimesRaw);
-      if (parsed.invalid.length > 0) {
-        nextErrors.scheduleMode = `Invalid time(s): ${parsed.invalid.join(', ')}. Use HH:mm.`;
-      } else if (parsed.cleaned === null) {
-        nextErrors.scheduleMode = 'Enter at least one HH:mm time.';
+      if (form.specificTimes.length === 0) {
+        nextErrors.scheduleMode = 'Add at least one specific time.';
       } else {
-        specificTimes = parsed.cleaned;
+        // FormState already holds normalised HH:mm strings; join sorted
+        // so cross-device diffs stay deterministic.
+        specificTimes = [...form.specificTimes].sort().join(',');
       }
     } else if (form.scheduleMode === 'INTERVAL') {
       const hours = parseFloat(form.intervalHours);
@@ -410,12 +422,10 @@ export function MedicationEditorDialog({
         )}
 
         {form.scheduleMode === 'SPECIFIC_TIMES' && (
-          <Input
-            label="Specific times (HH:mm, comma-separated)"
-            value={form.specificTimesRaw}
-            onChange={(e) => setField('specificTimesRaw', e.target.value)}
-            placeholder="08:00, 14:30, 21:00"
-            helperText="24-hour times separated by commas or spaces."
+          <SpecificTimesPicker
+            times={form.specificTimes}
+            onChange={(next) => setField('specificTimes', next)}
+            error={errors.scheduleMode}
           />
         )}
 
@@ -507,6 +517,168 @@ export function MedicationEditorDialog({
           value={form.notes}
           onChange={(e) => setField('notes', e.target.value)}
         />
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Per-medication times list using {@link AnalogClockPicker} for adds /
+ * edits. Mirrors the "every time field renders a 3-hand dial" rule
+ * (memory: `feedback-time-input-use-clock-not-slider`). The data model
+ * only stores hour + minute — the second hand is purely visual.
+ */
+function SpecificTimesPicker({
+  times,
+  onChange,
+  error,
+}: {
+  times: readonly string[];
+  onChange: (next: string[]) => void;
+  error?: string;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  const handleAdd = () => {
+    setEditingIndex(null);
+    setPickerOpen(true);
+  };
+
+  const handleEdit = (index: number) => {
+    setEditingIndex(index);
+    setPickerOpen(true);
+  };
+
+  const handleRemove = (index: number) => {
+    const next = times.filter((_, i) => i !== index);
+    onChange(next);
+  };
+
+  const handlePicked = (hm: string) => {
+    let next: string[];
+    if (editingIndex !== null) {
+      next = times.map((t, i) => (i === editingIndex ? hm : t));
+    } else {
+      next = [...times, hm];
+    }
+    // De-dupe + sort canonical so the chip row reads chronologically.
+    next = [...new Set(next)].sort();
+    onChange(next);
+    setPickerOpen(false);
+    setEditingIndex(null);
+  };
+
+  const initialSeed = useMemo(() => {
+    if (editingIndex !== null && times[editingIndex]) {
+      const [h, m] = times[editingIndex].split(':').map((n) => parseInt(n, 10));
+      return { hour: h, minute: m };
+    }
+    return { hour: 8, minute: 0 };
+  }, [editingIndex, times]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium text-[var(--color-text-primary)]">
+        Specific Times
+      </span>
+      {error && <span className="text-xs text-rose-600">{error}</span>}
+      <div className="flex flex-wrap gap-2">
+        {times.map((t, i) => (
+          <span
+            key={`${t}-${i}`}
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-bg-card)] px-2.5 py-1 text-xs text-[var(--color-text-primary)]"
+          >
+            <button
+              type="button"
+              onClick={() => handleEdit(i)}
+              className="inline-flex items-center gap-1 hover:text-[var(--color-accent)]"
+              aria-label={`Edit ${t}`}
+            >
+              <Clock className="h-3 w-3" />
+              {t}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRemove(i)}
+              aria-label={`Remove ${t}`}
+              className="ml-1 text-[var(--color-text-secondary)] hover:text-rose-600"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleAdd}
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add Time
+        </Button>
+      </div>
+      <p className="text-xs text-[var(--color-text-secondary)]">
+        Tap a chip to edit, or Add Time to pick a new one with the
+        analog clock.
+      </p>
+      {pickerOpen && (
+        <SpecificTimePickerModal
+          initialHour={initialSeed.hour}
+          initialMinute={initialSeed.minute}
+          onCancel={() => {
+            setPickerOpen(false);
+            setEditingIndex(null);
+          }}
+          onSave={handlePicked}
+        />
+      )}
+    </div>
+  );
+}
+
+function SpecificTimePickerModal({
+  initialHour,
+  initialMinute,
+  onCancel,
+  onSave,
+}: {
+  initialHour: number;
+  initialMinute: number;
+  onCancel: () => void;
+  onSave: (hm: string) => void;
+}) {
+  const api = useAnalogClockState({
+    initialHour,
+    initialMinute,
+    initialSecond: 0,
+    is24Hour: true,
+  });
+  return (
+    <Modal
+      isOpen={true}
+      onClose={onCancel}
+      title="Pick Time"
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => onSave(formatHm(api.state.hour, api.state.minute))}
+          >
+            Save Time
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-center text-xs text-[var(--color-text-secondary)]">
+          Hour and minute are persisted. Second is visual only.
+        </p>
+        <AnalogClockPicker api={api} />
       </div>
     </Modal>
   );
