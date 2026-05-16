@@ -27,6 +27,10 @@ import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskStore } from '@/stores/taskStore';
 import type { LifeCategory } from '@/types/task';
+import {
+  LIFE_CATEGORY_COLOR,
+  LIFE_CATEGORY_LABEL,
+} from '@/theme/lifeCategoryColors';
 
 /**
  * Morning Check-In guided stepper (parity C.5a).
@@ -125,20 +129,12 @@ function clampScale(n: unknown): number {
   return Math.max(1, Math.min(5, Math.round(n)));
 }
 
-const CATEGORY_LABEL: Record<LifeCategory, string> = {
-  WORK: 'Work',
-  PERSONAL: 'Personal',
-  SELF_CARE: 'Self-Care',
-  HEALTH: 'Health',
-  UNCATEGORIZED: 'Uncategorized',
-};
-
-const CATEGORY_COLOR: Record<Exclude<LifeCategory, 'UNCATEGORIZED'>, string> = {
-  WORK: '#2563eb',
-  PERSONAL: '#a855f7',
-  SELF_CARE: '#16a34a',
-  HEALTH: '#dc2626',
-};
+// LifeCategory palette is the single source of truth shared with
+// TodayBalanceBar and the Weekly Balance Report — see
+// `@/theme/lifeCategoryColors`. These tokens mirror Android's
+// `LifeCategoryColor.kt` exactly.
+const CATEGORY_LABEL: Record<LifeCategory, string> = LIFE_CATEGORY_LABEL;
+const CATEGORY_COLOR: Record<LifeCategory, string> = LIFE_CATEGORY_COLOR;
 
 interface MorningCheckInStepperProps {
   dateIso: string;
