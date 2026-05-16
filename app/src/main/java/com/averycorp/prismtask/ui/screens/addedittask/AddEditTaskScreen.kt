@@ -232,16 +232,17 @@ internal fun AddEditTaskFormFields(
         Spacer(modifier = Modifier.height(4.dp))
 
         // Title
+        val titleLengthLimit by viewModel.titleLengthLimit.collectAsStateWithLifecycle()
         OutlinedTextField(
             value = viewModel.title,
             onValueChange = viewModel::onTitleChange,
             label = { Text("Title") },
             isError = viewModel.titleError,
-            supportingText = if (viewModel.titleError) {
-                { Text("Title is required") }
-            } else {
-                null
-            },
+            supportingText = TitleSupportingText(
+                hasError = viewModel.titleError,
+                currentLength = viewModel.title.length,
+                limit = titleLengthLimit.limit
+            ),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -877,4 +878,24 @@ internal fun ReminderPickerDialog(
             }
         }
     )
+}
+
+/**
+ * Supporting-text slot for the title field. Surfaces the "required" error when
+ * present; otherwise shows a "current/max" counter once the user is within
+ * [com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer.COUNTER_WARNING_THRESHOLD]
+ * characters of the cap. Returns `null` when there's nothing to show so the
+ * field collapses its supporting row.
+ */
+@Composable
+internal fun TitleSupportingText(
+    hasError: Boolean,
+    currentLength: Int,
+    limit: Int?
+): @Composable (() -> Unit)? {
+    if (hasError) return { Text("Title is required") }
+    if (com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer.shouldShowCounter(currentLength, limit)) {
+        return { Text("$currentLength / $limit") }
+    }
+    return null
 }

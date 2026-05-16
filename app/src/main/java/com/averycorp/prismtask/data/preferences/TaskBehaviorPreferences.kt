@@ -40,6 +40,22 @@ data class StartOfDay(
 )
 
 /**
+ * User-configurable hard cap on task / subtask title length.
+ *
+ * `limit == null` means "no cap" — the disabled state of the Settings toggle.
+ * A non-null value is the maximum number of characters typed input is allowed
+ * to reach. Existing over-cap titles are never auto-truncated on read.
+ */
+data class TitleLengthLimit(val limit: Int?) {
+    companion object {
+        const val DEFAULT_LIMIT = 100
+        const val MIN_LIMIT = 20
+        const val MAX_LIMIT = 500
+        const val STEP = 10
+    }
+}
+
+/**
  * Read-only source of truth for the current Start of Day, used by components
  * that need SoD outside of the DataStore-aware flow model (e.g. the offline
  * NLP regex parser, which cannot suspend). Production binds to
@@ -69,6 +85,8 @@ constructor(
         private val DAY_START_HOUR = intPreferencesKey("day_start_hour")
         private val DAY_START_MINUTE = intPreferencesKey("day_start_minute")
         private val HAS_SET_START_OF_DAY = booleanPreferencesKey("has_set_start_of_day")
+        private val MAX_TASK_TITLE_LENGTH = intPreferencesKey("max_task_title_length")
+        private val MAX_TASK_TITLE_LENGTH_ENABLED = booleanPreferencesKey("max_task_title_length_enabled")
     }
 
     fun getDefaultSort(): Flow<String> = context.taskBehaviorDataStore.data.map { prefs ->
@@ -116,6 +134,32 @@ constructor(
             minute = (prefs[DAY_START_MINUTE] ?: 0).coerceIn(0, 59),
             hasBeenSet = prefs[HAS_SET_START_OF_DAY] ?: false
         )
+    }
+
+    /**
+     * Combined view of [MAX_TASK_TITLE_LENGTH] and [MAX_TASK_TITLE_LENGTH_ENABLED].
+     * Returns a [TitleLengthLimit] whose [TitleLengthLimit.limit] is `null` when
+     * the user has disabled the cap (the "No limit" toggle in Settings →
+     * Global Defaults).
+     */
+    fun getTitleLengthLimit(): Flow<TitleLengthLimit> = context.taskBehaviorDataStore.data.map { prefs ->
+        val enabled = prefs[MAX_TASK_TITLE_LENGTH_ENABLED] ?: true
+        if (!enabled) {
+            TitleLengthLimit(null)
+        } else {
+            val raw = prefs[MAX_TASK_TITLE_LENGTH] ?: TitleLengthLimit.DEFAULT_LIMIT
+            TitleLengthLimit(raw.coerceIn(TitleLengthLimit.MIN_LIMIT, TitleLengthLimit.MAX_LIMIT))
+        }
+    }
+
+    suspend fun setMaxTaskTitleLength(value: Int) {
+        context.taskBehaviorDataStore.edit {
+            it[MAX_TASK_TITLE_LENGTH] = value.coerceIn(TitleLengthLimit.MIN_LIMIT, TitleLengthLimit.MAX_LIMIT)
+        }
+    }
+
+    suspend fun setMaxTaskTitleLengthEnabled(enabled: Boolean) {
+        context.taskBehaviorDataStore.edit { it[MAX_TASK_TITLE_LENGTH_ENABLED] = enabled }
     }
 
     suspend fun setDefaultSort(sort: String) {
@@ -183,6 +227,8 @@ constructor(
             prefs.remove(FIRST_DAY_OF_WEEK)
             prefs.remove(DAY_START_HOUR)
             prefs.remove(DAY_START_MINUTE)
+            prefs.remove(MAX_TASK_TITLE_LENGTH)
+            prefs.remove(MAX_TASK_TITLE_LENGTH_ENABLED)
             // [HAS_SET_START_OF_DAY] is intentionally NOT reset — if the user has
             // already completed the first-launch prompt, resetting Task Behavior
             // defaults shouldn't trigger the prompt again.
