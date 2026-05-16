@@ -2,21 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   addDocMock,
-  updateDocMock,
+  setDocMock,
   getDocMock,
   docMock,
   collectionMock,
+  serverTimestampMock,
 } = vi.hoisted(() => ({
   addDocMock: vi.fn(),
-  updateDocMock: vi.fn(),
+  setDocMock: vi.fn(),
   getDocMock: vi.fn(),
   docMock: vi.fn(),
   collectionMock: vi.fn(),
+  serverTimestampMock: vi.fn(() => '__SERVER_TIMESTAMP__'),
 }));
 
 vi.mock('firebase/firestore', () => ({
   addDoc: addDocMock,
-  updateDoc: updateDocMock,
+  setDoc: setDocMock,
   getDoc: getDocMock,
   doc: docMock,
   collection: collectionMock,
@@ -26,6 +28,9 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn(),
   orderBy: vi.fn(),
   onSnapshot: vi.fn(),
+  runTransaction: vi.fn(),
+  updateDoc: vi.fn(),
+  serverTimestamp: serverTimestampMock,
 }));
 vi.mock('@/lib/firebase', () => ({ firestore: {} }));
 
@@ -38,7 +43,8 @@ import {
 
 beforeEach(() => {
   addDocMock.mockReset();
-  updateDocMock.mockReset();
+  setDocMock.mockReset();
+  setDocMock.mockResolvedValue(undefined);
   getDocMock.mockReset();
   docMock.mockReset();
   collectionMock.mockReset();
@@ -121,7 +127,7 @@ describe('updateAnchor merge semantics', () => {
 
   it('only writes the label when only the label was passed', async () => {
     await updateAnchor('uid-1', 'a1', { label: 'Renamed' });
-    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    const payload = setDocMock.mock.calls[0][1] as Record<string, unknown>;
     expect(payload.label).toBe('Renamed');
     expect('anchorJson' in payload).toBe(false);
     expect('phaseCloudId' in payload).toBe(false);
@@ -130,7 +136,7 @@ describe('updateAnchor merge semantics', () => {
   it('re-encodes the anchor when the caller swaps the variant', async () => {
     const newAnchor: ExternalAnchor = { type: 'calendar_deadline', epochMs: 9 };
     await updateAnchor('uid-1', 'a1', { anchor: newAnchor });
-    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    const payload = setDocMock.mock.calls[0][1] as Record<string, unknown>;
     expect(JSON.parse(payload.anchorJson as string)).toEqual(newAnchor);
   });
 });

@@ -3,7 +3,6 @@ import {
   doc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   orderBy,
@@ -14,6 +13,7 @@ import {
 import { firestore } from '@/lib/firebase';
 import type { Tag } from '@/types/tag';
 import { timestampToIso } from './converters';
+import { safeMergeDoc } from '@/lib/firestore/safeMergeDoc';
 
 // ── Collection reference ──────────────────────────────────────
 
@@ -67,7 +67,13 @@ export async function updateTag(
   const updates: Record<string, unknown> = {};
   if (data.name !== undefined) updates.name = data.name;
   if (data.color !== undefined) updates.color = data.color;
-  await updateDoc(tagDoc(uid, tagId), updates);
+  // Tags don't carry an `updatedAt` field on Android — the schema is
+  // `name`, `color`, `createdAt` only. We route through `safeMergeDoc`
+  // with `expectedUpdatedAt = null` (first-create-wins shape) so the
+  // helper stamps a server-side `updatedAt` for future cross-device
+  // LWW visibility without breaking Android's additive pull (unknown
+  // keys are ignored).
+  await safeMergeDoc(tagDoc(uid, tagId), updates, null);
   // Return the updated tag by re-reading (tags are small, this is fine)
   const snap = await getDocs(query(tagsCol(uid)));
   const tagSnap = snap.docs.find((d) => d.id === tagId);

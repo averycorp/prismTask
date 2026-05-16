@@ -2,21 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   addDocMock,
-  updateDocMock,
+  setDocMock,
   getDocMock,
   docMock,
   collectionMock,
+  serverTimestampMock,
 } = vi.hoisted(() => ({
   addDocMock: vi.fn(),
-  updateDocMock: vi.fn(),
+  setDocMock: vi.fn(),
   getDocMock: vi.fn(),
   docMock: vi.fn(),
   collectionMock: vi.fn(),
+  serverTimestampMock: vi.fn(() => '__SERVER_TIMESTAMP__'),
 }));
 
 vi.mock('firebase/firestore', () => ({
   addDoc: addDocMock,
-  updateDoc: updateDocMock,
+  setDoc: setDocMock,
   getDoc: getDocMock,
   doc: docMock,
   collection: collectionMock,
@@ -26,6 +28,9 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn(),
   orderBy: vi.fn(),
   onSnapshot: vi.fn(),
+  runTransaction: vi.fn(),
+  updateDoc: vi.fn(),
+  serverTimestamp: serverTimestampMock,
 }));
 vi.mock('@/lib/firebase', () => ({ firestore: {} }));
 
@@ -33,7 +38,8 @@ import { createPhase, updatePhase } from '@/api/firestore/projectPhases';
 
 beforeEach(() => {
   addDocMock.mockReset();
-  updateDocMock.mockReset();
+  setDocMock.mockReset();
+  setDocMock.mockResolvedValue(undefined);
   getDocMock.mockReset();
   docMock.mockReset();
   collectionMock.mockReset();
@@ -96,16 +102,19 @@ describe('updatePhase payload shape (merge semantics)', () => {
 
   it('only writes fields the caller passed (omit-on-undefined merge)', async () => {
     await updatePhase('uid-1', 'p1', { title: 'Renamed' });
-    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    const payload = setDocMock.mock.calls[0][1] as Record<string, unknown>;
     expect(payload.title).toBe('Renamed');
     expect('description' in payload).toBe(false);
     expect('versionAnchor' in payload).toBe(false);
-    expect(payload.updatedAt).toEqual(expect.any(Number));
+    // `updatedAt` is stamped via `serverTimestamp()` by safeMergeDoc —
+    // the field is present on the payload, but the value is a
+    // Firestore sentinel, not a number, until commit time.
+    expect('updatedAt' in payload).toBe(true);
   });
 
   it('writes null when the caller explicitly clears a field', async () => {
     await updatePhase('uid-1', 'p1', { description: null });
-    const payload = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    const payload = setDocMock.mock.calls[0][1] as Record<string, unknown>;
     expect(payload.description).toBeNull();
   });
 });

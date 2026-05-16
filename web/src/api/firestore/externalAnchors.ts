@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
@@ -22,6 +21,7 @@ import {
   type ExternalAnchorRecord,
   type ExternalAnchorUpdate,
 } from '@/types/externalAnchor';
+import { safeMergeDoc } from '@/lib/firestore/safeMergeDoc';
 
 // ── Collection reference ──────────────────────────────────────
 
@@ -78,7 +78,11 @@ function anchorCreateToDoc(
 }
 
 function anchorUpdateToDoc(data: ExternalAnchorUpdate): Record<string, unknown> {
-  const result: Record<string, unknown> = { updatedAt: Date.now() };
+  // `updatedAt` is stamped by `safeMergeCurrentDoc` via
+  // `serverTimestamp()` — don't pre-populate it here, otherwise the
+  // helper's stamp clobbers a literal `Date.now()` and the timestamps
+  // diverge under clock skew.
+  const result: Record<string, unknown> = {};
   if (data.label !== undefined) result.label = data.label;
   if (data.anchor !== undefined) result.anchorJson = encodeExternalAnchor(data.anchor);
   if (data.phase_id !== undefined) result.phaseCloudId = data.phase_id;
@@ -136,7 +140,14 @@ export async function updateAnchor(
   data: ExternalAnchorUpdate,
 ): Promise<ExternalAnchorRecord | null> {
   const payload = anchorUpdateToDoc(data);
-  await updateDoc(anchorDoc(uid, anchorId), payload);
+  // Server-stamped merge via `safeMergeDoc`'s first-create path
+  // (`expectedUpdatedAt = null`). The caller doesn't keep an
+  // `expectedUpdatedAt` for anchors (no detail-view that snapshots
+  // it), so the strict precondition path doesn't apply — but routing
+  // through the helper keeps the `updatedAt` stamp consistent
+  // (`serverTimestamp()` rather than a clock-skewed local `Date.now()`)
+  // so cross-device LWW on Android's side stays honest. Sync sweep C.
+  await safeMergeDoc(anchorDoc(uid, anchorId), payload, null);
   const snap = await getDoc(anchorDoc(uid, anchorId));
   const docData = snap.data() ?? {};
   const projectId =
