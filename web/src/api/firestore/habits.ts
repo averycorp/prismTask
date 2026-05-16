@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
-import type { Habit, HabitCompletion } from '@/types/habit';
+import type { Habit, HabitCompletion, HabitFrequency } from '@/types/habit';
 import { timestampToIso, timestampToDateStr } from './converters';
 
 // ── Collection references ─────────────────────────────────────
@@ -111,9 +111,25 @@ function docToHabit(docId: string, data: DocumentData, uid: string): Habit {
   };
 }
 
-function mapFrequency(period: string | undefined): 'daily' | 'weekly' {
-  if (period === 'weekly') return 'weekly';
-  return 'daily';
+/**
+ * Map Android's `HabitEntity.frequencyPeriod` string to the web
+ * `HabitFrequency` union. Android writes six values (see
+ * `HabitEntity.kt` and `AddEditHabitScreen.kt:285-300`); web previously
+ * collapsed everything except `weekly` to `daily`, which hid
+ * fortnightly/monthly/bimonthly/quarterly habits in the web Habits
+ * screen by treating them as daily.
+ */
+function mapFrequency(period: string | undefined): HabitFrequency {
+  switch (period) {
+    case 'weekly':
+    case 'fortnightly':
+    case 'monthly':
+    case 'bimonthly':
+    case 'quarterly':
+      return period;
+    default:
+      return 'daily';
+  }
 }
 
 function docToCompletion(docId: string, data: DocumentData): HabitCompletion {

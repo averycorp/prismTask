@@ -346,7 +346,12 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         const isoDay = jsDay === 0 ? 7 : jsDay;
         if (!activeDays.includes(isoDay)) continue;
       }
-      if (habit.frequency === 'weekly') {
+      if (habit.frequency !== 'daily') {
+        // Weekly / fortnightly / monthly / bimonthly / quarterly all
+        // share the same Today-screen "is the target met in the current
+        // week?" check. Period-aware windows are a follow-up — for now
+        // they at minimum surface progress without being silently
+        // dropped into the daily branch.
         total++;
         const weekCompletions = (state.completions[habit.id] || []).reduce(
           (sum, c) => {

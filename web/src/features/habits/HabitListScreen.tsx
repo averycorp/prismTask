@@ -29,7 +29,7 @@ import {
   type PendingBuiltInUpdate,
 } from '@/utils/builtInHabitReconciler';
 import { HabitBookingDialog } from './HabitBookingDialog';
-import type { Habit } from '@/types/habit';
+import { isRecurringFrequency, type Habit } from '@/types/habit';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -62,6 +62,11 @@ export function HabitListScreen() {
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Habit | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Daily vs Recurring filter — mirrors Android's segmented control at
+  // `HabitListScreen.kt:171-186`. `daily` shows `frequency === 'daily'`;
+  // `recurring` shows weekly / fortnightly / monthly / bimonthly /
+  // quarterly. Defaults to `daily` like Android.
+  const [filter, setFilter] = useState<'daily' | 'recurring'>('daily');
   // Booking dialog target — parity audit § B.3b. Surfaced from the
   // card context menu so Android-bookable habits get a quick-log path
   // without diving into analytics first.
@@ -135,6 +140,19 @@ export function HabitListScreen() {
     setEditingHabit(null);
     setModalOpen(true);
   }, []);
+
+  // Apply the Daily/Recurring filter. Same predicate Android uses in
+  // `HabitListScreen.kt:73-86`. Memoized to keep the JSX list reference
+  // stable across re-renders when neither input changes.
+  const filteredHabits = useMemo(
+    () =>
+      habits.filter((h) =>
+        filter === 'daily'
+          ? h.frequency === 'daily'
+          : isRecurringFrequency(h.frequency),
+      ),
+    [habits, filter],
+  );
 
   if (isLoading && habits.length === 0) {
     return (
@@ -213,8 +231,39 @@ export function HabitListScreen() {
         </div>
       )}
 
-      {/* Empty State */}
-      {habits.length === 0 && (
+      {/* Daily / Recurring filter — parity with Android's segmented
+          control at `HabitListScreen.kt:171-186`. Hidden when there are
+          no habits at all (the empty state already CTA's the user to
+          create one). */}
+      {habits.length > 0 && (
+        <div
+          className="mb-4 inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1"
+          role="tablist"
+          aria-label="Habit frequency filter"
+        >
+          {(['daily', 'recurring'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={filter === f}
+              onClick={() => setFilter(f)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                filter === f
+                  ? 'bg-[var(--color-accent)] text-white'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              {f === 'daily' ? 'Daily' : 'Recurring'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Empty States — distinct copy for "no habits at all" vs "no
+          habits in the current filter bucket". Mirrors Android's empty
+          state at `HabitListScreen.kt:188-207`. */}
+      {habits.length === 0 ? (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
           <EmptyState
             icon={<Activity className="h-8 w-8" />}
@@ -224,11 +273,29 @@ export function HabitListScreen() {
             onAction={handleCreate}
           />
         </div>
-      )}
+      ) : filteredHabits.length === 0 ? (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
+          <EmptyState
+            icon={<Activity className="h-8 w-8" />}
+            title={
+              filter === 'daily'
+                ? 'Start Building Habits'
+                : 'No Recurring Habits'
+            }
+            description={
+              filter === 'daily'
+                ? 'Track daily routines at your own pace.'
+                : 'Add a weekly, monthly, or other recurring habit.'
+            }
+            actionLabel="Create Habit"
+            onAction={handleCreate}
+          />
+        </div>
+      ) : null}
 
       {/* Habit Cards */}
       <div className="flex flex-col gap-3">
-        {habits.map((habit) => (
+        {filteredHabits.map((habit) => (
           <HabitCard
             key={habit.id}
             habit={habit}
