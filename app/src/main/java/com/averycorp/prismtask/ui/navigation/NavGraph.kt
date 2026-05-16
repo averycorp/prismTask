@@ -602,6 +602,7 @@ fun PrismTaskNavGraph(
                                         text = item.label,
                                         fontFamily = prismFonts,
                                         fontSize = 10.sp,
+                                        letterSpacing = 0.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         softWrap = false
