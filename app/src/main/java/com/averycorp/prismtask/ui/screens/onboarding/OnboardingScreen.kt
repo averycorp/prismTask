@@ -1674,6 +1674,14 @@ private fun AccessibilityPage(viewModel: OnboardingViewModel) {
             checked = reduceMotion,
             onCheckedChange = viewModel::setReduceMotion
         )
+        Text(
+            text = "Stacks with any Brain Mode preferences from earlier.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 4.dp)
+        )
         LifeModeRow(
             emoji = "🌓",
             title = "High Contrast",
