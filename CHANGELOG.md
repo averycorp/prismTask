@@ -125,6 +125,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(billing): the `ProxyBillingActivityGuard` no longer relies on
+  `Activity.finish()` from `onActivityPreCreated` (which does not skip
+  `onCreate`) to dodge the Google Play Billing 8.3.0 NPE. The guard now
+  injects a cancelled `BUY_INTENT` PendingIntent before `onCreate`
+  runs, steering the library down its own
+  `IntentSender.SendIntentException` catch branch and graceful
+  `finish()` + cancel-broadcast. v1.9.39 (#1.9.40 ships the fix) top
+  issue #2 — 8 events / 8 users across the v1.9.32 → v1.9.39 window.
+- fix(widgets): added `GlanceTrampolineGuard` for the
+  `InvisibleActionTrampolineActivity` /
+  `ActionTrampolineActivity` crash where the launch Intent arrives
+  without `ACTION_INTENT` / `ACTION_TYPE` extras and Glance throws
+  `IllegalArgumentException("List adapter activity trampoline invoked
+  without specifying target intent.")`. The guard injects an empty
+  `ACTION_INTENT` and `ACTION_TYPE = "BROADCAST"` so Glance's
+  trampoline runs a no-op `sendBroadcast(emptyIntent)` and our
+  `finish()` tears the invisible trampoline down. v1.9.39 top issue #1
+  — 40 events / 24 users; regressed in 1.9.39 after first appearing in
+  the v1.6.0 widget-action work.
+
 - fix(onboarding): stop TuningPage from silently overriding BrainMode + Forgiveness toggles. `OnboardingViewModel.applyTuningSelections` previously cascaded TuningPage picks into the parent ND-mode flags (`adhdMode`, `calmMode`, `focusReleaseMode`) and `ForgivenessPrefs.enabled` — so a user who opted OUT of any of those on BrainModePage (page 9) or the HabitsPage Forgiveness Switch (page 6) got silently re-enabled at `completeOnboarding` if they then picked the matching tuning option on page 10. Fix: strip the four parent-flag cascade writes from `applyTuningSelections` + the matching fields from `OnboardingPreferenceMapper.Result`. TuningPage now only writes the sub-flags / knobs it uniquely owns (`reduceAnimations`, `mutedColorPalette`, `goodEnoughTimers`, `compactMode`, `primeRestDay`, `checkInIntervalMinutes`). Audit findings #2 + #6 of `docs/audits/ONBOARDING_OVERLAP_AUDIT.md` (PR #1585).
 - fix(web/build): bump `idb` pin from `^8.0.4` to `^8.0.3` — `8.0.4` was never published to npm so every clean `npm install` since PR #1239 (2026-05-10) failed with `ETARGET`, silently turning web CI red across the repo. Also cleans up 3 pre-existing lint errors (`no-useless-assignment` in `batchHistoryStore.ts` + `batchStore.ts`; `react-hooks/set-state-in-effect` in `WorkLifeBalanceSection.tsx`) plus 1 tautology test (`endsWith(slice(0,0))` always true) in `chatStore.test.ts`. Web suite now lint + tsc + vitest clean: 72/72 files, 679/679 tests.
 - fix(web/sync): repair `useFirestoreSync.ts` + matching test file syntax left broken by PR #1340's botched manual merge — restores the missing `)` after `subscribeToStartOfDayHour`, the missing `});` after the `taskBehaviorPreferences` mock, and the duplicate `it('subscribes to all 8 …')` line. Web CI was failing every PR since 2026-05-13.

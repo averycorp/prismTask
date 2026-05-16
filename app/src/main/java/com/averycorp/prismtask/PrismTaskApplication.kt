@@ -25,6 +25,7 @@ import com.averycorp.prismtask.notifications.MedicationClockRescheduler
 import com.averycorp.prismtask.notifications.MedicationIntervalRescheduler
 import com.averycorp.prismtask.notifications.MedicationReminderScheduler
 import com.averycorp.prismtask.notifications.NotificationWorkerScheduler
+import com.averycorp.prismtask.widget.GlanceTrampolineGuard
 import com.averycorp.prismtask.widget.WidgetUpdateManager
 import com.averycorp.prismtask.workers.AutoArchiveWorker
 import com.averycorp.prismtask.workers.AutomationTimeTickWorker
@@ -126,6 +127,7 @@ class PrismTaskApplication :
         configureCrashlytics()
         installRatingPromptCrashHook()
         registerActivityLifecycleCallbacks(ProxyBillingActivityGuard())
+        registerActivityLifecycleCallbacks(GlanceTrampolineGuard())
         // Belt-and-braces flush for migration events that fired
         // before Firebase was ready on cold-boot (BootReceiver) paths.
         // The RoomDatabase.Callback.onOpen hook is the primary flush
