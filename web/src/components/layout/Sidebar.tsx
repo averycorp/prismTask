@@ -25,6 +25,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
+  Hash,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
@@ -74,6 +76,8 @@ const SECTIONS: readonly NavSection[] = [
     id: 'workspace',
     label: 'Workspace',
     items: [
+      { to: '/search', icon: Search, label: 'Search' },
+      { to: '/tags', icon: Hash, label: 'Tags' },
       { to: '/templates', icon: FileText, label: 'Templates' },
       { to: '/extract', icon: ClipboardPaste, label: 'Extract' },
       { to: '/archive', icon: Archive, label: 'Archive' },

@@ -68,6 +68,8 @@ const NotificationsSoundScreen = lazy(() => import('@/features/settings/sections
 const NotificationsVibrationScreen = lazy(() => import('@/features/settings/sections/Notifications/VibrationScreen').then(m => ({ default: m.VibrationScreen })));
 const NotificationsQuietHoursScreen = lazy(() => import('@/features/settings/sections/Notifications/QuietHoursScreen').then(m => ({ default: m.QuietHoursScreen })));
 const NotificationsEscalationScreen = lazy(() => import('@/features/settings/sections/Notifications/EscalationScreen').then(m => ({ default: m.EscalationScreen })));
+const TagManagementScreen = lazy(() => import('@/features/tags/TagManagementScreen').then(m => ({ default: m.TagManagementScreen })));
+const SearchScreen = lazy(() => import('@/features/search/SearchScreen').then(m => ({ default: m.SearchScreen })));
 
 function LazyRoute({ Component, fallback }: { Component: ComponentType; fallback?: React.ReactNode }) {
   return (
@@ -170,6 +172,8 @@ const routes: RouteObject[] = [
       { path: 'settings/notifications/vibration', element: <LazyRoute Component={NotificationsVibrationScreen} fallback={<SettingsSkeleton />} /> },
       { path: 'settings/notifications/quiet-hours', element: <LazyRoute Component={NotificationsQuietHoursScreen} fallback={<SettingsSkeleton />} /> },
       { path: 'settings/notifications/escalation', element: <LazyRoute Component={NotificationsEscalationScreen} fallback={<SettingsSkeleton />} /> },
+      { path: 'tags', element: <LazyRoute Component={TagManagementScreen} /> },
+      { path: 'search', element: <LazyRoute Component={SearchScreen} /> },
     ],
   },
 

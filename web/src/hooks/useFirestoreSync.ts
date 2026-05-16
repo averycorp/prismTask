@@ -35,6 +35,14 @@ import { useSavedFiltersStore } from '@/stores/savedFiltersStore';
 import { useNlpShortcutsStore } from '@/stores/nlpShortcutsStore';
 import { useHabitTemplatesStore } from '@/stores/habitTemplatesStore';
 import { useProjectTemplatesStore } from '@/stores/projectTemplatesStore';
+import { useTaskTimingsStore } from '@/stores/taskTimingsStore';
+import { useMilestoneStore } from '@/stores/milestoneStore';
+import { useMedicationSlotsExtStore } from '@/stores/medicationSlotsExtStore';
+import { useMedicationSlotOverridesStore } from '@/stores/medicationSlotOverridesStore';
+import { useMedicationTierStatesStore } from '@/stores/medicationTierStatesStore';
+import { useMedicationRefillsStore } from '@/stores/medicationRefillsStore';
+import { useDailyEssentialSlotCompletionsStore } from '@/stores/dailyEssentialSlotCompletionsStore';
+import { useSortPreferencesStore } from '@/stores/sortPreferencesStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -67,6 +75,12 @@ import { useProjectTemplatesStore } from '@/stores/projectTemplatesStore';
  * downstream UI units can read live snapshots without standing up the
  * write path inside this hook. Write surfaces land alongside the per-
  * feature UI units (notification profiles, templates, etc).
+ * Sync sweep A (parity unit 1 of 23) adds eight more listeners —
+ * `task_timings`, `milestones`, `medication_slots` (Android-canonical
+ * shape, parallel to the existing slot-defs cache), `medication_slot_overrides`,
+ * `medication_tier_states`, `medication_refills`, `daily_essential_slot_completions`,
+ * and the `settings/sort_preferences` doc — closing the gap between
+ * collections Android writes and listeners web previously wired.
  * `subscribeToAiFeaturesEnabled` is intentionally NOT wired here: the
  * AI-features flag is already pulled imperatively via
  * `settingsStore.loadAiFeaturesFromFirestore` on auth bootstrap, and
@@ -162,6 +176,29 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToProjectTemplates = useProjectTemplatesStore(
     (s) => s.subscribeToTemplates,
   );
+  const subscribeToTaskTimings = useTaskTimingsStore(
+    (s) => s.subscribeToTaskTimings,
+  );
+  const subscribeToMilestones = useMilestoneStore(
+    (s) => s.subscribeToMilestones,
+  );
+  const subscribeToMedicationSlotsExt = useMedicationSlotsExtStore(
+    (s) => s.subscribeToMedicationSlots,
+  );
+  const subscribeToMedicationSlotOverrides = useMedicationSlotOverridesStore(
+    (s) => s.subscribeToOverrides,
+  );
+  const subscribeToMedicationTierStates = useMedicationTierStatesStore(
+    (s) => s.subscribeToTierStates,
+  );
+  const subscribeToMedicationRefills = useMedicationRefillsStore(
+    (s) => s.subscribeToRefills,
+  );
+  const subscribeToDailyEssentialSlotCompletions =
+    useDailyEssentialSlotCompletionsStore((s) => s.subscribeToCompletions);
+  const subscribeToSortPreferences = useSortPreferencesStore(
+    (s) => s.subscribeToSortPreferences,
+  );
   const resetHabitLogs = useHabitLogStore((s) => s.reset);
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
@@ -192,6 +229,19 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   // Tracks whether the one-shot built-in habit reconciler has fired for
   // the *current* session. Reset on uid change inside the effect below.
   const reconcileFiredRef = useRef(false);
+  const resetTaskTimings = useTaskTimingsStore((s) => s.reset);
+  const resetMilestones = useMilestoneStore((s) => s.reset);
+  const resetMedicationSlotsExt = useMedicationSlotsExtStore((s) => s.reset);
+  const resetMedicationSlotOverrides = useMedicationSlotOverridesStore(
+    (s) => s.reset,
+  );
+  const resetMedicationTierStates = useMedicationTierStatesStore(
+    (s) => s.reset,
+  );
+  const resetMedicationRefills = useMedicationRefillsStore((s) => s.reset);
+  const resetDailyEssentialSlotCompletions =
+    useDailyEssentialSlotCompletionsStore((s) => s.reset);
+  const resetSortPreferences = useSortPreferencesStore((s) => s.reset);
 
   useEffect(() => {
     reconcileFiredRef.current = false;
@@ -224,6 +274,14 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetNlpShortcuts();
       resetHabitTemplates();
       resetProjectTemplates();
+      resetTaskTimings();
+      resetMilestones();
+      resetMedicationSlotsExt();
+      resetMedicationSlotOverrides();
+      resetMedicationTierStates();
+      resetMedicationRefills();
+      resetDailyEssentialSlotCompletions();
+      resetSortPreferences();
       return;
     }
 
@@ -304,6 +362,20 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToNlpShortcuts, 'nlp-shortcuts');
     safeSubscribe(subscribeToHabitTemplates, 'habit-templates');
     safeSubscribe(subscribeToProjectTemplates, 'project-templates');
+    safeSubscribe(subscribeToTaskTimings, 'task-timings');
+    safeSubscribe(subscribeToMilestones, 'milestones');
+    safeSubscribe(subscribeToMedicationSlotsExt, 'medication-slots-ext');
+    safeSubscribe(
+      subscribeToMedicationSlotOverrides,
+      'medication-slot-overrides',
+    );
+    safeSubscribe(subscribeToMedicationTierStates, 'medication-tier-states');
+    safeSubscribe(subscribeToMedicationRefills, 'medication-refills');
+    safeSubscribe(
+      subscribeToDailyEssentialSlotCompletions,
+      'daily-essential-slot-completions',
+    );
+    safeSubscribe(subscribeToSortPreferences, 'sort-preferences');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -355,6 +427,14 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToNlpShortcuts,
     subscribeToHabitTemplates,
     subscribeToProjectTemplates,
+    subscribeToTaskTimings,
+    subscribeToMilestones,
+    subscribeToMedicationSlotsExt,
+    subscribeToMedicationSlotOverrides,
+    subscribeToMedicationTierStates,
+    subscribeToMedicationRefills,
+    subscribeToDailyEssentialSlotCompletions,
+    subscribeToSortPreferences,
     resetHabitLogs,
     resetSelfCare,
     resetSlots,
@@ -380,5 +460,13 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     resetNlpShortcuts,
     resetHabitTemplates,
     resetProjectTemplates,
+    resetTaskTimings,
+    resetMilestones,
+    resetMedicationSlotsExt,
+    resetMedicationSlotOverrides,
+    resetMedicationTierStates,
+    resetMedicationRefills,
+    resetDailyEssentialSlotCompletions,
+    resetSortPreferences,
   ]);
 }

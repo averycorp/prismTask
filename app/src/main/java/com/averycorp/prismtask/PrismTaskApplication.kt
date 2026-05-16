@@ -7,6 +7,7 @@ import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.averycorp.prismtask.data.billing.ProxyBillingActivityGuard
 import com.averycorp.prismtask.data.diagnostics.MigrationInstrumentor
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.ThemePreferences
@@ -124,6 +125,7 @@ class PrismTaskApplication :
         configureFirebaseEmulator()
         configureCrashlytics()
         installRatingPromptCrashHook()
+        registerActivityLifecycleCallbacks(ProxyBillingActivityGuard())
         // Belt-and-braces flush for migration events that fired
         // before Firebase was ready on cold-boot (BootReceiver) paths.
         // The RoomDatabase.Callback.onOpen hook is the primary flush

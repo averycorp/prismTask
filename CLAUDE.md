@@ -47,7 +47,7 @@
 - **Auth**: Credential Manager + Google Identity
 - **Drag-to-Reorder**: sh.calvin.reorderable 2.4.3
 - **Widgets**: Glance for Compose 1.1.0
-- **Billing**: Google Play Billing 7.1.1
+- **Billing**: Google Play Billing 8.3.0
 - **Testing**: JUnit 4.13.2, kotlinx-coroutines-test 1.9.0, Turbine 1.1.0, MockK 1.13.13, Robolectric 4.13, Hilt Testing 2.59.2
 - **Build**: Gradle 9.3.1 with Kotlin DSL, AGP 9.1.1
 - **Min SDK**: 26 (Android 8.0) / **Target SDK**: 35 (Android 15)
