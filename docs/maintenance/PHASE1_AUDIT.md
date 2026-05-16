@@ -236,7 +236,6 @@ Looks current and correct: backend `pip install` + `uvicorn` works; web `npm ins
 These are **point-in-time audits**, intentionally frozen as historical records — Phase 2 moved them from the repo root into `docs/audits/` so the root stays oriented around CLAUDE.md / README / ARCHITECTURE / CONTRIBUTING / SECURITY / CHANGELOG / LICENSE / CI_LOGS:
 - `docs/audits/COPY_STRINGS_AUDIT.md`
 - `docs/audits/CRASH_STABILITY_AUDIT.md`
-- `docs/audits/DAILY_ESSENTIALS_AUDIT.md`
 - `docs/audits/DATA_INTEGRITY_AUDIT.md`
 - `docs/audits/DEAD_CODE_AUDIT.md`
 
