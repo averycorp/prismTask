@@ -158,6 +158,9 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToNotificationProfiles = useNotificationProfilesStore(
     (s) => s.subscribeToProfiles,
   );
+  const subscribeToActiveNotificationProfile = useNotificationProfilesStore(
+    (s) => s.subscribeToActiveProfile,
+  );
   const subscribeToCustomSounds = useCustomSoundsStore(
     (s) => s.subscribeToSounds,
   );
@@ -350,6 +353,10 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToAdvancedTuning, 'advanced-tuning');
     safeSubscribe(subscribeToRestDays, 'rest-days');
     safeSubscribe(subscribeToNotificationProfiles, 'notification-profiles');
+    safeSubscribe(
+      subscribeToActiveNotificationProfile,
+      'active-notification-profile',
+    );
     safeSubscribe(subscribeToCustomSounds, 'custom-sounds');
     safeSubscribe(subscribeToSavedFilters, 'saved-filters');
     safeSubscribe(subscribeToNlpShortcuts, 'nlp-shortcuts');
@@ -414,6 +421,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToAdvancedTuning,
     subscribeToRestDays,
     subscribeToNotificationProfiles,
+    subscribeToActiveNotificationProfile,
     subscribeToCustomSounds,
     subscribeToSavedFilters,
     subscribeToNlpShortcuts,
