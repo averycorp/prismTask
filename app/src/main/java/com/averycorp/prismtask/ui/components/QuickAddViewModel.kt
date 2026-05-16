@@ -8,6 +8,7 @@ import com.averycorp.prismtask.data.local.dao.UsageLogDao
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
 import com.averycorp.prismtask.data.local.entity.UsageLogEntity
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
@@ -66,7 +67,8 @@ constructor(
     private val voiceCommandParser: VoiceCommandParser,
     private val tts: TextToSpeechManager,
     private val voicePreferences: VoicePreferences,
-    private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+    private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences,
+    private val userPreferencesDataStore: UserPreferencesDataStore
 ) : ViewModel() {
 
     /**
@@ -153,6 +155,26 @@ constructor(
 
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting: StateFlow<Boolean> = _isSubmitting
+
+    /**
+     * Confirm-before-save preference (default true). Drives whether
+     * [onSubmit] writes the task immediately or stages it in
+     * [pendingConfirm] for the user to review in [TaskConfirmSheet].
+     * Continuous voice mode bypasses confirmation either way — see
+     * [onSubmit] for the gate.
+     */
+    private val showConfirmation: StateFlow<Boolean> =
+        userPreferencesDataStore.quickAddFlow
+            .map { it.showConfirmation }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * Pending preview emitted before the actual insert when
+     * [showConfirmation] is on. Consumers render [TaskConfirmSheet] from
+     * this state; null means no preview is pending.
+     */
+    private val _pendingConfirm = MutableStateFlow<PendingConfirmTask?>(null)
+    val pendingConfirm: StateFlow<PendingConfirmTask?> = _pendingConfirm.asStateFlow()
 
     // ----- Voice input surface -----
 
@@ -499,6 +521,44 @@ constructor(
 
         val projectHintFromIntent = (intent as? ProjectIntent.CreateTask)?.projectHint
 
+        // Confirm-before-save path: stage the parse result and let the UI
+        // surface [TaskConfirmSheet] for the user to review/edit. Skipped
+        // when continuous voice mode is active (hands-free contract — the
+        // utterance IS the confirm) or when the preference is off.
+        if (showConfirmation.value && !_continuousModeActive.value) {
+            viewModelScope.launch {
+                try {
+                    val parsed = if (proFeatureGate.hasAccess(ProFeatureGate.AI_NLP)) {
+                        parser.parseRemote(text)
+                    } else {
+                        parser.parse(text)
+                    }
+                    val resolvedCategory = parsed.lifeCategory ?: run {
+                        val guess = lifeCategoryClassifier().classify(parsed.title)
+                        if (guess == LifeCategory.UNCATEGORIZED) null else guess.name
+                    }
+                    _pendingConfirm.value = PendingConfirmTask(
+                        title = parsed.title,
+                        dueDate = parsed.dueDate,
+                        dueTime = parsed.dueTime,
+                        priority = parsed.priority,
+                        projectName = parsed.projectName ?: projectHintFromIntent,
+                        tags = parsed.tags,
+                        recurrenceHint = parsed.recurrenceHint,
+                        lifeCategory = resolvedCategory,
+                        taskMode = parsed.taskMode,
+                        cognitiveLoad = parsed.cognitiveLoad,
+                        plannedDateOverride = plannedDateOverride
+                    )
+                } catch (e: Exception) {
+                    Log.e("QuickAddVM", "Failed to parse for confirm", e)
+                } finally {
+                    _isSubmitting.value = false
+                }
+            }
+            return
+        }
+
         viewModelScope.launch {
             _isSubmitting.value = true
             try {
@@ -790,6 +850,107 @@ constructor(
 
     fun onDismissDisambiguation() {
         _templateDisambiguation.value = null
+    }
+
+    /**
+     * Commit a confirm-sheet preview to the database. Reuses [resolver] to
+     * convert raw tag / project names into ids (auto-creating both as
+     * needed) so the resulting task is structurally identical to one made
+     * via the immediate-insert path.
+     */
+    fun confirmAndSave(edited: PendingConfirmTask) {
+        _pendingConfirm.value = null
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            try {
+                val synthetic = ParsedTask(
+                    title = edited.title,
+                    dueDate = edited.dueDate,
+                    dueTime = edited.dueTime,
+                    tags = edited.tags,
+                    projectName = edited.projectName,
+                    priority = edited.priority,
+                    recurrenceHint = edited.recurrenceHint,
+                    lifeCategory = edited.lifeCategory,
+                    taskMode = edited.taskMode,
+                    cognitiveLoad = edited.cognitiveLoad
+                )
+                val resolved = resolver.resolve(synthetic)
+
+                val newTagIds = resolved.unmatchedTags.map { tagName ->
+                    tagRepository.addTag(name = tagName)
+                }
+                val allTagIds = resolved.tagIds + newTagIds
+
+                var projectId = resolved.projectId
+                if (projectId == null && resolved.unmatchedProject != null) {
+                    projectId = projectRepository.addProject(name = resolved.unmatchedProject)
+                }
+
+                val recurrenceJson = resolved.recurrenceRule?.let { RecurrenceConverter.toJson(it) }
+                val now = System.currentTimeMillis()
+                val task = TaskEntity(
+                    title = resolved.title,
+                    dueDate = resolved.dueDate,
+                    dueTime = resolved.dueTime,
+                    priority = resolved.priority,
+                    projectId = projectId,
+                    recurrenceRule = recurrenceJson,
+                    plannedDate = edited.plannedDateOverride,
+                    lifeCategory = resolved.lifeCategory,
+                    taskMode = resolved.taskMode,
+                    cognitiveLoad = resolved.cognitiveLoad,
+                    createdAt = now,
+                    updatedAt = now
+                )
+                val taskId = taskRepository.insertTask(task)
+                lastCreatedTaskId = taskId
+
+                if (allTagIds.isNotEmpty()) {
+                    tagRepository.setTagsForTask(taskId, allTagIds)
+                }
+
+                val keywords = extractKeywords(resolved.title).joinToString(",")
+                if (keywords.isNotBlank()) {
+                    allTagIds.forEach { tagId ->
+                        val tagName = resolved.unmatchedTags.getOrNull(
+                            (tagId - (resolved.tagIds.lastOrNull() ?: 0) - 1).toInt().coerceAtLeast(0)
+                        ) ?: resolved.title
+                        usageLogDao.insert(
+                            UsageLogEntity(
+                                eventType = "tag_assigned",
+                                entityId = tagId,
+                                entityName = tagName,
+                                taskTitle = resolved.title,
+                                titleKeywords = keywords
+                            )
+                        )
+                    }
+                    if (projectId != null) {
+                        usageLogDao.insert(
+                            UsageLogEntity(
+                                eventType = "project_assigned",
+                                entityId = projectId,
+                                entityName = resolved.unmatchedProject ?: "",
+                                taskTitle = resolved.title,
+                                titleKeywords = keywords
+                            )
+                        )
+                    }
+                }
+
+                inputText.value = ""
+            } catch (e: Exception) {
+                Log.e("QuickAddVM", "Failed to insert from confirm", e)
+            } finally {
+                _isSubmitting.value = false
+            }
+        }
+    }
+
+    /** Discard a pending confirm preview without writing anything. */
+    fun dismissPendingConfirm() {
+        _pendingConfirm.value = null
     }
 
     override fun onCleared() {
