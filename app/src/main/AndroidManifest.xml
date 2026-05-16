@@ -227,6 +227,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".widget.TodayWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PrismTask">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!--
             Harden Google Play Billing's proxy activities so the system
             cannot restore them from Recents or after process death with a

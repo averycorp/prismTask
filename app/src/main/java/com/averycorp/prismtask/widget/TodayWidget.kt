@@ -66,7 +66,7 @@ class TodayWidget : GlanceAppWidget() {
         provideContent {
             val size = LocalSize.current
             if (data != null) {
-                TodayWidgetContent(context, data, size, palette, config.maxTasks, quietMode)
+                TodayWidgetContent(context, data, size, palette, config, quietMode)
             } else {
                 WidgetLoadingState(palette)
             }
@@ -80,7 +80,7 @@ private fun TodayWidgetContent(
     data: TodayWidgetData,
     size: DpSize,
     palette: WidgetThemePalette,
-    configuredMaxTasks: Int,
+    config: WidgetConfigDataStore.TodayConfig,
     quietMode: Boolean
 ) {
     val isSmall = size.width < 250.dp
@@ -109,7 +109,7 @@ private fun TodayWidgetContent(
                 text = "$completed/$total tasks done",
                 style = WidgetTextStyles.body(palette.onSurface)
             )
-            if (data.totalHabits > 0) {
+            if (config.showHabitSummary && data.totalHabits > 0) {
                 Text(
                     text = "${data.completedHabits}/${data.totalHabits} habits",
                     style = WidgetTextStyles.caption(palette.secondary)
@@ -117,45 +117,53 @@ private fun TodayWidgetContent(
             }
         } else {
             Spacer(modifier = GlanceModifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = progress.coerceIn(0f, 1f),
-                modifier = GlanceModifier.fillMaxWidth().height(4.dp),
-                color = palette.primary,
-                backgroundColor = palette.surfaceVariant
-            )
-            Spacer(modifier = GlanceModifier.height(2.dp))
-            Text(
-                text = "$completed of $total tasks · ${data.completedHabits}/${data.totalHabits} habits",
-                style = WidgetTextStyles.badge(palette.onSurfaceVariant)
-            )
-            Spacer(modifier = GlanceModifier.height(6.dp))
-            val sizeTierCap = if (isLarge) 8 else 3
-            val effective = minOf(configuredMaxTasks, sizeTierCap)
-            val maxTasks = effective.coerceIn(1, 20)
-            if (data.tasks.isEmpty()) {
-                WidgetEmptyState(
-                    emoji = "✅",
-                    message = "All Caught Up!",
-                    palette = palette,
-                    quietMode = quietMode
+            if (config.showProgress) {
+                LinearProgressIndicator(
+                    progress = progress.coerceIn(0f, 1f),
+                    modifier = GlanceModifier.fillMaxWidth().height(4.dp),
+                    color = palette.primary,
+                    backgroundColor = palette.surfaceVariant
                 )
-            } else {
-                data.tasks.take(maxTasks).forEach { task ->
-                    WidgetTaskRowView(context, task, palette = palette, showDate = isLarge)
-                    Spacer(modifier = GlanceModifier.height(6.dp))
-                }
-                if (isLarge && data.tasks.size < 3) {
-                    val nextTask = data.tasks.firstOrNull { !it.isOverdue && !it.isCompleted }
-                    if (nextTask != null) {
-                        Text(
-                            text = "Next Up",
-                            style = WidgetTextStyles.badge(palette.primary)
-                        )
-                        Spacer(modifier = GlanceModifier.height(2.dp))
+                Spacer(modifier = GlanceModifier.height(2.dp))
+                Text(
+                    text = if (config.showHabitSummary) {
+                        "$completed of $total tasks · ${data.completedHabits}/${data.totalHabits} habits"
+                    } else {
+                        "$completed of $total tasks"
+                    },
+                    style = WidgetTextStyles.badge(palette.onSurfaceVariant)
+                )
+                Spacer(modifier = GlanceModifier.height(6.dp))
+            }
+            if (config.showTaskList) {
+                val sizeTierCap = if (isLarge) 8 else 3
+                val effective = minOf(config.maxTasks, sizeTierCap)
+                val maxTasks = effective.coerceIn(1, 20)
+                if (data.tasks.isEmpty()) {
+                    WidgetEmptyState(
+                        emoji = "✅",
+                        message = "All Caught Up!",
+                        palette = palette,
+                        quietMode = quietMode
+                    )
+                } else {
+                    data.tasks.take(maxTasks).forEach { task ->
+                        WidgetTaskRowView(context, task, palette = palette, showDate = isLarge)
+                        Spacer(modifier = GlanceModifier.height(6.dp))
+                    }
+                    if (isLarge && data.tasks.size < 3) {
+                        val nextTask = data.tasks.firstOrNull { !it.isOverdue && !it.isCompleted }
+                        if (nextTask != null) {
+                            Text(
+                                text = "Next Up",
+                                style = WidgetTextStyles.badge(palette.primary)
+                            )
+                            Spacer(modifier = GlanceModifier.height(2.dp))
+                        }
                     }
                 }
             }
-            if (isLarge && data.totalHabits > 0) {
+            if (isLarge && config.showHabitSummary && data.totalHabits > 0) {
                 Spacer(modifier = GlanceModifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     data.habitIcons.take(5).forEach { icon ->
@@ -169,7 +177,7 @@ private fun TodayWidgetContent(
                     )
                 }
             }
-            if (isLarge && overdueCount > 0) {
+            if (isLarge && config.showOverdueBadge && overdueCount > 0) {
                 Spacer(modifier = GlanceModifier.height(4.dp))
                 Box(
                     modifier = GlanceModifier
