@@ -118,7 +118,11 @@ data class EisenhowerQuadrantSummary(
     // same priority dot + due-date hint the in-app CompactTaskCard shows.
     // Both null when [topTaskTitle] is null or the underlying field was unset.
     val topTaskPriority: Int? = null,
-    val topTaskDueDate: Long? = null
+    val topTaskDueDate: Long? = null,
+    // Task id for the top task so [EisenhowerWidget] can dispatch
+    // [ToggleTaskFromWidgetAction] when the user taps the per-quadrant
+    // checkbox on LARGE size. Null when [topTaskTitle] is null.
+    val topTaskId: Long? = null
 )
 
 data class InboxWidgetData(
@@ -473,7 +477,8 @@ object WidgetDataProvider {
                 count = matches.size,
                 topTaskTitle = top?.title,
                 topTaskPriority = top?.priority,
-                topTaskDueDate = top?.dueDate
+                topTaskDueDate = top?.dueDate,
+                topTaskId = top?.id
             )
         }
         return EisenhowerWidgetData(

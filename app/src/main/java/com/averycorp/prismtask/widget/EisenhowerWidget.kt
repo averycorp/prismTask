@@ -12,6 +12,7 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -21,7 +22,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -43,11 +43,21 @@ import java.util.concurrent.TimeUnit
  *
  * Tapping anywhere on the widget opens the Eisenhower screen in
  * MainActivity (via the standard launch intent).
+ *
+ * **LARGE-only per-quadrant complete checkbox.** When the widget is sized
+ * at or above the [LARGE] bucket, each quadrant renders a small checkbox
+ * next to the headline task title. Tapping it dispatches
+ * [ToggleTaskFromWidgetAction] keyed on the top task's id; refresh is
+ * driven by the standard `updateTaskWidgets` fan-out inside that action.
+ * MEDIUM stays checkbox-free to preserve density on the 2×2 grid — the
+ * deferral path documented in `docs/audits/WIDGET_TAB_PARITY_AUDIT.md`
+ * § 2.2.
  */
 class EisenhowerWidget : GlanceAppWidget() {
     companion object {
         private val MEDIUM = DpSize(250.dp, 150.dp)
         private val LARGE = DpSize(350.dp, 250.dp)
+        internal val LARGE_THRESHOLD = LARGE.width
     }
 
     override val sizeMode = SizeMode.Responsive(setOf(MEDIUM, LARGE))
@@ -77,6 +87,7 @@ private data class Quad(
     val color: ColorProvider,
     val bgColor: ColorProvider,
     val top: String?,
+    val topId: Long?,
     val topPriority: Int?,
     val topDueDate: Long?
 )
@@ -88,47 +99,23 @@ private fun EisenhowerContent(
     palette: WidgetThemePalette,
     data: EisenhowerWidgetData
 ) {
-    val isLarge = size.width >= 350.dp
+    val isLarge = size.width >= EisenhowerWidget.LARGE_THRESHOLD
     val quads = listOf(
         Quad(
-            "Q1",
-            "Do",
-            data.q1.count,
-            palette.quadrantQ1,
-            palette.quadrantQ1Bg,
-            data.q1.topTaskTitle,
-            data.q1.topTaskPriority,
-            data.q1.topTaskDueDate
+            "Q1", "Do", data.q1.count, palette.quadrantQ1, palette.quadrantQ1Bg,
+            data.q1.topTaskTitle, data.q1.topTaskId, data.q1.topTaskPriority, data.q1.topTaskDueDate
         ),
         Quad(
-            "Q2",
-            "Schedule",
-            data.q2.count,
-            palette.quadrantQ2,
-            palette.quadrantQ2Bg,
-            data.q2.topTaskTitle,
-            data.q2.topTaskPriority,
-            data.q2.topTaskDueDate
+            "Q2", "Schedule", data.q2.count, palette.quadrantQ2, palette.quadrantQ2Bg,
+            data.q2.topTaskTitle, data.q2.topTaskId, data.q2.topTaskPriority, data.q2.topTaskDueDate
         ),
         Quad(
-            "Q3",
-            "Delegate",
-            data.q3.count,
-            palette.quadrantQ3,
-            palette.quadrantQ3Bg,
-            data.q3.topTaskTitle,
-            data.q3.topTaskPriority,
-            data.q3.topTaskDueDate
+            "Q3", "Delegate", data.q3.count, palette.quadrantQ3, palette.quadrantQ3Bg,
+            data.q3.topTaskTitle, data.q3.topTaskId, data.q3.topTaskPriority, data.q3.topTaskDueDate
         ),
         Quad(
-            "Q4",
-            "Drop",
-            data.q4.count,
-            palette.quadrantQ4,
-            palette.quadrantQ4Bg,
-            data.q4.topTaskTitle,
-            data.q4.topTaskPriority,
-            data.q4.topTaskDueDate
+            "Q4", "Drop", data.q4.count, palette.quadrantQ4, palette.quadrantQ4Bg,
+            data.q4.topTaskTitle, data.q4.topTaskId, data.q4.topTaskPriority, data.q4.topTaskDueDate
         )
     )
     val total = data.total
@@ -137,27 +124,19 @@ private fun EisenhowerContent(
         putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenMatrix.wireId)
     }
 
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .cornerRadius(palette.widgetCornerRadius)
-            .background(palette.surfaceBackground)
-            .padding(if (isLarge) 12.dp else 10.dp)
-            .clickable(actionStartActivity(openMatrix))
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = WidgetTextStyles.headerLabel(palette, "Matrix"),
-                style = WidgetTextStyles.headerThemed(palette, palette.onSurface),
-                modifier = GlanceModifier.defaultWeight()
-            )
+    WidgetScaffold(
+        palette = palette,
+        isLarge = isLarge,
+        title = "Matrix",
+        outerAction = actionStartActivity(openMatrix),
+        headerTrailing = {
             Text(
                 text = "$total tasks",
                 style = WidgetTextStyles.badge(palette.onSurfaceVariant)
             )
         }
+    ) {
         Spacer(modifier = GlanceModifier.height(6.dp))
-
         // 2×2 grid: two rows, two quads each.
         QuadRow(quads[0], quads[1], palette = palette, compact = !isLarge)
         Spacer(modifier = GlanceModifier.height(5.dp))
@@ -198,50 +177,82 @@ private fun QuadCell(q: Quad, palette: WidgetThemePalette, compact: Boolean, mod
             }
             if (!compact) {
                 Spacer(modifier = GlanceModifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (q.top != null && q.topPriority != null) {
-                        Box(
-                            modifier = GlanceModifier
-                                .size(6.dp)
-                                .cornerRadius(3.dp)
-                                .background(priorityColor(q.topPriority, palette))
-                        ) {}
-                        Spacer(modifier = GlanceModifier.width(4.dp))
-                    }
-                    Text(
-                        text = q.top ?: "—",
-                        style = WidgetTextStyles.badge(palette.onSurfaceVariant),
-                        maxLines = 1,
-                        modifier = GlanceModifier.defaultWeight()
-                    )
-                    val dueLabel = q.topDueDate?.let { dueDateLabel(it) }
-                    if (dueLabel != null) {
-                        Spacer(modifier = GlanceModifier.width(4.dp))
-                        Text(
-                            text = dueLabel.text,
-                            style = WidgetTextStyles.badge(
-                                if (dueLabel.overdue) palette.overdue else palette.onSurfaceVariant
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                }
+                QuadTopTaskRow(q = q, palette = palette)
             }
         }
     }
 }
 
-private fun priorityColor(priority: Int, palette: WidgetThemePalette): ColorProvider = when (priority) {
-    4 -> palette.priorityUrgent
-    3 -> palette.priorityHigh
-    2 -> palette.priorityMedium
-    1 -> palette.priorityLow
-    else -> palette.priorityNone
+/**
+ * Bottom row of a LARGE quadrant cell. Shows (in order):
+ *  - per-quadrant complete-top-task checkbox (LARGE only, hidden when the
+ *    quadrant has no top task), wired to [ToggleTaskFromWidgetAction];
+ *  - priority dot when both a top task and priority exist;
+ *  - the top task title or an em-dash fallback;
+ *  - a relative due-date label when the task has a due date.
+ */
+@Composable
+private fun QuadTopTaskRow(q: Quad, palette: WidgetThemePalette) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (q.top != null && q.topId != null) {
+            QuadCheckbox(topId = q.topId, palette = palette)
+            Spacer(modifier = GlanceModifier.width(4.dp))
+        }
+        if (q.top != null && q.topPriority != null) {
+            Box(
+                modifier = GlanceModifier
+                    .size(6.dp)
+                    .cornerRadius(3.dp)
+                    .background(priorityColorFor(q.topPriority, palette))
+            ) {}
+            Spacer(modifier = GlanceModifier.width(4.dp))
+        }
+        Text(
+            text = q.top ?: "—",
+            style = WidgetTextStyles.badge(palette.onSurfaceVariant),
+            maxLines = 1,
+            modifier = GlanceModifier.defaultWeight()
+        )
+        val dueLabel = q.topDueDate?.let { dueDateLabel(it) }
+        if (dueLabel != null) {
+            Spacer(modifier = GlanceModifier.width(4.dp))
+            Text(
+                text = dueLabel.text,
+                style = WidgetTextStyles.badge(
+                    if (dueLabel.overdue) palette.overdue else palette.onSurfaceVariant
+                ),
+                maxLines = 1
+            )
+        }
+    }
 }
 
-private data class DueDateLabel(val text: String, val overdue: Boolean)
+/**
+ * Empty surface-variant box used as the LARGE-only complete-top-task
+ * checkbox. The top task surfaced by `getEisenhowerData` is always
+ * incomplete (completed roots are filtered out), so an unchecked box is
+ * the only state we render. Tapping fires [ToggleTaskFromWidgetAction]
+ * which triggers `updateTaskWidgets`; the widget redraws with the next
+ * task in line.
+ */
+@Composable
+private fun QuadCheckbox(topId: Long, palette: WidgetThemePalette) {
+    Box(
+        modifier = GlanceModifier
+            .size(12.dp)
+            .cornerRadius(3.dp)
+            .background(palette.surfaceVariant)
+            .clickable(
+                actionRunCallback<ToggleTaskFromWidgetAction>(
+                    parameters = taskIdParams(topId)
+                )
+            )
+    ) {}
+}
 
-private fun dueDateLabel(dueDate: Long, now: Long = System.currentTimeMillis()): DueDateLabel {
+internal data class DueDateLabel(val text: String, val overdue: Boolean)
+
+internal fun dueDateLabel(dueDate: Long, now: Long = System.currentTimeMillis()): DueDateLabel {
     val diffMs = dueDate - now
     val days = TimeUnit.MILLISECONDS.toDays(diffMs).toInt()
     return when {
