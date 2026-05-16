@@ -28,6 +28,12 @@ import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useWeeklyReviewsStore } from '@/stores/weeklyReviewsStore';
 import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
 import { useRestDayStore } from '@/stores/restDayStore';
+import { useNotificationProfilesStore } from '@/stores/notificationProfilesStore';
+import { useCustomSoundsStore } from '@/stores/customSoundsStore';
+import { useSavedFiltersStore } from '@/stores/savedFiltersStore';
+import { useNlpShortcutsStore } from '@/stores/nlpShortcutsStore';
+import { useHabitTemplatesStore } from '@/stores/habitTemplatesStore';
+import { useProjectTemplatesStore } from '@/stores/projectTemplatesStore';
 
 /**
  * Wires all defined-but-previously-unused `subscribeTo*` Firestore
@@ -53,6 +59,13 @@ import { useRestDayStore } from '@/stores/restDayStore';
  * Pillars audit Phase 2 #4 adds `advanced_tuning_prefs` so a slider
  * tweak on phone (forgiveness grace window, allowed misses, classifier
  * custom keywords) propagates live to web and vice-versa.
+ * Sync Sweep B (unit 2 of 23) adds six read-only listeners for the
+ * config-family collections Android already pushes
+ * (`notification_profiles`, `custom_sounds`, `saved_filters`,
+ * `nlp_shortcuts`, `habit_templates`, `project_templates`) so
+ * downstream UI units can read live snapshots without standing up the
+ * write path inside this hook. Write surfaces land alongside the per-
+ * feature UI units (notification profiles, templates, etc).
  * `subscribeToAiFeaturesEnabled` is intentionally NOT wired here: the
  * AI-features flag is already pulled imperatively via
  * `settingsStore.loadAiFeaturesFromFirestore` on auth bootstrap, and
@@ -127,6 +140,24 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     (s) => s.subscribeToPrefs,
   );
   const subscribeToRestDays = useRestDayStore((s) => s.subscribeToRestDays);
+  const subscribeToNotificationProfiles = useNotificationProfilesStore(
+    (s) => s.subscribeToProfiles,
+  );
+  const subscribeToCustomSounds = useCustomSoundsStore(
+    (s) => s.subscribeToSounds,
+  );
+  const subscribeToSavedFilters = useSavedFiltersStore(
+    (s) => s.subscribeToFilters,
+  );
+  const subscribeToNlpShortcuts = useNlpShortcutsStore(
+    (s) => s.subscribeToShortcuts,
+  );
+  const subscribeToHabitTemplates = useHabitTemplatesStore(
+    (s) => s.subscribeToTemplates,
+  );
+  const subscribeToProjectTemplates = useProjectTemplatesStore(
+    (s) => s.subscribeToTemplates,
+  );
   const resetHabitLogs = useHabitLogStore((s) => s.reset);
   const resetSelfCare = useSelfCareStore((s) => s.reset);
   const resetNdPrefs = useNdPreferencesStore((s) => s.reset);
@@ -146,6 +177,14 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const resetWeeklyReviews = useWeeklyReviewsStore((s) => s.reset);
   const resetAdvancedTuning = useAdvancedTuningStore((s) => s.reset);
   const resetRestDays = useRestDayStore((s) => s.reset);
+  const resetNotificationProfiles = useNotificationProfilesStore(
+    (s) => s.reset,
+  );
+  const resetCustomSounds = useCustomSoundsStore((s) => s.reset);
+  const resetSavedFilters = useSavedFiltersStore((s) => s.reset);
+  const resetNlpShortcuts = useNlpShortcutsStore((s) => s.reset);
+  const resetHabitTemplates = useHabitTemplatesStore((s) => s.reset);
+  const resetProjectTemplates = useProjectTemplatesStore((s) => s.reset);
 
   useEffect(() => {
     if (!uid) {
@@ -171,6 +210,12 @@ export function useFirestoreSync(uid: string | null | undefined): void {
       resetHabitLogs();
       resetAdvancedTuning();
       resetRestDays();
+      resetNotificationProfiles();
+      resetCustomSounds();
+      resetSavedFilters();
+      resetNlpShortcuts();
+      resetHabitTemplates();
+      resetProjectTemplates();
       return;
     }
 
@@ -223,6 +268,12 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToHabitLogs, 'habit-logs');
     safeSubscribe(subscribeToAdvancedTuning, 'advanced-tuning');
     safeSubscribe(subscribeToRestDays, 'rest-days');
+    safeSubscribe(subscribeToNotificationProfiles, 'notification-profiles');
+    safeSubscribe(subscribeToCustomSounds, 'custom-sounds');
+    safeSubscribe(subscribeToSavedFilters, 'saved-filters');
+    safeSubscribe(subscribeToNlpShortcuts, 'nlp-shortcuts');
+    safeSubscribe(subscribeToHabitTemplates, 'habit-templates');
+    safeSubscribe(subscribeToProjectTemplates, 'project-templates');
 
     return () => {
       for (const unsub of unsubscribers) {
@@ -267,6 +318,12 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToHabitLogs,
     subscribeToAdvancedTuning,
     subscribeToRestDays,
+    subscribeToNotificationProfiles,
+    subscribeToCustomSounds,
+    subscribeToSavedFilters,
+    subscribeToNlpShortcuts,
+    subscribeToHabitTemplates,
+    subscribeToProjectTemplates,
     resetHabitLogs,
     resetSelfCare,
     resetSlots,
@@ -286,5 +343,11 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     resetWeeklyReviews,
     resetAdvancedTuning,
     resetRestDays,
+    resetNotificationProfiles,
+    resetCustomSounds,
+    resetSavedFilters,
+    resetNlpShortcuts,
+    resetHabitTemplates,
+    resetProjectTemplates,
   ]);
 }
