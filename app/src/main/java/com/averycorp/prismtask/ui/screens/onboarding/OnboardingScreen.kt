@@ -104,7 +104,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
-private const val TOTAL_PAGES = 16
+private const val TOTAL_PAGES = 15
 private const val LAST_PAGE_INDEX = TOTAL_PAGES - 1
 
 @Composable
@@ -143,17 +143,16 @@ fun OnboardingScreen(
                 1 -> HowWeThinkPage()
                 2 -> ThemePickerPage(viewModel = viewModel)
                 3 -> SmartTasksPage()
-                4 -> ProjectsPage()
-                5 -> NaturalLanguagePage()
-                6 -> HabitsPage(viewModel = viewModel)
-                7 -> LifeModesPage(viewModel = viewModel)
-                8 -> TemplatesPage(viewModel = viewModel)
-                9 -> BrainModePage(viewModel = viewModel)
-                10 -> TuningPage(viewModel = viewModel)
-                11 -> AccessibilityPage(viewModel = viewModel)
-                12 -> PrivacyPage(viewModel = viewModel)
-                13 -> NotificationsPage(viewModel = viewModel)
-                14 -> DaySetupPage(viewModel = viewModel)
+                4 -> NaturalLanguagePage()
+                5 -> HabitsPage(viewModel = viewModel)
+                6 -> LifeModesPage(viewModel = viewModel)
+                7 -> TemplatesPage(viewModel = viewModel)
+                8 -> BrainModePage(viewModel = viewModel)
+                9 -> TuningPage(viewModel = viewModel)
+                10 -> AccessibilityPage(viewModel = viewModel)
+                11 -> PrivacyPage(viewModel = viewModel)
+                12 -> NotificationsPage(viewModel = viewModel)
+                13 -> DaySetupPage(viewModel = viewModel)
                 LAST_PAGE_INDEX -> SetupPage(
                     viewModel = viewModel,
                     onComplete = {
@@ -474,13 +473,19 @@ private fun SmartTasksPage() {
     var animStarted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { animStarted = true }
 
-    val tasks = remember { listOf("Buy groceries", "Finish report", "Call dentist") }
+    val tasks = remember { listOf("Buy Groceries", "Finish Report", "Call Dentist") }
     val checked = remember { mutableStateOf(setOf<Int>()) }
+    val projects = remember {
+        listOf(
+            Triple("\ud83c\udfaf", "Launch V2", 0.7f),
+            Triple("\ud83d\udcda", "Read 12 Books", 0.5f)
+        )
+    }
 
     OnboardingPageLayout(
         emoji = "\u2705",
-        headline = "Organize Everything",
-        body = "Projects, tags, subtasks, and priorities. Drag to reorder, bulk edit, and quick-reschedule with a tap."
+        headline = "Organize Tasks & Projects",
+        body = "Capture tasks with tags, priorities, and subtasks. Group related work into projects with milestones and a forgiveness-friendly streak."
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -556,35 +561,18 @@ private fun SmartTasksPage() {
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun ProjectsPage() {
-    var animStarted by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { animStarted = true }
+            Spacer(modifier = Modifier.height(4.dp))
 
-    val projects = listOf(
-        Triple("🎯", "Launch v2", 0.7f),
-        Triple("🏠", "Move apartments", 0.35f),
-        Triple("📚", "Read 12 books", 0.5f)
-    )
-
-    OnboardingPageLayout(
-        emoji = "📁",
-        headline = "Group with Projects",
-        body = "Bundle related tasks into a project, set milestones, and track a forgiveness-friendly streak as you make progress."
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
             projects.forEachIndexed { index, (icon, name, progress) ->
+                // Stagger projects after the three task rows finish animating
+                // in, so the two-row illustration reads top-to-bottom (tasks,
+                // then projects).
+                val delayIndex = tasks.size + index
                 AnimatedVisibility(
                     visible = animStarted,
-                    enter = fadeIn(tween(300, delayMillis = index * 150)) +
-                        slideInVertically(tween(300, delayMillis = index * 150)) { it }
+                    enter = fadeIn(tween(300, delayMillis = delayIndex * 150)) +
+                        slideInVertically(tween(300, delayMillis = delayIndex * 150)) { it }
                 ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
