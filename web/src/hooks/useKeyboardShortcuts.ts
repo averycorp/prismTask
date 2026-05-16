@@ -21,10 +21,21 @@ export function useKeyboardShortcuts({ onSearch, onNewTask, onShowShortcuts }: S
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Cmd/Ctrl+K — search (always active)
+      // Cmd/Ctrl+K — quick search modal (always active)
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         onSearch();
+        return;
+      }
+
+      // Cmd/Ctrl+F — full Search screen (unit 23 spec). Browser
+      // default (in-page find) is overridden in favour of the
+      // cross-collection search route. Falls through to the browser
+      // when an input is focused so users can still find-in-page
+      // while typing into a field.
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !isInputFocused()) {
+        e.preventDefault();
+        navigate('/search');
         return;
       }
 

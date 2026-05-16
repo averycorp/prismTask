@@ -62,6 +62,8 @@ const CheckInHistoryScreen = lazy(() => import('@/features/checkin/CheckInHistor
 const WeeklyBalanceReportScreen = lazy(() => import('@/features/balance/WeeklyBalanceReportScreen').then(m => ({ default: m.WeeklyBalanceReportScreen })));
 const BoundaryRulesListScreen = lazy(() => import('@/features/boundaries/BoundaryRulesListScreen').then(m => ({ default: m.BoundaryRulesListScreen })));
 const BoundaryRuleEditScreen = lazy(() => import('@/features/boundaries/BoundaryRuleEditScreen').then(m => ({ default: m.BoundaryRuleEditScreen })));
+const TagManagementScreen = lazy(() => import('@/features/tags/TagManagementScreen').then(m => ({ default: m.TagManagementScreen })));
+const SearchScreen = lazy(() => import('@/features/search/SearchScreen').then(m => ({ default: m.SearchScreen })));
 
 function LazyRoute({ Component, fallback }: { Component: ComponentType; fallback?: React.ReactNode }) {
   return (
@@ -158,6 +160,8 @@ const routes: RouteObject[] = [
       { path: 'boundaries', element: <LazyRoute Component={BoundaryRulesListScreen} /> },
       { path: 'boundaries/new', element: <LazyRoute Component={BoundaryRuleEditScreen} /> },
       { path: 'boundaries/:id', element: <LazyRoute Component={BoundaryRuleEditScreen} /> },
+      { path: 'tags', element: <LazyRoute Component={TagManagementScreen} /> },
+      { path: 'search', element: <LazyRoute Component={SearchScreen} /> },
     ],
   },
 
