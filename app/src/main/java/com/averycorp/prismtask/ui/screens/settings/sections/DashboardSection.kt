@@ -38,11 +38,13 @@ import com.averycorp.prismtask.ui.screens.settings.sectionLabels
 fun DashboardSection(
     progressStyle: String,
     showProgressPercentage: Boolean,
+    ringAsCompletionArc: Boolean,
     completionCountMode: CompletionCountMode,
     sectionOrder: List<String>,
     hiddenSections: Set<String>,
     onProgressStyleChange: (String) -> Unit,
     onShowProgressPercentageChange: (Boolean) -> Unit,
+    onRingAsCompletionArcChange: (Boolean) -> Unit,
     onCompletionCountModeChange: (CompletionCountMode) -> Unit,
     onHiddenSectionsChange: (Set<String>) -> Unit,
     onSectionOrderChange: (List<String>) -> Unit,
@@ -93,6 +95,31 @@ fun DashboardSection(
         Switch(
             checked = showProgressPercentage,
             onCheckedChange = onShowProgressPercentageChange
+        )
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onRingAsCompletionArcChange(!ringAsCompletionArc) }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Show Ring As Completion Arc",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "Draw the Today ring as a partial arc reflecting completion instead of a full circle.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = ringAsCompletionArc,
+            onCheckedChange = onRingAsCompletionArcChange
         )
     }
 

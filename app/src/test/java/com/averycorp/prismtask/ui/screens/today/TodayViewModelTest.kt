@@ -131,6 +131,7 @@ class TodayViewModelTest {
         coEvery { dashboardPreferences.getCollapsedSections() } returns flowOf(setOf("planned"))
         coEvery { dashboardPreferences.getProgressStyle() } returns flowOf("ring")
         coEvery { dashboardPreferences.getShowProgressPercentage() } returns flowOf(false)
+        coEvery { dashboardPreferences.getRingAsCompletionArc() } returns flowOf(false)
         coEvery { dashboardPreferences.getCompletionCountMode() } returns
             flowOf(CompletionCountMode.TASKS_AND_HABITS)
         coEvery { selfCareRepository.getLogsForDate(any()) } returns flowOf(emptyList())

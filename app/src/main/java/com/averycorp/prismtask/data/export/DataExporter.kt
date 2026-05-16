@@ -331,6 +331,7 @@ constructor(
         dashboard.add("hiddenSections", gson.toJsonTree(dashboardPreferences.getHiddenSections().first()))
         dashboard.addProperty("progressStyle", dashboardPreferences.getProgressStyle().first())
         dashboard.addProperty("showProgressPercentage", dashboardPreferences.getShowProgressPercentage().first())
+        dashboard.addProperty("ringAsCompletionArc", dashboardPreferences.getRingAsCompletionArc().first())
         dashboard.add("collapsedSections", gson.toJsonTree(dashboardPreferences.getCollapsedSections().first()))
         config.add("dashboard", dashboard)
 
