@@ -11,6 +11,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
@@ -44,15 +45,21 @@ class HabitStreakWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val palette = loadWidgetPalette(context)
+        val config = try {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            WidgetConfigDataStore.snapshotHabitStreakConfig(context, appWidgetId)
+        } catch (_: Exception) {
+            WidgetConfigDataStore.HabitStreakConfig()
+        }
         val data = try {
             WidgetDataProvider.getHabitData(context)
         } catch (_: Exception) {
             null
-        }
+        }?.let { applyConfig(it, config) }
         provideContent {
             val size = LocalSize.current
             if (data != null) {
-                HabitStreakContent(context, data, size, palette)
+                HabitStreakContent(context, data, config, size, palette)
             } else {
                 WidgetLoadingState(palette)
             }
@@ -60,10 +67,34 @@ class HabitStreakWidget : GlanceAppWidget() {
     }
 }
 
+/**
+ * Applies per-instance config to a freshly-fetched [HabitWidgetData]:
+ *
+ *  - If [WidgetConfigDataStore.HabitStreakConfig.selectedHabitIds] is non-empty,
+ *    keep only those habits (preserving the user-picked order).
+ *  - Cap to [WidgetConfigDataStore.HabitStreakConfig.maxItems].
+ *  - Recompute `longestStreak` over the visible subset so the header pill
+ *    reflects what the user actually sees, not the full active list.
+ */
+internal fun applyConfig(
+    data: HabitWidgetData,
+    config: WidgetConfigDataStore.HabitStreakConfig
+): HabitWidgetData {
+    val filtered = if (config.selectedHabitIds.isNotEmpty()) {
+        val byId = data.habits.associateBy { it.id }
+        config.selectedHabitIds.mapNotNull { byId[it] }
+    } else {
+        data.habits
+    }.take(config.maxItems)
+    val longest = filtered.maxOfOrNull { it.streak } ?: 0
+    return data.copy(habits = filtered, longestStreak = longest)
+}
+
 @Composable
 private fun HabitStreakContent(
     context: Context,
     data: HabitWidgetData,
+    config: WidgetConfigDataStore.HabitStreakConfig,
     size: DpSize,
     palette: WidgetThemePalette
 ) {
@@ -75,13 +106,17 @@ private fun HabitStreakContent(
     }
     val completedToday = data.habits.count { it.isCompletedToday }
     val totalHabits = data.habits.size
+    // `layoutGrid = false` (the default) is the original 2-column card grid; `true`
+    // forces the single-column compact row list even at medium / large widths so
+    // users who prefer a denser checkbox feed can opt in regardless of size bucket.
+    val useRowLayout = isSmall || config.layoutGrid
 
     WidgetScaffold(
         palette = palette,
         isLarge = isLarge,
         title = "Habits",
         headerAction = actionStartActivity(habitsIntent),
-        headerTrailing = if (data.longestStreak > 0) {
+        headerTrailing = if (config.showStreakCount && data.longestStreak > 0) {
             {
                 Text(
                     text = "🔥 ${data.longestStreak} day${if (data.longestStreak != 1) "s" else ""}",
@@ -96,7 +131,7 @@ private fun HabitStreakContent(
     ) {
         if (totalHabits > 0) {
             Text(
-                text = "$completedToday of $totalHabits done today",
+                text = "$completedToday Of $totalHabits Done Today",
                 style = WidgetTextStyles.badge(palette.onSurfaceVariant)
             )
         }
@@ -107,13 +142,14 @@ private fun HabitStreakContent(
                 message = "No Habits Yet",
                 palette = palette
             )
-        } else if (isSmall) {
-            data.habits.take(3).forEach { habit ->
-                SmallHabitRow(habit, palette)
+        } else if (useRowLayout) {
+            val rowCap = if (isLarge) config.maxItems else minOf(config.maxItems, if (isSmall) 3 else 6)
+            data.habits.take(rowCap).forEach { habit ->
+                SmallHabitRow(habit, palette, showStreak = config.showStreakCount)
                 Spacer(modifier = GlanceModifier.height(4.dp))
             }
         } else {
-            val maxHabits = if (isLarge) minOf(data.habits.size, 16) else 6
+            val maxHabits = if (isLarge) minOf(data.habits.size, config.maxItems) else minOf(config.maxItems, 6)
             val maxRows = if (isLarge) 8 else 3
             data.habits.take(maxHabits).chunked(2).take(maxRows).forEach { pair ->
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
@@ -121,7 +157,13 @@ private fun HabitStreakContent(
                         if (index > 0) {
                             Spacer(modifier = GlanceModifier.width(6.dp))
                         }
-                        HabitCell(habit, palette = palette, showWeeklyDots = isLarge, modifier = GlanceModifier.defaultWeight())
+                        HabitCell(
+                            habit = habit,
+                            palette = palette,
+                            showWeeklyDots = isLarge,
+                            showStreak = config.showStreakCount,
+                            modifier = GlanceModifier.defaultWeight()
+                        )
                     }
                     if (pair.size == 1) {
                         Spacer(modifier = GlanceModifier.defaultWeight())
@@ -141,7 +183,11 @@ private fun HabitStreakContent(
 }
 
 @Composable
-private fun SmallHabitRow(habit: HabitWidgetItem, palette: WidgetThemePalette) {
+private fun SmallHabitRow(
+    habit: HabitWidgetItem,
+    palette: WidgetThemePalette,
+    showStreak: Boolean
+) {
     Row(
         modifier = GlanceModifier.fillMaxWidth().clickable(
             actionRunCallback<ToggleHabitFromWidgetAction>(parameters = habitIdParams(habit.id))
@@ -156,6 +202,15 @@ private fun SmallHabitRow(habit: HabitWidgetItem, palette: WidgetThemePalette) {
             maxLines = 1,
             modifier = GlanceModifier.defaultWeight()
         )
+        if (showStreak && habit.streak > 0) {
+            Text(
+                text = "🔥 ${habit.streak}",
+                style = WidgetTextStyles.badgeBold(
+                    if (habit.isCompletedToday) palette.streakFire else palette.onSurfaceVariant
+                )
+            )
+            Spacer(modifier = GlanceModifier.width(6.dp))
+        }
         Text(
             text = if (habit.isCompletedToday) "✅" else "○",
             style = TextStyle(
@@ -171,6 +226,7 @@ private fun HabitCell(
     habit: HabitWidgetItem,
     palette: WidgetThemePalette,
     showWeeklyDots: Boolean,
+    showStreak: Boolean,
     modifier: GlanceModifier
 ) {
     val tint = if (habit.isCompletedToday) palette.habitCompleteBg else palette.surfaceVariant
@@ -191,7 +247,7 @@ private fun HabitCell(
                         style = WidgetTextStyles.captionMedium(palette.onSurface),
                         maxLines = 1
                     )
-                    if (habit.streak > 0) {
+                    if (showStreak && habit.streak > 0) {
                         Text(
                             text = "🔥 ${habit.streak}",
                             style = TextStyle(fontSize = 9.sp, color = palette.streakFire)
