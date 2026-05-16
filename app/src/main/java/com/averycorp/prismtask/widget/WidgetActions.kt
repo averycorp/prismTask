@@ -21,6 +21,8 @@ object WidgetActionKeys {
         ActionParameters.Key("prismtask-widget-task-id")
     val HABIT_ID: ActionParameters.Key<Long> =
         ActionParameters.Key("prismtask-widget-habit-id")
+    val MEDICATION_SLOT_ID: ActionParameters.Key<Long> =
+        ActionParameters.Key("prismtask-widget-medication-slot-id")
 
     /**
      * One of [TIMER_CONTROL_PAUSE], [TIMER_CONTROL_RESUME], or
@@ -186,12 +188,44 @@ class TimerStartFromWidgetAction : ActionCallback {
     }
 }
 
+/**
+ * Logs one outstanding dose against the slot the user tapped on
+ * [MedicationWidget]. Mirrors the in-app "mark slot taken" affordance: every
+ * active medication wired to the slot that does not yet have a non-synthetic
+ * dose on today's local date receives a fresh dose row. Idempotent — tapping
+ * a fully-filled slot is a no-op (the inner provider filters by remaining
+ * count), and the widget refresh is dispatched regardless so a stale snapshot
+ * gets cleared. Failures are swallowed because the widget is a fire-and-
+ * forget surface — surfacing an error here would just leave a stuck tile.
+ */
+class MarkDoseTakenFromWidgetAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val slotId = parameters[WidgetActionKeys.MEDICATION_SLOT_ID] ?: return
+        try {
+            WidgetDataProvider.markMedicationSlotTaken(context, slotId)
+        } catch (_: Exception) {
+            // fail silently — widget will redraw on next refresh
+        }
+        try {
+            MedicationWidget().updateAll(context)
+        } catch (_: Exception) {
+        }
+    }
+}
+
 /** Helper for call sites that need to build a parameter bundle inline. */
 fun taskIdParams(taskId: Long): ActionParameters =
     actionParametersOf(WidgetActionKeys.TASK_ID to taskId)
 
 fun habitIdParams(habitId: Long): ActionParameters =
     actionParametersOf(WidgetActionKeys.HABIT_ID to habitId)
+
+fun medicationSlotIdParams(slotId: Long): ActionParameters =
+    actionParametersOf(WidgetActionKeys.MEDICATION_SLOT_ID to slotId)
 
 fun timerControlParams(control: String): ActionParameters =
     actionParametersOf(WidgetActionKeys.TIMER_CONTROL to control)
