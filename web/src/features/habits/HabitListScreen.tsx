@@ -29,6 +29,7 @@ import {
   type PendingBuiltInUpdate,
 } from '@/utils/builtInHabitReconciler';
 import { HabitBookingDialog } from './HabitBookingDialog';
+import { HabitLogDialog } from '@/components/HabitLogDialog';
 import { isRecurringFrequency, type Habit } from '@/types/habit';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -71,6 +72,10 @@ export function HabitListScreen() {
   // card context menu so Android-bookable habits get a quick-log path
   // without diving into analytics first.
   const [bookingHabit, setBookingHabit] = useState<Habit | null>(null);
+  // Log-entry dialog target — non-bookable habits (parity unit 14)
+  // get a "Log Entry" context-menu item instead of "Book Activity",
+  // mirroring Android's `HabitLogDialog` quick-log flow.
+  const [logHabit, setLogHabit] = useState<Habit | null>(null);
 
   // Built-in habit template-version detector (parity B.4). `dismissalTick`
   // bumps after a localStorage dismissal so the memoized list refreshes
@@ -324,6 +329,9 @@ export function HabitListScreen() {
             onBookActivity={
               habit.is_bookable ? () => setBookingHabit(habit) : undefined
             }
+            onLogEntry={
+              habit.is_bookable ? undefined : () => setLogHabit(habit)
+            }
           />
         ))}
       </div>
@@ -344,6 +352,14 @@ export function HabitListScreen() {
         <HabitBookingDialog
           habit={bookingHabit}
           onClose={() => setBookingHabit(null)}
+        />
+      )}
+
+      {/* Log-entry dialog for ordinary habits — parity unit 14. */}
+      {logHabit && (
+        <HabitLogDialog
+          habit={logHabit}
+          onClose={() => setLogHabit(null)}
         />
       )}
 
@@ -375,6 +391,7 @@ function HabitCard({
   onViewAnalytics,
   onViewHistory,
   onBookActivity,
+  onLogEntry,
 }: {
   habit: Habit;
   streakData: ReturnType<typeof useHabitStore.getState>['getStreakData'] extends (
@@ -392,6 +409,8 @@ function HabitCard({
   onViewHistory: () => void;
   /** Only set for `is_bookable` habits — parity § B.3b. */
   onBookActivity?: () => void;
+  /** Only set for non-bookable habits — parity unit 14. */
+  onLogEntry?: () => void;
 }) {
   const currentStreak = streakData?.currentStreak ?? 0;
   const activeDays = parseActiveDays(habit.active_days_json);
@@ -534,7 +553,7 @@ function HabitCard({
                 },
                 {
                   key: 'history',
-                  label: 'Show History',
+                  label: 'Logs',
                   icon: <BookOpen className="h-4 w-4" />,
                   onClick: onViewHistory,
                 },
@@ -542,9 +561,19 @@ function HabitCard({
                   ? [
                       {
                         key: 'book',
-                        label: 'Book Activity',
+                        label: 'Book Habit',
                         icon: <PlusCircle className="h-4 w-4" />,
                         onClick: onBookActivity,
+                      },
+                    ]
+                  : []),
+                ...(onLogEntry
+                  ? [
+                      {
+                        key: 'log',
+                        label: 'Log Entry',
+                        icon: <PlusCircle className="h-4 w-4" />,
+                        onClick: onLogEntry,
                       },
                     ]
                   : []),
