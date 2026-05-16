@@ -66,7 +66,8 @@ constructor(
     private val voiceCommandParser: VoiceCommandParser,
     private val tts: TextToSpeechManager,
     private val voicePreferences: VoicePreferences,
-    private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+    private val advancedTuningPreferences: com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences,
+    taskBehaviorPreferences: com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 ) : ViewModel() {
 
     /**
@@ -77,6 +78,23 @@ constructor(
         advancedTuningPreferences.getQuickAddRows()
             .map { it.maxLines }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 5)
+
+    /**
+     * Live cap on quick-add input length, sourced from Settings → Global
+     * Defaults. We cap the raw typed input (not the parsed title) because the
+     * NLP parser strips tags / dates / priority into separate fields, so the
+     * resolved title is always shorter than the raw input — capping the raw
+     * input at the title length keeps the result well within the cap.
+     */
+    val titleLengthLimit: StateFlow<com.averycorp.prismtask.data.preferences.TitleLengthLimit> =
+        taskBehaviorPreferences.getTitleLengthLimit()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.TitleLengthLimit(
+                    com.averycorp.prismtask.data.preferences.TitleLengthLimit.DEFAULT_LIMIT
+                )
+            )
 
     /**
      * List of candidate templates shown in the disambiguation popup when a
@@ -194,7 +212,8 @@ constructor(
     }
 
     fun onInputChanged(text: String) {
-        inputText.value = text
+        inputText.value = com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer
+            .enforce(text, titleLengthLimit.value.limit)
     }
 
     fun onToggleExpand() {

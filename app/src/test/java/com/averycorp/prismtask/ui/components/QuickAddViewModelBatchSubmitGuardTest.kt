@@ -4,6 +4,8 @@ import app.cash.turbine.test
 import com.averycorp.prismtask.data.local.dao.UsageLogDao
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.QuickAddRows
+import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.TitleLengthLimit
 import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
@@ -71,6 +73,7 @@ class QuickAddViewModelBatchSubmitGuardTest {
     private lateinit var tts: TextToSpeechManager
     private lateinit var voicePreferences: VoicePreferences
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
+    private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
 
     @Before
     fun setUp() {
@@ -89,6 +92,7 @@ class QuickAddViewModelBatchSubmitGuardTest {
         tts = mockk(relaxed = true)
         voicePreferences = mockk(relaxed = true)
         advancedTuningPreferences = mockk(relaxed = true)
+        taskBehaviorPreferences = mockk(relaxed = true)
 
         // Init-block dependencies — these flows must be cold-emittable
         // so the VM's `init { viewModelScope.launch { collect } }` doesn't
@@ -101,6 +105,8 @@ class QuickAddViewModelBatchSubmitGuardTest {
             flowOf(QuickAddRows())
         every { advancedTuningPreferences.getLifeCategoryCustomKeywords() } returns
             flowOf(com.averycorp.prismtask.data.preferences.LifeCategoryCustomKeywords())
+        every { taskBehaviorPreferences.getTitleLengthLimit() } returns
+            flowOf(TitleLengthLimit(TitleLengthLimit.DEFAULT_LIMIT))
 
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_BATCH_OPS) } returns true
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_NLP) } returns true
@@ -290,6 +296,7 @@ class QuickAddViewModelBatchSubmitGuardTest {
         voiceCommandParser = voiceCommandParser,
         tts = tts,
         voicePreferences = voicePreferences,
-        advancedTuningPreferences = advancedTuningPreferences
+        advancedTuningPreferences = advancedTuningPreferences,
+        taskBehaviorPreferences = taskBehaviorPreferences
     )
 }

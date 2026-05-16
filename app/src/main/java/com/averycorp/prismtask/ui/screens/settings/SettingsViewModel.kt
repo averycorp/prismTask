@@ -532,6 +532,28 @@ constructor(
         }
     }
 
+    /**
+     * User-configurable cap on task / subtask title length. `limit == null`
+     * means the user disabled the cap via the "No limit" toggle.
+     */
+    val titleLengthLimit: StateFlow<com.averycorp.prismtask.data.preferences.TitleLengthLimit> =
+        taskBehaviorPreferences.getTitleLengthLimit()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.TitleLengthLimit(
+                    com.averycorp.prismtask.data.preferences.TitleLengthLimit.DEFAULT_LIMIT
+                )
+            )
+
+    fun setMaxTaskTitleLength(value: Int) {
+        viewModelScope.launch { taskBehaviorPreferences.setMaxTaskTitleLength(value) }
+    }
+
+    fun setMaxTaskTitleLengthEnabled(enabled: Boolean) {
+        viewModelScope.launch { taskBehaviorPreferences.setMaxTaskTitleLengthEnabled(enabled) }
+    }
+
     fun setSmartDefaultsEnabled(enabled: Boolean) {
         viewModelScope.launch { userPreferencesDataStore.setSmartDefaultsEnabled(enabled) }
     }

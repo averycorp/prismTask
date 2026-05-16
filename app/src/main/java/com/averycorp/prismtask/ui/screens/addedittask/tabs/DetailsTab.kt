@@ -489,6 +489,7 @@ internal fun SubtasksInlineSection(viewModel: AddEditTaskViewModel) {
     val subtasks = viewModel.pendingSubtasks
     var newText by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    val titleLengthLimit by viewModel.titleLengthLimit.collectAsStateWithLifecycle()
 
     val sorted = subtasks.sortedBy { it.isCompleted }
     val completed = subtasks.count { it.isCompleted }
@@ -534,11 +535,22 @@ internal fun SubtasksInlineSection(viewModel: AddEditTaskViewModel) {
 
         OutlinedTextField(
             value = newText,
-            onValueChange = { newText = it },
+            onValueChange = { input ->
+                newText = com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer
+                    .enforce(input, titleLengthLimit.limit)
+            },
             placeholder = { Text("Add Subtask\u2026") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { submit() }),
+            supportingText = if (
+                com.averycorp.prismtask.domain.usecase.TitleLengthEnforcer
+                    .shouldShowCounter(newText.length, titleLengthLimit.limit)
+            ) {
+                { Text("${newText.length} / ${titleLengthLimit.limit}") }
+            } else {
+                null
+            },
             trailingIcon = {
                 IconButton(onClick = submit) {
                     Icon(
