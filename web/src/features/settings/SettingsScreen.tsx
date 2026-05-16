@@ -60,14 +60,10 @@ import { AdvancedTuningSection } from '@/features/settings/sections/AdvancedTuni
 import { AiFeaturesSection } from '@/features/settings/sections/AiFeaturesSection';
 import { DebugSection } from '@/features/settings/sections/DebugSection';
 import { DeleteAccountSection } from '@/features/settings/sections/DeleteAccountSection';
+import { NotificationsHub } from '@/features/settings/sections/Notifications/NotificationsHub';
 import { THEME_ORDER, THEMES, type ThemeKey } from '@/theme/themes';
 import { exportJson, exportCsv } from '@/utils/export';
 import { parseImportFile, importData } from '@/utils/import';
-import {
-  isNotificationSupported,
-  requestNotificationPermission,
-  getNotificationPermission,
-} from '@/utils/notifications';
 import type { ImportPreview } from '@/utils/import';
 
 function SettingsSection({
@@ -714,54 +710,16 @@ export function SettingsScreen() {
         </div>
       </SettingsSection>
 
-      {/* Notifications */}
+      {/* Notifications Hub — parity unit 20: profiles / sounds /
+          vibration / quiet hours / escalation (mirrors Android's
+          notifications sub-screens). The legacy browser-permission
+          toggle lives inside the hub so the existing capability isn't
+          lost. */}
       <SettingsSection
         icon={<Bell className="h-5 w-5 text-[var(--color-accent)]" />}
         title="Notifications"
       >
-        {isNotificationSupported() ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                  Browser Notifications
-                </p>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  Get reminders for upcoming tasks
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={async () => {
-                  const perm = await requestNotificationPermission();
-                  if (perm === 'granted') {
-                    toast.success('Notifications enabled!');
-                  } else if (perm === 'denied') {
-                    toast.error('Notifications blocked. Please enable them in browser settings.');
-                  }
-                }}
-              >
-                {getNotificationPermission() === 'granted' ? (
-                  <>
-                    <Check className="h-3.5 w-3.5" />
-                    Enabled
-                  </>
-                ) : (
-                  'Enable Notifications'
-                )}
-              </Button>
-            </div>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Note: Notifications only work while PrismTask is open in a browser tab.
-              For reliable reminders, install PrismTask as an app.
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Browser notifications are not supported in this browser.
-          </p>
-        )}
+        <NotificationsHub />
       </SettingsSection>
 
       {/* Install App */}
