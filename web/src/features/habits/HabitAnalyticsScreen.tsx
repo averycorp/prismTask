@@ -7,6 +7,8 @@ import {
   Target,
   Hash,
   Pencil,
+  Activity,
+  Battery,
 } from 'lucide-react';
 import {
   format,
@@ -34,15 +36,20 @@ import {
   Cell,
 } from 'recharts';
 import { useHabitStore } from '@/stores/habitStore';
-import { buildCompletionGrid } from '@/utils/streaks';
+import { useMoodEnergyLogsStore } from '@/stores/moodEnergyLogsStore';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { ContributionGrid } from '@/components/ContributionGrid';
+import {
+  correlateMoodWithHabit,
+  correlateEnergyWithHabit,
+  interpretCorrelation,
+  type HabitMoodCorrelation,
+} from '@/lib/moodCorrelationEngine';
 import { HabitModal } from './HabitModal';
-import type { HabitCompletion } from '@/types/habit';
+import type { HabitCompletion, Habit } from '@/types/habit';
+import type { MoodEnergyLog } from '@/api/firestore/moodEnergyLogs';
 import type { StreakData } from '@/utils/streaks';
-
-const DAY_NAMES_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function HabitAnalyticsScreen() {
   const { id } = useParams<{ id: string }>();
@@ -56,6 +63,10 @@ export function HabitAnalyticsScreen() {
     fetchCompletionsForHabit,
     getStreakData,
   } = useHabitStore();
+  // Zustand v5: select the array directly so the reference is stable
+  // until the listener replaces it. (No fresh-object selectors —
+  // PR #1521 lesson.)
+  const moodLogs = useMoodEnergyLogsStore((s) => s.logs);
 
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
@@ -157,9 +168,21 @@ export function HabitAnalyticsScreen() {
 
       {/* Contribution Grid */}
       <ContributionGrid
-        completions={habitCompletions}
+        completions={habitCompletions.map((c) => ({
+          date: c.date,
+          count: c.count,
+        }))}
         habitColor={habitColor}
         maxCount={habit.target_count}
+        weeks={12}
+        title="Contributions"
+      />
+
+      {/* Mood / Energy Correlation */}
+      <MoodCorrelationCards
+        habit={habit}
+        habitCompletions={habitCompletions}
+        moodLogs={moodLogs}
       />
 
       {/* Charts Row */}
@@ -260,136 +283,119 @@ function StatCards({
   );
 }
 
-// Contribution Grid (GitHub-style heatmap)
-function ContributionGrid({
-  completions,
-  habitColor,
-  maxCount,
+// Mood / Energy Correlation Cards (parity unit 16/23)
+function MoodCorrelationCards({
+  habit,
+  habitCompletions,
+  moodLogs,
 }: {
-  completions: HabitCompletion[];
-  habitColor: string;
-  maxCount: number;
+  habit: Habit;
+  habitCompletions: HabitCompletion[];
+  moodLogs: MoodEnergyLog[];
 }) {
-  const grid = useMemo(
-    () =>
-      buildCompletionGrid(
-        completions.map((c) => ({ date: c.date, count: c.count })),
-        84,
-      ),
-    [completions],
+  const mood = useMemo(
+    () => correlateMoodWithHabit(habitCompletions, moodLogs),
+    [habitCompletions, moodLogs],
+  );
+  const energy = useMemo(
+    () => correlateEnergyWithHabit(habitCompletions, moodLogs),
+    [habitCompletions, moodLogs],
   );
 
-  // Build 12 columns x 7 rows (weeks x days)
-  const today = new Date();
-  const startDate = subDays(today, 83);
-
-  // Find the Monday on or before startDate
-  const startDow = getDay(startDate);
-  const adjustedStart = subDays(startDate, startDow === 0 ? 6 : startDow - 1);
-
-  const weeks: { date: Date; dateStr: string; count: number }[][] = [];
-  let current = adjustedStart;
-  while (current <= today || weeks.length < 12) {
-    const week: { date: Date; dateStr: string; count: number }[] = [];
-    for (let d = 0; d < 7; d++) {
-      const dateStr = format(current, 'yyyy-MM-dd');
-      week.push({
-        date: new Date(current),
-        dateStr,
-        count: grid.get(dateStr) || 0,
-      });
-      current = new Date(current.getTime() + 86400000);
-    }
-    weeks.push(week);
-    if (weeks.length >= 12 && current > today) break;
-  }
-
-  // Only take up to 12 weeks
-  const displayWeeks = weeks.slice(-12);
-
-  // Month labels
-  const monthLabels: { label: string; col: number }[] = [];
-  let lastMonth = -1;
-  displayWeeks.forEach((week, idx) => {
-    const monthNum = week[0].date.getMonth();
-    if (monthNum !== lastMonth) {
-      monthLabels.push({ label: format(week[0].date, 'MMM'), col: idx });
-      lastMonth = monthNum;
-    }
-  });
-
-  function getCellColor(count: number): string {
-    if (count === 0) return 'var(--color-bg-secondary)';
-    const intensity = Math.min(count / Math.max(maxCount, 1), 1);
-    if (intensity <= 0.25) return habitColor + '40';
-    if (intensity <= 0.5) return habitColor + '70';
-    if (intensity <= 0.75) return habitColor + 'A0';
-    return habitColor;
+  if (!mood && !energy) {
+    return (
+      <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+        <h3 className="mb-1 text-sm font-semibold text-[var(--color-text-primary)]">
+          Mood &amp; Energy Correlation
+        </h3>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Log mood at least 5 days to see how {habit.name} relates to how
+          you feel.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
-      <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
-        Activity
-      </h3>
-      <div className="overflow-x-auto">
-        <div className="inline-flex flex-col gap-1">
-          {/* Month labels */}
-          <div className="flex gap-1 pl-8">
-            {monthLabels.map((m, i) => (
-              <div
-                key={i}
-                className="text-xs text-[var(--color-text-secondary)]"
-                style={{
-                  marginLeft: i === 0 ? m.col * 16 : undefined,
-                  width: i < monthLabels.length - 1
-                    ? (monthLabels[i + 1].col - m.col) * 16
-                    : undefined,
-                }}
-              >
-                {m.label}
-              </div>
-            ))}
-          </div>
+    <div className="mt-6 grid gap-4 md:grid-cols-2">
+      {mood && (
+        <CorrelationCard
+          title="Mood Correlation"
+          icon={<Activity className="h-5 w-5" />}
+          accent="#a855f7"
+          result={mood}
+          signal="mood"
+          habitName={habit.name}
+        />
+      )}
+      {energy && (
+        <CorrelationCard
+          title="Energy Correlation"
+          icon={<Battery className="h-5 w-5" />}
+          accent="#eab308"
+          result={energy}
+          signal="energy"
+          habitName={habit.name}
+        />
+      )}
+    </div>
+  );
+}
 
-          {/* Grid rows */}
-          {[0, 1, 2, 3, 4, 5, 6].map((dayIdx) => (
-            <div key={dayIdx} className="flex items-center gap-1">
-              <span className="w-6 text-right text-xs text-[var(--color-text-secondary)]">
-                {dayIdx % 2 === 0 ? DAY_NAMES_SHORT[dayIdx] : ''}
-              </span>
-              <div className="flex gap-1">
-                {displayWeeks.map((week, weekIdx) => {
-                  const cell = week[dayIdx];
-                  if (!cell || cell.date > today) {
-                    return (
-                      <div
-                        key={weekIdx}
-                        className="h-3 w-3 rounded-sm"
-                        style={{ backgroundColor: 'transparent' }}
-                      />
-                    );
-                  }
-                  return (
-                    <Tooltip
-                      key={weekIdx}
-                      content={`${format(cell.date, 'MMM d, yyyy')}: ${cell.count} completion${cell.count !== 1 ? 's' : ''}`}
-                      delay={100}
-                    >
-                      <div
-                        className="h-3 w-3 rounded-sm transition-colors"
-                        style={{
-                          backgroundColor: getCellColor(cell.count),
-                        }}
-                      />
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+function CorrelationCard({
+  title,
+  icon,
+  accent,
+  result,
+  signal,
+  habitName,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  accent: string;
+  result: HabitMoodCorrelation;
+  signal: 'mood' | 'energy';
+  habitName: string;
+}) {
+  const interpretation = interpretCorrelation(result.r);
+  const verbal = (() => {
+    if (interpretation === 'no relationship') {
+      return `${habitName} doesn't appear to move with your ${signal} on log days.`;
+    }
+    const dir = result.r >= 0 ? 'higher' : 'lower';
+    return `Your ${signal} tends to be ${dir} on days you did ${habitName} (${interpretation}).`;
+  })();
+  const pLabel =
+    result.p < 0.001
+      ? '< 0.001'
+      : result.p < 0.01
+        ? '< 0.01'
+        : result.p.toFixed(3);
+
+  return (
+    <div
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4"
+      data-testid={`correlation-card-${signal}`}
+    >
+      <div className="mb-2 flex items-center gap-2" style={{ color: accent }}>
+        {icon}
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          {title}
+        </h3>
       </div>
+      <p
+        className="text-3xl font-bold text-[var(--color-text-primary)]"
+        data-testid={`correlation-r-${signal}`}
+      >
+        {result.r >= 0 ? '+' : ''}
+        {result.r.toFixed(2)}
+      </p>
+      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+        n = {result.n} · p = {pLabel}
+      </p>
+      <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+        {verbal}
+      </p>
     </div>
   );
 }
