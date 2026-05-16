@@ -76,10 +76,23 @@ export function HabitListScreen() {
   // bumps after a localStorage dismissal so the memoized list refreshes
   // without forcing a full habit re-fetch.
   const [dismissalTick, setDismissalTick] = useState(0);
+
+  // Hide archived habits from the list to match Android's
+  // `HabitDao.getActiveHabits()` (`WHERE is_archived = 0`). Without this
+  // filter, habits archived on the phone leak through to web as "extras"
+  // because `firestoreHabits.getHabits` returns every habit doc, and the
+  // mapper computes `is_active = !data.isArchived` but no consumer here
+  // was honouring it. The Today screen + `getTodayProgress` already
+  // filter on `is_active`; only this Habits list was missing it.
+  const activeHabits = useMemo(
+    () => habits.filter((h) => h.is_active),
+    [habits],
+  );
+
   const pendingUpdates = useMemo<PendingBuiltInUpdate[]>(
-    () => findPendingUpdates(habits),
+    () => findPendingUpdates(activeHabits),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits, dismissalTick],
+    [activeHabits, dismissalTick],
   );
   const handleDismissUpdate = useCallback(
     (templateKey: string, version: number) => {
@@ -146,15 +159,15 @@ export function HabitListScreen() {
   // stable across re-renders when neither input changes.
   const filteredHabits = useMemo(
     () =>
-      habits.filter((h) =>
+      activeHabits.filter((h) =>
         filter === 'daily'
           ? h.frequency === 'daily'
           : isRecurringFrequency(h.frequency),
       ),
-    [habits, filter],
+    [activeHabits, filter],
   );
 
-  if (isLoading && habits.length === 0) {
+  if (isLoading && activeHabits.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
@@ -235,7 +248,7 @@ export function HabitListScreen() {
           control at `HabitListScreen.kt:171-186`. Hidden when there are
           no habits at all (the empty state already CTA's the user to
           create one). */}
-      {habits.length > 0 && (
+      {activeHabits.length > 0 && (
         <div
           className="mb-4 inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1"
           role="tablist"
@@ -263,7 +276,7 @@ export function HabitListScreen() {
       {/* Empty States — distinct copy for "no habits at all" vs "no
           habits in the current filter bucket". Mirrors Android's empty
           state at `HabitListScreen.kt:188-207`. */}
-      {habits.length === 0 ? (
+      {activeHabits.length === 0 ? (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
           <EmptyState
             icon={<Activity className="h-8 w-8" />}
