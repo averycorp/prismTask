@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat(widgets): 13-PR design + functionality sweep across every
+  home-screen widget, paired with the `WIDGETS_ENABLED=true` re-enable
+  from PR #1527. Each widget was audited against a shared rubric
+  (palette via `loadWidgetPalette`, `WidgetScaffold` + `WidgetTextStyles`
+  shell, `SizeMode.Responsive` buckets where layout benefits,
+  `WidgetLoadingState` / `WidgetEmptyState` parity, real data via
+  `WidgetDataProvider`, refresh dispatch through `WidgetUpdateManager`,
+  deep links via the `WidgetLaunchAction` sealed shape, `onDeleted`
+  config cleanup) and any gaps shipped as a dedicated per-widget PR.
+  Highlights: TodayWidget (#1539) and HabitStreakWidget (#1538) got the
+  missing per-instance config Activities so persisted config is no
+  longer inert; EisenhowerWidget (#1531) gained per-quadrant
+  complete-top-task on LARGE size buckets (resolves the deferral in
+  `docs/audits/WIDGET_TAB_PARITY_AUDIT.md` § 2.2); MedicationWidget
+  (#1533) added `MarkDoseTakenFromWidgetAction` + a refill-warning
+  badge; UpcomingWidget (#1529) added Today / Tomorrow / This Week
+  section grouping with palette-styled headers; StreakCalendarWidget
+  (#1536) added per-cell date deep-link and pinned the "longest streak
+  was not 18" regression; StatsSparklineWidget (#1528) added an
+  `ACTION_OPEN_INSIGHTS` deep link and guarded the zero-day bar
+  rendering; CalendarWidget (#1530), QuickAddWidget (#1534),
+  FocusWidget (#1540), InboxWidget (#1532), ProductivityWidget (#1535),
+  and ProjectWidget (#1541) all received WidgetScaffold migration +
+  empty-state branches + a JVM render test matching
+  `CalendarWidgetTest.kt`'s pattern. Every PR added a Robolectric /
+  pure-Kotlin widget test that asserts on the rendered tree and the
+  click intents' `EXTRA_LAUNCH_ACTION` payload, so future widget
+  edits can't silently regress the wire contract. The Timer widget's
+  foreground-service work was already on `main` via PR #1194; no
+  duplicate work shipped for it in this batch.
 - feat(web/streaks): mode-aware forgiveness window — wider grace for
   Play / Relax (`docs/WORK_PLAY_RELAX.md` § *Streak strictness*).
   `ForgivenessConfig` now optionally carries a `byMode` field with
