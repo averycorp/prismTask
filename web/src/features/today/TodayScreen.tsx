@@ -29,6 +29,8 @@ import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow'
 import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
 import { PlanForTodaySheet } from '@/features/today/PlanForTodaySheet';
+import { DoneCounterSheet } from '@/features/today/DoneCounterSheet';
+import { MorningCheckInBanner } from '@/features/today/MorningCheckInBanner';
 import { RestDayBanner } from '@/features/today/RestDayBanner';
 import { useRestDayStore } from '@/stores/restDayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -111,6 +113,7 @@ export function TodayScreen() {
   );
   const [editorOpen, setEditorOpen] = useState(false);
   const [planSheetOpen, setPlanSheetOpen] = useState(false);
+  const [doneSheetOpen, setDoneSheetOpen] = useState(false);
   // "Show blocked tasks" filter (parity B.12). Default false — mirrors
   // Android's blocked-task hide behaviour on the Today screen so users
   // aren't nagged about work they can't act on yet.
@@ -338,8 +341,21 @@ export function TodayScreen() {
         <span className="text-sm text-[var(--color-text-secondary)]">
           {format(parseISO(settingsStartOfDay.todayIso), 'EEEE, MMMM d')}
         </span>
+        {!isRestingToday && (
+          <button
+            type="button"
+            onClick={() => setPlanSheetOpen(true)}
+            className="ml-auto inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-bg-secondary)]"
+            aria-label="Plan Today"
+            data-testid="plan-today-button"
+          >
+            <Pin className="h-3.5 w-3.5 text-[var(--color-accent)]" />
+            Plan Today
+          </button>
+        )}
       </div>
 
+      <MorningCheckInBanner />
       <BoundaryTodayBanner />
       <TodayBalanceBar />
       <SelfCareNudgeCard />
@@ -402,6 +418,7 @@ export function TodayScreen() {
                 completedTasksToday={completedTasksToday}
                 habitProgress={habitProgress}
                 summary={summary}
+                onCounterClick={() => setDoneSheetOpen(true)}
               />
             );
           case 'daily_essentials':
@@ -604,6 +621,12 @@ export function TodayScreen() {
         onClose={() => setPlanSheetOpen(false)}
         todayIso={settingsStartOfDay.todayIso}
       />
+
+      {/* Done Counter Sheet — opened by tapping the progress counter */}
+      <DoneCounterSheet
+        isOpen={doneSheetOpen}
+        onClose={() => setDoneSheetOpen(false)}
+      />
     </div>
   );
 }
@@ -699,6 +722,7 @@ function ProgressSection({
   completedTasksToday,
   habitProgress,
   summary,
+  onCounterClick,
 }: {
   progressPct: number;
   completedToday: number;
@@ -706,6 +730,7 @@ function ProgressSection({
   completedTasksToday: number;
   habitProgress: { completed: number; total: number };
   summary: DashboardSummary | null;
+  onCounterClick: () => void;
 }) {
   return (
     <div className="mb-6 flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-4 py-3">
@@ -736,14 +761,20 @@ function ProgressSection({
         </span>
       </div>
       <div className="flex-1">
-        <p className="text-sm font-medium text-[var(--color-text-primary)]">
-          {completedToday} of {totalToday} completed today
+        <button
+          type="button"
+          onClick={onCounterClick}
+          className="text-left text-sm font-medium text-[var(--color-text-primary)] hover:underline focus:outline-none"
+          aria-label="Open Completed Today List"
+          data-testid="done-counter-button"
+        >
+          {completedToday} Of {totalToday} Completed Today
           {habitProgress.total > 0 && (
             <span className="text-[var(--color-text-secondary)]">
-              {' '}({completedTasksToday} tasks, {habitProgress.completed} habits)
+              {' '}({completedTasksToday} Tasks, {habitProgress.completed} Habits)
             </span>
           )}
-        </p>
+        </button>
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-bg-secondary)]">
           <div
             className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-500"
