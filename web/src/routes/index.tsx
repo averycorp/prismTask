@@ -56,6 +56,8 @@ const LeisurePoolScreen = lazy(() => import('@/features/leisure/LeisurePoolScree
 const SelfCareScreen = lazy(() => import('@/features/selfcare/SelfCareScreen').then(m => ({ default: m.SelfCareScreen })));
 const CheckInHistoryScreen = lazy(() => import('@/features/checkin/CheckInHistoryScreen').then(m => ({ default: m.CheckInHistoryScreen })));
 const WeeklyBalanceReportScreen = lazy(() => import('@/features/balance/WeeklyBalanceReportScreen').then(m => ({ default: m.WeeklyBalanceReportScreen })));
+const BoundaryRulesListScreen = lazy(() => import('@/features/boundaries/BoundaryRulesListScreen').then(m => ({ default: m.BoundaryRulesListScreen })));
+const BoundaryRuleEditScreen = lazy(() => import('@/features/boundaries/BoundaryRuleEditScreen').then(m => ({ default: m.BoundaryRuleEditScreen })));
 
 function LazyRoute({ Component, fallback }: { Component: ComponentType; fallback?: React.ReactNode }) {
   return (
@@ -145,6 +147,9 @@ const routes: RouteObject[] = [
       { path: 'self-care', element: <LazyRoute Component={SelfCareScreen} /> },
       { path: 'checkin/history', element: <LazyRoute Component={CheckInHistoryScreen} /> },
       { path: 'balance/weekly-report', element: <LazyRoute Component={WeeklyBalanceReportScreen} /> },
+      { path: 'boundaries', element: <LazyRoute Component={BoundaryRulesListScreen} /> },
+      { path: 'boundaries/new', element: <LazyRoute Component={BoundaryRuleEditScreen} /> },
+      { path: 'boundaries/:id', element: <LazyRoute Component={BoundaryRuleEditScreen} /> },
     ],
   },
 

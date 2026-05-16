@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -111,6 +112,20 @@ export function BoundariesSection() {
         Declare limits on how you work — the enforcer checks them live
         from Today, and the burnout score reacts when they're crossed.
       </p>
+
+      <Link
+        to="/boundaries"
+        className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-bg-card)]"
+        data-testid="boundaries-manage-link"
+      >
+        <span className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          Manage Boundary Rules
+        </span>
+        <span className="text-xs text-[var(--color-text-secondary)]">
+          Open full editor
+        </span>
+      </Link>
 
       {rules.length === 0 ? (
         <p className="rounded-md border border-dashed border-[var(--color-border)] p-3 text-xs text-[var(--color-text-secondary)]">
