@@ -1,7 +1,8 @@
 # D5#2 — Medication Reminder Both-Mode S25 Runbook
 
-**Audit:** `docs/audits/MEDICATION_REMINDERS_BOTH_MODES_AUDIT.md` + this
-bundle's audit at `docs/audits/D5_D6_FINISH_BUNDLE_AUDIT.md` §2.
+**Audit:** `docs/audits/D5_D6_FINISH_BUNDLE_AUDIT.md` §2. (Original
+`MEDICATION_REMINDERS_BOTH_MODES_AUDIT.md` was shipped + retired in the
+docs cleanup sweep.)
 **Phase F gate:** YES — health data; silent reminder failure = missed
 dose.
 **Owner:** Avery (operator), on Samsung Galaxy S25 Ultra.
@@ -290,16 +291,17 @@ D5#2 → 1.0 when:
 - All P1 failures triaged: fix-and-redistribute OR documented as
   known-issues-at-kickoff.
 - Logcat captures saved to `~/test_runs/` for audit trail.
-- Append outcome to `docs/audits/MEDICATION_REMINDERS_BOTH_MODES_AUDIT.md`
-  under Phase 5 - Real-Device Verification.
+- Append outcome to `docs/audits/D5_D6_FINISH_BUNDLE_AUDIT.md` §2
+  (Phase 5 - Real-Device Verification block below). Original
+  `MEDICATION_REMINDERS_BOTH_MODES_AUDIT.md` was retired.
 
 D5#3 arms 2 + 4 → 1.0 in the same session (Tests 1, 2, 5, 6 cover
 arm 2 real-device E2E + arm 4 reminder-mode verification).
 
 ## Append-to-audit template
 
-After session, append to
-`docs/audits/MEDICATION_REMINDERS_BOTH_MODES_AUDIT.md`:
+After session, append to `docs/audits/D5_D6_FINISH_BUNDLE_AUDIT.md` §2
+(original `MEDICATION_REMINDERS_BOTH_MODES_AUDIT.md` was retired):
 
 ```markdown
 ## Phase 5 — Real-Device Verification (S25 Ultra, {date})
