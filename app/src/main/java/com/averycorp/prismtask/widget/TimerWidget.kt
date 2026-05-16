@@ -206,14 +206,16 @@ private fun TimerWidgetContent(
             }
             Spacer(modifier = GlanceModifier.height(6.dp))
 
-            // Pause/Resume + Stop. Routed through
-            // TimerControlFromWidgetAction → PomodoroTimerService so the
-            // running foreground service is the single source of truth.
-            // TimerViewModel observes the service's broadcasts and refreshes
-            // the widget DataStore, so the button state flips on the next
-            // tick.
+            // Pause/Resume + Stop + (mid-break) Skip. Each button routes
+            // directly to TimerForegroundService — the running foreground
+            // service is the single source of truth. TimerViewModel
+            // observes the service's broadcasts and refreshes the widget
+            // DataStore, so the button state flips on the next tick.
             TimerControlRow(
                 isPaused = state.isPaused,
+                sessionType = state.sessionType,
+                pomodoroEnabled = state.pomodoroEnabled,
+                isLarge = isLarge,
                 accentColor = accentColor,
                 palette = palette
             )
@@ -224,29 +226,43 @@ private fun TimerWidgetContent(
 @Composable
 private fun TimerControlRow(
     isPaused: Boolean,
+    sessionType: String,
+    pomodoroEnabled: Boolean,
+    isLarge: Boolean,
     accentColor: androidx.glance.unit.ColorProvider,
     palette: WidgetThemePalette
 ) {
+    val isBreak = sessionType == "break"
     Row(verticalAlignment = Alignment.CenterVertically) {
         TimerControlButton(
             label = if (isPaused) "▶ Resume" else "❚❚ Pause",
             background = accentColor,
             foreground = palette.onPrimary,
-            params = timerControlParams(
-                if (isPaused) {
-                    WidgetActionKeys.TIMER_CONTROL_RESUME
-                } else {
-                    WidgetActionKeys.TIMER_CONTROL_PAUSE
-                }
-            )
+            callback = if (isPaused) {
+                actionRunCallback<ResumeTimerAction>()
+            } else {
+                actionRunCallback<PauseTimerAction>()
+            }
         )
         Spacer(modifier = GlanceModifier.width(6.dp))
         TimerControlButton(
             label = "■ Stop",
             background = palette.surfaceVariant,
             foreground = palette.onSurfaceVariant,
-            params = timerControlParams(WidgetActionKeys.TIMER_CONTROL_STOP)
+            callback = actionRunCallback<StopTimerAction>()
         )
+        // Skip-break only makes sense mid-break with Pomodoro on. Hide
+        // it during focus sessions and in plain mode to keep the
+        // 120dp-wide small tile from overflowing.
+        if (isBreak && pomodoroEnabled && isLarge) {
+            Spacer(modifier = GlanceModifier.width(6.dp))
+            TimerControlButton(
+                label = "⏭ Skip",
+                background = palette.surfaceVariant,
+                foreground = palette.onSurfaceVariant,
+                callback = actionRunCallback<SkipBreakAction>()
+            )
+        }
     }
 }
 
@@ -255,18 +271,14 @@ private fun TimerControlButton(
     label: String,
     background: androidx.glance.unit.ColorProvider,
     foreground: androidx.glance.unit.ColorProvider,
-    params: androidx.glance.action.ActionParameters
+    callback: androidx.glance.action.Action
 ) {
     Box(
         modifier = GlanceModifier
             .cornerRadius(16.dp)
             .background(background)
             .padding(horizontal = 10.dp, vertical = 5.dp)
-            .clickable(
-                actionRunCallback<TimerControlFromWidgetAction>(
-                    parameters = params
-                )
-            )
+            .clickable(callback)
     ) {
         Text(
             text = label,

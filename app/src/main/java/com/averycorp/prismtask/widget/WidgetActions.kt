@@ -8,7 +8,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.updateAll
 import com.averycorp.prismtask.data.preferences.TimerPreferences
-import com.averycorp.prismtask.notifications.PomodoroTimerService
+import com.averycorp.prismtask.notifications.TimerForegroundService
 import kotlinx.coroutines.flow.first
 
 /**
@@ -21,18 +21,6 @@ object WidgetActionKeys {
         ActionParameters.Key("prismtask-widget-task-id")
     val HABIT_ID: ActionParameters.Key<Long> =
         ActionParameters.Key("prismtask-widget-habit-id")
-
-    /**
-     * One of [TIMER_CONTROL_PAUSE], [TIMER_CONTROL_RESUME], or
-     * [TIMER_CONTROL_STOP]. Read by [TimerControlFromWidgetAction] to pick
-     * the right [PomodoroTimerService] action to dispatch.
-     */
-    val TIMER_CONTROL: ActionParameters.Key<String> =
-        ActionParameters.Key("prismtask-widget-timer-control")
-
-    const val TIMER_CONTROL_PAUSE = "pause"
-    const val TIMER_CONTROL_RESUME = "resume"
-    const val TIMER_CONTROL_STOP = "stop"
 }
 
 /** Toggles a task's completion state from a widget checkbox tap. */
@@ -87,57 +75,109 @@ class ToggleHabitFromWidgetAction : ActionCallback {
 }
 
 /**
- * Routes Pause/Resume/Stop taps from [TimerWidget] to
- * [PomodoroTimerService]. The widget can't observe the new
- * service-driven timer state directly, but the service emits owner-tagged
- * broadcasts that `TimerViewModel` consumes; the next widget refresh
- * triggered by `TimerViewModel.syncWidgetState` then reflects the new
- * state. Failures are swallowed because the widget is a fire-and-forget
- * surface — surfacing an error here would just leave a stuck widget
- * tile.
+ * Pauses the running Timer countdown from [TimerWidget]. Dispatches an
+ * Intent targeting [TimerForegroundService] (the foreground service that
+ * owns the countdown) so the widget mutation can never be overwritten by
+ * a ViewModel sync race — the service is the single source of truth.
+ *
+ * The service emits [TimerForegroundService.ACTION_PAUSED] which
+ * [TimerWidget]'s DataStore reads, so the widget flips Pause -> Resume
+ * on the next refresh.
  */
-class TimerControlFromWidgetAction : ActionCallback {
+class PauseTimerAction : ActionCallback {
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val control = parameters[WidgetActionKeys.TIMER_CONTROL] ?: return
         try {
-            when (control) {
-                WidgetActionKeys.TIMER_CONTROL_PAUSE ->
-                    PomodoroTimerService.pause(context)
-                WidgetActionKeys.TIMER_CONTROL_RESUME ->
-                    PomodoroTimerService.resume(context)
-                WidgetActionKeys.TIMER_CONTROL_STOP ->
-                    PomodoroTimerService.stop(context)
-            }
+            TimerForegroundService.pause(context)
         } catch (_: Exception) {
             // Service may already be stopped, or we're in a context that
-            // can't dispatch start/startService (test harness, locked
-            // device early in boot, etc.). The next user-driven action
-            // will retry.
+            // can't dispatch startService (test harness, locked device
+            // early in boot, etc.). The next user-driven action will
+            // retry.
         }
     }
 }
 
 /**
- * Starts a fresh focus session from the [TimerWidget] without first opening
- * the app. Mirrors what `TimerViewModel.start()` does for an idle WORK
- * session: read the user's Pomodoro toggle + work duration + sessions-per-
- * cycle from [TimerPreferences], pre-write a running [TimerWidgetState] so
- * the widget flips out of "Ready to Focus" immediately, then hand off to
- * [PomodoroTimerService] as [PomodoroTimerService.OWNER_TIMER].
+ * Resumes the paused Timer countdown from [TimerWidget]. Same shape as
+ * [PauseTimerAction] — the service is authoritative and broadcasts
+ * [TimerForegroundService.ACTION_RESUMED] back for in-app sync.
+ */
+class ResumeTimerAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        try {
+            TimerForegroundService.resume(context)
+        } catch (_: Exception) {
+        }
+    }
+}
+
+/**
+ * Stops the Timer countdown from [TimerWidget]. The service tears
+ * itself down and broadcasts [TimerForegroundService.ACTION_STOPPED];
+ * the ViewModel resets in-app state to mirror [TimerViewModel.reset]
+ * and the widget snaps back to the idle "Ready to Focus" pill.
+ */
+class StopTimerAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        try {
+            TimerForegroundService.stop(context)
+        } catch (_: Exception) {
+        }
+    }
+}
+
+/**
+ * Skips the current break early from [TimerWidget]. Only meaningful
+ * mid-break — the service no-ops if the current session is a focus
+ * session, so a stray tap during work can't accidentally bail out.
  *
- * Pre-writing the structural fields (mode, session counts, pomodoro flag)
- * matters because the service's per-tick `pushWidgetRunState` only touches
- * the run flags + deadline; without this seed write the widget would render
- * an "isRunning" pill against stale structural fields from the last in-app
+ * The service broadcasts [TimerForegroundService.ACTION_SKIPPED] back
+ * to the ViewModel which advances the Pomodoro state machine to the
+ * next focus session.
+ */
+class SkipBreakAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        try {
+            TimerForegroundService.skipBreak(context)
+        } catch (_: Exception) {
+        }
+    }
+}
+
+/**
+ * Starts a fresh focus session from the [TimerWidget] without first
+ * opening the app. Mirrors what `TimerViewModel.start()` does for an
+ * idle WORK session: read the user's Pomodoro toggle + work duration +
+ * sessions-per-cycle from [TimerPreferences], pre-write a running
+ * [TimerWidgetState] so the widget flips out of "Ready to Focus"
+ * immediately, then hand off to [TimerForegroundService].
+ *
+ * Pre-writing the structural fields (mode, session counts, pomodoro
+ * flag) matters because the service's per-tick `pushWidgetRunState`
+ * only touches the run flags + deadline; without this seed write the
+ * widget would render an "isRunning" pill against stale structural
+ * fields from the last in-app session.
+ *
+ * When the user later opens the app, `TimerViewModel`'s broadcast
+ * receiver picks up the service's ACTION_TICK / ACTION_PAUSED /
+ * ACTION_COMPLETE stream and resyncs in-app UI to the widget-started
  * session.
- *
- * When the user later opens the app, `TimerViewModel`'s broadcast receiver
- * picks up the service's ACTION_TICK / ACTION_PAUSED / ACTION_COMPLETE
- * stream and resyncs in-app UI to the widget-started session.
  */
 class TimerStartFromWidgetAction : ActionCallback {
     override suspend fun onAction(
@@ -170,18 +210,19 @@ class TimerStartFromWidgetAction : ActionCallback {
             )
             TimerWidget().updateAll(context)
 
-            PomodoroTimerService.start(
+            TimerForegroundService.start(
                 context = context,
                 durationSeconds = workSeconds,
                 sessionIndex = 0,
-                sessionType = PomodoroTimerService.SESSION_TYPE_WORK,
-                owner = PomodoroTimerService.OWNER_TIMER
+                totalSessions = sessionsUntilLongBreak,
+                sessionType = TimerForegroundService.SESSION_TYPE_WORK,
+                isLongBreak = false
             )
         } catch (_: Exception) {
             // Test contexts (mocked Context, no DataStore disk) and edge
             // cases (locked device early in boot) may reject either the
-            // prefs read or the foreground service start. The widget will
-            // redraw on the next refresh; the user can retry.
+            // prefs read or the foreground service start. The widget
+            // will redraw on the next refresh; the user can retry.
         }
     }
 }
@@ -192,6 +233,3 @@ fun taskIdParams(taskId: Long): ActionParameters =
 
 fun habitIdParams(habitId: Long): ActionParameters =
     actionParametersOf(WidgetActionKeys.HABIT_ID to habitId)
-
-fun timerControlParams(control: String): ActionParameters =
-    actionParametersOf(WidgetActionKeys.TIMER_CONTROL to control)
