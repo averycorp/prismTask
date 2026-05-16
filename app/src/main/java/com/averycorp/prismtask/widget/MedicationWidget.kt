@@ -13,6 +13,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -66,8 +67,9 @@ class MedicationWidget : GlanceAppWidget() {
         } catch (_: Exception) {
             MedicationWidgetData(slots = emptyList(), totalDoses = 0, takenDoses = 0, nextSlotIndex = -1)
         }
+        val quietMode = WidgetDataProvider.getQuietMode(context)
         provideContent {
-            MedicationContent(context, LocalSize.current, palette, data)
+            MedicationContent(context, LocalSize.current, palette, data, quietMode)
         }
     }
 }
@@ -77,7 +79,8 @@ private fun MedicationContent(
     context: Context,
     size: DpSize,
     palette: WidgetThemePalette,
-    data: MedicationWidgetData
+    data: MedicationWidgetData,
+    quietMode: Boolean
 ) {
     val isSmall = size.height < 130.dp
     val openMeds = Intent(context, MainActivity::class.java).apply {
@@ -99,24 +102,31 @@ private fun MedicationContent(
             .clickable(actionStartActivity(openMeds))
     ) {
         when {
-            slots.isEmpty() -> EmptyMedicationView(palette)
+            slots.isEmpty() -> EmptyMedicationView(palette, quietMode)
             isSmall && nextSlot != null -> CompactNextDose(palette, nextSlot, takenDoses, totalDoses)
-            else -> FullDayView(palette, slots, takenDoses, totalDoses, nextSlot)
+            else -> FullDayView(palette, slots, takenDoses, totalDoses, nextSlot, data)
         }
     }
 }
 
 @Composable
-private fun ColumnScope.EmptyMedicationView(palette: WidgetThemePalette) {
+private fun ColumnScope.EmptyMedicationView(palette: WidgetThemePalette, quietMode: Boolean) {
     Text(
         text = WidgetTextStyles.headerLabel(palette, "Medication"),
         style = WidgetTextStyles.headerThemed(palette, palette.onSurface)
     )
     Spacer(modifier = GlanceModifier.height(8.dp))
-    Text(
-        text = "No medication slots yet",
-        style = WidgetTextStyles.caption(palette.onSurfaceVariant)
-    )
+    if (!quietMode) {
+        Text(
+            text = "Tap to set up your meds",
+            style = WidgetTextStyles.caption(palette.onSurfaceVariant)
+        )
+    } else {
+        Text(
+            text = "No medications configured",
+            style = WidgetTextStyles.caption(palette.onSurfaceVariant)
+        )
+    }
 }
 
 @Composable
@@ -167,7 +177,8 @@ private fun ColumnScope.FullDayView(
     slots: List<MedicationWidgetSlot>,
     takenDoses: Int,
     totalDoses: Int,
-    nextSlot: MedicationWidgetSlot?
+    nextSlot: MedicationWidgetSlot?,
+    data: MedicationWidgetData
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -187,10 +198,48 @@ private fun ColumnScope.FullDayView(
         color = palette.successColor,
         backgroundColor = palette.surfaceVariant
     )
+    if (data.hasRefillWarning) {
+        Spacer(modifier = GlanceModifier.height(6.dp))
+        RefillWarningRow(palette, data)
+    }
     Spacer(modifier = GlanceModifier.height(8.dp))
     slots.forEach { slot ->
         SlotRow(slot, palette, highlight = slot === nextSlot)
         Spacer(modifier = GlanceModifier.height(5.dp))
+    }
+}
+
+@Composable
+private fun RefillWarningRow(palette: WidgetThemePalette, data: MedicationWidgetData) {
+    val days = data.lowestRefillDaysRemaining ?: return
+    val name = data.lowestRefillMedicationName ?: "Refill"
+    val label = when {
+        days <= 0 -> "$name · out of stock"
+        days == 1 -> "$name · 1 day left"
+        else -> "$name · $days days left"
+    }
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .cornerRadius(6.dp)
+            .background(palette.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = GlanceModifier.size(8.dp).cornerRadius(4.dp).background(palette.warningColor)
+        ) {}
+        Spacer(modifier = GlanceModifier.width(8.dp))
+        Text(
+            text = label,
+            style = WidgetTextStyles.badgeBold(palette.warningColor),
+            modifier = GlanceModifier.defaultWeight(),
+            maxLines = 1
+        )
+        Text(
+            text = "Refill",
+            style = WidgetTextStyles.badge(palette.onSurfaceVariant)
+        )
     }
 }
 
@@ -201,13 +250,26 @@ private fun safeProgress(taken: Int, total: Int): Float =
 private fun SlotRow(slot: MedicationWidgetSlot, palette: WidgetThemePalette, highlight: Boolean) {
     val tcolor = tierColor(slot.tier, palette)
     val allDone = slot.active && slot.total > 0 && slot.taken >= slot.total
+    val canMark = slot.active && slot.total > 0 && slot.taken < slot.total
     val rowBg: ColorProvider = if (highlight) palette.primaryContainer else palette.surfaceVariant
+    val rowModifier = GlanceModifier
+        .fillMaxWidth()
+        .cornerRadius(6.dp)
+        .background(rowBg)
+        .padding(horizontal = 8.dp, vertical = 6.dp)
+        .let { mod ->
+            if (canMark) {
+                mod.clickable(
+                    actionRunCallback<MarkDoseTakenFromWidgetAction>(
+                        parameters = medicationSlotIdParams(slot.slotId)
+                    )
+                )
+            } else {
+                mod
+            }
+        }
     Row(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .cornerRadius(6.dp)
-            .background(rowBg)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = GlanceModifier.size(8.dp).cornerRadius(4.dp).background(tcolor)) {}
@@ -226,8 +288,18 @@ private fun SlotRow(slot: MedicationWidgetSlot, palette: WidgetThemePalette, hig
                 maxLines = 1
             )
         }
+        if (canMark) {
+            // "Mark taken" affordance — tappable check pill. Distinct from the
+            // dose progress badge so users immediately read the row as
+            // actionable, mirroring the in-app slot tick affordance.
+            Text(
+                text = "✓ Taken",
+                style = WidgetTextStyles.badgeBold(palette.primary)
+            )
+            Spacer(modifier = GlanceModifier.width(6.dp))
+        }
         Text(
-            text = if (allDone) "✓ done" else "${slot.taken}/${slot.total}",
+            text = if (allDone) "✓ Done" else "${slot.taken}/${slot.total}",
             style = WidgetTextStyles.badgeBold(
                 if (allDone) palette.successColor else palette.onSurfaceVariant
             )

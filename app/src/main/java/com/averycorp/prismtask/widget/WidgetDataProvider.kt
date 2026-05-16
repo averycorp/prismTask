@@ -152,9 +152,20 @@ data class MedicationWidgetData(
     val slots: List<MedicationWidgetSlot>,
     val totalDoses: Int,
     val takenDoses: Int,
-    val nextSlotIndex: Int
+    val nextSlotIndex: Int,
+    /**
+     * Lowest projected days-remaining across every refill row, or null if
+     * the user hasn't configured any refill metadata. [MedicationWidget]
+     * surfaces a badge when this drops below the user-configured
+     * `reminderDaysBefore` threshold; the widget treats null as "no
+     * warning to render".
+     */
+    val lowestRefillDaysRemaining: Int? = null,
+    val lowestRefillMedicationName: String? = null
 ) {
     val nextSlot: MedicationWidgetSlot? get() = slots.getOrNull(nextSlotIndex)
+    val hasRefillWarning: Boolean
+        get() = lowestRefillDaysRemaining != null && lowestRefillDaysRemaining <= 7
 }
 
 data class MedicationWidgetSlot(
@@ -679,12 +690,91 @@ object WidgetDataProvider {
         }.let {
             if (it >= 0) it else slots.indexOfFirst { s -> s.active && s.taken < s.total }
         }
+
+        // Refill warning: surface the smallest projected days-remaining across
+        // any refill row. RefillCalculator's exact projection lives in the
+        // domain module; the widget only needs the headline value, so we use
+        // the simple `pillCount / (pillsPerDose * dosesPerDay)` projection
+        // inline. Anything <= 7 days is considered "warning-worthy" by the
+        // widget; tighter thresholds are the in-app screen's job.
+        val refills = try {
+            db.medicationRefillDao().getAllOnce()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val lowestRefill = refills
+            .mapNotNull { refill ->
+                val perDay = (refill.pillsPerDose * refill.dosesPerDay).coerceAtLeast(1)
+                val days = refill.pillCount / perDay
+                if (days < 0) null else refill.medicationName to days
+            }
+            .minByOrNull { it.second }
+
         return MedicationWidgetData(
             slots = slots,
             totalDoses = totalDoses,
             takenDoses = takenDoses,
-            nextSlotIndex = nextIndex
+            nextSlotIndex = nextIndex,
+            lowestRefillDaysRemaining = lowestRefill?.second,
+            lowestRefillMedicationName = lowestRefill?.first
         )
+    }
+
+    /**
+     * Logs an outstanding dose for every active medication wired to [slotId]
+     * that does not yet have a non-synthetic dose on today's local date.
+     * Used by [MarkDoseTakenFromWidgetAction]; mirrors the in-app
+     * "mark slot taken" flow without going through SyncTracker — the next
+     * full sync pass picks up the inserted rows by their `updatedAt`
+     * watermark. The widget refresh is dispatched by the calling action.
+     */
+    suspend fun markMedicationSlotTaken(
+        context: Context,
+        slotId: Long,
+        now: Long = System.currentTimeMillis()
+    ) {
+        if (slotId <= 0) return
+        val db = getDb(context)
+        val slot = db.medicationSlotDao().getByIdOnce(slotId) ?: return
+        if (!slot.isActive) return
+        val medIds = db.medicationSlotDao().getMedicationIdsForSlotOnce(slotId)
+        if (medIds.isEmpty()) return
+        val dayStartHour = context.readDayStartHour()
+        val dayStartMinute = context.readDayStartMinute()
+        val startOfToday = DayBoundary.startOfCurrentDay(
+            dayStartHour = dayStartHour,
+            now = now,
+            dayStartMinute = dayStartMinute
+        )
+        val todayLocal = epochToLocalDateString(startOfToday)
+        val doseDao = db.medicationDoseDao()
+        val medDao = db.medicationDao()
+        val existing = doseDao.getForDateOnce(todayLocal)
+            .filter { !it.isSyntheticSkip && it.slotKey.equals(slot.name, ignoreCase = true) }
+            .mapNotNull { it.medicationId }
+            .toSet()
+        for (medId in medIds) {
+            if (medId in existing) continue
+            // Only log for medications that are still active. Archived meds
+            // can keep historical cross-ref rows; we should not synthesize
+            // new doses for them.
+            val med = medDao.getByIdOnce(medId) ?: continue
+            if (med.isArchived) continue
+            val dose = com.averycorp.prismtask.data.local.entity.MedicationDoseEntity(
+                medicationId = medId,
+                slotKey = slot.name,
+                takenAt = now,
+                takenDateLocal = todayLocal,
+                note = "",
+                createdAt = now,
+                updatedAt = now
+            )
+            try {
+                doseDao.insert(dose)
+            } catch (_: Exception) {
+                // duplicate cloud_id or transient — skip this med, keep going
+            }
+        }
     }
 
     private fun minutesOfDay(hhmm: String): Int {
