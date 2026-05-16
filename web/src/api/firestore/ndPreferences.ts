@@ -63,6 +63,10 @@ export interface NdPreferences {
   // Ship-It Celebrations
   shipItCelebrationsEnabled: boolean;
   celebrationIntensity: CelebrationIntensity;
+  // Energy-Aware Suggestions (parity unit 21: Brain Mode screen)
+  // Gates the Pomodoro EnergyAwarePomodoro nudge and other
+  // energy-driven suggestions surfaced across the app.
+  energyAwareSuggestionsEnabled: boolean;
 }
 
 export const DEFAULT_ND_PREFERENCES: NdPreferences = {
@@ -90,6 +94,7 @@ export const DEFAULT_ND_PREFERENCES: NdPreferences = {
   maxRevisions: 3,
   shipItCelebrationsEnabled: true,
   celebrationIntensity: 'MEDIUM',
+  energyAwareSuggestionsEnabled: true,
 };
 
 const FIELD_MAP: Record<keyof NdPreferences, string> = {
@@ -117,6 +122,7 @@ const FIELD_MAP: Record<keyof NdPreferences, string> = {
   maxRevisions: 'nd_max_revisions',
   shipItCelebrationsEnabled: 'nd_ship_it_celebrations_enabled',
   celebrationIntensity: 'nd_celebration_intensity',
+  energyAwareSuggestionsEnabled: 'nd_energy_aware_suggestions_enabled',
 };
 
 const BOOL_KEYS: (keyof NdPreferences)[] = [
@@ -138,6 +144,7 @@ const BOOL_KEYS: (keyof NdPreferences)[] = [
   'coolingOffEnabled',
   'revisionCounterEnabled',
   'shipItCelebrationsEnabled',
+  'energyAwareSuggestionsEnabled',
 ];
 
 const INT_KEYS: (keyof NdPreferences)[] = [

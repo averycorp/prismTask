@@ -38,6 +38,7 @@ const WeeklyReviewScreen = lazy(() => import('@/features/weeklyreview/WeeklyRevi
 const TemplateListScreen = lazy(() => import('@/features/templates/TemplateListScreen').then(m => ({ default: m.TemplateListScreen })));
 const ArchiveScreen = lazy(() => import('@/features/archive/ArchiveScreen').then(m => ({ default: m.ArchiveScreen })));
 const SettingsScreen = lazy(() => import('@/features/settings/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
+const BrainModeScreen = lazy(() => import('@/features/settings/BrainModeScreen').then(m => ({ default: m.BrainModeScreen })));
 const SchoolworkScreen = lazy(() => import('@/features/schoolwork/SchoolworkScreen').then(m => ({ default: m.SchoolworkScreen })));
 const AdminLogsScreen = lazy(() => import('@/features/admin/AdminLogsScreen').then(m => ({ default: m.AdminLogsScreen })));
 const BatchPreviewScreen = lazy(() => import('@/features/batch/BatchPreviewScreen').then(m => ({ default: m.BatchPreviewScreen })));
@@ -129,6 +130,7 @@ const routes: RouteObject[] = [
       { path: 'schoolwork', element: <LazyRoute Component={SchoolworkScreen} /> },
       { path: 'archive', element: <LazyRoute Component={ArchiveScreen} /> },
       { path: 'settings', element: <LazyRoute Component={SettingsScreen} fallback={<SettingsSkeleton />} /> },
+      { path: 'settings/brain-mode', element: <LazyRoute Component={BrainModeScreen} fallback={<SettingsSkeleton />} /> },
       { path: 'admin/logs', element: <LazyRoute Component={AdminLogsScreen} /> },
       { path: 'batch/preview', element: <LazyRoute Component={BatchPreviewScreen} /> },
       { path: 'briefing', element: <LazyRoute Component={DailyBriefingScreen} /> },
