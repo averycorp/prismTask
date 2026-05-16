@@ -48,6 +48,9 @@ object BuiltInHabitVersionRegistry {
     const val KEY_BEDTIME_SELFCARE = "builtin_bedtime_selfcare"
     const val KEY_MEDICATION = "builtin_medication"
     const val KEY_HOUSEWORK = "builtin_housework"
+    const val KEY_WORKDAY_SETUP = "builtin_workday_setup"
+    const val KEY_WINDDOWN = "builtin_winddown"
+    const val KEY_ERRANDS = "builtin_errands"
 
     private val definitions: Map<String, BuiltInHabitDefinition> = listOf(
         BuiltInHabitDefinition(
@@ -107,6 +110,36 @@ object BuiltInHabitVersionRegistry {
             targetCount = 1,
             activeDaysCsv = "",
             steps = stepsFromRoutine(SelfCareRoutines.houseworkSteps, "housework")
+        ),
+        BuiltInHabitDefinition(
+            templateKey = KEY_WORKDAY_SETUP,
+            version = 1,
+            name = "Work-Day Setup",
+            description = "Set up your work day",
+            frequency = "daily",
+            targetCount = 1,
+            activeDaysCsv = "",
+            steps = stepsFromRoutine(SelfCareRoutines.workdaySteps, "workday")
+        ),
+        BuiltInHabitDefinition(
+            templateKey = KEY_WINDDOWN,
+            version = 1,
+            name = "Wind-Down",
+            description = "Transition into a calm evening",
+            frequency = "daily",
+            targetCount = 1,
+            activeDaysCsv = "",
+            steps = stepsFromRoutine(SelfCareRoutines.winddownSteps, "winddown")
+        ),
+        BuiltInHabitDefinition(
+            templateKey = KEY_ERRANDS,
+            version = 1,
+            name = "Errands",
+            description = "Complete your weekly errands",
+            frequency = "weekly",
+            targetCount = 1,
+            activeDaysCsv = "",
+            steps = stepsFromRoutine(SelfCareRoutines.errandsSteps, "errands")
         )
     ).associateBy { it.templateKey }
 
