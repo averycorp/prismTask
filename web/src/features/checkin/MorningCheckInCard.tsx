@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronRight, Flame, Loader2, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
 import {
   getCheckIn,
   getRecentCheckIns,
@@ -17,13 +16,14 @@ import {
   selectForgivenessConfig,
   useAdvancedTuningStore,
 } from '@/stores/advancedTuningStore';
-import { MorningCheckInStepper } from './MorningCheckInStepper';
 
 /**
  * Today-screen card that prompts the user for a morning check-in and
  * displays a forgiveness-first streak. The card hides itself when the
- * `showMorningCheckIn` preference is off. Tap to open the stepper
- * modal (MOOD_ENERGY → BALANCE → CALENDAR; parity audit C.5a).
+ * `showMorningCheckIn` preference is off. Tap the "Check In" button to
+ * navigate to the routed `/checkin` stepper screen (MOOD_ENERGY →
+ * BALANCE → CALENDAR; parity audit C.5a + unit 11 of 23). The History
+ * link routes to `/checkin/history` for the 90-day view.
  */
 export function MorningCheckInCard() {
   const show = useSettingsStore((s) => s.showMorningCheckIn);
@@ -40,7 +40,6 @@ export function MorningCheckInCard() {
   const [log, setLog] = useState<CheckInLog | null>(null);
   const [recent, setRecent] = useState<CheckInLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -87,7 +86,7 @@ export function MorningCheckInCard() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Morning check-in
+              Morning Check-In
             </h3>
             {streak.current > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-500">
@@ -115,15 +114,16 @@ export function MorningCheckInCard() {
           <Button
             size="sm"
             variant={log ? 'secondary' : 'primary'}
-            onClick={() => setModalOpen(true)}
+            onClick={() => navigate('/checkin')}
             disabled={loading}
+            data-testid="morning-checkin-open"
           >
             {loading ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : log ? (
               <Check className="mr-1 h-3.5 w-3.5" />
             ) : null}
-            {log ? 'Update' : 'Check in'}
+            {log ? 'Update' : 'Check In'}
           </Button>
           <button
             onClick={() => setSetting('showMorningCheckIn', false)}
@@ -133,20 +133,6 @@ export function MorningCheckInCard() {
           </button>
         </div>
       </div>
-
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Morning check-in"
-        size="md"
-      >
-        <MorningCheckInStepper
-          dateIso={todayIso}
-          initial={log}
-          onSaved={() => load()}
-          onClose={() => setModalOpen(false)}
-        />
-      </Modal>
     </div>
   );
 }

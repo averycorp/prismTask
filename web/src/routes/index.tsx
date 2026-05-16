@@ -55,6 +55,7 @@ const ChatScreen = lazy(() => import('@/features/chat/ChatScreen').then(m => ({ 
 const LeisurePoolScreen = lazy(() => import('@/features/leisure/LeisurePoolScreen').then(m => ({ default: m.LeisurePoolScreen })));
 const SelfCareScreen = lazy(() => import('@/features/selfcare/SelfCareScreen').then(m => ({ default: m.SelfCareScreen })));
 const CheckInHistoryScreen = lazy(() => import('@/features/checkin/CheckInHistoryScreen').then(m => ({ default: m.CheckInHistoryScreen })));
+const MorningCheckInScreen = lazy(() => import('@/features/checkin/MorningCheckInScreen').then(m => ({ default: m.MorningCheckInScreen })));
 const WeeklyBalanceReportScreen = lazy(() => import('@/features/balance/WeeklyBalanceReportScreen').then(m => ({ default: m.WeeklyBalanceReportScreen })));
 
 function LazyRoute({ Component, fallback }: { Component: ComponentType; fallback?: React.ReactNode }) {
@@ -143,6 +144,7 @@ const routes: RouteObject[] = [
       { path: 'chat', element: <LazyRoute Component={ChatScreen} /> },
       { path: 'leisure', element: <LazyRoute Component={LeisurePoolScreen} /> },
       { path: 'self-care', element: <LazyRoute Component={SelfCareScreen} /> },
+      { path: 'checkin', element: <LazyRoute Component={MorningCheckInScreen} /> },
       { path: 'checkin/history', element: <LazyRoute Component={CheckInHistoryScreen} /> },
       { path: 'balance/weekly-report', element: <LazyRoute Component={WeeklyBalanceReportScreen} /> },
     ],

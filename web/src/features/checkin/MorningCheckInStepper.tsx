@@ -6,8 +6,8 @@ import {
   Check,
   Heart,
   Loader2,
+  RotateCcw,
   Scale,
-  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import { createLog as createMoodEnergyLog } from '@/api/firestore/moodEnergyLogs
 import {
   DEFAULT_BALANCE_PREFERENCES,
   getBalancePreferences,
+  setBalancePreferences,
   type BalancePreferences,
 } from '@/api/firestore/balancePreferences';
 import {
@@ -26,7 +27,8 @@ import {
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTaskStore } from '@/stores/taskStore';
-import type { LifeCategory } from '@/types/task';
+import type { LifeCategory, Task } from '@/types/task';
+import { useLogicalToday } from '@/utils/useLogicalToday';
 
 /**
  * Morning Check-In guided stepper (parity C.5a).
@@ -238,9 +240,9 @@ export function MorningCheckInStepper({
   }, [currentStep, dateIso, draft, initial, onClose, onSaved]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-testid="checkin-stepper">
       <StepProgress current={draft.step} total={totalSteps} />
-      <div className="min-h-[280px]">
+      <div className="min-h-[280px]" data-testid={`checkin-step-${currentStep}`}>
         {currentStep === 'MOOD_ENERGY' && (
           <MoodEnergyStep
             mood={draft.mood}
@@ -259,21 +261,21 @@ export function MorningCheckInStepper({
           disabled={submitting}
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          {draft.step === 0 ? 'Cancel' : 'Back'}
+          {draft.step === 0 ? 'Skip' : 'Back'}
         </Button>
         {draft.step < totalSteps - 1 ? (
           <Button onClick={goNext} disabled={submitting}>
-            Next
+            Continue
             <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button onClick={handleSubmit} disabled={submitting} data-testid="checkin-finish">
             {submitting ? (
               <Loader2 className="mr-1 h-4 w-4 animate-spin" />
             ) : (
               <Check className="mr-1 h-4 w-4" />
             )}
-            {initial ? 'Update' : 'Submit'}
+            {initial ? 'Update' : 'Finish'}
           </Button>
         )}
       </div>
@@ -405,6 +407,7 @@ function BalanceStep() {
   const tasks = useTaskStore((s) => s.tasks);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const [prefs, setPrefs] = useState<BalancePreferences>(DEFAULT_BALANCE_PREFERENCES);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -441,23 +444,68 @@ function BalanceStep() {
     [tasks, config, startOfDayHour],
   );
 
+  const handleAdjust = useCallback(
+    (
+      key: keyof Pick<
+        BalancePreferences,
+        'workTarget' | 'personalTarget' | 'selfCareTarget' | 'healthTarget'
+      >,
+      value: number,
+    ) => {
+      setPrefs((p) => ({ ...p, [key]: value }));
+    },
+    [],
+  );
+
+  const totalPct =
+    prefs.workTarget + prefs.personalTarget + prefs.selfCareTarget + prefs.healthTarget;
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      const uid = getFirebaseUid();
+      await setBalancePreferences(uid, {
+        workTarget: prefs.workTarget,
+        personalTarget: prefs.personalTarget,
+        selfCareTarget: prefs.selfCareTarget,
+        healthTarget: prefs.healthTarget,
+      });
+      toast.success('Targets updated');
+    } catch (e) {
+      toast.error((e as Error).message || 'Could not save targets');
+    } finally {
+      setSaving(false);
+    }
+  }, [prefs]);
+
+  const handleReset = useCallback(() => {
+    setPrefs((p) => ({
+      ...p,
+      workTarget: DEFAULT_BALANCE_PREFERENCES.workTarget,
+      personalTarget: DEFAULT_BALANCE_PREFERENCES.personalTarget,
+      selfCareTarget: DEFAULT_BALANCE_PREFERENCES.selfCareTarget,
+      healthTarget: DEFAULT_BALANCE_PREFERENCES.healthTarget,
+    }));
+  }, []);
+
   return (
     <div className="flex flex-col gap-3 text-sm">
       <div className="flex items-start gap-2">
         <Scale className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-accent)]" aria-hidden="true" />
-        <div>
+        <div className="flex-1">
           <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Today's intended balance
+            Yesterday's Balance
           </h4>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Your targets versus the last seven days.
+            Review your targets and the last seven days. Adjust below if today
+            calls for a different mix.
           </p>
         </div>
       </div>
 
       <BalanceBars label="Target" ratios={config} />
       <BalanceBars
-        label="Last 7 days"
+        label="Last 7 Days"
         ratios={{
           workTarget: state.currentRatios.WORK ?? 0,
           personalTarget: state.currentRatios.PERSONAL ?? 0,
@@ -477,7 +525,99 @@ function BalanceStep() {
           Tag tasks with a life category to see your balance ratios here.
         </p>
       )}
+
+      <div className="mt-1 flex flex-col gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Adjust Today's Targets
+          </span>
+          <span
+            className={`text-[11px] ${
+              totalPct === 100
+                ? 'text-[var(--color-text-secondary)]'
+                : 'text-amber-500'
+            }`}
+            aria-live="polite"
+          >
+            Total {totalPct}%
+          </span>
+        </div>
+        <TargetSlider
+          label="Work"
+          color={CATEGORY_COLOR.WORK}
+          value={prefs.workTarget}
+          onChange={(v) => handleAdjust('workTarget', v)}
+        />
+        <TargetSlider
+          label="Personal"
+          color={CATEGORY_COLOR.PERSONAL}
+          value={prefs.personalTarget}
+          onChange={(v) => handleAdjust('personalTarget', v)}
+        />
+        <TargetSlider
+          label="Self-Care"
+          color={CATEGORY_COLOR.SELF_CARE}
+          value={prefs.selfCareTarget}
+          onChange={(v) => handleAdjust('selfCareTarget', v)}
+        />
+        <TargetSlider
+          label="Health"
+          color={CATEGORY_COLOR.HEALTH}
+          value={prefs.healthTarget}
+          onChange={(v) => handleAdjust('healthTarget', v)}
+        />
+        <div className="mt-1 flex items-center justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={handleReset} disabled={saving}>
+            <RotateCcw className="mr-1 h-3 w-3" aria-hidden="true" />
+            Reset
+          </Button>
+          <Button size="sm" variant="secondary" onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Check className="mr-1 h-3 w-3" />
+            )}
+            Save Targets
+          </Button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+interface TargetSliderProps {
+  label: string;
+  color: string;
+  value: number;
+  onChange: (v: number) => void;
+}
+
+function TargetSlider({ label, color, value, onChange }: TargetSliderProps) {
+  return (
+    <label className="flex items-center gap-2 text-xs">
+      <span
+        className="inline-block h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+        aria-hidden="true"
+      />
+      <span className="w-20 shrink-0 text-[var(--color-text-primary)]">{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="h-1 flex-1 accent-[var(--color-accent)]"
+        aria-label={`${label} target percent`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={value}
+      />
+      <span className="w-10 shrink-0 text-right text-[var(--color-text-secondary)]">
+        {value}%
+      </span>
+    </label>
   );
 }
 
@@ -540,7 +680,38 @@ function BalanceBars({ label, ratios }: BalanceBarsProps) {
 
 function CalendarStep() {
   // Web has no Google Calendar integration yet (parity audit D.x).
-  // Mirror Android's "Connect Calendar in Settings" empty state.
+  // To still give the user something to commit to / defer from, mirror
+  // Android's CalendarStep shape by previewing TODAY's tasks: that's the
+  // payload the Calendar step exists to surface ("here is what's on your
+  // plate today"). Defer = bump out one day; commit = leave as-is.
+  const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  const todayIso = useLogicalToday(startOfDayHour);
+  const todayTasks = useTaskStore((s) => s.todayTasks);
+  const updateTask = useTaskStore((s) => s.updateTask);
+  const [deferred, setDeferred] = useState<Set<string>>(new Set());
+
+  const visible = useMemo(() => {
+    return todayTasks
+      .filter((t) => t.status !== 'done')
+      .slice(0, 5);
+  }, [todayTasks]);
+
+  const defer = useCallback(
+    async (task: Task) => {
+      const next = new Date(`${todayIso}T12:00:00`);
+      next.setDate(next.getDate() + 1);
+      const nextIso = next.toISOString().slice(0, 10);
+      try {
+        await updateTask(task.id, { due_date: nextIso });
+        setDeferred((s) => new Set(s).add(task.id));
+        toast.success(`Deferred "${task.title.slice(0, 24)}" to tomorrow`);
+      } catch (e) {
+        toast.error((e as Error).message || 'Could not defer task');
+      }
+    },
+    [todayIso, updateTask],
+  );
+
   return (
     <div className="flex flex-col gap-3 text-sm">
       <div className="flex items-start gap-2">
@@ -550,29 +721,71 @@ function CalendarStep() {
         />
         <div>
           <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Calendar glance
+            Today's Plan
           </h4>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Your morning events at a glance.
+            Glance over your tasks. Defer anything that doesn't belong today.
           </p>
         </div>
       </div>
-      <div className="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-6 text-center">
-        <Sparkles
-          className="mx-auto mb-2 h-6 w-6 text-[var(--color-text-secondary)]"
-          aria-hidden="true"
-        />
-        <p className="text-sm font-medium text-[var(--color-text-primary)]">
-          Calendar preview coming to web
-        </p>
-        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-          Two-way Google Calendar sync ships in PrismTask on Android. Web will
-          surface the same morning preview once the integration is wired up.
-        </p>
-      </div>
+
+      {visible.length === 0 ? (
+        <div className="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-6 text-center">
+          <Calendar
+            className="mx-auto mb-2 h-6 w-6 text-[var(--color-text-secondary)]"
+            aria-hidden="true"
+          />
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">
+            Clear day ahead
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            Nothing scheduled — savour the open canvas, or plan something
+            intentional from the Today screen.
+          </p>
+        </div>
+      ) : (
+        <ul
+          className="flex flex-col gap-1.5"
+          aria-label="Today's tasks preview"
+          data-testid="checkin-calendar-tasks"
+        >
+          {visible.map((task) => {
+            const isDeferred = deferred.has(task.id);
+            return (
+              <li
+                key={task.id}
+                className={`flex items-center gap-2 rounded-md border border-[var(--color-border)] px-2.5 py-1.5 ${
+                  isDeferred
+                    ? 'opacity-60'
+                    : 'bg-[var(--color-bg-secondary)]'
+                }`}
+              >
+                <span className="flex-1 truncate text-xs text-[var(--color-text-primary)]">
+                  {task.title}
+                </span>
+                {task.priority > 0 && (
+                  <span className="shrink-0 rounded-full bg-[var(--color-bg-card)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                    P{task.priority}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void defer(task)}
+                  disabled={isDeferred}
+                  className="shrink-0 rounded px-2 py-0.5 text-[11px] font-medium text-[var(--color-accent)] hover:bg-[var(--color-bg-card)] disabled:opacity-50"
+                >
+                  {isDeferred ? 'Deferred' : 'Defer'}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
       <p className="text-[11px] text-[var(--color-text-secondary)]">
-        For now, treat this step as a moment to glance at your own calendar app
-        before you dive in.
+        Tap Finish to commit to today's plan. Two-way Google Calendar sync
+        ships on Android — web will preview events here once the integration
+        is wired up.
       </p>
     </div>
   );

@@ -37,7 +37,7 @@ describe('MorningCheckInCard — no infinite render loop (React #185)', () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText('Morning check-in')).toBeInTheDocument();
+      expect(screen.getByText('Morning Check-In')).toBeInTheDocument();
     });
   });
 });
