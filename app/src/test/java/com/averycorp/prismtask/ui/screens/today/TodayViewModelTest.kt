@@ -104,8 +104,6 @@ class TodayViewModelTest {
         schoolworkRepository = mockk(relaxed = true)
         tourCardPreferences = mockk(relaxed = true)
         coEvery { tourCardPreferences.eligible() } returns flowOf(false)
-        coEvery { tourCardPreferences.dismissed() } returns flowOf(false)
-        coEvery { tourCardPreferences.stepIndex() } returns flowOf(0)
         coEvery { tourCardPreferences.coachmarkCompleted() } returns flowOf(false)
         coEvery { tourCardPreferences.coachmarkDismissed() } returns flowOf(false)
         coEvery { tourCardPreferences.coachmarkStepIndex() } returns flowOf(0)

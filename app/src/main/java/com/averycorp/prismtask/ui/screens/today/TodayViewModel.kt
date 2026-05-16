@@ -215,26 +215,6 @@ constructor(
     }
 
     /**
-     * Post-onboarding Guided Tour state. Visible only for users who
-     * finished onboarding via SetupPage (eligibility flag flips in
-     * `OnboardingViewModel.completeOnboarding`); the existing-user skip
-     * path and RestorePending bypass deliberately leave eligibility
-     * false so returning users never see the card. See
-     * [TourCardPreferences].
-     */
-    val tourCardState: StateFlow<TourCardUiState?> = combine(
-        tourCardPreferences.eligible(),
-        tourCardPreferences.dismissed(),
-        tourCardPreferences.stepIndex()
-    ) { eligible, dismissed, step ->
-        if (!eligible || dismissed) {
-            null
-        } else {
-            TourCardUiState(stepIndex = step.coerceAtLeast(0))
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    /**
      * True when the post-onboarding coachmark tour is paused mid-flight
      * and a "Resume Tour" chip should appear in the Today quick-actions row.
      *
@@ -274,32 +254,6 @@ constructor(
                 SharingStarted.WhileSubscribed(5000),
                 com.averycorp.prismtask.data.preferences.PerFeatureAiPrefs()
             )
-
-    fun advanceTourCard(totalSteps: Int) {
-        viewModelScope.launch {
-            try {
-                val current = tourCardPreferences.stepIndex().first()
-                val next = current + 1
-                if (next >= totalSteps) {
-                    tourCardPreferences.markDismissed()
-                } else {
-                    tourCardPreferences.setStepIndex(next)
-                }
-            } catch (e: Exception) {
-                Log.e("TodayVM", "Failed to advance tour card", e)
-            }
-        }
-    }
-
-    fun dismissTourCard() {
-        viewModelScope.launch {
-            try {
-                tourCardPreferences.markDismissed()
-            } catch (e: Exception) {
-                Log.e("TodayVM", "Failed to dismiss tour card", e)
-            }
-        }
-    }
 
     init {
         try {
@@ -1467,9 +1421,3 @@ constructor(
     }
 }
 
-/**
- * Lightweight UI state for the post-onboarding Guided Tour card.
- * Only emitted while the user is eligible AND the card is not dismissed;
- * the screen renders nothing when [TodayViewModel.tourCardState] is null.
- */
-data class TourCardUiState(val stepIndex: Int)

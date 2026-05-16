@@ -17,9 +17,9 @@ internal val Context.tourCardDataStore: DataStore<Preferences> by
     preferencesDataStore(name = "tour_card_prefs")
 
 /**
- * Backing store for the post-onboarding "Guided Tour" card on Today.
+ * Backing store for the post-onboarding coachmark tour.
  *
- * The card surfaces a small set of breadth-overview steps after a user
+ * The tour surfaces a 13-surface anchored walkthrough after a user
  * finishes onboarding. State is device-local and intentionally NOT
  * synced — a returning user on a fresh install starts with their own
  * dismissed/eligible state, which matches the behaviour the tour is
@@ -33,11 +33,12 @@ internal val Context.tourCardDataStore: DataStore<Preferences> by
  * never reach `completeOnboarding`, so they're excluded by the same
  * gate.
  *
- * **Dismissal model.** [dismissed] is set when the user finishes the
- * last step ("Got it" on step N-1) or taps "Don't show again" at any
- * point. Once dismissed, the card never returns; a debug "Show Tutorial
- * Again" reset clears all three keys via [resetTourCard] so the card
- * can re-appear once onboarding re-runs.
+ * **Historical note.** A 5-step in-flow `GuidedTourCard` on Today also
+ * read this store. It was retired in favour of the anchored coachmark
+ * tour (audit doc `docs/audits/ONBOARDING_OVERLAP_AUDIT.md` finding
+ * #1); its `tour_card_dismissed` / `tour_step_index` DataStore keys are
+ * no longer written. `tour_card_eligible` is retained — the coachmark
+ * controller still uses it as the post-onboarding eligibility signal.
  */
 @Singleton
 class TourCardPreferences
@@ -46,14 +47,14 @@ constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
+        // Post-onboarding eligibility flag. Still load-bearing — the
+        // CoachmarkController reads it via `eligible()` to gate
+        // `tryStart`. Only flipped by `OnboardingViewModel.completeOnboarding`.
         private val TOUR_CARD_ELIGIBLE = booleanPreferencesKey("tour_card_eligible")
-        private val TOUR_CARD_DISMISSED = booleanPreferencesKey("tour_card_dismissed")
-        private val TOUR_STEP_INDEX = intPreferencesKey("tour_step_index")
 
         // Coachmark tour (post-onboarding 13-surface walkthrough). Reuses
         // the same DataStore so account-wipe (PR #1180) and debug-reset
-        // paths stay single-store. Eligibility shares the same gate as
-        // the 5-step Today card: only `markEligible()` flips it.
+        // paths stay single-store.
         private val COACHMARK_TOUR_COMPLETED = booleanPreferencesKey("coachmark_tour_completed")
         private val COACHMARK_TOUR_DISMISSED = booleanPreferencesKey("coachmark_tour_dismissed")
         private val COACHMARK_STEP_INDEX = intPreferencesKey("coachmark_step_index")
@@ -65,30 +66,10 @@ constructor(
         prefs[TOUR_CARD_ELIGIBLE] ?: false
     }
 
-    fun dismissed(): Flow<Boolean> = context.tourCardDataStore.data.map { prefs ->
-        prefs[TOUR_CARD_DISMISSED] ?: false
-    }
-
-    fun stepIndex(): Flow<Int> = context.tourCardDataStore.data.map { prefs ->
-        prefs[TOUR_STEP_INDEX] ?: 0
-    }
-
     /** Called from `OnboardingViewModel.completeOnboarding()` only. */
     suspend fun markEligible() {
         context.tourCardDataStore.edit { prefs ->
             prefs[TOUR_CARD_ELIGIBLE] = true
-        }
-    }
-
-    suspend fun setStepIndex(index: Int) {
-        context.tourCardDataStore.edit { prefs ->
-            prefs[TOUR_STEP_INDEX] = index.coerceAtLeast(0)
-        }
-    }
-
-    suspend fun markDismissed() {
-        context.tourCardDataStore.edit { prefs ->
-            prefs[TOUR_CARD_DISMISSED] = true
         }
     }
 
@@ -122,14 +103,12 @@ constructor(
         }
     }
 
-    /** Clears all tour flags so the card re-appears alongside a future
+    /** Clears all tour flags so the tour re-fires alongside a future
      *  re-run of onboarding. Used by Settings → Reset App Data when the
      *  user wipes preferences. */
     suspend fun resetTourCard() {
         context.tourCardDataStore.edit { prefs ->
             prefs.remove(TOUR_CARD_ELIGIBLE)
-            prefs.remove(TOUR_CARD_DISMISSED)
-            prefs.remove(TOUR_STEP_INDEX)
             prefs.remove(COACHMARK_TOUR_COMPLETED)
             prefs.remove(COACHMARK_TOUR_DISMISSED)
             prefs.remove(COACHMARK_STEP_INDEX)

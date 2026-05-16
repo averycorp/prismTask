@@ -6,6 +6,7 @@ import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
 import com.averycorp.prismtask.data.preferences.QuickAddRows
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.preferences.TitleLengthLimit
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
@@ -74,6 +75,7 @@ class QuickAddViewModelBatchSubmitGuardTest {
     private lateinit var voicePreferences: VoicePreferences
     private lateinit var advancedTuningPreferences: AdvancedTuningPreferences
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
+    private lateinit var userPreferencesDataStore: UserPreferencesDataStore
 
     @Before
     fun setUp() {
@@ -93,6 +95,7 @@ class QuickAddViewModelBatchSubmitGuardTest {
         voicePreferences = mockk(relaxed = true)
         advancedTuningPreferences = mockk(relaxed = true)
         taskBehaviorPreferences = mockk(relaxed = true)
+        userPreferencesDataStore = mockk(relaxed = true)
 
         // Init-block dependencies — these flows must be cold-emittable
         // so the VM's `init { viewModelScope.launch { collect } }` doesn't
@@ -297,6 +300,7 @@ class QuickAddViewModelBatchSubmitGuardTest {
         tts = tts,
         voicePreferences = voicePreferences,
         advancedTuningPreferences = advancedTuningPreferences,
-        taskBehaviorPreferences = taskBehaviorPreferences
+        taskBehaviorPreferences = taskBehaviorPreferences,
+        userPreferencesDataStore = userPreferencesDataStore
     )
 }
