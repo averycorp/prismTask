@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
@@ -19,6 +18,7 @@ import type {
   ProjectPhaseCreate,
   ProjectPhaseUpdate,
 } from '@/types/projectPhase';
+import { safeMergeDoc } from '@/lib/firestore/safeMergeDoc';
 
 // ── Collection reference ──────────────────────────────────────
 
@@ -80,7 +80,8 @@ function phaseUpdateToDoc(data: ProjectPhaseUpdate): Record<string, unknown> {
   // Merge-mode write: include only fields the caller passed. Anything
   // not present here Firestore leaves untouched, protecting Android-only
   // state (e.g. cloudId metadata) from being clobbered.
-  const result: Record<string, unknown> = { updatedAt: Date.now() };
+  // `updatedAt` is stamped by safeMergeCurrentDoc via serverTimestamp().
+  const result: Record<string, unknown> = {};
   if (data.title !== undefined) result.title = data.title;
   if (data.description !== undefined) result.description = data.description;
   if (data.color_key !== undefined) result.colorKey = data.color_key;
@@ -136,7 +137,12 @@ export async function updatePhase(
   data: ProjectPhaseUpdate,
 ): Promise<ProjectPhase> {
   const payload = phaseUpdateToDoc(data);
-  await updateDoc(phaseDoc(uid, phaseId), payload);
+  // Server-stamped merge via `safeMergeDoc`'s first-create path
+  // (`expectedUpdatedAt = null`). Phase updates here are fire-and-
+  // forget — no caller cached the `expectedUpdatedAt` to feed a
+  // strict precondition. `serverTimestamp()` keeps Android's LWW
+  // comparison honest under clock skew. Sync sweep C.
+  await safeMergeDoc(phaseDoc(uid, phaseId), payload, null);
   const snap = await getDoc(phaseDoc(uid, phaseId));
   const docData = snap.data() ?? {};
   const projectId =

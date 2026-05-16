@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   addDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
@@ -20,6 +19,7 @@ import {
   type ProjectRiskCreate,
   type ProjectRiskUpdate,
 } from '@/types/projectRisk';
+import { safeMergeDoc } from '@/lib/firestore/safeMergeDoc';
 
 // ── Collection reference ──────────────────────────────────────
 
@@ -65,7 +65,9 @@ function riskCreateToDoc(
 }
 
 function riskUpdateToDoc(data: ProjectRiskUpdate): Record<string, unknown> {
-  const result: Record<string, unknown> = { updatedAt: Date.now() };
+  // `updatedAt` is stamped by the safeMerge helper via
+  // `serverTimestamp()` — don't pre-populate it here.
+  const result: Record<string, unknown> = {};
   if (data.title !== undefined) result.title = data.title;
   if (data.level !== undefined) result.level = data.level;
   if (data.mitigation !== undefined) result.mitigation = data.mitigation;
@@ -113,7 +115,12 @@ export async function updateRisk(
   data: ProjectRiskUpdate,
 ): Promise<ProjectRisk> {
   const payload = riskUpdateToDoc(data);
-  await updateDoc(riskDoc(uid, riskId), payload);
+  // Server-stamped merge via `safeMergeDoc`'s first-create path
+  // (`expectedUpdatedAt = null`). Risk updates here are fire-and-
+  // forget — no caller cached the `expectedUpdatedAt` to feed a
+  // strict precondition. Using `serverTimestamp()` keeps Android's
+  // LWW comparison honest under clock skew. Sync sweep C.
+  await safeMergeDoc(riskDoc(uid, riskId), payload, null);
   const snap = await getDoc(riskDoc(uid, riskId));
   const docData = snap.data() ?? {};
   const projectId =
