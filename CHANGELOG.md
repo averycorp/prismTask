@@ -121,6 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- chore(onboarding): fold the standalone Projects page into the Smart
+  Tasks page so the pager drops from 16 → 15 pages, removing the
+  three-consecutive-informational-page UX smell flagged by the
+  onboarding overlap audit (PR #1585, finding #4). The combined
+  "Organize Tasks & Projects" page keeps the existing animated task
+  cards and adds a second row of project progress cards underneath;
+  the standalone `ProjectsPage` composable is deleted.
 - refactor(android/medication): drop legacy Firestore writes for
   `daily_essential_slot_completions` (parity Batch 5 PR-9, decision
   D-E4). `BackendSyncService` is now the single authoritative writer;
