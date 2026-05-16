@@ -264,8 +264,7 @@ fun SettingsScreen(
                 // Productivity — STANDARD+
                 item {
                     SettingsGroup(label = "Productivity") {
-                        // AI Features moved to the Today "AI Tools" hub sheet
-                        // (docs/audits/AI_FEATURES_TO_TODAY_RELOCATION_AUDIT.md).
+                        // AI Features moved to the Today "AI Tools" hub sheet.
                         SettingsNavRow(
                             title = "AI Memory",
                             subtitle = "What the AI Executive Assistant remembers about you",

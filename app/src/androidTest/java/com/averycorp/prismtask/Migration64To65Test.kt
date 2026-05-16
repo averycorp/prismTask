@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 
 /**
  * Migration test for v64 → v65 — adds the `task_timings` table for per-task
- * time-tracking. Path 2 of `docs/audits/ANALYTICS_C4_C5_TIME_TRACKING_DESIGN.md`.
+ * time-tracking.
  *
  * Verifies that the new table is created with the expected columns + indices,
  * a row can be inserted, and CASCADE delete fires when the parent task row is

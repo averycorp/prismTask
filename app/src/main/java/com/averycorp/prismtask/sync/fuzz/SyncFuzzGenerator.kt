@@ -10,11 +10,11 @@ import kotlin.random.Random
  * same seed reproduces the exact same sequence — required so a CI failure
  * can be replayed locally by pinning the seed in the failing test.
  *
- * Per the audit (`docs/audits/AUTOMATED_EDGE_CASE_TESTING_AUDIT.md`,
- * Tier A1), the generator is hand-rolled rather than using Kotest-property
- * because Firestore-backed harness I/O is incompatible with Kotest's
- * shrinking pass. The harness's `cleanupFirestoreUser()` + `clearAllTables()`
- * lifecycle already provides "minimum failing case" via fixed-seed replay.
+ * (Edge-case-testing Tier A1.) The generator is hand-rolled rather than using
+ * Kotest-property because Firestore-backed harness I/O is incompatible with
+ * Kotest's shrinking pass. The harness's `cleanupFirestoreUser()` +
+ * `clearAllTables()` lifecycle already provides "minimum failing case" via
+ * fixed-seed replay.
  *
  * Generators are intentionally narrow — each [SyncFuzzGenerator] instance
  * targets a single entity type (Task, Habit, Project, Medication, …).

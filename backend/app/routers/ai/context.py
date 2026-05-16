@@ -10,8 +10,7 @@ week of leisure totals, and the last week of medication adherence.
 Server-side data only. Mood, check-ins, boundary rules, and the live
 Pomodoro/timer state live in Android Room and are NOT persisted to the
 FastAPI backend; passing them in is a follow-up that requires extending
-``ChatRequest`` (see ``docs/audits/AI_CHAT_CURRENT_STATE_AUDIT.md`` and
-``docs/audits/AI_CHAT_ALL_DATA_CONTEXT_AUDIT.md``).
+``ChatRequest``.
 
 The output dict is rendered by ``_format_current_state_block`` in
 ``ai_productivity`` and appended after the preferences block. Per-bucket

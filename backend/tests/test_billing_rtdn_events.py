@@ -1,7 +1,7 @@
 """Tests for the ``rtdn_events`` audit table introduced by alembic
 migration 022.
 
-Scope (per ``docs/audits/BILLING_SCHEMA_AUDIT.md`` option B):
+Scope (billing-schema option B):
 - Schema round-trip via ``Base.metadata.create_all`` (the conftest
   fixture already does this; we just verify the new table is in the
   metadata and that all expected columns exist).

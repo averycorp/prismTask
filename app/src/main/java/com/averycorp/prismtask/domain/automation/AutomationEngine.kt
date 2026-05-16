@@ -33,9 +33,7 @@ import javax.inject.Singleton
  *     halt the action chain or the engine.
  *  7. Per-task notify soft cap (mental-health class): one rule may not
  *     fire more than [AutomationRateLimiter.MAX_NOTIFIES_PER_TASK_PER_DAY]
- *     notify actions against the same task in a 24h window. See
- *     `docs/audits/AUTOMATION_MENTAL_HEALTH_GUARDRAILS_AUDIT.md`
- *     Option C.
+ *     notify actions against the same task in a 24h window.
  *
  * Composed triggers are emitted back to the bus as
  * [AutomationEvent.RuleFired] rather than recursively dispatched, which

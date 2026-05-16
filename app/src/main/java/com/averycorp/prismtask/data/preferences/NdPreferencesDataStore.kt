@@ -79,7 +79,7 @@ class NdPreferencesDataStore(
     // mirror the `setAdhdMode(true)` / `setCalmMode(true)` cascade so a
     // fresh install reads self-consistent state. Explicit-false stored by
     // a returning user is preserved (the `?:` fallback only fires when the
-    // key is absent). See `docs/audits/BRAIN_MODE_PAGE_DEFAULT_ON_AUDIT.md`.
+    // key is absent).
     val ndPreferencesFlow: Flow<NdPreferences> = dataStore.data.map { prefs ->
         NdPreferences(
             adhdModeEnabled = prefs[KEY_ADHD_MODE] ?: true,

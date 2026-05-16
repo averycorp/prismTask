@@ -12,8 +12,7 @@ import kotlin.random.Random
  * Emulator so it gates every PR's `testDebugUnitTest` instead of only the
  * integration workflow.
  *
- * Per audit (`docs/audits/AUTOMATED_EDGE_CASE_TESTING_AUDIT.md`), seed
- * stability is the contract that lets a CI failure be replayed locally —
+ * Seed stability is the contract that lets a CI failure be replayed locally —
  * if this contract breaks, every fuzz scenario's "replay seed=N" instruction
  * is wrong.
  */

@@ -4,8 +4,7 @@ package com.averycorp.prismtask.domain.model.medication
  * Selection scope for bulk-marking medications to a single tier in one
  * action. Tier-scope is intentionally not modeled here — under the
  * uniform-setter interpretation it collapses onto [FULL_DAY], so the
- * first ship offers two scopes and the dialog stays narrower. See
- * `docs/audits/BULK_MEDICATION_MARK_AUDIT.md` Decision 2.
+ * first ship offers two scopes and the dialog stays narrower.
  */
 enum class BulkMarkScope {
     /**

@@ -386,9 +386,8 @@ constructor(
         // `_batchIntents` / `_multiCreateIntents` twice. Two emissions =
         // two navigations = two fresh `BatchPreviewViewModel`s = two
         // Haiku calls returning non-deterministic mutations (the user
-        // sees "different options the second time"). See
-        // docs/audits/BATCH_OPERATIONS_DOUBLE_RUN_AUDIT.md (A4 / A5 /
-        // A6 — three branches, one race shape).
+        // sees "different options the second time"). Three branches,
+        // one race shape (A4 / A5 / A6).
         if (_isSubmitting.value) return
         _isSubmitting.value = true
 

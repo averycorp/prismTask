@@ -8,7 +8,7 @@ import org.junit.Test
  * Pure-JVM unit tests for
  * [AutomationTimeTickWorker.computeNextMinuteBoundaryDelayMs] — the
  * delay-arithmetic helper that drives the per-minute self-rescheduling
- * chain (Path C, per `AUTOMATION_MINUTE_CADENCE_PHASE_2_AUDIT.md`).
+ * chain (minute-cadence Phase 2, Path C).
  *
  * Mirrors the [DailyResetWorkerScheduleTest] shape: hand-built `now`
  * instants exercise the boundary-equality and end-of-minute edges that

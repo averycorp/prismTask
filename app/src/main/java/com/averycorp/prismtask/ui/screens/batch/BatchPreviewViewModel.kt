@@ -85,8 +85,7 @@ constructor(
         // tapped Approve — re-parsing would burn a Haiku call on now-stale
         // state and, for non-idempotent operations like tag adds or date
         // increments, risk a double-apply if the user taps Approve on the
-        // re-fired preview. See docs/audits/BATCH_PREVIEW_REFIRE_AUDIT.md
-        // for the full failure analysis.
+        // re-fired preview.
         when (val current = _state.value) {
             is BatchPreviewState.Loading,
             is BatchPreviewState.Committing,

@@ -35,9 +35,6 @@ import org.junit.runner.RunWith
  * does the Save button refuse the click in the first place. Without
  * this test, a future refactor of `enabled = ...` would not regress
  * the unit tests but would silently regress the dialog.
- *
- * See `docs/audits/ALLOW_UNSCHEDULED_MEDICATION_AUDIT.md` and
- * `docs/audits/F5_MEDICATION_HYGIENE_FOLLOWONS_AUDIT.md` § B.3.
  */
 @RunWith(AndroidJUnit4::class)
 class MedicationEditorDialogTest {
@@ -156,10 +153,7 @@ class MedicationEditorDialogTest {
      * prevented the user from completing the value. Post-fix, the
      * field's visibility is governed by an explicit `isCustomInterval`
      * state that only flips on chip clicks, so typing through any
-     * preset is non-disruptive. See
-     * `docs/audits/MEDICATION_CUSTOM_INTERVAL_INPUT_AUDIT.md` §
-     * Anti-pattern recommendation #1 for the unfixed-half-of-#1051
-     * history.
+     * preset is non-disruptive.
      */
     @Test
     fun customIntervalField_staysVisible_whenTypedValueLandsOnPreset() {

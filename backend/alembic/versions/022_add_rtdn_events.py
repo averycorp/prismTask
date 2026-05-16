@@ -1,10 +1,10 @@
 """Add ``rtdn_events`` append-only audit table for Google Play
 Real-Time Developer Notifications.
 
-Per ``docs/audits/BILLING_SCHEMA_AUDIT.md``, this is option B (the
-smallest delta that earns its keep): a single append-only table that
-captures every Pub/Sub Push payload from Google's RTDN feed, keyed by
-the Pub/Sub message id for idempotency on redelivery.
+This is option B of the billing-schema audit (the smallest delta that
+earns its keep): a single append-only table that captures every Pub/Sub
+Push payload from Google's RTDN feed, keyed by the Pub/Sub message id
+for idempotency on redelivery.
 
 The existing ``users.tier`` column + ``services/billing.py`` validator
 remain the entitlement source of truth — this migration does not

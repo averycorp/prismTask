@@ -28,8 +28,7 @@ interface Props {
  * complete" is one Firestore doc write and "mark today complete (full
  * day)" is N doc writes, where N = active slot count. The full-day
  * path uses `setTierStatesAtomic` (a writeBatch wrapper) so a network
- * blip mid-bulk doesn't leave the user with a torn state — see
- * `docs/audits/BULK_MEDICATION_MARK_AUDIT.md` Decision 1.
+ * blip mid-bulk doesn't leave the user with a torn state.
  *
  * Tier scope (the third option in the original audit prompt) is not
  * modeled — under the uniform-setter interpretation it collapses onto

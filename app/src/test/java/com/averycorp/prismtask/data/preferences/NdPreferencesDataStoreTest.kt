@@ -51,8 +51,7 @@ class NdPreferencesDataStoreTest {
         // Operator product decision 2026-05-14: presume ND baseline for
         // first-time users. Fresh DataStore (no keys written) reads all
         // three top-level modes ON and their cascade sub-settings ON to
-        // match `setX(true)` semantics. See
-        // `docs/audits/BRAIN_MODE_PAGE_DEFAULT_ON_AUDIT.md`.
+        // match `setX(true)` semantics.
         val prefs = ndPrefs.ndPreferencesFlow.first()
         assertTrue(prefs.adhdModeEnabled)
         assertTrue(prefs.calmModeEnabled)

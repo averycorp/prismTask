@@ -4,8 +4,7 @@ name: Auto-update-branch
 # auto-merge.yml's PR #777 update-branch step (which fires only on
 # pull_request events — i.e. when the PR head SHA changes); this
 # workflow fires when MAIN advances, which auto-merge.yml does not
-# observe. See docs/audits/AUTO_UPDATE_BRANCH_AUDIT.md for the full
-# rationale.
+# observe.
 #
 # Token: AUTOFIX_PAT (Pull Requests: Write + Contents: Read+Write per
 # memory entry #21). The whole point of this workflow is that

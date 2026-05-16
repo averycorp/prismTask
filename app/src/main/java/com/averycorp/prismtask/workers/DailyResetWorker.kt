@@ -93,10 +93,9 @@ constructor(
          * milliseconds from [now] until the next configured boundary
          * crossing — never negative.
          *
-         * Per audit `docs/audits/AUTOMATED_EDGE_CASE_TESTING_AUDIT.md`
-         * (Tier A2), threading [now] makes this deterministic; production
-         * callers continue to use `System.currentTimeMillis()` via the
-         * default.
+         * Threading [now] makes this deterministic (edge-case-testing
+         * Tier A2); production callers continue to use
+         * `System.currentTimeMillis()` via the default.
          */
         @JvmStatic
         @JvmOverloads
