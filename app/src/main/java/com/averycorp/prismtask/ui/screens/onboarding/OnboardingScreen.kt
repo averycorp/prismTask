@@ -785,12 +785,6 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
             LaunchedEffect(Unit) { flow.collect { state.value = it } }
             state
         }
-    val leisureEnabled by viewModel.leisureEnabled
-        .let { flow ->
-            val state = remember { mutableStateOf(true) }
-            LaunchedEffect(Unit) { flow.collect { state.value = it } }
-            state
-        }
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
@@ -831,9 +825,12 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
         // Hide template sections whose owning Life Mode is off (toggled on the
         // prior LifeModesPage). Settings "Browse Templates" still shows everything.
-        if (!selfCareEnabled && !houseworkEnabled && !leisureEnabled) {
+        // Leisure intentionally excluded: post Leisure Budget v2.0 (PR #1278) the
+        // picker no longer has a Leisure section — that pool is seeded via
+        // LeisurePoolScreen — so Self-Care + Housework are the only mode gates.
+        if (!selfCareEnabled && !houseworkEnabled) {
             Text(
-                text = "No template sections — every Life Mode is off. Tap Next to skip.",
+                text = "No template sections — Self-Care and Housework are both off. Tap Next to skip.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -844,7 +841,6 @@ private fun TemplatesPage(viewModel: OnboardingViewModel) {
                 state = selections,
                 onChange = viewModel::updateTemplateSelections,
                 modifier = Modifier.fillMaxWidth(),
-                showLeisure = leisureEnabled,
                 showSelfCare = selfCareEnabled,
                 showHousework = houseworkEnabled
             )
