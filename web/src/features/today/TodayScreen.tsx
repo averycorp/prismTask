@@ -28,6 +28,7 @@ import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
 import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow';
 import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
+import { DailyEssentialsCards } from '@/features/today/DailyEssentialsCards';
 import { PlanForTodaySheet } from '@/features/today/PlanForTodaySheet';
 import { RestDayBanner } from '@/features/today/RestDayBanner';
 import { useRestDayStore } from '@/stores/restDayStore';
@@ -405,7 +406,7 @@ export function TodayScreen() {
               />
             );
           case 'daily_essentials':
-            return null;
+            return <DailyEssentialsCards key={sectionKey} />;
           case 'habits':
             return (
               <HabitChipsSection
