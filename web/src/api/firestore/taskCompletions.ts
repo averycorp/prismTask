@@ -26,12 +26,11 @@ import { firestore } from '@/lib/firebase';
  * Parity audit item B.6 — see
  * `docs/audits/ANDROID_WEB_PARITY_AUDIT_2026-05-13.md`.
  *
- * The write path uses Pattern A canonical-row dedup
- * (`docs/audits/WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md`): a
- * deterministic doc id of `${taskCloudId}__${completedDateLocal}` plus
- * `setDoc(..., { merge: true })` so two devices completing the same
- * task on the same logical day converge on a single Firestore doc
- * rather than racing into duplicate siblings.
+ * The write path uses Pattern A canonical-row dedup: a deterministic
+ * doc id of `${taskCloudId}__${completedDateLocal}` plus `setDoc(..., {
+ * merge: true })` so two devices completing the same task on the same
+ * logical day converge on a single Firestore doc rather than racing
+ * into duplicate siblings.
  */
 
 // ── Collection / doc refs ─────────────────────────────────────

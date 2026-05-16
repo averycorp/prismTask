@@ -21,8 +21,7 @@ import org.junit.Test
 
 /**
  * Unit tests for [AiFeatureGateInterceptor] — the OkHttp interceptor that
- * enforces the privacy invariant for the master AI features toggle (PR #790,
- * `docs/audits/PII_EGRESS_AUDIT.md`).
+ * enforces the privacy invariant for the master AI features toggle (PR #790).
  *
  * Phase F privacy invariant: when `Settings → AI Features → "Use Claude AI
  * for advanced features"` is OFF, no PrismTask data — including medication

@@ -24,8 +24,7 @@ internal data class DueDateLabel(
  *
  * Reads SoD-anchored day bounds from [LocalDayBounds] so the
  * Today/Tomorrow split tracks the user's configured Start of Day,
- * not raw calendar midnight — see
- * `docs/audits/TODAY_LABEL_SOD_BOUNDARY_AUDIT.md`.
+ * not raw calendar midnight.
  */
 @Composable
 internal fun formatDueDate(epochMillis: Long): DueDateLabel {

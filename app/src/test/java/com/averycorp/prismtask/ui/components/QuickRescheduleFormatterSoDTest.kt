@@ -6,8 +6,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Repro for the SoD-boundary bug in `QuickRescheduleFormatter` —
- * see `docs/audits/TODAY_LABEL_SOD_BOUNDARY_AUDIT.md` § 4.
+ * Repro for the SoD-boundary bug in `QuickRescheduleFormatter`.
  */
 class QuickRescheduleFormatterSoDTest {
     private val zone = ZoneId.of("UTC")

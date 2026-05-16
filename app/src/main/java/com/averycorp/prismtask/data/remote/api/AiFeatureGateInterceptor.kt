@@ -86,7 +86,6 @@ constructor(
 
         /**
          * Path prefixes that egress user data to Anthropic via the backend.
-         * Sourced from `docs/audits/PII_EGRESS_AUDIT.md` Section 1.
          *
          * Prefixes must match the *full* outbound URL path (including the
          * `/api/v1` API version prefix), because OkHttp interceptors see

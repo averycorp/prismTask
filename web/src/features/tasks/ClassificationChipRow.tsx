@@ -4,10 +4,8 @@ import { Loader2, Sparkles } from 'lucide-react';
  * Shared three-chip picker used by Organize-tab classification dimensions
  * (TaskMode, CognitiveLoad). Mirrors Android's chip-row Organize-tab
  * pattern: three explicit values + an "Auto" affordance, with the
- * `UNCATEGORIZED` state represented by no chip selected. Extracted per
- * the audit's recommendation (WEB_PILLARS_PHILOSOPHY_AUDIT lines
- * 365–368) so the three classification rows stay visually + behaviorally
- * in sync.
+ * `UNCATEGORIZED` state represented by no chip selected. Extracted so
+ * the three classification rows stay visually + behaviorally in sync.
  *
  * The `LifeCategory` row inside `TaskEditor` still uses a `<select>` today
  * because it lives on a different upgrade path (AI-backed Claude

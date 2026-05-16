@@ -11,8 +11,7 @@ import { firestore } from '@/lib/firebase';
 /**
  * Advanced Tuning preferences synced cross-device with Android.
  *
- * Phase 2 item #4 from `docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md` —
- * mirrors the subset of Android's `AdvancedTuningPreferences` DataStore
+ * Mirrors the subset of Android's `AdvancedTuningPreferences` DataStore
  * that the three composable philosophy pillars depend on:
  *
  *   - **Forgiveness-first streaks** — `gracePeriodDays` + `allowedMisses`
@@ -59,8 +58,7 @@ const FIELD_FORGIVENESS_ENABLED = 'forgiveness_enabled';
 const FIELD_GRACE_PERIOD_DAYS = 'forgiveness_grace_days';
 const FIELD_ALLOWED_MISSES = 'forgiveness_allowed_misses';
 
-// Per-`TaskMode` forgiveness overrides — Phase 2 item #5 from the web
-// pillars audit (`docs/audits/WEB_PILLARS_PHILOSOPHY_AUDIT.md`). Mirrors
+// Per-`TaskMode` forgiveness overrides. Mirrors
 // the `docs/WORK_PLAY_RELAX.md` § *Streak strictness* table: Work uses
 // the standard window, Play and Relax default to a wider one (14 days /
 // 2 allowed misses). Each mode's grace + miss pair has its own slider

@@ -154,9 +154,7 @@ data class TaskEntity(
      * Per-task fractional progress in `0..100`. NULL means "binary" —
      * the task uses [isCompleted] as its source of truth (legacy
      * default). Non-NULL values are only authored by tasks that live
-     * under a project (P9 option a from
-     * `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md`); other surfaces
-     * keep reading [isCompleted].
+     * under a project; other surfaces keep reading [isCompleted].
      *
      * Added in v1.8.x as part of the PrismTask-timeline-class scope (PR-1).
      */

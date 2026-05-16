@@ -45,8 +45,6 @@ function completionsCol(uid: string) {
  * not on the legacy `completedDate` epoch ms — two devices in different
  * timezones agree on the logical-day key but disagree on the epoch
  * derived from `new Date(date+"T00:00:00").getTime()`.
- *
- * See `docs/audits/WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md`.
  */
 function habitCompletionId(habitCloudId: string, completedDateLocal: string): string {
   return `${habitCloudId}__${completedDateLocal}`;
@@ -390,7 +388,7 @@ export async function toggleCompletion(
   // resolve to the same Firestore doc path, so parallel `setDoc(...,
   // {merge: true})` calls converge to one doc rather than racing into
   // two siblings (the prior `getDocs` pre-query → `addDoc` shape had a
-  // TOCTOU window). See WEB_CANONICAL_ROW_DEDUP_PARITY_AUDIT.md.
+  // TOCTOU window).
   const completionId = habitCompletionId(habitId, date);
   const canonicalRef = completionDoc(uid, completionId);
   const canonicalSnap = await getDoc(canonicalRef);

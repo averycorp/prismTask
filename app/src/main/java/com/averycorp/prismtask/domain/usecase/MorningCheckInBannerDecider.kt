@@ -10,8 +10,6 @@ package com.averycorp.prismtask.domain.usecase
  * and SoD (when the user's day hadn't started yet), and the
  * `MorningCheckInPromptCutoff` Settings slider had no effect on the
  * banner.
- *
- * See `docs/audits/MORNING_CHECKIN_SOD_BOUNDARY_AUDIT.md`.
  */
 object MorningCheckInBannerDecider {
     /**

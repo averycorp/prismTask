@@ -35,9 +35,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * End-to-end test exercising [GenericPreferenceSyncService] against the
- * live Firebase Emulator Suite. Closes the structural gap identified by
- * `docs/audits/SETTINGS_SYNC_AUDIT.md` (Item 6) — prior to this test
- * the only sync-side coverage was unit-level
+ * live Firebase Emulator Suite. Closes a structural gap — prior to this
+ * test the only sync-side coverage was unit-level
  * `PreferenceSyncSerializationTest`, leaving the entire
  * DataStore → Firestore → DataStore round-trip untested.
  *

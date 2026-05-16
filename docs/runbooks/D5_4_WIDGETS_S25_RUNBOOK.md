@@ -1,10 +1,7 @@
 # D5#4 — Widget Phase F S25 Runbook
 
 **Audit:** `docs/audits/WIDGET_FUNCTIONALITY_FIDELITY_AUDIT.md`,
-`docs/audits/WIDGET_TAB_PARITY_AUDIT.md`,
-`docs/audits/WIDGET_LAUNCHER_PREVIEWS_AUDIT.md`,
-`docs/audits/TIMER_WIDGET_BROKEN_AUDIT.md`,
-`docs/audits/WIDGET_LAUNCH_ACTION_SEALED_AUDIT.md` + this bundle's
+`docs/audits/WIDGET_TAB_PARITY_AUDIT.md` + this bundle's
 audit at `docs/audits/D5_D6_FINISH_BUNDLE_AUDIT.md` §4.
 **Phase F gate:** YES — 14 widgets at 1.0 is a launch promise.
 **Owner:** Avery (operator), on Samsung Galaxy S25 Ultra (OneUI

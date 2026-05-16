@@ -60,8 +60,6 @@ constructor(
      * in as [logicalDateIso] so the dismissal stays consistent with the
      * reader-side comparison. Defaults to the wall-clock date for callers
      * with no SoD context.
-     *
-     * See `docs/audits/MORNING_CHECKIN_SOD_BOUNDARY_AUDIT.md` § 3.
      */
     suspend fun dismissBannerToday(logicalDateIso: String = todayString()) {
         context.morningCheckInDataStore.edit { prefs ->

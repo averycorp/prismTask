@@ -21,8 +21,7 @@ import java.time.ZoneId
 
 /**
  * Regression gate for `TaskListViewModel.startOfToday`'s SoD-boundary
- * fix (`docs/audits/UTIL_DAYBOUNDARY_SWEEP_AUDIT.md` § 3, plus the
- * "From Earlier shows things due today" follow-up).
+ * fix (covers the "From Earlier shows things due today" follow-up).
  *
  * Reconstructs the production shape from `TaskListViewModel.startOfToday`:
  *

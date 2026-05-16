@@ -23,8 +23,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * Regression gate for `TodayViewModel`'s SoD-boundary fix
- * (`docs/audits/UTIL_DAYBOUNDARY_SWEEP_AUDIT.md` § 1).
+ * Regression gate for `TodayViewModel`'s SoD-boundary fix.
  *
  * **Phase-5 (GREEN) form** — assertions encode the bug-fixed state.
  * The two tests reconstruct the post-migration shapes from

@@ -2131,7 +2131,7 @@ val MIGRATION_69_70 = object : Migration(69, 70) {
  * mode classifier only runs on new tasks created after the feature
  * ships, so a user's archived history is not silently re-tagged.
  *
- * Audit: `docs/audits/WORK_PLAY_RELAX_AUDIT.md` (PR #1059).
+ * Shipped in PR #1059.
  */
 val MIGRATION_70_71 = object : Migration(70, 71) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -2175,8 +2175,7 @@ val MIGRATION_71_72 = object : Migration(71, 72) {
  *    deletion does not cascade-delete tasks.
  *  * `tasks.progress_percent` — nullable INTEGER in `0..100`.
  *
- * Audit: `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md`. Recovery
- * strategy mirrors PR #1056 — fall through to
+ * Recovery strategy mirrors PR #1056 — fall through to
  * `fallbackToDestructiveMigration` if the migration fails on a tester
  * device; Firestore pull restores data on next sign-in.
  */
@@ -2258,8 +2257,7 @@ val MIGRATION_72_73 = object : Migration(72, 73) {
  * `DependencyCycleGuard` (mirror of the AutomationEngine lineage check
  * from PR #1056).
  *
- * Pure-additive migration. Audit:
- * `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md`.
+ * Pure-additive migration.
  */
 val MIGRATION_73_74 = object : Migration(73, 74) {
     override fun migrate(db: SupportSQLiteDatabase) {

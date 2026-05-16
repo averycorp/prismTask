@@ -4,8 +4,7 @@ package com.averycorp.prismtask.domain.model
  * Per-task lifecycle state used by the Today / project surfaces. The
  * forgiveness-first streak engine treats [BlockedByDependency] as a
  * third state that is neither "overdue" (which would break the streak)
- * nor "met" (which would count toward it) — see P6 in
- * `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md`.
+ * nor "met" (which would count toward it).
  *
  * Added in v1.8.x as part of the PrismTask-timeline-class scope (PR-2).
  *

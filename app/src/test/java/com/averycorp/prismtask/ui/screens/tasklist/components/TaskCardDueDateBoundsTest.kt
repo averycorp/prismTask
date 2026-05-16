@@ -8,8 +8,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Structural repro for the SoD-boundary bug — see
- * `docs/audits/TODAY_LABEL_SOD_BOUNDARY_AUDIT.md`.
+ * Structural repro for the SoD-boundary bug.
  *
  * Setup: wall-clock = 2026-04-29 02:00 UTC, SoD = 04:00.
  * Logical day = 2026-04-28 (we're still before SoD on Apr 29).

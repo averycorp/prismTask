@@ -9,8 +9,7 @@ package com.averycorp.prismtask.domain.model
  * Stored on disk as a single JSON string in `external_anchors.anchor_json`
  * via [com.averycorp.prismtask.data.remote.adapter.ExternalAnchorJsonAdapter],
  * which mirrors the `AutomationJsonAdapter` polymorphic pattern from
- * PR #1056. See
- * `docs/audits/PRISMTASK_TIMELINE_CLASS_AUDIT.md` (P8).
+ * PR #1056.
  *
  * Added in v1.8.x as part of the PrismTask-timeline-class scope (PR-3).
  */

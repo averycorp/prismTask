@@ -26,8 +26,6 @@ import org.junit.Test
  * the data-class fallback ("solid"). The Habits card on the same routine
  * read the configured value correctly because `HabitListViewModel` folds
  * `tierDefaults` into a subscribed combine.
- *
- * See `docs/audits/SELFCARE_DEFAULT_TIER_NOT_RESPECTED_AUDIT.md`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SelfCareViewModelTierDefaultTest {
