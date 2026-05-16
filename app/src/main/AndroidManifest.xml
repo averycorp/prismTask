@@ -180,7 +180,7 @@
 
         <receiver
             android:name=".widget.TodayWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -192,7 +192,7 @@
 
         <receiver
             android:name=".widget.HabitStreakWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -213,7 +213,7 @@
 
         <receiver
             android:name=".widget.ProjectWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -289,7 +289,7 @@
 
         <receiver
             android:name=".widget.QuickAddWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -301,7 +301,7 @@
 
         <receiver
             android:name=".widget.ProductivityWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -313,7 +313,7 @@
 
         <receiver
             android:name=".widget.UpcomingWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -325,7 +325,7 @@
 
         <receiver
             android:name=".widget.TimerWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -337,7 +337,7 @@
 
         <receiver
             android:name=".widget.CalendarWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -350,7 +350,7 @@
         <!-- Eisenhower matrix widget (proposed in Widget Mockups, v1.7+) -->
         <receiver
             android:name=".widget.EisenhowerWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -362,7 +362,7 @@
 
         <receiver
             android:name=".widget.StreakCalendarWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -374,7 +374,7 @@
 
         <receiver
             android:name=".widget.FocusWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -386,7 +386,7 @@
 
         <receiver
             android:name=".widget.MedicationWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -398,7 +398,7 @@
 
         <receiver
             android:name=".widget.StatsSparklineWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -410,7 +410,7 @@
 
         <receiver
             android:name=".widget.InboxWidgetReceiver"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
