@@ -1563,11 +1563,21 @@ private fun LifeModeRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    // Card-level toggleable owns the gesture so a tap anywhere on the row —
+    // including the Switch thumb — routes through a single handler. The earlier
+    // shape paired `Card.clickable { onCheckedChange(!checked) }` with
+    // `Switch(onCheckedChange = onCheckedChange)`, so a tap on the Switch fired
+    // *both* and the duplicate write drove a recompose race that snapped the
+    // thumb back. `Role.Switch` also gives TalkBack the right announcement.
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .clickable { onCheckedChange(!checked) },
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (checked) {
                 MaterialTheme.colorScheme.primaryContainer
@@ -1611,9 +1621,11 @@ private fun LifeModeRow(
                     }
                 )
             }
+            // Visual indicator only — the Card's toggleable is the sole tap
+            // handler, so the Switch must not fire onCheckedChange itself.
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = null
             )
         }
     }
