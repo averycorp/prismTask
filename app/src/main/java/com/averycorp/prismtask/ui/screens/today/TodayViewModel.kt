@@ -596,6 +596,10 @@ constructor(
         .getShowProgressPercentage()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val ringAsCompletionArc: StateFlow<Boolean> = dashboardPreferences
+        .getRingAsCompletionArc()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val collapsedSections: StateFlow<Set<String>> = dashboardPreferences
         .getCollapsedSections()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardPreferences.DEFAULT_COLLAPSED)

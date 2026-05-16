@@ -29,6 +29,7 @@ constructor(
         private val COLLAPSED_SECTIONS = stringSetPreferencesKey("collapsed_sections")
         private val COMPLETION_COUNT_MODE = stringPreferencesKey("completion_count_mode")
         private val SHOW_PROGRESS_PERCENTAGE = booleanPreferencesKey("show_progress_percentage")
+        private val RING_AS_COMPLETION_ARC = booleanPreferencesKey("ring_as_completion_arc")
 
         val DEFAULT_ORDER = listOf(
             "progress",
@@ -88,6 +89,16 @@ constructor(
         }
     }
 
+    fun getRingAsCompletionArc(): Flow<Boolean> = context.dashboardDataStore.data.map { prefs ->
+        prefs[RING_AS_COMPLETION_ARC] ?: false
+    }
+
+    suspend fun setRingAsCompletionArc(enabled: Boolean) {
+        context.dashboardDataStore.edit { prefs ->
+            prefs[RING_AS_COMPLETION_ARC] = enabled
+        }
+    }
+
     suspend fun setSectionCollapsed(sectionKey: String, collapsed: Boolean) {
         context.dashboardDataStore.edit { prefs ->
             val current = prefs[COLLAPSED_SECTIONS] ?: DEFAULT_COLLAPSED
@@ -121,6 +132,7 @@ constructor(
             prefs.remove(COLLAPSED_SECTIONS)
             prefs.remove(COMPLETION_COUNT_MODE)
             prefs.remove(SHOW_PROGRESS_PERCENTAGE)
+            prefs.remove(RING_AS_COMPLETION_ARC)
         }
     }
 }

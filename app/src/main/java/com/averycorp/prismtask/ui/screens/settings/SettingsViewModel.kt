@@ -678,6 +678,10 @@ constructor(
         .getShowProgressPercentage()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val ringAsCompletionArc: StateFlow<Boolean> = dashboardPreferences
+        .getRingAsCompletionArc()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val completionCountMode: StateFlow<CompletionCountMode> = dashboardPreferences
         .getCompletionCountMode()
         .stateIn(
@@ -1037,6 +1041,10 @@ constructor(
 
     fun setShowProgressPercentage(show: Boolean) {
         viewModelScope.launch { dashboardPreferences.setShowProgressPercentage(show) }
+    }
+
+    fun setRingAsCompletionArc(enabled: Boolean) {
+        viewModelScope.launch { dashboardPreferences.setRingAsCompletionArc(enabled) }
     }
 
     fun setCompletionCountMode(mode: CompletionCountMode) {

@@ -74,6 +74,7 @@ internal fun CompactProgressHeader(
     progress: Float,
     progressStyle: String = "ring",
     showProgressPercentage: Boolean = false,
+    ringAsCompletionArc: Boolean = false,
     onAnalyticsClick: (() -> Unit)? = null,
     onCompletedClick: (() -> Unit)? = null,
     productivityBadge: @Composable (() -> Unit)? = null,
@@ -210,12 +211,32 @@ internal fun CompactProgressHeader(
                                 }
                             }
 
-                            // Always a full ring — the count inside conveys completion,
-                            // not a partial arc sweep. Matrix theme keeps its dashed look.
+                            // Default: full ring — the count inside conveys completion.
+                            // When ringAsCompletionArc is on, sweep proportionally to progress.
+                            // Matrix theme keeps its dashed look either way.
                             val ringPathEffect = if (attrs.terminal) {
                                 PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()), 0f)
                             } else {
                                 null
+                            }
+                            val sweep = if (ringAsCompletionArc) {
+                                animatedProgress.coerceIn(0f, 1f) * 360f
+                            } else {
+                                360f
+                            }
+                            if (ringAsCompletionArc) {
+                                drawArc(
+                                    color = colors.surface,
+                                    startAngle = -90f,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    topLeft = topLeft,
+                                    size = arcSize,
+                                    style = Stroke(
+                                        width = stroke,
+                                        cap = if (attrs.terminal || attrs.brackets) StrokeCap.Square else StrokeCap.Round
+                                    )
+                                )
                             }
                             if (attrs.sunset) {
                                 drawArc(
@@ -224,7 +245,7 @@ internal fun CompactProgressHeader(
                                         center = Offset(size.width / 2f, size.height / 2f)
                                     ),
                                     startAngle = -90f,
-                                    sweepAngle = 360f,
+                                    sweepAngle = sweep,
                                     useCenter = false,
                                     topLeft = topLeft,
                                     size = arcSize,
@@ -234,7 +255,7 @@ internal fun CompactProgressHeader(
                                 drawArc(
                                     color = barColor,
                                     startAngle = -90f,
-                                    sweepAngle = 360f,
+                                    sweepAngle = sweep,
                                     useCenter = false,
                                     topLeft = topLeft,
                                     size = arcSize,

@@ -112,12 +112,20 @@ class DashboardPreferencesTest {
     }
 
     @Test
+    fun ringAsCompletionArc_defaultsOff_andRoundTrips() = runTest {
+        assertEquals(false, prefs.getRingAsCompletionArc().first())
+        prefs.setRingAsCompletionArc(true)
+        assertEquals(true, prefs.getRingAsCompletionArc().first())
+    }
+
+    @Test
     fun resetToDefaults_clearsAllOverrides() = runTest {
         prefs.setSectionOrder(listOf("completed"))
         prefs.setHiddenSections(setOf("completed"))
         prefs.setProgressStyle("bar")
         prefs.setCompletionCountMode(CompletionCountMode.TASKS_ONLY)
         prefs.setShowProgressPercentage(true)
+        prefs.setRingAsCompletionArc(true)
         prefs.resetToDefaults()
 
         assertEquals(DashboardPreferences.DEFAULT_ORDER, prefs.getSectionOrder().first())
@@ -125,5 +133,6 @@ class DashboardPreferencesTest {
         assertEquals("ring", prefs.getProgressStyle().first())
         assertEquals(CompletionCountMode.TASKS_AND_HABITS, prefs.getCompletionCountMode().first())
         assertEquals(false, prefs.getShowProgressPercentage().first())
+        assertEquals(false, prefs.getRingAsCompletionArc().first())
     }
 }

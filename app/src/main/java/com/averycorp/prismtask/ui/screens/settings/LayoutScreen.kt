@@ -38,6 +38,7 @@ fun LayoutScreen(
     val hiddenSections by viewModel.hiddenSections.collectAsStateWithLifecycle()
     val progressStyle by viewModel.progressStyle.collectAsStateWithLifecycle()
     val showProgressPercentage by viewModel.showProgressPercentage.collectAsStateWithLifecycle()
+    val ringAsCompletionArc by viewModel.ringAsCompletionArc.collectAsStateWithLifecycle()
     val completionCountMode by viewModel.completionCountMode.collectAsStateWithLifecycle()
     val swipePrefs by viewModel.swipePrefs.collectAsStateWithLifecycle()
 
@@ -71,11 +72,13 @@ fun LayoutScreen(
             DashboardSection(
                 progressStyle = progressStyle,
                 showProgressPercentage = showProgressPercentage,
+                ringAsCompletionArc = ringAsCompletionArc,
                 completionCountMode = completionCountMode,
                 sectionOrder = sectionOrder,
                 hiddenSections = hiddenSections,
                 onProgressStyleChange = viewModel::setProgressStyle,
                 onShowProgressPercentageChange = viewModel::setShowProgressPercentage,
+                onRingAsCompletionArcChange = viewModel::setRingAsCompletionArc,
                 onCompletionCountModeChange = viewModel::setCompletionCountMode,
                 onHiddenSectionsChange = viewModel::setHiddenSections,
                 onSectionOrderChange = viewModel::setSectionOrder,
