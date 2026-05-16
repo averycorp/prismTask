@@ -29,6 +29,7 @@ import {
   Coffee,
   Brain,
   LayoutDashboard,
+  GraduationCap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useThemeStore } from '@/stores/themeStore';
@@ -52,6 +53,7 @@ import { MedicationReminderModeSection } from '@/features/settings/sections/Medi
 import { BoundariesSection } from '@/features/settings/sections/BoundariesSection';
 import { WorkLifeBalanceSection } from '@/features/settings/sections/WorkLifeBalanceSection';
 import { LeisureBudgetSection } from '@/features/settings/sections/LeisureBudgetSection';
+import { SchoolworkSection } from '@/features/settings/sections/SchoolworkSection';
 import { AboutSection } from '@/features/settings/sections/AboutSection';
 import { HelpFeedbackSection } from '@/features/settings/sections/HelpFeedbackSection';
 import { AccessibilitySection } from '@/features/settings/sections/AccessibilitySection';
@@ -583,6 +585,14 @@ export function SettingsScreen() {
         >
           Open Brain Mode →
         </Link>
+      </SettingsSection>
+
+      {/* Schoolwork — parity unit 22 (course + assignment CRUD) */}
+      <SettingsSection
+        icon={<GraduationCap className="h-5 w-5 text-[var(--color-accent)]" />}
+        title="Schoolwork"
+      >
+        <SchoolworkSection />
       </SettingsSection>
 
       {/* ND-Friendly Modes — parity audit C.7c (granular sub-settings) */}
