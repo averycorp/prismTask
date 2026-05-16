@@ -204,3 +204,70 @@ PR fan-out:
 2. `chore/onboarding-retire-guided-tour-card` — finding #1
 3. `chore/onboarding-merge-projects-into-smart-tasks` — finding #4
 4. `chore/onboarding-a11y-reduce-motion-caption` — finding #3
+
+---
+
+## Phase 3 — Bundle summary
+
+| Finding | PR | Title | State |
+|---|---|---|---|
+| #2 + #6 | [#1588](https://github.com/averycorp/prismTask/pull/1588) | `fix(onboarding): stop TuningPage from silently overriding BrainMode + Forgiveness toggles` | Merged |
+| #4 | [#1587](https://github.com/averycorp/prismTask/pull/1587) | `chore(onboarding): fold ProjectsPage into SmartTasksPage (16 → 15 pages)` | Merged |
+| #3 | [#1586](https://github.com/averycorp/prismTask/pull/1586) | `chore(onboarding/a11y): clarify reduce-motion stacks with Brain Mode preferences` | Merged |
+| #1 | [#1591](https://github.com/averycorp/prismTask/pull/1591) | `chore(onboarding): retire GuidedTourCard in favor of CoachmarkTour` | Auto-merge queued |
+
+**Measured impact:**
+- Pager length: **16 → 15** pages (finding #4).
+- Post-onboarding tour surfaces: **5 + 13 = 18 → 13** (finding #1 — net –5 instructional surfaces).
+- Silent override defect class eliminated for 4 user-set preferences: `adhdMode`, `calmMode`, `focusReleaseMode`, `forgivenessPrefs.enabled` (finding #2 + #6).
+- Two-pref reduce-motion perception issue resolved with a caption (finding #3) — no behavior change.
+
+**Drive-by:** PR #1591 also fixed a pre-existing main red in `QuickAddViewModelBatchSubmitGuardTest` — PR #1580 added a `userPreferencesDataStore` parameter to `QuickAddViewModel`'s constructor but didn't update the test setUp. The audit's PR #1588 worker flagged it; #1591 picked up the fix.
+
+**Memory entry candidates:**
+- *None promoted.* The cascade-override pattern is a specific anti-pattern of `applyTuningSelections` rather than a generalizable rule, and the GuidedTour/Coachmark duplication was a one-off shipping accident. If the same pattern re-emerges in a future audit, that's the right time to canonize a memory.
+
+**Next-audit schedule:** No follow-up recommended on the onboarding flow specifically. The remaining green/intentional overlaps (`WelcomePage` + `SetupPage` sign-in; PrivacyPage AI toggle + V3 disclosure; Settings-parity surfaces) were verified and should be left alone. A separate audit on the **pager-page growth rate** (16 → 15 today, but trending up over the last 6 months) could be useful when the count hits 18+.
+
+---
+
+## Phase 4 — Claude Chat handoff
+
+```markdown
+**Scope.** Audited the PrismTask Android onboarding journey (16-page pager + 2 post-onboarding tour systems + first-run disclosures) for duplicate surfaces, conflicting prefs, and silent overrides between consecutive pages.
+
+**Verdicts.**
+
+| # | Surface | Verdict | One-line finding |
+|---|---|---|---|
+| 1 | `GuidedTourCard` (5 steps) + `CoachmarkTour` (13 steps) | RED | Both fire post-onboarding, gated on the same `tour_card_eligible` flag; coachmark content is a strict superset with mirrored phrasing. |
+| 2 | `OnboardingViewModel.applyTuningSelections` | RED | `TuningPage` (page 10) writes `setAdhdMode(true)` / `setCalmMode(true)` / `setFocusReleaseMode(true)` / `setForgivenessPrefs(...)` unconditionally, silently overriding explicit opt-outs from `BrainModePage` (page 9) and `HabitsPage` (page 6). |
+| 3 | `TuningPage` reduce-animations vs `AccessibilityPage` reduce-motion | YELLOW | Two distinct DataStore keys for the same concept on consecutive pages — `NdPreferencesDataStore.KEY_REDUCE_ANIMATIONS` vs `A11yPreferences.REDUCE_MOTION`. |
+| 4 | `SmartTasksPage` + `ProjectsPage` | YELLOW | Three consecutive informational pages (3, 4, 5); pages 3 and 4 both centre on projects. |
+| 5 | `PrivacyPage` AI toggle + `KEY_AI_CHAT_DISCLOSURE_SHOWN_V3` | STOP | Intentional — V3 disclosure carries retention-shape change not covered by onboarding gate. |
+| 6 | `HabitsPage` forgiveness Switch + Tuning `LOW_ENERGY_DAYS` | YELLOW (subsumed by #2) | Same write-conflict pattern as #2; fixed alongside it. |
+| 7 | `WelcomePage` sign-in + `SetupPage` sign-in | GREEN | Intentional second-chance pattern; shared `signInState`. |
+| 8 | Onboarding ↔ Settings parity (Brain Modes, Life Modes, Notifications, Accessibility) | GREEN | Principle 6 (no locked defaults) — required pattern, not overlap. |
+
+**Shipped.**
+
+- PR #1585 — audit doc (`docs/audits/ONBOARDING_OVERLAP_AUDIT.md`, 206 lines).
+- PR #1588 — `fix(onboarding): stop TuningPage from silently overriding BrainMode + Forgiveness toggles` (merged). Removed the parent-flag cascade writes from `applyTuningSelections`; defaults-true on all four affected prefs means it's a no-op for users who never opted out.
+- PR #1587 — `chore(onboarding): fold ProjectsPage into SmartTasksPage (16 → 15 pages)` (merged).
+- PR #1586 — `chore(onboarding/a11y): clarify reduce-motion stacks with Brain Mode preferences` (merged). One-line caption only, no behavior change.
+- PR #1591 — `chore(onboarding): retire GuidedTourCard in favor of CoachmarkTour` (auto-merge queued). Net –5 post-onboarding instructional surfaces; `TOUR_CARD_ELIGIBLE` preserved because the coachmark controller still reads it.
+
+**Deferred / stopped.**
+
+- Finding #5 (`PrivacyPage` AI vs Chat V3) — investigated, intentional. The V3 disclosure carries the retention-shape change documented in CLAUDE.md's "Chat Persistence (D11 E.3)" entry. Documented as "investigated, no work needed" so future audits don't re-flag.
+- Findings #7, #8 — green by design.
+
+**Non-obvious findings.**
+
+- All three ND modes (`KEY_ADHD_MODE`, `KEY_CALM_MODE`, `KEY_FOCUS_RELEASE_MODE`) default to **TRUE** in DataStore (`NdPreferencesDataStore.kt:85-87`). Same for `KEY_FORGIVENESS_ENABLED` (`UserPreferencesDataStore.kt:445`). This made the cascade-override bug surface invisible to new users (writes were no-ops) but actively destructive for any user who had opted out — easy class of bug to miss in QA.
+- `OnboardingPreferenceMapper`'s write-on-truthy-only pattern (`if (result.X) setX(true)`) cannot represent a "set X to false" intent. If a future Tuning option needs that, the architecture silently breaks. Flagged in the audit's anti-patterns section.
+- `CoachmarkTourContent.kt:82-83` carried a self-acknowledging comment that the tour mirrored `GUIDED_TOUR_STEPS` — visible evidence that the duplication was known but never resolved.
+- The drive-by fix to `QuickAddViewModelBatchSubmitGuardTest` shipped in PR #1591 — `userPreferencesDataStore` constructor parameter was added in PR #1580 but the test setUp wasn't updated. Pre-existing main red, not caused by this audit.
+
+**Open questions.** None blocking. The pager-page growth-rate trend is worth watching for a future audit if the count climbs back above 18.
+```
