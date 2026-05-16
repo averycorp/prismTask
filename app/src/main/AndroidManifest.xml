@@ -197,6 +197,15 @@
                 android:resource="@xml/habit_streak_widget_info" />
         </receiver>
 
+        <activity
+            android:name=".widget.HabitStreakWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PrismTask">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".widget.ProjectWidgetReceiver"
             android:enabled="true"
