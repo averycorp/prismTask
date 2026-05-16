@@ -157,3 +157,32 @@ Re-baselined wall-clock-per-PR estimate: this audit's data-wiring scope was a si
 ### Schedule for next audit
 
 In ~2 weeks, sample widget freshness on real installs by checking `gh run list --workflow=android-integration.yml` for any widget-related test failures and skim user-reported issues for "widget showing wrong data" / "widget hasn't updated" symptoms. If clean, no follow-up audit needed; if flake reappears, reopen this doc.
+
+---
+
+## Addendum — StreakCalendar widget audit (per-cell deep link + WidgetScaffold migration)
+
+**Date**: 2026-05-15
+**Scope**: `app/src/main/java/com/averycorp/prismtask/widget/StreakCalendarWidget.kt`, the matching `widget_preview_streak_calendar.xml`, and a new `StreakCalendarWidgetTest.kt`.
+
+Item 1 (PR #1025) landed real data wiring. This sweep verifies the four follow-up gaps called out in the unit-worker prompt and converts the widget from an ad-hoc inline scaffold to the shared `WidgetScaffold` + `WidgetEmptyState` chrome.
+
+| Gap | Pre-state | Post-state |
+|---|---|---|
+| Tap-cell deep link | The whole widget surface opened the Habits tab; per-cell taps had no date context. | Each cell builds an Intent carrying `EXTRA_LAUNCH_ACTION = open_habits` plus a new `StreakCalendarWidget.EXTRA_HABIT_DATE` long extra (cell's start-of-day timestamp). Fall-through tap on the scaffold opens habits at today. `NavGraph.OpenHabits` still routes to the Habits pager — the date payload is forward-compatible (Activity's `getIntent().getLongExtra(...)` consumer is a separate ship). |
+| Longest-streak header | Already wired in PR #1025; this sweep confirmed the source. | `data.longestStreak` from `WidgetDataProvider.getStreakCalendarData` — no hardcoded `18` survives. Pluralisation matches `HabitStreakWidget` (`day` vs `days`). Test pins this with an explicit `assertNotEquals(18, longestStreak)` regression assertion. |
+| Heatmap intensity scaling | `heatColor(v)` → `palette.primary.copy(alpha = ramp[v])` for `v` ∈ 1..4, `habitIncomplete` for `v == 0`. | Same shape; promoted from `private` to `internal` so the unit test can assert each bucket maps to a distinct color and `v ≥ 4` saturates to alpha 1.0. |
+| Empty state | None — the widget rendered a full empty heatmap with `🔥 0 day` header even when the user had zero completions. | When `data.activeDays == 0 && data.longestStreak == 0`, the widget renders `WidgetEmptyState(emoji = "🌱", message = "No Habit Activity Yet", palette)`. Header trailing fire icon is also dropped when `longestStreak == 0`. |
+
+Other deltas worth pinning:
+
+- **WidgetScaffold migration**: outer `Column { … }` with hand-rolled `cornerRadius` / `background(palette.surfaceBackground)` / `padding` / clickable surface replaced with `WidgetScaffold(palette, isLarge, "Streak Calendar", outerAction = …, headerTrailing = …)`. This brings the widget in line with the design rubric (palette via `loadWidgetPalette`, atmospheric drawable via `palette.surfaceBackground`, themed corner radius via `palette.widgetCornerRadius`, `WidgetTextStyles.headerThemed` / `headerLabel` for the title). The pre-PR widget had a *correctly-shaped* inline scaffold but duplicated the chrome that 5+ siblings already share.
+- **Start-of-Day awareness**: cell-date computation reuses `DayBoundary.startOfCurrentDay(...)` against `TaskBehaviorPreferences.getStartOfDay()` — same flow as `WidgetDataProvider.getStreakCalendarData` itself, so the deep-link timestamp matches the heatmap bucketing. A read failure (no DataStore / locked early-boot) silently falls back to `(0, 0)`.
+- **No shared-file edits**: `WidgetActions`, `WidgetUpdateManager`, `WidgetDataProvider`, `MainActivity`, `NavGraph`, `AndroidManifest` left untouched. Sibling widget units rely on this isolation.
+- **Test surface**: `StreakCalendarWidgetTest` (13 cases, Robolectric for the Intent assertions) — pins the extra key name, the launch-action wire-id, the cell-intent shape, the `OpenHabits` round-trip via `WidgetLaunchAction.deserialize`, and the empty-state condition. Heat-color tests confirm each bucket is distinct and `v ≥ 4` saturates.
+
+| Improvement | Cost | User-visible impact | PR |
+|---|---:|---|---|
+| Tap-cell deep link with date extra | XS | Per-day taps preserve a date payload for downstream "open habit log for this day" routing | this PR |
+| Empty state when no activity | XS | Users with no habit completions see "No Habit Activity Yet" instead of an empty heatmap and `🔥 0 day` header | this PR |
+| `WidgetScaffold` migration | XS | Consistent chrome / palette / atmospheric background with the rest of the widget family | this PR |
