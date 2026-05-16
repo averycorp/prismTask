@@ -33,12 +33,44 @@ import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.widget.launch.WidgetLaunchAction
 import java.util.Calendar
 
+/**
+ * Quick-Add Glance widget — a pill-shaped home-screen launcher that opens
+ * the in-app NLP quick-add capture (and a voice-input shortcut) without
+ * waiting for the app's cold start to draw its FAB.
+ *
+ * Size tiers:
+ *  - **SMALL** (200×40): pill only — diamond accent, rotating placeholder,
+ *    mic chip.
+ *  - **LARGE** (250×100): pill plus a row of up to three top template
+ *    shortcuts pulled from [WidgetDataProvider.getTopTemplates]. Empty
+ *    template list renders [WidgetEmptyState] instead of collapsing.
+ *
+ * Deep-link routing — every clickable surface stamps the typed
+ * [WidgetLaunchAction] wire id onto an Intent the activity rehydrates
+ * via [MainActivity.EXTRA_LAUNCH_ACTION]:
+ *  - Diamond + placeholder → [WidgetLaunchAction.QuickAdd]
+ *  - Mic chip → [WidgetLaunchAction.VoiceInput]
+ *  - Template tile → [WidgetLaunchAction.OpenTemplates]
+ *
+ * Theming: outer surface uses `palette.surfaceBackground` (atmospheric)
+ * and `palette.widgetCornerRadius`; inner pill keeps a 28dp radius as a
+ * deliberate design constant — pills aren't supposed to inherit the
+ * card-corner language. All text styles go through [WidgetTextStyles].
+ *
+ * `quick_add_widget_info.xml` declares `updatePeriodMillis="0"` — refresh
+ * is driven by [WidgetUpdateManager.updateAllWidgets] rather than the
+ * AppWidgetManager periodic schedule.
+ */
 class QuickAddWidget : GlanceAppWidget() {
     companion object {
         private val SMALL = DpSize(200.dp, 40.dp)
         private val LARGE = DpSize(250.dp, 100.dp)
         internal val PLACEHOLDERS =
             listOf("What's on your mind?", "Add a task...", "What needs doing?", "Plan something great...", "Quick capture...")
+
+        /** Stable index into [PLACEHOLDERS]; exposed for unit tests. */
+        internal fun placeholderFor(dayOfYear: Int): String =
+            PLACEHOLDERS[Math.floorMod(dayOfYear, PLACEHOLDERS.size)]
     }
 
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, LARGE))
@@ -66,32 +98,35 @@ private fun QuickAddContent(
 ) {
     val isLarge = size.height >= 100.dp
     val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
-    val placeholder = QuickAddWidget.PLACEHOLDERS[dayOfYear % QuickAddWidget.PLACEHOLDERS.size]
-    val addTaskIntent = Intent(context, MainActivity::class.java).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.QuickAdd.wireId)
-    }
-    val voiceIntent = Intent(context, MainActivity::class.java).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.VoiceInput.wireId)
-    }
-    Column(modifier = GlanceModifier.fillMaxSize().padding(8.dp).background(palette.background)) {
+    val placeholder = QuickAddWidget.placeholderFor(dayOfYear)
+    val addTaskIntent = launchIntent(context, WidgetLaunchAction.QuickAdd)
+    val voiceIntent = launchIntent(context, WidgetLaunchAction.VoiceInput)
+    val templatesIntent = launchIntent(context, WidgetLaunchAction.OpenTemplates)
+
+    Column(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .cornerRadius(palette.widgetCornerRadius)
+            .background(palette.surfaceBackground)
+            .padding(if (isLarge) 12.dp else 8.dp)
+    ) {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .cornerRadius(28.dp)
                 .background(palette.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clickable(actionStartActivity(addTaskIntent)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(text = "◆", style = TextStyle(fontSize = 16.sp, color = palette.primary))
             Spacer(modifier = GlanceModifier.width(10.dp))
-            Box(modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(addTaskIntent))) {
-                Text(
-                    text = placeholder,
-                    style = WidgetTextStyles.body(palette.onSurfaceVariant)
-                )
-            }
+            Text(
+                text = placeholder,
+                style = WidgetTextStyles.body(palette.onSurfaceVariant),
+                maxLines = 1,
+                modifier = GlanceModifier.defaultWeight()
+            )
             Spacer(modifier = GlanceModifier.width(8.dp))
             Box(
                 modifier = GlanceModifier
@@ -103,31 +138,35 @@ private fun QuickAddContent(
                 Text(text = "🎤", style = TextStyle(fontSize = 16.sp, color = palette.onPrimaryContainer))
             }
         }
-        if (isLarge && templates.isNotEmpty()) {
+        if (isLarge) {
             Spacer(modifier = GlanceModifier.height(8.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                templates.take(3).forEachIndexed { index, tpl ->
-                    if (index > 0) Spacer(modifier = GlanceModifier.width(6.dp))
-                    val tplIntent = Intent(context, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenTemplates.wireId)
-                    }
-                    Box(
-                        modifier = GlanceModifier
-                            .defaultWeight()
-                            .cornerRadius(8.dp)
-                            .background(palette.secondaryContainer)
-                            .padding(vertical = 8.dp)
-                            .clickable(actionStartActivity(tplIntent)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = tpl.icon, style = TextStyle(fontSize = 16.sp))
-                            Text(
-                                text = tpl.name.take(10),
-                                style = WidgetTextStyles.badge(palette.onSecondaryContainer),
-                                maxLines = 1
-                            )
+            if (templates.isEmpty()) {
+                WidgetEmptyState(
+                    emoji = "📋",
+                    message = "No Templates Yet",
+                    palette = palette
+                )
+            } else {
+                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    templates.take(3).forEachIndexed { index, tpl ->
+                        if (index > 0) Spacer(modifier = GlanceModifier.width(6.dp))
+                        Box(
+                            modifier = GlanceModifier
+                                .defaultWeight()
+                                .cornerRadius(8.dp)
+                                .background(palette.secondaryContainer)
+                                .padding(vertical = 8.dp)
+                                .clickable(actionStartActivity(templatesIntent)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(text = tpl.icon, style = TextStyle(fontSize = 16.sp))
+                                Text(
+                                    text = tpl.name.take(10),
+                                    style = WidgetTextStyles.badge(palette.onSecondaryContainer),
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
@@ -135,6 +174,13 @@ private fun QuickAddContent(
         }
     }
 }
+
+/** Build an Intent that rehydrates [action] inside `MainActivity`. */
+private fun launchIntent(context: Context, action: WidgetLaunchAction): Intent =
+    Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, action.wireId)
+    }
 
 class QuickAddWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = QuickAddWidget()
