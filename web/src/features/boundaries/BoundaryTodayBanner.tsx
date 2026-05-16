@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Flame, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import { useTaskStore } from '@/stores/taskStore';
@@ -110,6 +111,13 @@ export function BoundaryTodayBanner() {
               short break.
             </p>
           )}
+          <Link
+            to="/boundaries"
+            className="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline"
+            data-testid="boundary-today-banner-manage-link"
+          >
+            Review Boundary Rules
+          </Link>
         </div>
       </div>
     </div>

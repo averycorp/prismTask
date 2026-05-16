@@ -27,10 +27,32 @@ import { lwwUpdate } from './lww';
  *     scorer; not actively checked minute-by-minute.
  */
 
+/**
+ * `daily_task_cap` / `work_hours_window` / `weekly_hour_budget` are the
+ * original web-only rule types — the live enforcer + Today banner
+ * already understand them.
+ *
+ * `category_limit` and `escalation` are the parity-19 additions that
+ * mirror Android's richer `BoundaryRuleType` enum (BLOCK_CATEGORY /
+ * SUGGEST_CATEGORY / REMIND): category-limit rules cap hours/day on a
+ * `LifeCategory`, escalation rules describe a notification-profile
+ * chain. The enforcer keeps a no-op fallthrough for the new types so
+ * existing breach logic doesn't regress — they're surfaced only by the
+ * dedicated boundary-rule editor for now.
+ */
 export type BoundaryRuleType =
   | 'daily_task_cap'
   | 'work_hours_window'
-  | 'weekly_hour_budget';
+  | 'weekly_hour_budget'
+  | 'category_limit'
+  | 'escalation';
+
+/** Mirrors Android `LifeCategory` (`domain/model/LifeCategory.kt`). */
+export type BoundaryLifeCategory =
+  | 'WORK'
+  | 'PERSONAL'
+  | 'SELF_CARE'
+  | 'HEALTH';
 
 export interface BoundaryRule {
   id: string;
@@ -40,14 +62,37 @@ export interface BoundaryRule {
    *  it verbatim in breach messages. */
   label: string;
   /** Numeric value the rule compares against — task count for caps,
-   *  start hour for window (0–23), budgeted hours/week. */
+   *  start hour for window (0–23), budgeted hours/week,
+   *  hours/day cap for `category_limit`, stage delay (minutes) for
+   *  `escalation`. */
   value: number;
   /** Optional second value. For `work_hours_window` this is the end
-   *  hour (0–23). Unused for other types. */
+   *  hour (0–23). Unused for other types — minute components and
+   *  escalation chains have their own dedicated fields below. */
   secondary_value: number | null;
   enabled: boolean;
   created_at: number;
   updated_at: number;
+  /** Optional `LifeCategory` for `category_limit` rules. Stored on
+   *  the doc so cross-device readers don't have to re-parse `label`. */
+  category?: BoundaryLifeCategory | null;
+  /** For `category_limit`: 'max' means at-most, 'min' means at-least. */
+  bound?: 'max' | 'min' | null;
+  /** Active days as ISO-1 (Mon=1 … Sun=7) ordinals. Empty/missing =
+   *  all days. */
+  active_days?: number[] | null;
+  /** For `work_hours_window`: minute-component of `value` (the start
+   *  hour). Lets the editor round-trip 09:30 cleanly. */
+  start_minute?: number | null;
+  /** For `work_hours_window`: minute-component of `secondary_value`
+   *  (the end hour). */
+  end_minute?: number | null;
+  /** For `escalation`: ordered notification-profile names. */
+  escalation_chain?: string[] | null;
+  /** For `escalation`: free-form name of the rule that triggers this
+   *  escalation. Stored as text so we don't need a foreign-key
+   *  lifecycle for now. */
+  escalation_trigger?: string | null;
 }
 
 function rulesCol(uid: string) {
@@ -58,11 +103,53 @@ function ruleDoc(uid: string, id: string) {
   return doc(firestore, 'users', uid, 'boundary_rules', id);
 }
 
+const SUPPORTED_TYPES: ReadonlyArray<BoundaryRuleType> = [
+  'daily_task_cap',
+  'work_hours_window',
+  'weekly_hour_budget',
+  'category_limit',
+  'escalation',
+];
+
+function isSupportedType(value: unknown): value is BoundaryRuleType {
+  return (
+    typeof value === 'string' &&
+    (SUPPORTED_TYPES as ReadonlyArray<string>).includes(value)
+  );
+}
+
+const SUPPORTED_CATEGORIES: ReadonlyArray<BoundaryLifeCategory> = [
+  'WORK',
+  'PERSONAL',
+  'SELF_CARE',
+  'HEALTH',
+];
+
+function coerceCategory(value: unknown): BoundaryLifeCategory | null {
+  return typeof value === 'string' &&
+    (SUPPORTED_CATEGORIES as ReadonlyArray<string>).includes(value)
+    ? (value as BoundaryLifeCategory)
+    : null;
+}
+
+function coerceStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const out = value.filter((s): s is string => typeof s === 'string');
+  return out.length > 0 ? out : null;
+}
+
+function coerceNumberArray(value: unknown): number[] | null {
+  if (!Array.isArray(value)) return null;
+  const out = value.filter(
+    (n): n is number => typeof n === 'number' && n >= 1 && n <= 7,
+  );
+  return out.length > 0 ? out : null;
+}
+
 function docToRule(id: string, data: DocumentData): BoundaryRule {
-  const type: BoundaryRuleType =
-    data.type === 'work_hours_window' || data.type === 'weekly_hour_budget'
-      ? data.type
-      : 'daily_task_cap';
+  const type: BoundaryRuleType = isSupportedType(data.type)
+    ? data.type
+    : 'daily_task_cap';
   return {
     id,
     type,
@@ -73,6 +160,18 @@ function docToRule(id: string, data: DocumentData): BoundaryRule {
     enabled: data.enabled !== false,
     created_at: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
     updated_at: typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
+    category: coerceCategory(data.category),
+    bound:
+      data.bound === 'max' || data.bound === 'min' ? data.bound : null,
+    active_days: coerceNumberArray(data.activeDays),
+    start_minute:
+      typeof data.startMinute === 'number' ? data.startMinute : null,
+    end_minute: typeof data.endMinute === 'number' ? data.endMinute : null,
+    escalation_chain: coerceStringArray(data.escalationChain),
+    escalation_trigger:
+      typeof data.escalationTrigger === 'string'
+        ? data.escalationTrigger
+        : null,
   };
 }
 
@@ -82,6 +181,13 @@ export interface BoundaryRuleInput {
   value: number;
   secondary_value?: number | null;
   enabled?: boolean;
+  category?: BoundaryLifeCategory | null;
+  bound?: 'max' | 'min' | null;
+  active_days?: number[] | null;
+  start_minute?: number | null;
+  end_minute?: number | null;
+  escalation_chain?: string[] | null;
+  escalation_trigger?: string | null;
 }
 
 export async function getRules(uid: string): Promise<BoundaryRule[]> {
@@ -104,6 +210,13 @@ export async function createRule(
     enabled: input.enabled ?? true,
     createdAt: now,
     updatedAt: now,
+    category: input.category ?? null,
+    bound: input.bound ?? null,
+    activeDays: input.active_days ?? null,
+    startMinute: input.start_minute ?? null,
+    endMinute: input.end_minute ?? null,
+    escalationChain: input.escalation_chain ?? null,
+    escalationTrigger: input.escalation_trigger ?? null,
   };
   const ref = await addDoc(rulesCol(uid), payload);
   return docToRule(ref.id, payload);
@@ -125,6 +238,16 @@ export async function updateRule(
   if (input.secondary_value !== undefined)
     payload.secondaryValue = input.secondary_value;
   if (input.enabled !== undefined) payload.enabled = input.enabled;
+  if (input.category !== undefined) payload.category = input.category;
+  if (input.bound !== undefined) payload.bound = input.bound;
+  if (input.active_days !== undefined) payload.activeDays = input.active_days;
+  if (input.start_minute !== undefined)
+    payload.startMinute = input.start_minute;
+  if (input.end_minute !== undefined) payload.endMinute = input.end_minute;
+  if (input.escalation_chain !== undefined)
+    payload.escalationChain = input.escalation_chain;
+  if (input.escalation_trigger !== undefined)
+    payload.escalationTrigger = input.escalation_trigger;
   await lwwUpdate(ruleDoc(uid, id), payload as Parameters<typeof lwwUpdate>[1]);
 }
 
