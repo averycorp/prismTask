@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -64,12 +65,14 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
@@ -471,6 +474,9 @@ private fun SmartTasksPage() {
     var animStarted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { animStarted = true }
 
+    val tasks = remember { listOf("Buy groceries", "Finish report", "Call dentist") }
+    val checked = remember { mutableStateOf(setOf<Int>()) }
+
     OnboardingPageLayout(
         emoji = "\u2705",
         headline = "Organize Everything",
@@ -480,14 +486,27 @@ private fun SmartTasksPage() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-            listOf("Buy groceries", "Finish report", "Call dentist").forEachIndexed { index, task ->
+            tasks.forEachIndexed { index, task ->
                 AnimatedVisibility(
                     visible = animStarted,
                     enter = fadeIn(tween(300, delayMillis = index * 150)) +
                         slideInVertically(tween(300, delayMillis = index * 150)) { it }
                 ) {
+                    val isChecked = index in checked.value
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = isChecked,
+                                role = Role.Checkbox,
+                                onValueChange = { nowChecked ->
+                                    checked.value = if (nowChecked) {
+                                        checked.value + index
+                                    } else {
+                                        checked.value - index
+                                    }
+                                }
+                            ),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -500,10 +519,39 @@ private fun SmartTasksPage() {
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                            )
+                                    .then(
+                                        if (isChecked) {
+                                            Modifier.background(MaterialTheme.colorScheme.primary)
+                                        } else {
+                                            Modifier.border(
+                                                2.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isChecked) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(task, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = task,
+                                style = MaterialTheme.typography.bodyLarge,
+                                textDecoration = if (isChecked) TextDecoration.LineThrough else null,
+                                color = if (isChecked) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
                         }
                     }
                 }
