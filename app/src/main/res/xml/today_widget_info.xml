@@ -9,5 +9,6 @@
     android:updatePeriodMillis="900000"
     android:widgetCategory="home_screen"
     android:widgetFeatures="reconfigurable"
+    android:configure="com.averycorp.prismtask.widget.TodayWidgetConfigActivity"
     android:previewLayout="@layout/widget_preview_today"
     android:previewImage="@drawable/widget_thumb_today" />
