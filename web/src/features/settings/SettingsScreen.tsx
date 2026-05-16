@@ -363,6 +363,12 @@ export function SettingsScreen() {
           checked={settings.confirmBeforeDelete}
           onChange={(v) => settings.setSetting('confirmBeforeDelete', v)}
         />
+        <ToggleRow
+          label="Confirm Task Details Before Saving"
+          description="Show a preview of the parsed task — title, date, priority, project, tags — before it's added."
+          checked={settings.confirmTaskBeforeSave}
+          onChange={(v) => settings.setSetting('confirmTaskBeforeSave', v)}
+        />
       </SettingsSection>
 
       {/* Today View */}

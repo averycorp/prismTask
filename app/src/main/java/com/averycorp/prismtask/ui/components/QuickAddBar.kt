@@ -76,6 +76,7 @@ fun QuickAddBar(
     val isExpanded by viewModel.isExpanded.collectAsStateWithLifecycle()
     val isSubmitting by viewModel.isSubmitting.collectAsStateWithLifecycle()
     val disambiguation by viewModel.templateDisambiguation.collectAsStateWithLifecycle()
+    val pendingConfirm by viewModel.pendingConfirm.collectAsStateWithLifecycle()
     val isListening by viewModel.isListening.collectAsStateWithLifecycle()
     val rmsLevel by viewModel.voiceRmsLevel.collectAsStateWithLifecycle()
     val voiceEnabled by viewModel.voiceInputEnabled.collectAsStateWithLifecycle()
@@ -376,6 +377,17 @@ fun QuickAddBar(
         onStopContinuous = { viewModel.stopContinuousVoiceMode() },
         onRestartListening = { viewModel.restartContinuousListening() }
     )
+
+    pendingConfirm?.let { pending ->
+        TaskConfirmSheet(
+            pending = pending,
+            onSave = { edited ->
+                viewModel.confirmAndSave(edited)
+                onTaskCreated()
+            },
+            onDismiss = { viewModel.dismissPendingConfirm() }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

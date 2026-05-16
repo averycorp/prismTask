@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.averycorp.prismtask.ui.components.settings.SectionHeader
+import com.averycorp.prismtask.ui.components.settings.SettingsToggleRow
 import com.averycorp.prismtask.ui.screens.settings.sections.TaskDefaultsSection
 import com.averycorp.prismtask.ui.theme.ThemedSubScreenTitle
 
@@ -40,6 +42,7 @@ fun TaskDefaultsScreen(
     val aiMasterPrefs by viewModel.aiFeaturePrefs.collectAsStateWithLifecycle()
     val perFeatureAiPrefs by viewModel.perFeatureAiPrefs.collectAsStateWithLifecycle()
     val taskDefaults by viewModel.taskDefaultPrefs.collectAsStateWithLifecycle()
+    val quickAddPrefs by viewModel.quickAddPrefs.collectAsStateWithLifecycle()
     val titleLengthLimit by viewModel.titleLengthLimit.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -84,6 +87,18 @@ fun TaskDefaultsScreen(
                 onTitleLengthMaxChange = viewModel::setMaxTaskTitleLength,
                 onResetTaskBehaviorDefaults = viewModel::resetTaskBehaviorDefaults
             )
+
+            SectionHeader("Quick Add")
+            SettingsToggleRow(
+                title = "Confirm Task Details Before Saving",
+                subtitle = "Show a preview of the parsed task — title, date, priority, " +
+                    "project, tags — before it's added. Continuous voice mode skips this.",
+                checked = quickAddPrefs.showConfirmation,
+                onCheckedChange = { enabled ->
+                    viewModel.setQuickAddPrefs(quickAddPrefs.copy(showConfirmation = enabled))
+                }
+            )
+
             Spacer(modifier = Modifier.height(32.dp))
         }
     }

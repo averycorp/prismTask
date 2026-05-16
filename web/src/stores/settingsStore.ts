@@ -41,6 +41,14 @@ interface SettingsState {
   compactMode: boolean;
 
   /**
+   * When true (default), Quick Add surfaces a TaskConfirmModal pre-filled
+   * from the NLP parse result so the user can review/edit before the task
+   * is saved. Mirrors Android's `KEY_QUICK_ADD_CONFIRM`. Stored locally —
+   * per-device pref, not synced cross-platform yet.
+   */
+  confirmTaskBeforeSave: boolean;
+
+  /**
    * Master AI-features opt-out. Default `true` (opt-out, not opt-in) to match
    * Android's `KEY_AI_FEATURES_ENABLED`. When false, the request-side gate in
    * `api/client.ts` short-circuits all Anthropic-touching paths with a
@@ -104,6 +112,7 @@ function saveSettings(state: Partial<SettingsState>) {
     showWeekends,
     compactMode,
     aiFeaturesEnabled,
+    confirmTaskBeforeSave,
   } = state as SettingsState;
 
   localStorage.setItem(
@@ -124,6 +133,7 @@ function saveSettings(state: Partial<SettingsState>) {
       showWeekends,
       compactMode,
       aiFeaturesEnabled,
+      confirmTaskBeforeSave,
     }),
   );
 }
@@ -144,6 +154,7 @@ const defaults = {
   showWeekends: true,
   compactMode: false,
   aiFeaturesEnabled: DEFAULT_AI_FEATURES_ENABLED,
+  confirmTaskBeforeSave: true,
 };
 
 const stored = loadSettings();

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
 import { useTemplateStore } from '@/stores/templateStore';
 import { useBatchStore } from '@/stores/batchStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useProFeature } from '@/hooks/useProFeature';
 import { detectBatchIntent } from '@/utils/batchIntentDetector';
 import { detectMultiCreate } from '@/utils/multiCreateDetector';
@@ -48,6 +49,7 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
   const { templates, fetch: fetchTemplates, use: applyTemplate } = useTemplateStore();
   const navigate = useNavigate();
   const setPendingBatchCommand = useBatchStore((s) => s.setPendingCommand);
+  const confirmTaskBeforeSave = useSettingsStore((s) => s.confirmTaskBeforeSave);
   const { isPro, showUpgrade, setShowUpgrade } = useProFeature();
 
   // Fetch templates on mount for autocomplete
@@ -236,6 +238,19 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
     setLoading(true);
     try {
       const result = await parseApi.parse({ text });
+      // When confirmation is disabled, skip the preview popover and
+      // submit straight to the caller. Mirrors Android's
+      // `showConfirmation=false` direct-insert path.
+      if (!confirmTaskBeforeSave) {
+        onTaskCreate?.({
+          title: result.title || text,
+          due_date: result.due_date ?? undefined,
+          priority: result.priority ?? undefined,
+          project_suggestion: result.project_suggestion ?? undefined,
+        });
+        setValue('');
+        return;
+      }
       setParseResult(result);
       setEditedResult({
         title: result.title,
@@ -244,7 +259,14 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
         project_suggestion: result.project_suggestion,
       });
     } catch {
-      // On parse error, fall back to raw text
+      // On parse error, fall back to raw text. Still respect the
+      // confirm-before-save preference — when it's off we just create
+      // the task with the raw title.
+      if (!confirmTaskBeforeSave) {
+        onTaskCreate?.({ title: text });
+        setValue('');
+        return;
+      }
       setParseResult({
         title: text,
         project_suggestion: null,
@@ -269,6 +291,8 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
     setPendingBatchCommand,
     navigate,
     multiPreview,
+    confirmTaskBeforeSave,
+    onTaskCreate,
   ]);
 
   const handleConfirmMulti = useCallback(async () => {

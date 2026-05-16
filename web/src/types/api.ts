@@ -27,8 +27,27 @@ export interface NLPParseResult {
   title: string;
   project_suggestion: string | null;
   due_date: string | null;
+  /**
+   * HH:MM 24-hour time-of-day component when the user supplied a time
+   * (e.g. "at 3pm" → "15:00"). Backend may omit this field — treat as
+   * optional. Mirrors Android's `ParsedTaskResponse.dueTime`.
+   */
+  due_time?: string | null;
   priority: number | null;
   parent_task_suggestion: string | null;
+  /**
+   * Tag names suggested by the parser. Currently the backend `ParseResponse`
+   * does not emit these; the field is present so callers can opportunistically
+   * merge backend tags with locally-parsed ones without an extra type-cast.
+   * Mirrors Android's `ParsedTaskResponse.tagSuggestions`.
+   */
+  tag_suggestions?: string[] | null;
+  /**
+   * Recurrence hint ("daily", "weekly", "monthly", "yearly"). Same status
+   * as [tag_suggestions] — present for forward-compat, currently always
+   * null from the live backend.
+   */
+  recurrence_hint?: string | null;
   confidence: number;
   suggestions: string[];
   needs_confirmation: boolean;
