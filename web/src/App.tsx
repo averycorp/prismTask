@@ -3,18 +3,16 @@ import { RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { router } from '@/routes';
 import { useAuthStore } from '@/stores/authStore';
-import { useThemeStore } from '@/stores/themeStore';
 import { useBatchStore } from '@/stores/batchStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { applyA11yToDocument, useA11yStore } from '@/stores/a11yStore';
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { OfflineBanner } from '@/components/shared/OfflineBanner';
+import { PrismThemeProvider } from '@/theme/PrismThemeProvider';
 
 export default function App() {
   const hydrateFromStorage = useAuthStore((s) => s.hydrateFromStorage);
-  const applyTheme = useThemeStore((s) => s.applyTheme);
-  const themeKey = useThemeStore((s) => s.themeKey);
 
   const initFirebaseAuthListener = useAuthStore((s) => s.initFirebaseAuthListener);
   const firebaseUid = useAuthStore((s) => s.firebaseUser?.uid);
@@ -54,12 +52,11 @@ export default function App() {
   // after a manual page refresh.
   useFirestoreSync(firebaseUid);
 
-  // Apply theme on mount and whenever the user picks a new one. All four
-  // named themes are dark-first with no system/light variant — matches
-  // Android, so no media-query listener is needed.
-  useEffect(() => {
-    applyTheme();
-  }, [applyTheme, themeKey]);
+  // Theme application is owned by `<PrismThemeProvider>` below — it
+  // subscribes to the same store and fires `applyThemeToDocument` on
+  // every key change. Mounting it inside the tree (rather than a
+  // top-level effect here) keeps the React tree the single source of
+  // truth for the active variant.
 
   // Apply accessibility overrides on mount (AccessibilitySection re-applies
   // when the user toggles controls, but the initial load needs this).
@@ -85,18 +82,20 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <OfflineBanner />
-      <RouterProvider router={router} />
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: 'var(--color-bg-card)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-          },
-        }}
-      />
+      <PrismThemeProvider>
+        <OfflineBanner />
+        <RouterProvider router={router} />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: 'var(--color-bg-card)',
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)',
+            },
+          }}
+        />
+      </PrismThemeProvider>
     </ErrorBoundary>
   );
 }
