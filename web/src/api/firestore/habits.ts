@@ -308,6 +308,74 @@ export async function deleteHabit(uid: string, habitId: string): Promise<void> {
   await deleteDoc(habitDoc(uid, habitId));
 }
 
+/**
+ * Reassign every `habit_completions` doc pointing at `oldHabitId` to
+ * `newHabitId`, used by the built-in habit reconciler when collapsing
+ * duplicate built-in habits onto a single keeper. Mirrors Android's
+ * `HabitCompletionDao.reassignHabitId` (see `BuiltInHabitReconciler.kt:99-102`).
+ *
+ * Implementation: we can't rename a Firestore doc, and the canonical doc
+ * id is `${habit_id}__${date}` (see `habitCompletionId`), so each
+ * completion needs to be rewritten at the new id. We skip rewriting when
+ * the keeper already has a completion on that date — Android's
+ * `reassignHabitId` is a bulk UPDATE that respects the PK constraint;
+ * the equivalent on Firestore is "keep the keeper's existing doc, drop
+ * the loser's".
+ *
+ * Best-effort: any per-doc failure is swallowed so the rest of the
+ * reassignment proceeds. The next reconciler pass (skipped under the
+ * one-shot flag in `BuiltInSyncPreferences`) would re-try the failure
+ * if it ever runs again.
+ */
+export async function reassignCompletions(
+  uid: string,
+  oldHabitId: string,
+  newHabitId: string,
+): Promise<void> {
+  const loserCompletions = await getCompletions(uid, oldHabitId);
+  if (loserCompletions.length === 0) return;
+  const keeperCompletions = await getCompletions(uid, newHabitId);
+  const keeperDates = new Set(keeperCompletions.map((c) => c.date));
+
+  for (const completion of loserCompletions) {
+    const oldRef = completionDoc(
+      uid,
+      habitCompletionId(oldHabitId, completion.date),
+    );
+    if (keeperDates.has(completion.date)) {
+      // Keeper already has a completion for this date — drop the loser's
+      // dupe. Mirrors Android's PK-constraint behaviour (one row per
+      // (habit_id, date)).
+      try {
+        await deleteDoc(oldRef);
+      } catch {
+        // ignore
+      }
+      continue;
+    }
+
+    const newRef = completionDoc(
+      uid,
+      habitCompletionId(newHabitId, completion.date),
+    );
+    const newData = {
+      habitCloudId: newHabitId,
+      completedDate: new Date(completion.date + 'T00:00:00').getTime(),
+      completedDateLocal: completion.date,
+      completedAt: new Date(completion.created_at).getTime(),
+      notes: null,
+    };
+    try {
+      await setDoc(newRef, newData, { merge: true });
+      await deleteDoc(oldRef);
+      keeperDates.add(completion.date);
+    } catch {
+      // Per-doc failure is non-fatal; the reconciler is allowed to drop
+      // a completion on the floor rather than abort the whole sweep.
+    }
+  }
+}
+
 // ── Completions ──────────────────────────────────────────────
 
 /**

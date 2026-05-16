@@ -27,7 +27,7 @@ export const DB_NAME = 'prismtask';
  * `migrations[N]` function that runs when the user's existing DB has
  * `version < N`.
  */
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 /**
  * One migration step. `oldVersion` is the version of the user's existing
@@ -61,6 +61,22 @@ export const migrations: Record<number, MigrationFn> = {
       store.createIndex('by_uid_created', ['uid', 'created_at'], {
         unique: false,
       });
+    }
+  },
+  /**
+   * v2 — `kv_flags` store. Generic key/value store for one-shot repair
+   * flags scoped per user — e.g. the built-in habit reconciler's
+   * `builtInReconcilerRanV1` flag. Mirrors Android's
+   * `BuiltInSyncPreferences` DataStore booleans. Records are keyed by
+   * `(uid, key)` compound so multiple users on the same browser stay
+   * isolated, matching the IDB-cleared-on-logout contract.
+   */
+  2: (db) => {
+    if (!db.objectStoreNames.contains('kv_flags')) {
+      const store = db.createObjectStore('kv_flags', {
+        keyPath: ['uid', 'key'],
+      });
+      store.createIndex('by_uid', 'uid', { unique: false });
     }
   },
 };
