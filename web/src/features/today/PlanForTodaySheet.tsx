@@ -70,6 +70,7 @@ export function PlanForTodaySheet({ isOpen, onClose, todayIso }: Props) {
   // don't carry over.
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- parity batch follow-up; see #1573
       setSearch('');
       setSelectedIds(new Set());
       setMultiSelect(false);

@@ -84,6 +84,7 @@ export function PrismThemeProvider({ children }: { children: ReactNode }) {
  * called outside a [PrismThemeProvider] so unit tests, Storybook, and
  * isolated previews don't crash.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function useTheme(): PrismThemeContextValue {
   const ctx = useContext(PrismThemeContext);
   if (ctx) return ctx;

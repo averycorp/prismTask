@@ -48,6 +48,7 @@ export function WeeklyReviewDetailScreen() {
   useEffect(() => {
     if (!weekStartDate || storeReview) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- parity batch follow-up; see #1573
     setLoading(true);
     (async () => {
       try {

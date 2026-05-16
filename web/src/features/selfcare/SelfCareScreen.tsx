@@ -32,6 +32,7 @@ export function SelfCareScreen() {
   const [pending, setPending] = useState<Set<string>>(new Set());
 
   const todayMs = useMemo(
+    // eslint-disable-next-line react-hooks/purity -- parity batch follow-up; see #1573
     () => startOfLogicalDayMs(Date.now(), startOfDayHour),
     [startOfDayHour],
   );

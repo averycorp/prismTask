@@ -203,6 +203,7 @@ const CALM_KEYS: (keyof NdPreferences)[] = [
  *     combinations bias toward showing more, not less, which matches
  *     Android's "Full" being the no-restriction state)
  */
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function computeUiComplexityLevel(prefs: NdPreferences): 0 | 1 | 2 {
   const allOn = CALM_KEYS.every((k) => prefs[k] === true);
   if (allOn) return 0;
@@ -216,6 +217,7 @@ export function computeUiComplexityLevel(prefs: NdPreferences): 0 | 1 | 2 {
   return 2;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function uiComplexityPatchFor(level: 0 | 1 | 2): Partial<NdPreferences> {
   if (level === 0) {
     return {
@@ -244,6 +246,7 @@ export function uiComplexityPatchFor(level: 0 | 1 | 2): Partial<NdPreferences> {
   };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function computeShipItIntensityLevel(
   prefs: NdPreferences,
 ): 0 | 1 | 2 | 3 {
@@ -260,6 +263,7 @@ export function computeShipItIntensityLevel(
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function shipItIntensityPatchFor(
   level: 0 | 1 | 2 | 3,
 ): Partial<NdPreferences> {
