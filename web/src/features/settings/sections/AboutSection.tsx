@@ -13,7 +13,7 @@ export function AboutSection() {
       <Row label="Backend" value="averytask-production.up.railway.app" />
       <LinkRow
         label="Privacy policy"
-        href="https://github.com/akarlin3/prismTask/blob/main/docs/PRIVACY_POLICY.md"
+        href="https://github.com/akarlin3/prismTask/blob/main/docs/privacy/index.md"
       />
       <LinkRow
         label="Terms of service"

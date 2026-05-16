@@ -577,12 +577,12 @@ prismTask/
 │
 ├── docs/                            # Design and architecture docs
 │   ├── NOTIFICATIONS_DESIGN.md      # Cross-platform notification system
-│   ├── ADR-calendar-sync.md         # Architecture decision: backend-mediated calendar sync
 │   ├── FIREBASE_EMULATOR.md         # Local Firebase Emulator setup
 │   ├── projects-feature.md          # Projects Phase 1 deep-dive
 │   ├── sync-architecture.md         # Firestore sync pipeline design
-│   ├── PRIVACY_POLICY.md / TERMS_OF_SERVICE.md (+ HTML twins)
-│   └── RELEASE.md                   # Release checklist
+│   ├── privacy/index.md             # Canonical privacy policy (Jekyll-served)
+│   ├── TERMS_OF_SERVICE.md          # Terms of service (+ HTML twin)
+│   └── archive/                     # Historical runbooks / phase docs (preserved, not maintained)
 │
 ├── ARCHITECTURE.md                  # This document (root, not under docs/)
 │

@@ -28,7 +28,7 @@ import org.junit.runner.RunWith
 
 /**
  * Coverage for the Tier-1 entity families added to [CloudIdOrphanHealer]
- * per `docs/SPEC_SELF_CARE_STEPS_SYNC_PIPELINE.md` §8 Q1 follow-up.
+ * per `docs/archive/SPEC_SELF_CARE_STEPS_SYNC_PIPELINE.md` §8 Q1 follow-up.
  *
  * Tier-1 entities (tasks, projects, tags, habits, habit_completions,
  * habit_logs, task_completions, task_templates) ship via

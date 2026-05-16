@@ -154,5 +154,5 @@ Cumulative since v1.6.0; detailed entries live in [`CHANGELOG.md`](CHANGELOG.md#
 | 🔜 v1.10+ | Medication reminders | Web slot-editor per-slot reminder-mode picker (settable from Android only today) |
 | 🔜 v1.10+ | Sync test matrix | Tests 12 + 13 (sign-out/sign-in same user; sign-in different user) automated when the OAuth Custom Tab flow becomes UIAutomator-driveable |
 | 🔜 v2.0+ | Phase G | Remaining web parity slices toward 100% feature equivalence with Android |
-| 🔜 v2.0+ | Calendar | Backend-mediated Google Calendar sync (see `docs/ADR-calendar-sync.md`) |
+| 🔜 v2.0+ | Calendar | Backend-mediated Google Calendar sync (see `docs/archive/ADR-calendar-sync.md`) |
 | 🔜 v2.2+ | Widgets | Re-enable / refresh the eight Glance widgets after Phase G stabilizes |

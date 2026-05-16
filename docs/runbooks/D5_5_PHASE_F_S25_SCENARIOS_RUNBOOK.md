@@ -19,11 +19,11 @@ session; Scenario 11 is overnight).
 The canonical reminder-focused 11-scenario runbook at
 `docs/REMINDERS_TEST_RUNBOOK.md` was pruned from main on 2026-04-22 in
 commit `7e19a3f8`. The hybrid runbook
-`docs/PHASE_A_DEVICE_TESTING_RUNBOOK_HYBRID.md` is pinned to v1.4.38
+`docs/archive/PHASE_A_DEVICE_TESTING_RUNBOOK_HYBRID.md` is pinned to v1.4.38
 (versionCode 682, DB v56) and explicitly does not cover v1.6.0+
 medication reminder modes.
 
-`docs/release/PRE_PHASE_F_REGRESSION_SWEEP.md` (PR #828) covers the
+`docs/archive/PRE_PHASE_F_REGRESSION_SWEEP.md` (PR #828) covers the
 30-min abbreviated sweep with go/no-go rubric — but explicitly
 disclaims being the 11-scenario detailed runbook.
 

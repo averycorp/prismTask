@@ -287,7 +287,7 @@ does not conflict with a recently-fired reminder.
 D5#2 → 1.0 when:
 - All 7 tests run on S25.
 - All P0 failures filed and addressed (or NO-GO for Phase F kickoff
-  per `docs/release/PRE_PHASE_F_REGRESSION_SWEEP.md` rubric).
+  per `docs/archive/PRE_PHASE_F_REGRESSION_SWEEP.md` rubric).
 - All P1 failures triaged: fix-and-redistribute OR documented as
   known-issues-at-kickoff.
 - Logcat captures saved to `~/test_runs/` for audit trail.

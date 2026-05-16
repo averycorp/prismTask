@@ -98,7 +98,7 @@ You agree not to:
 
 ## 8. Data and Privacy
 
-Your use of PrismTask is also governed by our [Privacy Policy](PRIVACY_POLICY.md). By using the App, you consent to the collection and use of information as described in the Privacy Policy.
+Your use of PrismTask is also governed by our [Privacy Policy](privacy/index.md). By using the App, you consent to the collection and use of information as described in the Privacy Policy.
 
 ## 9. Disclaimer of Warranties
 
