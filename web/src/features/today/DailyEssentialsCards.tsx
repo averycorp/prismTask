@@ -98,6 +98,7 @@ export function DailyEssentialsCards() {
   // `startOfCurrentDay(startOfDay)` so a web-side toggle merges onto
   // the same (routine_type, date) row Android wrote.
   const todayMs = useMemo(
+    // eslint-disable-next-line react-hooks/purity -- parity batch follow-up; see #1573
     () => startOfLogicalDayMs(Date.now(), startOfDayHour),
     [startOfDayHour],
   );
@@ -268,6 +269,7 @@ interface RoutineCardState {
   steps: StepState[];
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function buildRoutineCard(
   routineType: 'morning' | 'bedtime' | 'housework',
   steps: SelfCareStep[],
@@ -308,6 +310,7 @@ export function buildRoutineCard(
  * "house" or "clean" so the card has something to render before the
  * user wires it explicitly.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export function pickHouseworkHabit(
   habits: Habit[],
   pinnedId: string | null,

@@ -311,7 +311,9 @@ export function PomodoroScreen() {
     // Persist a focus_release_logs entry so the ship counts toward
     // ND analytics + cross-device history. Errors are swallowed —
     // we never want a write failure to derail the break.
+    // eslint-disable-next-line react-hooks/purity -- parity batch follow-up; see #1573
     const startedAt = workStartedAtRef.current ?? Date.now();
+    // eslint-disable-next-line react-hooks/purity -- parity batch follow-up; see #1573
     const endedAt = Date.now();
     const actualMinutes = Math.max(1, Math.round(workElapsedSeconds / 60));
     const taskTitleSnapshot = currentTask?.title ?? '';

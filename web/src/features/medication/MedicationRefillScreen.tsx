@@ -85,6 +85,7 @@ export function MedicationRefillScreen() {
   }, [load]);
 
   const forecasts = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- parity batch follow-up; see #1573
     const now = Date.now();
     const map = new Map<string, RefillForecast>();
     for (const refill of refills) {
@@ -379,6 +380,7 @@ function RefillEditorDialog({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- parity batch follow-up; see #1573
       setForm(initialEditorState(initial));
       setErrors({});
     }

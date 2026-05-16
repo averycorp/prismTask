@@ -32,6 +32,7 @@ import type { Tag } from '@/types/tag';
  * parent `TaskEditor` can seed `newTagColor` from the same source —
  * keeps the swatch row and the initial-state seed in sync.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
 export const TAG_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
   '#84cc16', '#22c55e', '#14b8a6', '#06b6d4',
