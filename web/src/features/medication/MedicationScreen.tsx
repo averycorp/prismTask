@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  FileText,
   ListChecks,
   Pencil,
   Pill,
@@ -432,6 +433,16 @@ export function MedicationScreen() {
               title="Manage refills"
             >
               <RefreshCw className="h-4 w-4" />
+            </Button>
+          </Link>
+          <Link to="/medication/clinical-report">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Open clinical report"
+              title="Open clinical report"
+            >
+              <FileText className="h-4 w-4" />
             </Button>
           </Link>
           <Button
