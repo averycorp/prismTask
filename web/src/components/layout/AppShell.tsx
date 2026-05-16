@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
+import { isDetailRoute } from './navItems';
 import { SearchModal } from '@/components/shared/SearchModal';
 import { KeyboardShortcutsModal } from '@/components/shared/KeyboardShortcutsModal';
 import { useUIStore } from '@/stores/uiStore';
@@ -15,6 +16,14 @@ export function AppShell() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const isMobile = useIsMobile();
   const setSelectedTask = useTaskStore((s) => s.setSelectedTask);
+  const location = useLocation();
+
+  // Detail routes (e.g. /tasks/:id, /projects/:id) hide the mobile
+  // bottom nav so the detail screen owns the viewport, mirroring
+  // Android's `showBottomBar = currentRoute == MainTabs.route` check.
+  // Desktop sidebar stays put on all routes — there's enough screen
+  // real estate that hiding nav chrome doesn't help.
+  const onDetailRoute = isDetailRoute(location.pathname);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -39,9 +48,11 @@ export function AppShell() {
     onShowShortcuts: handleShowShortcuts,
   });
 
+  const showMobileNav = isMobile && !onDetailRoute;
+
   return (
     <div className="flex h-screen bg-[var(--color-bg-primary)]">
-      {/* Desktop/Tablet Sidebar */}
+      {/* Desktop/Tablet Sidebar — visible on all routes */}
       {!isMobile && <Sidebar />}
 
       {/* Main Content Area */}
@@ -53,17 +64,18 @@ export function AppShell() {
         <Header />
         <main
           id="main-content"
-          className="flex-1 overflow-y-auto p-4 pb-20 lg:pb-4"
+          className={`flex-1 overflow-y-auto p-4 ${showMobileNav ? 'pb-20 lg:pb-4' : 'pb-4'}`}
           role="main"
         >
           <Outlet />
         </main>
       </div>
 
-      {/* Mobile Bottom Nav */}
-      {isMobile && <MobileNav />}
+      {/* Mobile bottom nav — hidden on detail routes so the detail
+          screen owns the full viewport. */}
+      {showMobileNav && <MobileNav />}
 
-      {/* Global Search Modal (from Ctrl+K shortcut) */}
+      {/* Global Search Modal (from Ctrl+K / Ctrl+F shortcut) */}
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* Global Keyboard Shortcuts Modal (from ? shortcut) */}
@@ -72,7 +84,7 @@ export function AppShell() {
         onClose={() => setShortcutsOpen(false)}
       />
 
-      {/* Global New Task (from `n` shortcut) */}
+      {/* Global New Task (from Ctrl+N shortcut) */}
       {newTaskOpen && (
         <TaskEditor
           mode="create"
