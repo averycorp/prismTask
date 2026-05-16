@@ -2,7 +2,7 @@
 
 **Destination:** Play Console → Policy → App content → Permissions declaration form (where required) and the in-listing "App permissions" section.
 
-Every permission declared in `AndroidManifest.xml` (lines 5-52) has a user-facing justification below. Paste each cell into the matching Play Console field. The table mirrors §3 of `PHASE1_AUDIT.md`.
+Every permission declared in `AndroidManifest.xml` (lines 5-52) has a user-facing justification below. Paste each cell into the matching Play Console field. The table mirrors §3 of `docs/archive/STORE_LISTING_PHASE1_AUDIT.md`.
 
 ---
 
@@ -49,7 +49,7 @@ Every permission declared in `AndroidManifest.xml` (lines 5-52) has a user-facin
 
 ### `REQUEST_INSTALL_PACKAGES`
 
-**⚠️ Open engineering question (see `PHASE1_AUDIT.md` §Policy-Risk-1):** this permission is used by the in-app self-updater (`AppUpdater.kt`) for Firebase App Distribution / sideloaded builds only. It does not fire on Play Store builds.
+**⚠️ Open engineering question (see `docs/archive/STORE_LISTING_PHASE1_AUDIT.md` §Policy-Risk-1):** this permission is used by the in-app self-updater (`AppUpdater.kt`) for Firebase App Distribution / sideloaded builds only. It does not fire on Play Store builds.
 
 **Play Console declaration (if permission is kept as-is):** "Used exclusively by Firebase App Distribution beta builds to install self-updates. Play Store releases do not exercise this path; the app relies on the Play Store update mechanism."
 

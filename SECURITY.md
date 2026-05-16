@@ -4,9 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.4.x (development) | Yes |
-| 1.3.x | Yes |
-| < 1.3 | No |
+| 1.9.x (current) | Yes |
+| 1.8.x | Yes |
+| < 1.8 | No |
 
 ## Overview
 

@@ -13,7 +13,7 @@ the platform's defaults don't enforce.
 
 | Severity | Definition | Action window | Examples |
 |----------|-----------|---------------|----------|
-| **P0** | Data loss, security/privacy regression, crash on launch, or ANY stop-the-line condition from `PHASE_F_KICKOFF_CHECKLIST.md` | Same-day fix + redistribution; halt new builds until resolved | Medication tier write lost; AI gate leaks data when off; sync corrupts other device's row; cold-start crash >5%; Auth wipe |
+| **P0** | Data loss, security/privacy regression, crash on launch, or ANY stop-the-line condition from `docs/archive/PHASE_F_KICKOFF_CHECKLIST.md` | Same-day fix + redistribution; halt new builds until resolved | Medication tier write lost; AI gate leaks data when off; sync corrupts other device's row; cold-start crash >5%; Auth wipe |
 | **P1** | Core feature broken on a major surface; >25% of testers affected; no workaround | Within 48h; bundled into next planned build | Medication slot reminder fails to fire; habit completion not persisting; weekly review crashes |
 | **P2** | Feature degraded but workaround exists; <25% testers affected; visible UX bug | Within the 3-week round; bundled into a regular release | Sort order resets on rotation; quick-add NLP misses a date pattern; widget shows yesterday's data |
 | **P3** | Cosmetic, edge-case, or "nice-to-have"; deferrable past Phase F | DEFERRED to G.0 unless trivially fixable | Color contrast on one screen edge; missing TalkBack label on minor button; off-by-one in a count |
@@ -89,11 +89,11 @@ min during the 3-week round.
 
 1. **Pull all new bugs from BetaTesting platform** (or GitHub issues
    with `phase-f` label, depending on which surface was chosen in the
-   `PHASE_F_KICKOFF_CHECKLIST.md` decision).
+   `docs/archive/PHASE_F_KICKOFF_CHECKLIST.md` decision).
 2. **Apply taxonomy:** severity, surface, repro-confidence,
    fix-window estimate. Default severity P2 if unsure.
 3. **Stop-the-line check:** any P0? If yes, halt regular triage and
-   execute the stop-the-line response from `PHASE_F_KICKOFF_CHECKLIST.md`.
+   execute the stop-the-line response from `docs/archive/PHASE_F_KICKOFF_CHECKLIST.md`.
 4. **Promote / demote:** review last week's open bugs; promote any with
    new tester reports, demote any single-report bugs that aged into
    `repro/cannot` without additional confirmation.

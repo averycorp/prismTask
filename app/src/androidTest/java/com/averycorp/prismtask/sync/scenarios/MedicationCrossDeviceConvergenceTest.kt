@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.seconds
  * medication migration safety net). Both devices run the same schema
  * version — `SyncTestHarness` cannot pair Room DBs at different
  * versions; cross-version cases live in the manual runbook
- * (`docs/MEDICATION_MIGRATION_INSTRUMENTATION.md`).
+ * (`docs/archive/MEDICATION_MIGRATION_INSTRUMENTATION.md`).
  *
  * Each scenario exercises a real production sync path: the
  * `SyncService.pullRemoteChanges` pipeline at

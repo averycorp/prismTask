@@ -1734,7 +1734,7 @@ val MIGRATION_60_61 = object : Migration(60, 61) {
  * Adds three columns to `habits` and one to `self_care_steps` so the
  * app can detect, diff, and merge updates to code-defined built-in
  * habit definitions without losing user edits. See
- * `docs/TEMPLATE_MIGRATION_DESIGN.md` for the full schema design.
+ * `docs/archive/TEMPLATE_MIGRATION_DESIGN.md` for the full schema design.
  *
  *  * `habits.source_version` — the registry version the user accepted
  *    for this row. NULL means "never linked to a built-in"; 0 means

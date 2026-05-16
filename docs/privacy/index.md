@@ -109,6 +109,10 @@ PrismTask is intended for users aged **18 and older**. We do not knowingly colle
 
 When this policy changes, the "Last updated" date at the top of this page changes and a new entry is added to the changelog below. We will not materially expand data collection without updating this page; if we ever do, we will notify active users in-app.
 
+## Governing law
+
+This Privacy Policy is governed by the laws of the State of New York, United States, without regard to its conflict of law provisions.
+
 ## Changelog
 
 - **2026-05-07** — Disclosed that AI Coach chat now forwards your chat
