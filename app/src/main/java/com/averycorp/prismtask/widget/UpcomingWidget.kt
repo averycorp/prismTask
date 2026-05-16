@@ -13,6 +13,7 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -27,17 +28,31 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.widget.launch.WidgetLaunchAction
 
 /**
- * Upcoming widget — shows tasks for today, tomorrow, and the day after.
+ * Upcoming widget — section-grouped task list spanning Today, Tomorrow,
+ * and This Week (the day-after bucket).
+ *
+ * Layout follows the launcher preview: stacked rows with a left-aligned
+ * palette-themed section header (TODAY / TOMORROW / THIS WEEK) followed by
+ * the tasks in that bucket. An overdue banner appears above the sections
+ * when there are past-due tasks, mirroring the in-app Today screen.
+ *
+ * Each task row:
+ *  - Renders a priority stripe + checkbox + title
+ *  - Checkbox tap → [ToggleTaskFromWidgetAction] (refresh fans out through
+ *    [WidgetUpdateManager.updateTaskWidgets])
+ *  - Title tap → [WidgetLaunchAction.OpenTask] deep link
  *
  * Adapts to two size breakpoints:
- * - Medium (4x3): today + tomorrow columns
- * - Large (5x4+): 3-day columns with expanded task details per day
+ *  - Medium (4x3): 2 tasks per section
+ *  - Large (5x4+): 4 tasks per section
  */
 class UpcomingWidget : GlanceAppWidget() {
     companion object {
@@ -74,7 +89,7 @@ private fun UpcomingContent(
     palette: WidgetThemePalette
 ) {
     val isLarge = size.width >= 350.dp
-    val maxTasksPerColumn = if (isLarge) 5 else 3
+    val maxTasksPerSection = if (isLarge) 4 else 2
 
     val mainIntent = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -88,10 +103,10 @@ private fun UpcomingContent(
         palette = palette,
         isLarge = isLarge,
         title = "Upcoming",
-        outerAction = actionStartActivity(mainIntent),
+        headerAction = actionStartActivity(mainIntent),
         headerTrailing = {
             Text(
-                text = "${data.totalCount} tasks",
+                text = "${data.totalCount} Tasks",
                 style = WidgetTextStyles.caption(palette.onSurfaceVariant)
             )
         }
@@ -108,7 +123,7 @@ private fun UpcomingContent(
             ) {
                 Column {
                     Text(
-                        text = "⚠ ${data.overdue.size} overdue",
+                        text = "⚠ ${data.overdue.size} Overdue",
                         style = WidgetTextStyles.badgeBold(palette.overdue)
                     )
                     data.overdue.take(2).forEach { row ->
@@ -132,7 +147,7 @@ private fun UpcomingContent(
         }
 
         if (data.totalCount == 0) {
-            Spacer(modifier = GlanceModifier.height(16.dp))
+            Spacer(modifier = GlanceModifier.height(8.dp))
             WidgetEmptyState(
                 emoji = "📅",
                 message = "Nothing Upcoming",
@@ -140,93 +155,113 @@ private fun UpcomingContent(
             )
         } else {
             Spacer(modifier = GlanceModifier.height(6.dp))
+            val sections = buildList {
+                add("Today" to data.today)
+                add("Tomorrow" to data.tomorrow)
+                if (isLarge) add("This Week" to data.dayAfter)
+            }.filter { (_, rows) -> rows.isNotEmpty() }
 
-            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                DayColumn(
-                    label = "Today",
-                    tasks = data.today,
-                    maxTasks = maxTasksPerColumn,
-                    palette = palette,
-                    modifier = GlanceModifier.defaultWeight()
+            sections.forEachIndexed { index, (label, rows) ->
+                if (index > 0) Spacer(modifier = GlanceModifier.height(4.dp))
+                UpcomingSection(
+                    context = context,
+                    label = label,
+                    tasks = rows,
+                    maxTasks = maxTasksPerSection,
+                    palette = palette
                 )
-                Spacer(modifier = GlanceModifier.width(6.dp))
-                DayColumn(
-                    label = "Tomorrow",
-                    tasks = data.tomorrow,
-                    maxTasks = maxTasksPerColumn,
-                    palette = palette,
-                    modifier = GlanceModifier.defaultWeight()
-                )
-                if (isLarge) {
-                    Spacer(modifier = GlanceModifier.width(6.dp))
-                    DayColumn(
-                        label = "+2 Days",
-                        tasks = data.dayAfter,
-                        maxTasks = maxTasksPerColumn,
-                        palette = palette,
-                        modifier = GlanceModifier.defaultWeight()
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun DayColumn(
+private fun UpcomingSection(
+    context: Context,
     label: String,
     tasks: List<WidgetTaskRow>,
     maxTasks: Int,
-    palette: WidgetThemePalette,
-    modifier: GlanceModifier
+    palette: WidgetThemePalette
 ) {
-    Column(
-        modifier = modifier
-            .cornerRadius(8.dp)
-            .background(palette.surfaceVariant)
-            .padding(6.dp)
-    ) {
+    Text(
+        text = label.uppercase(),
+        style = WidgetTextStyles.badgeBold(palette.primary)
+    )
+    Spacer(modifier = GlanceModifier.height(2.dp))
+    tasks.take(maxTasks).forEach { row ->
+        UpcomingTaskRow(context = context, task = row, palette = palette)
+        Spacer(modifier = GlanceModifier.height(3.dp))
+    }
+    if (tasks.size > maxTasks) {
         Text(
-            text = label,
-            style = WidgetTextStyles.badgeBold(palette.primary)
+            text = "+${tasks.size - maxTasks} More",
+            style = WidgetTextStyles.badge(palette.onSurfaceVariant)
         )
-        Spacer(modifier = GlanceModifier.height(4.dp))
-        if (tasks.isEmpty()) {
-            Text(
-                text = "—",
-                style = WidgetTextStyles.badge(palette.onSurfaceVariant)
-            )
-        } else {
-            tasks.take(maxTasks).forEach { row ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = GlanceModifier
-                            .size(4.dp)
-                            .cornerRadius(2.dp)
-                            .background(priorityColorFor(row.priority, palette))
-                    ) {}
-                    Spacer(modifier = GlanceModifier.width(3.dp))
-                    Text(
-                        text = row.title,
-                        style = TextStyle(
-                            fontSize = 11.sp,
-                            color = palette.onSurface
-                        ),
-                        maxLines = 1
+    }
+}
+
+@Composable
+private fun UpcomingTaskRow(
+    context: Context,
+    task: WidgetTaskRow,
+    palette: WidgetThemePalette
+) {
+    val taskIntent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenTask.WIRE_ID)
+        putExtra(MainActivity.EXTRA_TASK_ID, task.id)
+    }
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .size(width = 3.dp, height = 16.dp)
+                .cornerRadius(2.dp)
+                .background(priorityColorFor(task.priority, palette))
+        ) {}
+        Spacer(modifier = GlanceModifier.width(5.dp))
+        Box(
+            modifier = GlanceModifier
+                .size(16.dp)
+                .cornerRadius(4.dp)
+                .background(if (task.isCompleted) palette.primary else palette.surfaceVariant)
+                .clickable(
+                    actionRunCallback<ToggleTaskFromWidgetAction>(
+                        parameters = taskIdParams(task.id)
                     )
-                }
-                Spacer(modifier = GlanceModifier.height(2.dp))
-            }
-            if (tasks.size > maxTasks) {
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (task.isCompleted) {
                 Text(
-                    text = "+${tasks.size - maxTasks} more",
+                    text = "✓",
                     style = TextStyle(
                         fontSize = 10.sp,
-                        color = palette.onSurfaceVariant
+                        color = palette.onPrimary,
+                        fontWeight = FontWeight.Bold
                     )
                 )
             }
         }
+        Spacer(modifier = GlanceModifier.width(6.dp))
+        Text(
+            text = task.title,
+            style = TextStyle(
+                fontSize = 12.sp,
+                color = when {
+                    task.isOverdue -> palette.error
+                    task.isCompleted -> palette.onSurfaceVariant
+                    else -> palette.onSurface
+                },
+                textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+            ),
+            maxLines = 1,
+            modifier = GlanceModifier
+                .defaultWeight()
+                .clickable(actionStartActivity(taskIntent))
+        )
     }
 }
 
