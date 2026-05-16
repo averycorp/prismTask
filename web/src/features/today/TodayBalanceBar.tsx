@@ -22,6 +22,10 @@ import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useTaskStore } from '@/stores/taskStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { LifeCategory, TaskMode } from '@/types/task';
+import {
+  LIFE_CATEGORY_COLOR,
+  LIFE_CATEGORY_LABEL,
+} from '@/theme/lifeCategoryColors';
 
 /**
  * Today-screen Work-Life Balance bar. Mirrors Android's
@@ -38,20 +42,12 @@ import type { LifeCategory, TaskMode } from '@/types/task';
  * All copy here is descriptive — never prescriptive. See
  * `docs/WORK_PLAY_RELAX.md` § *Descriptive, not prescriptive*.
  */
-const CATEGORY_COLOR: Record<Exclude<LifeCategory, 'UNCATEGORIZED'>, string> = {
-  WORK: '#2563eb', // blue-600
-  PERSONAL: '#a855f7', // purple-500
-  SELF_CARE: '#16a34a', // green-600
-  HEALTH: '#dc2626', // red-600
-};
-
-const CATEGORY_LABEL: Record<LifeCategory, string> = {
-  WORK: 'Work',
-  PERSONAL: 'Personal',
-  SELF_CARE: 'Self-Care',
-  HEALTH: 'Health',
-  UNCATEGORIZED: 'Uncategorized',
-};
+// LifeCategory palette is the single source of truth shared with the
+// Weekly Balance Report and the Morning check-in summary card — see
+// `@/theme/lifeCategoryColors`. These tokens mirror Android's
+// `LifeCategoryColor.kt` exactly.
+const CATEGORY_COLOR: Record<LifeCategory, string> = LIFE_CATEGORY_COLOR;
+const CATEGORY_LABEL: Record<LifeCategory, string> = LIFE_CATEGORY_LABEL;
 
 // Mode colors are deliberately distinct from the LifeCategory palette so
 // the two stacked bars are visually separable even though "Work" appears
