@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { HabitBookingDialog } from './HabitBookingDialog';
+import { HabitLogDialog } from '@/components/HabitLogDialog';
 import type { HabitLog } from '@/api/firestore/habitLogs';
 
 // Stable empty fallback for the Zustand selector below. Returning a
@@ -64,9 +65,9 @@ export function HabitLogsScreen() {
     setDeleting(true);
     try {
       await deleteLog(deleteCandidate.id);
-      toast.success('Activity removed');
+      toast.success('Log removed');
     } catch {
-      toast.error('Failed to remove activity');
+      toast.error('Failed to remove log');
     } finally {
       setDeleting(false);
       setDeleteCandidate(null);
@@ -119,22 +120,20 @@ export function HabitLogsScreen() {
             {habit.name}
           </h1>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Activity History
+            Logs
           </p>
         </div>
-        {habit.is_bookable && (
-          <Button onClick={() => setBookingOpen(true)} size="sm">
-            <Plus className="h-4 w-4" />
-            Book Activity
-          </Button>
-        )}
+        <Button onClick={() => setBookingOpen(true)} size="sm">
+          <Plus className="h-4 w-4" />
+          {habit.is_bookable ? 'Book Habit' : 'Log Entry'}
+        </Button>
       </div>
 
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatTile label="Total Activities" value={String(logs.length)} />
+        <StatTile label="Total Logs" value={String(logs.length)} />
         <StatTile
-          label="Last Activity"
+          label="Last Log"
           value={
             logs.length > 0
               ? format(new Date(logs[0].date), 'MMM d, yyyy')
@@ -152,16 +151,14 @@ export function HabitLogsScreen() {
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
           <EmptyState
             icon={<BookOpen className="h-8 w-8" />}
-            title="No Activity Yet"
+            title="No Logs Yet"
             description={
               habit.is_bookable
-                ? 'Tap "Book Activity" to record your first session.'
-                : 'Activity logs appear here once recorded on any device.'
+                ? 'Tap "Book Habit" to record your first session.'
+                : 'Tap "Log Entry" to record your first activity.'
             }
-            actionLabel={habit.is_bookable ? 'Book Activity' : undefined}
-            onAction={
-              habit.is_bookable ? () => setBookingOpen(true) : undefined
-            }
+            actionLabel={habit.is_bookable ? 'Book Habit' : 'Log Entry'}
+            onAction={() => setBookingOpen(true)}
           />
         </div>
       ) : (
@@ -177,8 +174,14 @@ export function HabitLogsScreen() {
         </div>
       )}
 
-      {bookingOpen && (
+      {bookingOpen && habit.is_bookable && (
         <HabitBookingDialog
+          habit={habit}
+          onClose={() => setBookingOpen(false)}
+        />
+      )}
+      {bookingOpen && !habit.is_bookable && (
+        <HabitLogDialog
           habit={habit}
           onClose={() => setBookingOpen(false)}
         />
@@ -188,8 +191,8 @@ export function HabitLogsScreen() {
         isOpen={!!deleteCandidate}
         onClose={() => setDeleteCandidate(null)}
         onConfirm={handleConfirmDelete}
-        title="Delete Activity"
-        message="This will permanently remove the activity log entry."
+        title="Delete Log"
+        message="This will permanently remove the log entry."
         confirmLabel="Delete"
         variant="danger"
         loading={deleting}
@@ -244,7 +247,7 @@ function LogRow({
       <button
         onClick={onDelete}
         className="shrink-0 rounded-md p-1.5 text-[var(--color-text-secondary)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--color-bg-secondary)] hover:text-red-500"
-        aria-label="Delete activity"
+        aria-label="Delete log"
       >
         <Trash2 className="h-4 w-4" />
       </button>
