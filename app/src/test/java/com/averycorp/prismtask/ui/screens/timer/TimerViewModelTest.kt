@@ -27,7 +27,7 @@ import org.junit.Test
  * a single regression test to lock the existing flow in.
  *
  * Post-D6: TimerViewModel no longer runs an in-memory tick loop — it
- * delegates the countdown to PomodoroTimerService and consumes broadcasts.
+ * delegates the countdown to TimerForegroundService and consumes broadcasts.
  * The earlier tickJob-leak mitigations (toggleStartPauseIfRunning in
  * @After, "pause before returning to avoid runTest burning through the
  * 25-minute loop") are no longer needed; start() is now a pure

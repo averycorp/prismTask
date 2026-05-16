@@ -8,7 +8,7 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.preferences.TimerPreferences
-import com.averycorp.prismtask.notifications.PomodoroTimerService
+import com.averycorp.prismtask.notifications.TimerForegroundService
 import com.averycorp.prismtask.widget.TimerWidgetState
 import com.averycorp.prismtask.widget.WidgetUpdateManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -66,28 +66,27 @@ constructor(
     val uiState: StateFlow<TimerUiState> = _uiState.asStateFlow()
 
     /**
-     * Listens for tick / pause / resume / complete broadcasts from
-     * [PomodoroTimerService]. Filters on
-     * [PomodoroTimerService.EXTRA_OWNER] == [PomodoroTimerService.OWNER_TIMER]
-     * so a SmartPomodoroViewModel session running concurrently doesn't bleed
-     * into our state.
+     * Listens for tick / pause / resume / stop / skip / complete broadcasts
+     * from [TimerForegroundService]. The dedicated Timer service can't
+     * collide with [com.averycorp.prismtask.notifications.PomodoroTimerService]
+     * (Smart Pomodoro) since they emit on disjoint action namespaces, so no
+     * owner filtering is needed.
      */
     private val timerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val incomingOwner = intent?.getStringExtra(PomodoroTimerService.EXTRA_OWNER)
-            if (incomingOwner != PomodoroTimerService.OWNER_TIMER) return
-            when (intent.action) {
-                PomodoroTimerService.ACTION_TICK -> {
+            when (intent?.action) {
+                TimerForegroundService.ACTION_TICK -> {
                     val seconds = intent.getIntExtra(
-                        PomodoroTimerService.EXTRA_SECONDS_REMAINING,
+                        TimerForegroundService.EXTRA_SECONDS_REMAINING,
                         -1
                     )
                     if (seconds >= 0) onTick(seconds)
                 }
-                PomodoroTimerService.ACTION_PAUSED -> onServicePaused()
-                PomodoroTimerService.ACTION_RESUMED -> onServiceResumed()
-                PomodoroTimerService.ACTION_STOPPED -> onServiceStopped()
-                PomodoroTimerService.ACTION_COMPLETE -> onServiceComplete()
+                TimerForegroundService.ACTION_PAUSED -> onServicePaused()
+                TimerForegroundService.ACTION_RESUMED -> onServiceResumed()
+                TimerForegroundService.ACTION_STOPPED -> onServiceStopped()
+                TimerForegroundService.ACTION_SKIPPED -> onServiceSkipped()
+                TimerForegroundService.ACTION_COMPLETE -> onServiceComplete()
             }
         }
     }
@@ -189,11 +188,12 @@ constructor(
         if (receiverRegistered) return
         try {
             val filter = IntentFilter().apply {
-                addAction(PomodoroTimerService.ACTION_TICK)
-                addAction(PomodoroTimerService.ACTION_PAUSED)
-                addAction(PomodoroTimerService.ACTION_RESUMED)
-                addAction(PomodoroTimerService.ACTION_STOPPED)
-                addAction(PomodoroTimerService.ACTION_COMPLETE)
+                addAction(TimerForegroundService.ACTION_TICK)
+                addAction(TimerForegroundService.ACTION_PAUSED)
+                addAction(TimerForegroundService.ACTION_RESUMED)
+                addAction(TimerForegroundService.ACTION_STOPPED)
+                addAction(TimerForegroundService.ACTION_SKIPPED)
+                addAction(TimerForegroundService.ACTION_COMPLETE)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 appContext.registerReceiver(timerReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -237,12 +237,13 @@ constructor(
         if (state.remainingSeconds <= 0) return
         _uiState.value = state.copy(isRunning = true)
         syncWidgetState()
-        PomodoroTimerService.start(
+        TimerForegroundService.start(
             context = appContext,
             durationSeconds = state.remainingSeconds,
             sessionIndex = state.completedSessions,
+            totalSessions = state.sessionsUntilLongBreak,
             sessionType = sessionTypeFor(state),
-            owner = PomodoroTimerService.OWNER_TIMER
+            isLongBreak = state.isLongBreak
         )
     }
 
@@ -251,13 +252,13 @@ constructor(
         if (state.remainingSeconds <= 0) return
         _uiState.value = state.copy(isRunning = true)
         syncWidgetState()
-        PomodoroTimerService.resume(appContext)
+        TimerForegroundService.resume(appContext)
     }
 
     private fun pause() {
         _uiState.value = _uiState.value.copy(isRunning = false)
         syncWidgetState()
-        PomodoroTimerService.pause(appContext)
+        TimerForegroundService.pause(appContext)
     }
 
     private fun onTick(secondsRemaining: Int) {
@@ -269,12 +270,12 @@ constructor(
             remainingSeconds = secondsRemaining,
             isRunning = secondsRemaining > 0
         )
-        // Widget refreshes are driven by PomodoroTimerService directly so
-        // the home-screen countdown keeps ticking even when this ViewModel
-        // is gone (process backgrounded + reclaimed). The widget composes
-        // its displayed time from `sessionEndElapsedRealtime - now()`, so
-        // each push is just a Glance recomposition — no per-tick DataStore
-        // write needed.
+        // Widget refreshes are driven by TimerForegroundService directly
+        // so the home-screen countdown keeps ticking even when this
+        // ViewModel is gone (process backgrounded + reclaimed). The
+        // widget composes its displayed time from
+        // `sessionEndElapsedRealtime - now()`, so each push is just a
+        // Glance recomposition — no per-tick DataStore write needed.
     }
 
     private fun onServicePaused() {
@@ -316,6 +317,42 @@ constructor(
         // the post-completion state even when both auto-start
         // flags are off.
         syncWidgetState()
+    }
+
+    /**
+     * Service-driven skip — the widget Skip-Break button (or the in-app
+     * Skip control) cancelled the current break early. Advances the
+     * Pomodoro state machine the same way [skipToNext] does, but without
+     * re-firing the service stop (the service already terminated when it
+     * broadcast [TimerForegroundService.ACTION_SKIPPED]).
+     */
+    private fun onServiceSkipped() {
+        val state = _uiState.value
+        if (!state.pomodoroEnabled) {
+            // Non-Pomodoro plain Break: drop back to idle work tab.
+            val workDuration = workDurationSeconds.value
+            _uiState.value = state.copy(
+                mode = TimerMode.WORK,
+                isLongBreak = false,
+                remainingSeconds = workDuration,
+                totalSeconds = workDuration,
+                isRunning = false
+            )
+            syncWidgetState()
+            return
+        }
+        if (state.mode == TimerMode.BREAK) {
+            val workDuration = workDurationSeconds.value
+            _uiState.value = state.copy(
+                mode = TimerMode.WORK,
+                isLongBreak = false,
+                remainingSeconds = workDuration,
+                totalSeconds = workDuration,
+                isRunning = false
+            )
+            syncWidgetState()
+            if (state.autoStartWork) start()
+        }
     }
 
     @androidx.annotation.VisibleForTesting
@@ -392,7 +429,15 @@ constructor(
     fun skipToNext() {
         val state = _uiState.value
         if (!state.pomodoroEnabled) return
-        PomodoroTimerService.stop(appContext)
+        // If a break is currently running, dispatch SKIP_BREAK so the
+        // service tears itself down cleanly and emits ACTION_SKIPPED;
+        // otherwise (skip work → break) just stop the service like a
+        // normal "next session" advance.
+        if (state.mode == TimerMode.BREAK && state.isRunning) {
+            TimerForegroundService.skipBreak(appContext)
+        } else {
+            TimerForegroundService.stop(appContext)
+        }
 
         if (state.mode == TimerMode.WORK) {
             val newCompleted = state.completedSessions + 1
@@ -423,7 +468,7 @@ constructor(
     }
 
     fun reset() {
-        PomodoroTimerService.stop(appContext)
+        TimerForegroundService.stop(appContext)
         val state = _uiState.value
         val total = when {
             state.mode == TimerMode.WORK -> workDurationSeconds.value
@@ -440,7 +485,7 @@ constructor(
     }
 
     fun resetPomodoro() {
-        PomodoroTimerService.stop(appContext)
+        TimerForegroundService.stop(appContext)
         val workDuration = workDurationSeconds.value
         _uiState.value = _uiState.value.copy(
             mode = TimerMode.WORK,
@@ -454,7 +499,7 @@ constructor(
 
     fun setMode(mode: TimerMode) {
         if (_uiState.value.mode == mode) return
-        PomodoroTimerService.stop(appContext)
+        TimerForegroundService.stop(appContext)
         val total = when (mode) {
             TimerMode.WORK -> workDurationSeconds.value
             TimerMode.BREAK -> breakDurationSeconds.value
@@ -528,9 +573,9 @@ constructor(
 
     private fun sessionTypeFor(state: TimerUiState): String = when {
         state.mode == TimerMode.BREAK && state.isLongBreak ->
-            PomodoroTimerService.SESSION_TYPE_LONG_BREAK
-        state.mode == TimerMode.BREAK -> PomodoroTimerService.SESSION_TYPE_BREAK
-        else -> PomodoroTimerService.SESSION_TYPE_WORK
+            TimerForegroundService.SESSION_TYPE_LONG_BREAK
+        state.mode == TimerMode.BREAK -> TimerForegroundService.SESSION_TYPE_BREAK
+        else -> TimerForegroundService.SESSION_TYPE_WORK
     }
 
     /**
