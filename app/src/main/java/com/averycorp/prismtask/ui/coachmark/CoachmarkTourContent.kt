@@ -79,8 +79,11 @@ object CoachmarkRoutes {
 }
 
 /**
- * The post-onboarding coachmark tour. 13 surfaces; voice & tone match
- * existing `GUIDED_TOUR_STEPS` in `today/components/GuidedTourCard.kt`.
+ * The post-onboarding coachmark tour. 13 surfaces; voice is warm,
+ * non-judgmental, ADHD-aware where it lands naturally. Sole
+ * post-onboarding walkthrough since the in-flow `GuidedTourCard` was
+ * retired in favour of this anchored overlay (audit doc
+ * `docs/audits/ONBOARDING_OVERLAP_AUDIT.md` finding #1).
  */
 val DEFAULT_COACHMARK_TOUR: List<CoachmarkStep> = listOf(
     CoachmarkStep(

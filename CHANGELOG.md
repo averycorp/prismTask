@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Removed
+
+- chore(onboarding): retired the in-flow 5-step `GuidedTourCard` on
+  Today in favour of the existing 13-surface anchored coachmark tour
+  (audit doc `docs/audits/ONBOARDING_OVERLAP_AUDIT.md` finding #1, PR
+  #1585). Five concepts overlapped verbatim between the two systems;
+  the coachmark variant is anchored to real UI and more useful for
+  orientation. `TOUR_CARD_ELIGIBLE` is retained — it remains the
+  post-onboarding eligibility signal the `CoachmarkController` consults
+  before firing `tryStart`. The dead `tour_card_dismissed` and
+  `tour_step_index` DataStore keys are no longer written; existing
+  installs leave them as orphaned bytes (no migration needed).
+
 ### Added
 
 - feat(widgets): 13-PR design + functionality sweep across every

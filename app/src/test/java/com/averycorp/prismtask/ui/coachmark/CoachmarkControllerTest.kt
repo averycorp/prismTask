@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -300,6 +301,33 @@ class CoachmarkControllerTest {
         advanceUntilIdle()
         assertEquals(CoachmarkState.Dismissed, c.state.value)
     }
+
+    /**
+     * Regression for the GuidedTourCard retirement (audit doc
+     * `docs/audits/ONBOARDING_OVERLAP_AUDIT.md` finding #1, PR #1585):
+     * once the in-flow Today card is gone, the coachmark tour is the
+     * sole post-onboarding walkthrough — so it MUST start whenever
+     * onboarding flips `tour_card_eligible` and neither completion nor
+     * dismissal has been recorded. This pins the eligibility contract
+     * to all three flags simultaneously, not just `eligible()`.
+     */
+    @Test
+    fun tryStart_starts_when_eligible_and_not_completed_and_not_dismissed() =
+        runTest(testDispatcher) {
+            prefs.markEligible()
+            // explicit: completed = false, dismissed = false, step = 0
+            assertFalse(prefs.coachmarkCompleted().first())
+            assertFalse(prefs.coachmarkDismissed().first())
+            assertEquals(0, prefs.coachmarkStepIndex().first())
+
+            val c = controller()
+            c.tryStart()
+            advanceUntilIdle()
+
+            val s = c.state.value as CoachmarkState.ShowingStep
+            assertEquals(0, s.stepIndex)
+            assertEquals("step0", s.step.anchorId)
+        }
 
     @Test
     fun stepIndex_persists_on_advance() = runTest(testDispatcher) {
