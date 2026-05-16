@@ -8,7 +8,6 @@ import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
@@ -22,32 +21,46 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxHeight
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.padding
 import androidx.glance.layout.width
 import androidx.glance.text.Text
 import com.averycorp.prismtask.MainActivity
 import com.averycorp.prismtask.widget.launch.WidgetLaunchAction
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
  * Stats Sparkline widget — week-over-week tasks completed trend.
  *
- * The mockup uses an SVG line chart but Glance only supports
- * RemoteViews-friendly primitives, so the visualization here is a
- * 7-bar column chart per day with today highlighted. Today's bar
- * carries the primary accent; the rest carry primary at 0.6 alpha.
+ * Glance only supports RemoteViews-friendly primitives, so the
+ * visualization is a 7-bar column chart per day with today's bar
+ * highlighted via [WidgetThemePalette.primary] and the other six bars
+ * tinted via [primaryContainer]. Days with zero completions render a
+ * dim baseline track instead of a degenerate stub, so the chart reads
+ * as "no activity that day" rather than "tiny bar".
  *
- * Header surfaces the delta vs. last week (▲ / ▼ percentage), with
- * the on-color picked from the theme's success / destructive tokens.
+ * Header shows the total completions this week + delta vs. last week
+ * (▲ green / ▼ red). When both windows have zero completions we show an
+ * empty-state instead of an all-dim chart.
+ *
+ * Tapping the surface opens the Insights / Task Analytics screen via
+ * [WidgetLaunchAction.OpenInsights], routed through `NavGraph`.
  */
 class StatsSparklineWidget : GlanceAppWidget() {
     companion object {
         private val SMALL_WIDE = DpSize(200.dp, 100.dp)
         private val LARGE = DpSize(350.dp, 250.dp)
         private val LARGE_WIDE = DpSize(450.dp, 250.dp)
+
+        internal val EMPTY_DATA = StatsSparklineWidgetData(
+            thisWeek = List(7) { 0 },
+            lastWeek = List(7) { 0 },
+            total = 0,
+            lastTotal = 0,
+            deltaPct = 0,
+            up = true
+        )
     }
 
     override val sizeMode = SizeMode.Responsive(setOf(SMALL_WIDE, LARGE, LARGE_WIDE))
@@ -57,14 +70,7 @@ class StatsSparklineWidget : GlanceAppWidget() {
         val data = try {
             WidgetDataProvider.getStatsSparklineData(context)
         } catch (_: Exception) {
-            StatsSparklineWidgetData(
-                thisWeek = List(7) { 0 },
-                lastWeek = List(7) { 0 },
-                total = 0,
-                lastTotal = 0,
-                deltaPct = 0,
-                up = true
-            )
+            EMPTY_DATA
         }
         provideContent {
             SparklineContent(context, LocalSize.current, palette, data)
@@ -81,48 +87,41 @@ private fun SparklineContent(
 ) {
     val isWide = size.width >= 450.dp
     val isSmall = size.height < 130.dp
-
-    val thisWeek = data.thisWeek
-    val total = data.total
-    val lastTotal = data.lastTotal
-    val deltaPct = data.deltaPct
-    val up = data.up
-    val maxBar = (thisWeek.maxOrNull() ?: 1).coerceAtLeast(1)
+    val isEmpty = data.total == 0 && data.lastTotal == 0
 
     val openInsights = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.OpenInsights.wireId)
     }
 
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .cornerRadius(palette.widgetCornerRadius)
-            .background(palette.surfaceBackground)
-            .padding(if (isSmall) 11.dp else 12.dp)
-            .clickable(actionStartActivity(openInsights))
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "This Week",
-                style = WidgetTextStyles.captionMedium(palette.onSurfaceVariant),
-                modifier = GlanceModifier.defaultWeight()
-            )
-            Text(
-                text = "${if (up) "▲" else "▼"} ${kotlin.math.abs(deltaPct)}%",
-                style = WidgetTextStyles.captionMedium(
-                    if (up) palette.successColor else palette.scoreRed
-                )
-            )
+    WidgetScaffold(
+        palette = palette,
+        isLarge = !isSmall,
+        title = "This Week",
+        outerAction = actionStartActivity(openInsights),
+        headerTrailing = if (!isEmpty) {
+            { DeltaBadge(data, palette) }
+        } else {
+            null
         }
+    ) {
+        if (isEmpty) {
+            WidgetEmptyState(
+                emoji = "📊",
+                message = "No Completions Yet",
+                palette = palette
+            )
+            return@WidgetScaffold
+        }
+
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                text = total.toString(),
+                text = data.total.toString(),
                 style = WidgetTextStyles.scoreLargeThemed(palette, palette.onSurface)
             )
             Spacer(modifier = GlanceModifier.width(6.dp))
             Text(
-                text = "tasks · vs $lastTotal",
+                text = "Tasks · Vs ${data.lastTotal} Last Week",
                 style = WidgetTextStyles.caption(palette.onSurfaceVariant)
             )
         }
@@ -134,9 +133,8 @@ private fun SparklineContent(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .defaultWeight()
-                .padding(top = 4.dp)
         ) {
-            BarChart(thisWeek, maxBar, palette, isWide)
+            BarChart(data.thisWeek, palette, isWide)
         }
 
         if (isWide) {
@@ -144,7 +142,7 @@ private fun SparklineContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Spacer(modifier = GlanceModifier.defaultWeight())
                 Text(
-                    text = "${(total / 7.0 * 10).roundToInt() / 10.0}/day avg",
+                    text = "${roundOneDecimal(data.total / 7.0)}/Day Avg",
                     style = WidgetTextStyles.badge(palette.onSurfaceVariant)
                 )
             }
@@ -153,11 +151,26 @@ private fun SparklineContent(
 }
 
 @Composable
-private fun BarChart(values: List<Int>, max: Int, palette: WidgetThemePalette, isWide: Boolean) {
+private fun DeltaBadge(data: StatsSparklineWidgetData, palette: WidgetThemePalette) {
+    val arrow = if (data.up) "▲" else "▼"
+    val color = if (data.up) palette.successColor else palette.scoreRed
+    Text(
+        text = "$arrow ${abs(data.deltaPct)}% Vs Last Week",
+        style = WidgetTextStyles.captionMedium(color)
+    )
+}
+
+@Composable
+private fun BarChart(values: List<Int>, palette: WidgetThemePalette, isWide: Boolean) {
+    // Single Mon-Sun axis. The data provider returns oldest→today (7 entries)
+    // anchored to the user's start-of-day, so day-of-week alignment depends on
+    // `now`; we render M…S as a stable axis label.
     val days = listOf("M", "T", "W", "T", "F", "S", "S")
     val todayIdx = values.lastIndex
+    val maxBar = (values.maxOrNull() ?: 0).coerceAtLeast(1)
+    val barWidth = if (isWide) 14.dp else 10.dp
     Row(
-        modifier = GlanceModifier.fillMaxSize(),
+        modifier = GlanceModifier.fillMaxWidth().fillMaxHeight(),
         verticalAlignment = Alignment.Bottom
     ) {
         values.forEachIndexed { i, v ->
@@ -166,16 +179,23 @@ private fun BarChart(values: List<Int>, max: Int, palette: WidgetThemePalette, i
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalAlignment = Alignment.Bottom
             ) {
-                // Pseudo "max-stretch": each bar height is computed in 4dp
-                // increments scaled to 0..40dp. Glance composables don't
-                // support fractional fills so we approximate the heatmap.
-                val barHeight = ((v.toFloat() / max) * 40).coerceAtLeast(2f).dp
+                // Bars scale 0..40dp. A 0-task day renders a 2dp baseline
+                // *track* (palette.surfaceVariant) so the day reads as
+                // "no activity" rather than a degenerate stub of the active
+                // accent — fixes the empty-bar issue called out in the audit.
+                val (barHeight, barColor) = if (v <= 0) {
+                    2.dp to palette.surfaceVariant
+                } else {
+                    val scaled = ((v.toFloat() / maxBar) * 40).coerceAtLeast(4f).dp
+                    val color = if (i == todayIdx) palette.primary else palette.primaryContainer
+                    scaled to color
+                }
                 Box(
                     modifier = GlanceModifier
-                        .width(if (isWide) 14.dp else 10.dp)
+                        .width(barWidth)
                         .height(barHeight)
                         .cornerRadius(2.dp)
-                        .background(if (i == todayIdx) palette.primary else palette.primaryContainer)
+                        .background(barColor)
                 ) {}
                 Spacer(modifier = GlanceModifier.height(3.dp))
                 Text(
@@ -188,6 +208,8 @@ private fun BarChart(values: List<Int>, max: Int, palette: WidgetThemePalette, i
         }
     }
 }
+
+private fun roundOneDecimal(v: Double): Double = (v * 10).roundToInt() / 10.0
 
 class StatsSparklineWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = StatsSparklineWidget()
