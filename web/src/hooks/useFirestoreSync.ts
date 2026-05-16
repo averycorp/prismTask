@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Unsubscribe } from 'firebase/firestore';
 import { backfillLegacySlotDefs } from '@/api/firestore/medicationSlots';
+import { reconcileBuiltInHabits } from '@/lib/builtInHabitReconciler';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
@@ -185,8 +186,12 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const resetNlpShortcuts = useNlpShortcutsStore((s) => s.reset);
   const resetHabitTemplates = useHabitTemplatesStore((s) => s.reset);
   const resetProjectTemplates = useProjectTemplatesStore((s) => s.reset);
+  // Tracks whether the one-shot built-in habit reconciler has fired for
+  // the *current* session. Reset on uid change inside the effect below.
+  const reconcileFiredRef = useRef(false);
 
   useEffect(() => {
+    reconcileFiredRef.current = false;
     if (!uid) {
       // Signed out — make sure local caches reset so the next user
       // doesn't see stale data from the previous session before their
@@ -237,6 +242,24 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     // so re-mounts and re-signs no-op after the first success. Fires
     // in the background — failure doesn't gate subscriptions.
     void backfillLegacySlotDefs(uid).catch(() => undefined);
+
+    // One-shot built-in habit dedup (parity unit 15). Runs after the
+    // first habit-store snapshot — the `subscribeToHabits` listener
+    // above hydrates `habits + completions` on the very first emit, so
+    // we kick off the reconciler from a microtask that waits until the
+    // store has a non-empty habits array. Subsequent loads no-op via
+    // the `RECONCILER_FLAG_V1` IDB flag inside the reconciler.
+    const reconcileUnsub = useHabitStore.subscribe((state) => {
+      // First non-empty snapshot wins. Guard with a ref-style flag so
+      // we don't re-fire on every list mutation (toggleCompletion etc.)
+      if (reconcileFiredRef.current) return;
+      if (state.habits.length === 0) return;
+      reconcileFiredRef.current = true;
+      void reconcileBuiltInHabits(uid, state.habits, state.completions).catch(
+        () => undefined,
+      );
+    });
+    unsubscribers.push(reconcileUnsub);
 
     safeSubscribe(subscribeToTasks, 'tasks');
     safeSubscribe(subscribeToTaskCompletions, 'task-completions');
