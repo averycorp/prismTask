@@ -97,6 +97,87 @@ describe('chatStore — sendMessage', () => {
   });
 });
 
+describe('chatStore — rolling N=6 history payload', () => {
+  it('forwards at most the last 6 user/assistant pairs (12 entries) as history', () => {
+    const long: { role: 'user' | 'assistant'; text: string }[] = [];
+    for (let i = 0; i < 20; i += 1) {
+      long.push({ role: 'user', text: `u${i}` });
+      long.push({ role: 'assistant', text: `a${i}` });
+    }
+    const messages = long.map((m, idx) => ({
+      id: `m${idx}`,
+      conversationId: 'chat_x',
+      role: m.role,
+      text: m.text,
+      actions: [],
+      createdAt: new Date().toISOString(),
+    }));
+    const payload = __internals.buildHistoryPayload(messages);
+    expect(payload).toHaveLength(12);
+    // Last entries are preserved.
+    expect(payload[payload.length - 1]).toEqual({
+      role: 'assistant',
+      content: 'a19',
+    });
+    expect(payload[0]).toEqual({ role: 'user', content: 'u14' });
+  });
+
+  it('returns fewer entries when there is less history', () => {
+    const messages = [
+      {
+        id: 'm0',
+        conversationId: 'chat_x',
+        role: 'user' as const,
+        text: 'hi',
+        actions: [],
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    expect(__internals.buildHistoryPayload(messages)).toHaveLength(1);
+  });
+
+  it('forwards history payload in sendMessage', async () => {
+    aiChatHistoryMock.mockResolvedValue({ messages: [], next_before: null });
+    await useChatStore.getState().initialize(0);
+
+    aiChatMock.mockResolvedValue({
+      message: 'ok',
+      actions: [],
+      conversation_id: useChatStore.getState().conversationId,
+      user_preferences: [],
+    });
+
+    await useChatStore.getState().sendMessage('first');
+    await useChatStore.getState().sendMessage('second');
+
+    expect(aiChatMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        message: 'second',
+        history: expect.arrayContaining([
+          expect.objectContaining({ role: 'user', content: 'first' }),
+          expect.objectContaining({ role: 'assistant', content: 'ok' }),
+        ]),
+      }),
+    );
+  });
+});
+
+describe('chatStore — conversation id pattern', () => {
+  it('matches chat_{ISO_DATE}_{UUID8}', () => {
+    const id = __internals.newConversationId('2026-05-15');
+    expect(id).toMatch(/^chat_2026-05-15_[a-z0-9]{8}$/);
+  });
+
+  it('isoDateForStartOfDay rolls back to the previous day when before SoD', () => {
+    const t = new Date('2026-05-15T04:00:00');
+    // SoD hour 6 means 4am is still "yesterday".
+    expect(__internals.isoDateForStartOfDay(t, 6)).toBe('2026-05-14');
+    // SoD hour 0 means today.
+    const out = __internals.isoDateForStartOfDay(t, 0);
+    expect(out).toMatch(/^2026-05-15$/);
+  });
+});
+
 describe('chatStore — clearConversation', () => {
   it('mints a fresh conversation id and empties the message list', async () => {
     aiChatHistoryMock.mockResolvedValue({ messages: [], next_before: null });

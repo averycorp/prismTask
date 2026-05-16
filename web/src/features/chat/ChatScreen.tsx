@@ -17,10 +17,10 @@ import { useProFeature } from '@/hooks/useProFeature';
 import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
 import type { ChatActionPayload } from '@/types/chat';
 import {
-  actionLabel,
   actionSignature,
   executeChatAction,
 } from '@/features/chat/chatActions';
+import { AiActionChip } from '@/components/shared/AiActionChip';
 import { Button } from '@/components/ui/Button';
 
 const STARTER_PROMPTS: string[] = [
@@ -58,7 +58,18 @@ export function ChatScreen() {
 
   const updateTask = useTaskStore((s) => s.updateTask);
   const completeTask = useTaskStore((s) => s.completeTask);
+  const uncompleteTask = useTaskStore((s) => s.uncompleteTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
+  // `tasks` is read in the dep snapshot via the store getter (not subscribed)
+  // so the chat doesn't re-render on every task update — we only need the
+  // latest values at the moment a chip is tapped.
+  const getTaskById = useCallback(
+    (taskId: string) => {
+      const t = useTaskStore.getState().tasks.find((tk) => tk.id === taskId);
+      return t ? { due_date: t.due_date ?? null } : null;
+    },
+    [],
+  );
   const setPendingBatchCommand = useBatchStore((s) => s.setPendingCommand);
 
   const [inputText, setInputText] = useState('');
@@ -98,8 +109,29 @@ export function ChatScreen() {
     if (sendDisabled) return;
     const text = inputText.trim();
     setInputText('');
+    // Slash-prefix shortcut: `/<phrase>` routes the natural-language
+    // phrasing straight to BatchPreviewScreen without an Anthropic round-
+    // trip. Mirrors the QuickAddBar batch detection so power users get the
+    // same affordance from the chat input. The leading `/` is stripped
+    // before the phrase is parsed.
+    if (text.startsWith('/')) {
+      const command = text.slice(1).trim();
+      if (command.length > 0) {
+        setPendingBatchCommand(command);
+        navigate('/batch/preview');
+        return;
+      }
+    }
     void sendMessage(text);
-  }, [isPro, setShowUpgrade, sendDisabled, inputText, sendMessage]);
+  }, [
+    isPro,
+    setShowUpgrade,
+    sendDisabled,
+    inputText,
+    sendMessage,
+    setPendingBatchCommand,
+    navigate,
+  ]);
 
   const handleStarterPrompt = useCallback(
     (prompt: string) => {
@@ -123,12 +155,26 @@ export function ChatScreen() {
         const result = await executeChatAction(action, {
           updateTask,
           completeTask,
+          uncompleteTask,
           deleteTask,
+          getTaskById,
           setPendingBatchCommand,
           navigate,
         });
         if (result?.message) {
-          toast.success(result.message);
+          if (result.undoLabel && result.undoAction) {
+            const undo = result.undoAction;
+            toast.success(result.message, {
+              action: {
+                label: result.undoLabel,
+                onClick: () => {
+                  void undo();
+                },
+              },
+            });
+          } else {
+            toast.success(result.message);
+          }
         }
       } catch {
         toast.error('Action failed');
@@ -141,7 +187,9 @@ export function ChatScreen() {
       setActionInFlight,
       updateTask,
       completeTask,
+      uncompleteTask,
       deleteTask,
+      getTaskById,
       setPendingBatchCommand,
       navigate,
     ],
@@ -250,6 +298,7 @@ export function ChatScreen() {
         onSend={handleSend}
         disabled={aiDisabled || proDisabled || isSending}
         sendDisabled={sendDisabled}
+        isBatchCommand={inputText.trim().startsWith('/')}
       />
 
       <ProUpgradeModal
@@ -378,21 +427,14 @@ function ChatBubble({
         </div>
         {!isUser && message.actions.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
-            {message.actions.map((action, idx) => {
-              const sig = actionSignature(action);
-              const disabled = sig != null && disabledActionSignatures.has(sig);
-              return (
-                <button
-                  key={`${action.type}-${idx}`}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onActionClick(action)}
-                  className="rounded-full bg-[var(--color-accent)]/15 px-3 py-1 text-xs font-medium text-[var(--color-accent)] transition hover:bg-[var(--color-accent)]/25 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {actionLabel(action)}
-                </button>
-              );
-            })}
+            {message.actions.map((action, idx) => (
+              <AiActionChip
+                key={`${action.type}-${idx}`}
+                action={action}
+                disabledSignatures={disabledActionSignatures}
+                onClick={onActionClick}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -424,43 +466,55 @@ function ChatInputBar({
   onSend,
   disabled,
   sendDisabled,
+  isBatchCommand,
 }: {
   value: string;
   onChange: (next: string) => void;
   onSend: () => void;
   disabled: boolean;
   sendDisabled: boolean;
+  isBatchCommand: boolean;
 }) {
   return (
     <form
-      className="flex items-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2"
+      className="flex flex-col gap-1 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2"
       onSubmit={(e) => {
         e.preventDefault();
         onSend();
       }}
     >
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            onSend();
-          }
-        }}
-        placeholder="What's on your mind?"
-        rows={1}
-        disabled={disabled}
-        className="max-h-32 flex-1 resize-none rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
-      />
-      <button
-        type="submit"
-        disabled={sendDisabled}
-        aria-label="Send"
-        className="rounded-full bg-[var(--color-accent)] p-2 text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <Send className="h-4 w-4" />
-      </button>
+      {isBatchCommand && (
+        <div
+          className="text-[11px] font-medium text-[var(--color-accent)]"
+          data-testid="chat-batch-hint"
+        >
+          Batch Command — Enter Opens Preview
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder="What's on your mind? (Start with / for a batch command)"
+          rows={1}
+          disabled={disabled}
+          className="max-h-32 flex-1 resize-none rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+        />
+        <button
+          type="submit"
+          disabled={sendDisabled || (isBatchCommand && value.trim().length <= 1)}
+          aria-label={isBatchCommand ? 'Preview Batch' : 'Send'}
+          className="rounded-full bg-[var(--color-accent)] p-2 text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </div>
     </form>
   );
 }

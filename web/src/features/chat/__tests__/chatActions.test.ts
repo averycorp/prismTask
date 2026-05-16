@@ -10,14 +10,18 @@ import {
 function makeDeps(): ChatActionDispatchDeps & {
   updateTask: ReturnType<typeof vi.fn>;
   completeTask: ReturnType<typeof vi.fn>;
+  uncompleteTask: ReturnType<typeof vi.fn>;
   deleteTask: ReturnType<typeof vi.fn>;
+  getTaskById: ReturnType<typeof vi.fn>;
   setPendingBatchCommand: ReturnType<typeof vi.fn>;
   navigate: ReturnType<typeof vi.fn>;
 } {
   return {
     updateTask: vi.fn().mockResolvedValue({}),
     completeTask: vi.fn().mockResolvedValue({}),
+    uncompleteTask: vi.fn().mockResolvedValue({}),
     deleteTask: vi.fn().mockResolvedValue({}),
+    getTaskById: vi.fn().mockReturnValue({ due_date: null }),
     setPendingBatchCommand: vi.fn<(cmd: string | null) => void>(),
     navigate: vi.fn<(to: string) => void>(),
   };
@@ -223,5 +227,114 @@ describe('chatActions — executeChatAction', () => {
       deps,
     );
     expect(res).toBeNull();
+  });
+});
+
+describe('chatActions — destructive undo callbacks', () => {
+  it('complete returns an Undo callback that calls uncompleteTask', async () => {
+    const deps = makeDeps();
+    const res = await executeChatAction(
+      { type: 'complete', task_id: 't1' },
+      deps,
+    );
+    expect(res?.undoLabel).toBe('Undo');
+    expect(res?.undoAction).toBeDefined();
+    await res?.undoAction?.();
+    expect(deps.uncompleteTask).toHaveBeenCalledWith('t1');
+  });
+
+  it('reschedule snapshots the original due_date before mutation and restores it on Undo', async () => {
+    const deps = makeDeps();
+    deps.getTaskById.mockReturnValueOnce({ due_date: '2026-05-13' });
+    const res = await executeChatAction(
+      { type: 'reschedule', task_id: 't2', to: '2026-05-20' },
+      deps,
+    );
+    expect(deps.updateTask).toHaveBeenNthCalledWith(1, 't2', {
+      due_date: '2026-05-20',
+    });
+    await res?.undoAction?.();
+    expect(deps.updateTask).toHaveBeenNthCalledWith(2, 't2', {
+      due_date: '2026-05-13',
+    });
+  });
+
+  it('reschedule_batch Undo restores per-task original due dates', async () => {
+    const deps = makeDeps();
+    deps.getTaskById.mockImplementation((id: string) => {
+      if (id === 'a') return { due_date: '2026-05-01' };
+      if (id === 'b') return { due_date: '2026-05-02' };
+      if (id === 'c') return { due_date: null };
+      return { due_date: null };
+    });
+    const res = await executeChatAction(
+      {
+        type: 'reschedule_batch',
+        task_ids: ['a', 'b', 'c'],
+        to: 'today',
+      },
+      deps,
+    );
+    expect(res?.undoLabel).toBe('Undo');
+    // 3 forward mutations already happened; undo should add 3 reversals.
+    deps.updateTask.mockClear();
+    await res?.undoAction?.();
+    expect(deps.updateTask).toHaveBeenCalledWith('a', {
+      due_date: '2026-05-01',
+    });
+    expect(deps.updateTask).toHaveBeenCalledWith('b', {
+      due_date: '2026-05-02',
+    });
+    expect(deps.updateTask).toHaveBeenCalledWith('c', {
+      due_date: null,
+    });
+  });
+
+  it('reschedule_batch omits Undo when every task failed', async () => {
+    const deps = makeDeps();
+    deps.updateTask.mockRejectedValue(new Error('boom'));
+    const res = await executeChatAction(
+      {
+        type: 'reschedule_batch',
+        task_ids: ['a', 'b'],
+        to: 'today',
+      },
+      deps,
+    );
+    expect(res?.message).toBe('Reschedule Failed');
+    expect(res?.undoLabel).toBeUndefined();
+    expect(res?.undoAction).toBeUndefined();
+  });
+
+  it('archive (web=delete) does NOT offer an Undo because deleteTask is permanent', async () => {
+    const deps = makeDeps();
+    const res = await executeChatAction(
+      { type: 'archive', task_id: 't3' },
+      deps,
+    );
+    expect(res?.message).toBe('Task Archived');
+    expect(res?.undoLabel).toBeUndefined();
+  });
+
+  it('start_timer / breakdown / create_task have no Undo callback', async () => {
+    const deps = makeDeps();
+    const timer = await executeChatAction(
+      { type: 'start_timer', minutes: 25 },
+      deps,
+    );
+    expect(timer?.undoAction).toBeUndefined();
+    const create = await executeChatAction(
+      { type: 'create_task', title: 'foo' },
+      deps,
+    );
+    expect(create?.undoAction).toBeUndefined();
+    const breakdown = await executeChatAction(
+      { type: 'breakdown', task_id: 't', subtasks: ['x'] },
+      deps,
+    );
+    // breakdown returns a message but no Undo callback.
+    if (breakdown) {
+      expect(breakdown.undoAction).toBeUndefined();
+    }
   });
 });
