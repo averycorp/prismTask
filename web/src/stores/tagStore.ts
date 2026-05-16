@@ -12,6 +12,8 @@ interface TagState {
   createTag: (data: TagCreate) => Promise<Tag>;
   updateTag: (tagId: string, data: TagUpdate) => Promise<Tag>;
   deleteTag: (tagId: string) => Promise<void>;
+  bulkDeleteTags: (tagIds: string[]) => Promise<void>;
+  reorderTags: (orderedIds: string[]) => Promise<void>;
   subscribeToTags: (uid: string) => Unsubscribe;
   clearError: () => void;
 }
@@ -60,6 +62,40 @@ export const useTagStore = create<TagState>((set) => ({
     set((state) => ({
       tags: state.tags.filter((t) => t.id !== tagId),
     }));
+  },
+
+  bulkDeleteTags: async (tagIds) => {
+    if (tagIds.length === 0) return;
+    const uid = getUid();
+    await firestoreTags.bulkDeleteTags(uid, tagIds);
+    const idSet = new Set(tagIds);
+    set((state) => ({
+      tags: state.tags.filter((t) => !idSet.has(t.id)),
+    }));
+  },
+
+  reorderTags: async (orderedIds) => {
+    if (orderedIds.length === 0) return;
+    const uid = getUid();
+    // Optimistic local reorder so the drag feedback sticks instantly;
+    // the real-time Firestore subscription re-syncs with server truth
+    // once the batch commits.
+    set((state) => {
+      const byId = new Map(state.tags.map((t) => [t.id, t] as const));
+      const reordered: Tag[] = [];
+      orderedIds.forEach((id, index) => {
+        const tag = byId.get(id);
+        if (tag) {
+          reordered.push({ ...tag, sort_order: (index + 1) * 100 });
+          byId.delete(id);
+        }
+      });
+      // Append any tags not in the supplied order (e.g. archived rows
+      // filtered out of the active list) so they survive the reorder.
+      byId.forEach((tag) => reordered.push(tag));
+      return { tags: reordered };
+    });
+    await firestoreTags.reorderTags(uid, orderedIds);
   },
 
   subscribeToTags: (uid: string) => {
