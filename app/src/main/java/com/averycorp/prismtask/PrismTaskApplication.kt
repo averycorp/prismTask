@@ -25,6 +25,7 @@ import com.averycorp.prismtask.notifications.MedicationClockRescheduler
 import com.averycorp.prismtask.notifications.MedicationIntervalRescheduler
 import com.averycorp.prismtask.notifications.MedicationReminderScheduler
 import com.averycorp.prismtask.notifications.NotificationWorkerScheduler
+import com.averycorp.prismtask.widget.AdminWidgetGate
 import com.averycorp.prismtask.widget.GlanceTrampolineGuard
 import com.averycorp.prismtask.widget.WidgetUpdateManager
 import com.averycorp.prismtask.workers.AutoArchiveWorker
@@ -97,6 +98,9 @@ class PrismTaskApplication :
     lateinit var widgetUpdateManager: WidgetUpdateManager
 
     @Inject
+    lateinit var adminWidgetGate: AdminWidgetGate
+
+    @Inject
     lateinit var automationEngine: AutomationEngine
 
     @Inject
@@ -144,6 +148,7 @@ class PrismTaskApplication :
             scheduleNotificationWorkers()
             scheduleWidgetRefresh()
             observeThemeChangesForWidgets()
+            adminWidgetGate.start(appScope)
             scheduleCalendarSync()
             scheduleBatchUndoSweep()
         } catch (e: Exception) {
