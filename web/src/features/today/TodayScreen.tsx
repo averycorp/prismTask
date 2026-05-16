@@ -4,11 +4,8 @@ import {
   ChevronDown,
   ChevronRight,
   PartyPopper,
-  Activity,
   BarChart3,
   Pin,
-  Plus,
-  PlusCircle,
 } from 'lucide-react';
 import { format, parseISO, startOfWeek, subDays, isMonday, isSunday } from 'date-fns';
 import { toast } from 'sonner';
@@ -28,16 +25,16 @@ import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
 import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
 import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow';
-import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
+import { SchoolworkSection } from '@/features/today/SchoolworkSection';
+import { HabitsSection } from '@/features/today/HabitsSection';
+import { BurnoutBadgeSection } from '@/features/today/BurnoutBadgeSection';
+import { SelfCareRoutineSection } from '@/features/today/SelfCareRoutineSection';
 import { TodayBalanceBar } from '@/features/today/TodayBalanceBar';
 import { DailyEssentialsCards } from '@/features/today/DailyEssentialsCards';
 import { PlanForTodaySheet } from '@/features/today/PlanForTodaySheet';
 import { DoneCounterSheet } from '@/features/today/DoneCounterSheet';
 import { MorningCheckInBanner } from '@/features/today/MorningCheckInBanner';
 import { RestDayBanner } from '@/features/today/RestDayBanner';
-import { HabitLogDialog } from '@/components/HabitLogDialog';
-import { HabitBookingDialog } from '@/features/habits/HabitBookingDialog';
-import type { Habit } from '@/types/habit';
 import { useRestDayStore } from '@/stores/restDayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDashboardStore } from '@/stores/dashboardStore';
@@ -79,14 +76,11 @@ export function TodayScreen() {
 
   const { projects, fetchAllProjects } = useProjectStore();
 
-  const {
-    habits,
-    fetchHabits,
-    toggleCompletion,
-    isTodayCompleted,
-    getTodayCount,
-    getTodayProgress,
-  } = useHabitStore();
+  // Habits — only `fetchHabits` + progress numbers are read here. Row
+  // rendering lives in `<HabitsSection />`, which subscribes directly
+  // to the store with stable Zustand selectors.
+  const fetchHabits = useHabitStore((s) => s.fetchHabits);
+  const getTodayProgress = useHabitStore((s) => s.getTodayProgress);
 
   // Rest-Day primitive (`docs/REST_DAY.md`). When today is marked as a
   // rest day we replace the dense task list with a soft takeover banner;
@@ -367,7 +361,6 @@ export function TodayScreen() {
       <SelfCareNudgeCard />
       <MorningCheckInCard />
       <TodayLeisureMinimumRow />
-      <SchoolworkTodayCard />
 
       {/* Rest-Day primitive. The banner renders both states (takeover
           when resting; small mark-as-rest affordance when not). Tasks
@@ -429,18 +422,23 @@ export function TodayScreen() {
             );
           case 'daily_essentials':
             return <DailyEssentialsCards key={sectionKey} />;
+          case 'burnout_badge':
+            // Self-silencing — hides itself when score is calm. The
+            // tap routes to /settings so the user can adjust boundaries.
+            return <BurnoutBadgeSection key={sectionKey} />;
+          case 'self_care_nudge':
+            // Routine prompt (morning/bedtime) — distinct from the
+            // burnout-driven `<SelfCareNudgeCard />` above the dashboard
+            // sections, which rotates by burnout signals.
+            return <SelfCareRoutineSection key={sectionKey} />;
           case 'habits':
-            return (
-              <HabitChipsSection
-                key={sectionKey}
-                habits={habits}
-                isTodayCompleted={isTodayCompleted}
-                getTodayCount={getTodayCount}
-                toggleCompletion={toggleCompletion}
-                todayIso={settingsStartOfDayTodayIso}
-                navigate={navigate}
-              />
-            );
+            // Row-based habits section (parity with Android's
+            // `TodayHabitCheckItem`). The chip-style fallback below is
+            // retained for callers that haven't migrated yet — currently
+            // unused but kept compile-safe.
+            return <HabitsSection key={sectionKey} />;
+          case 'schoolwork':
+            return <SchoolworkSection key={sectionKey} />;
           case 'overdue':
             return activeOverdue.length > 0 ? (
               <TaskSection
@@ -850,156 +848,6 @@ function PlanMoreSection({ onClick }: { onClick: () => void }) {
   );
 }
 
-/**
- * Habit chip row. Extracted from the inline JSX; chip click still
- * toggles the daily completion (parity with the original behaviour),
- * but each chip now sprouts a trailing "Log" / "Book" icon-button per
- * parity unit 14 of the web port — `Log` for ordinary habits opens
- * `HabitLogDialog`, `Book` for `is_bookable` habits opens
- * `HabitBookingDialog`.
- */
-function HabitChipsSection({
-  habits,
-  isTodayCompleted,
-  getTodayCount,
-  toggleCompletion,
-  todayIso,
-  navigate,
-}: {
-  habits: ReturnType<typeof useHabitStore.getState>['habits'];
-  isTodayCompleted: (id: string) => boolean;
-  getTodayCount: (id: string) => number;
-  toggleCompletion: (id: string, dateIso: string) => Promise<void>;
-  todayIso: string;
-  navigate: (path: string) => void;
-}) {
-  const [logTarget, setLogTarget] = useState<Habit | null>(null);
-  const [bookTarget, setBookTarget] = useState<Habit | null>(null);
-
-  if (habits.length === 0) return null;
-  return (
-    <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[var(--color-accent)]" />
-          <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-            Today's Habits
-          </span>
-        </div>
-        <button
-          onClick={() => navigate('/habits')}
-          className="text-xs text-[var(--color-accent)] hover:underline"
-        >
-          View All
-        </button>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {habits
-          .filter((h) => h.is_active)
-          .map((habit) => {
-            const completed = isTodayCompleted(habit.id);
-            const habitColor = habit.color || 'var(--color-accent)';
-            const count = getTodayCount(habit.id);
-            const isBookable = !!habit.is_bookable;
-            return (
-              <div
-                key={habit.id}
-                className={`flex shrink-0 items-center gap-1 rounded-full border px-0.5 ${
-                  completed
-                    ? 'border-transparent text-white'
-                    : 'border-[var(--color-border)] text-[var(--color-text-primary)]'
-                }`}
-                style={completed ? { backgroundColor: habitColor } : undefined}
-              >
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await toggleCompletion(habit.id, todayIso);
-                    } catch {
-                      toast.error('Failed to update habit');
-                    }
-                  }}
-                  className="flex items-center gap-2 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-black/5"
-                  aria-label={
-                    completed
-                      ? `Mark ${habit.name} incomplete`
-                      : `Mark ${habit.name} complete`
-                  }
-                >
-                  <span>{habit.icon || '🎯'}</span>
-                  <span className="max-w-[100px] truncate">{habit.name}</span>
-                  {habit.target_count > 1 && (
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                        completed
-                          ? 'bg-white/20'
-                          : 'bg-[var(--color-bg-secondary)]'
-                      }`}
-                    >
-                      {count}/{habit.target_count}
-                    </span>
-                  )}
-                  {completed && habit.target_count <= 1 && (
-                    <svg
-                      className="h-3 w-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isBookable) setBookTarget(habit);
-                    else setLogTarget(habit);
-                  }}
-                  className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                    completed
-                      ? 'hover:bg-white/20'
-                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-accent)]'
-                  }`}
-                  aria-label={
-                    isBookable
-                      ? `Book ${habit.name}`
-                      : `Log ${habit.name}`
-                  }
-                  title={isBookable ? 'Book' : 'Log'}
-                >
-                  {isBookable ? (
-                    <PlusCircle className="h-3.5 w-3.5" />
-                  ) : (
-                    <Plus className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
-            );
-          })}
-      </div>
-
-      {logTarget && (
-        <HabitLogDialog
-          habit={logTarget}
-          onClose={() => setLogTarget(null)}
-        />
-      )}
-      {bookTarget && (
-        <HabitBookingDialog
-          habit={bookTarget}
-          onClose={() => setBookTarget(null)}
-        />
-      )}
-    </div>
-  );
-}
 
 // Collapsible section component
 function TaskSection({

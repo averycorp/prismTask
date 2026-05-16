@@ -47,6 +47,13 @@ const META_UPDATED_AT = '__pref_updated_at';
 export const DEFAULT_SECTION_ORDER: ReadonlyArray<string> = [
   'progress',
   'daily_essentials',
+  // Wellness sections sit between Daily Essentials and Overdue to match
+  // Android's Today section order (parity unit 7 of 23). Each renders
+  // null when there's nothing to show, so the slot is quiet by default.
+  'burnout_badge',
+  'self_care_nudge',
+  'habits',
+  'schoolwork',
   'overdue',
   'today_tasks',
   'plan_more',
