@@ -4,11 +4,11 @@ import com.averycorp.prismtask.data.local.dao.RestDayDao
 import com.averycorp.prismtask.data.local.entity.RestDayEntity
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.util.DayBoundary
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton

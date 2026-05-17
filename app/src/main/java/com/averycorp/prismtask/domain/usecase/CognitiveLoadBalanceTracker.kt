@@ -96,8 +96,10 @@ class CognitiveLoadBalanceTracker {
         val monthCutoff = cutoff(now, days = 28, timeZone, dayStartHour, dayStartMinute)
         val unitMinutes = defaultDurationMinutes.coerceAtLeast(1)
 
-        val current = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff, unitMinutes)
-        val rolling = computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, monthCutoff, unitMinutes)
+        val current =
+            computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff, unitMinutes)
+        val rolling =
+            computeRatios(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, monthCutoff, unitMinutes)
         val total = countTracked(allTasks, habitCompletionTimestamps, leisureSessionTimestamps, weekCutoff)
 
         val dominant = if (total == 0) {

@@ -133,6 +133,7 @@ internal class ProxyBillingActivityGuard : Application.ActivityLifecycleCallback
         const val PROXY_V2 = "com.android.billingclient.api.ProxyBillingActivityV2"
         const val KEY_BUY_INTENT = "BUY_INTENT"
         const val NOOP_ACTION = "com.averycorp.prismtask.PROXY_BILLING_GUARD_NOOP"
+
         // Stable, unlikely-to-collide request code for our sentinel PendingIntent.
         const val REQUEST_CODE_GUARD_NOOP = 0xBADC0DE
     }

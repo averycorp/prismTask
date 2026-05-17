@@ -43,6 +43,7 @@ constructor(
     companion object {
         private val ENABLED_KEY = booleanPreferencesKey("reflection_enabled")
         private val ENTRIES_KEY = stringPreferencesKey("reflection_entries")
+
         // ASCII Unit Separator (0x1F). Spelt as a unicode escape so future
         // file rewrites don't accidentally strip the raw byte (this file
         // shipped briefly with an empty char literal in PR #1506 because
@@ -54,13 +55,16 @@ constructor(
             entries.joinToString(LINE_SEP.toString()) { e -> "${e.date}$FIELD_SEP${e.text}" }
 
         fun decode(raw: String): List<ReflectionEntry> =
-            if (raw.isBlank()) emptyList()
-            else raw.split(LINE_SEP).mapNotNull { line ->
-                val parts = line.split(FIELD_SEP, limit = 2)
-                if (parts.size < 2) return@mapNotNull null
-                val date = runCatching { LocalDate.parse(parts[0]) }.getOrNull()
-                    ?: return@mapNotNull null
-                ReflectionEntry(date = date, text = parts[1])
+            if (raw.isBlank()) {
+                emptyList()
+            } else {
+                raw.split(LINE_SEP).mapNotNull { line ->
+                    val parts = line.split(FIELD_SEP, limit = 2)
+                    if (parts.size < 2) return@mapNotNull null
+                    val date = runCatching { LocalDate.parse(parts[0]) }.getOrNull()
+                        ?: return@mapNotNull null
+                    ReflectionEntry(date = date, text = parts[1])
+                }
             }
     }
 

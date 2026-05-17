@@ -7,13 +7,14 @@ import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.core.time.LocalDateFlow
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.local.entity.TagEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.local.entity.TaskTemplateEntity
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
-import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.CompletionCountMode
+import com.averycorp.prismtask.data.preferences.DailyEssentialsPreferences
 import com.averycorp.prismtask.data.preferences.DashboardPreferences
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.MorningCheckInPreferences
@@ -68,7 +69,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import com.averycorp.prismtask.data.billing.BillingManager
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -161,6 +161,7 @@ constructor(
             }
         }
     }
+
     /**
      * True when the morning check-in banner should render on the Today
      * screen. Derived reactively from three signals (so it flips off the
@@ -671,7 +672,9 @@ constructor(
             val combined = today + planned
             if (lowEnergy) {
                 combined.filter { it.cognitiveLoad == com.averycorp.prismtask.domain.model.CognitiveLoad.EASY.name }
-            } else combined
+            } else {
+                combined
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalTodayCount: StateFlow<Int> = allTodayItems
@@ -1424,4 +1427,3 @@ constructor(
         }
     }
 }
-

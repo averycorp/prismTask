@@ -178,12 +178,20 @@ class DailyEssentialsUseCaseTest {
     @Test
     fun `SchoolworkCardState allComplete requires every course and assignment done`() {
         val course = CourseCompletionStatus(
-            courseId = 1L, name = "CS101", code = "CS101", icon = "📘",
-            color = 0, completedToday = true
+            courseId = 1L,
+            name = "CS101",
+            code = "CS101",
+            icon = "📘",
+            color = 0,
+            completedToday = true
         )
         val assignment = AssignmentSummary(
-            id = 9L, title = "Pset", courseId = 1L, courseName = "CS101",
-            courseColor = 0, completed = true
+            id = 9L,
+            title = "Pset",
+            courseId = 1L,
+            courseName = "CS101",
+            courseColor = 0,
+            completed = true
         )
         val state = SchoolworkCardState(
             courses = listOf(course),
@@ -205,8 +213,12 @@ class DailyEssentialsUseCaseTest {
         val state = SchoolworkCardState(
             courses = listOf(
                 CourseCompletionStatus(
-                    courseId = 1L, name = "CS101", code = "CS101", icon = "📘",
-                    color = 0, completedToday = true
+                    courseId = 1L,
+                    name = "CS101",
+                    code = "CS101",
+                    icon = "📘",
+                    color = 0,
+                    completedToday = true
                 )
             ),
             assignmentsDueToday = emptyList()

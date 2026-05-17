@@ -1460,5 +1460,4 @@ constructor(
     fun setAdminUseSonnet(enabled: Boolean) {
         billingManager.setAdminUseSonnet(enabled)
     }
-
 }

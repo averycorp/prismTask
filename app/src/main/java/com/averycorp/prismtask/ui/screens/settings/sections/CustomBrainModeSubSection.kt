@@ -422,7 +422,9 @@ private fun OverrideRow(
             colors = AssistChipDefaults.assistChipColors(
                 containerColor = if (state == null) {
                     MaterialTheme.colorScheme.secondaryContainer
-                } else MaterialTheme.colorScheme.surface
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
             )
         )
         Spacer(modifier = Modifier.width(4.dp))
@@ -432,7 +434,9 @@ private fun OverrideRow(
             colors = AssistChipDefaults.assistChipColors(
                 containerColor = if (state == true) {
                     MaterialTheme.colorScheme.secondaryContainer
-                } else MaterialTheme.colorScheme.surface
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
             )
         )
         Spacer(modifier = Modifier.width(4.dp))
@@ -442,7 +446,9 @@ private fun OverrideRow(
             colors = AssistChipDefaults.assistChipColors(
                 containerColor = if (state == false) {
                     MaterialTheme.colorScheme.secondaryContainer
-                } else MaterialTheme.colorScheme.surface
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
             )
         )
     }

@@ -1,5 +1,6 @@
 package com.averycorp.prismtask.ui.screens.settings.sections.medication
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import android.text.format.DateFormat
 import com.averycorp.prismtask.ui.components.AnalogClockPicker
 import com.averycorp.prismtask.ui.components.formatHhMm
 import com.averycorp.prismtask.ui.components.parseHhMm

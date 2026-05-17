@@ -78,7 +78,10 @@ fun NotificationQuietHoursScreen(
                 (startHour == endHour && startMinute > endMinute)
             Text(
                 text = if (isOvernight) {
-                    "Overnight window — starts at ${formatHm(startHour, startMinute)} today and ends at ${formatHm(endHour, endMinute)} tomorrow."
+                    "Overnight window — starts at ${formatHm(
+                        startHour,
+                        startMinute
+                    )} today and ends at ${formatHm(endHour, endMinute)} tomorrow."
                 } else {
                     "Same-day window."
                 },
@@ -194,14 +197,14 @@ private fun QuietHoursTimeRow(
     label: String,
     hour: Int,
     minute: Int,
-    onClick: () -> Unit,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
@@ -222,7 +225,7 @@ private fun QuietHoursTimePickerDialog(
     initialHour: Int,
     initialMinute: Int,
     onConfirm: (hour: Int, minute: Int) -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val clockState = rememberAnalogClockState(
         initialHour = initialHour,
