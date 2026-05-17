@@ -301,6 +301,7 @@ fun AddEditTaskSheet(
                 PriorityCircleRow(
                     selected = viewModel.priority,
                     onSelect = viewModel::onPriorityChange,
+                    onAuto = { viewModel.autoPickPriority(force = true) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp)
