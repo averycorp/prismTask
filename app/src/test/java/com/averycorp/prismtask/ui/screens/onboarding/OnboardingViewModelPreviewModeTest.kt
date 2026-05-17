@@ -250,6 +250,95 @@ class OnboardingViewModelPreviewModeTest {
         coVerify(exactly = 1) { themePreferences.setThemeMode("dark") }
     }
 
+    // ── Preview-friendly UI: visible StateFlows must reflect admin taps even
+    //     though DataStore writes are gated. The bug this guards against:
+    //     before this fix the Switch / Slider / Clock controls on the admin
+    //     "Show Tutorial" replay were bound to upstream-only StateFlows, so
+    //     a tap fired the gated setter, the setter no-op'd, the StateFlow
+    //     never re-emitted, and the thumb stayed put. Admins reported
+    //     "none of the switches in onboarding work."
+
+    @Test
+    fun `preview mode setSelfCareEnabled flips visible state without writing`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.setPreviewMode(true)
+            val before = vm.selfCareEnabled.value
+
+            vm.setSelfCareEnabled(!before)
+            advanceUntilIdle()
+
+            assertEquals(!before, vm.selfCareEnabled.value)
+            coVerify(exactly = 0) { habitListPreferences.setSelfCareEnabled(any()) }
+        }
+
+    @Test
+    fun `preview mode setAdhdMode flips visible state without writing`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.setPreviewMode(true)
+            val before = vm.adhdMode.value
+
+            vm.setAdhdMode(!before)
+            advanceUntilIdle()
+
+            assertEquals(!before, vm.adhdMode.value)
+            coVerify(exactly = 0) { ndPreferencesDataStore.setAdhdMode(any()) }
+        }
+
+    @Test
+    fun `preview mode setForgivenessStreaksEnabled flips visible state without writing`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.setPreviewMode(true)
+
+            vm.setForgivenessStreaksEnabled(false)
+            advanceUntilIdle()
+
+            assertFalse(vm.forgivenessStreaksEnabled.value)
+            coVerify(exactly = 0) { userPreferencesDataStore.setForgivenessPrefs(any()) }
+        }
+
+    @Test
+    fun `preview mode setStreakMaxMissedDays moves slider without writing`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.setPreviewMode(true)
+
+            vm.setStreakMaxMissedDays(7)
+            advanceUntilIdle()
+
+            assertEquals(7, vm.streakMaxMissedDays.value)
+            coVerify(exactly = 0) { habitListPreferences.setStreakMaxMissedDays(any()) }
+        }
+
+    @Test
+    fun `preview mode setStartOfDay moves clock hands without writing`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.setPreviewMode(true)
+
+            vm.setStartOfDay(hour = 7, minute = 30)
+            advanceUntilIdle()
+
+            assertEquals(7, vm.startOfDayHour.value)
+            assertEquals(30, vm.startOfDayMinute.value)
+            coVerify(exactly = 0) { taskBehaviorPreferences.setStartOfDay(any(), any()) }
+        }
+
+    @Test
+    fun `preview mode setThemeMode updates picker selection without writing`() =
+        runTest(dispatcher) {
+            val vm = newViewModel()
+            vm.setPreviewMode(true)
+
+            vm.setThemeMode("dark")
+            advanceUntilIdle()
+
+            assertEquals("dark", vm.themeMode.value)
+            coVerify(exactly = 0) { themePreferences.setThemeMode(any()) }
+        }
+
     // ── Mental-Health-First § G6 — tuning step ──────────────────────────────
 
     @Test

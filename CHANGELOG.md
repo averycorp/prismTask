@@ -125,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(onboarding): admin "Show Tutorial" replay now actually responds to switches, sliders, pickers, and the clock. `OnboardingViewModel` exposed every interactive pref as a `Flow.stateIn(WhileSubscribed)` mirror of DataStore — fine in production, but in preview mode every setter was gated by `ifNotPreview { ... }` so the underlying flow never re-emitted and the bound Switch thumb / Slider handle / picker selection / clock hand stayed pinned to its initial state. Admins reported "none of the switches in onboarding work." Fix: each user-interactive pref now has a private `MutableStateFlow` mirror that the setter writes to BEFORE the gated DataStore call. In production the upstream DataStore emit loops back through the mirror (no-op `state.value = it`); in preview mode the mirror is the sole source of UI truth so taps are visually applied without mutating the account. Covers all 5 Life Mode rows, 3 Accessibility toggles, 9 Notification rows, 2 Privacy rows, the Forgiveness Switch + Slider, the 3 BrainMode cards, the widget-theme-follows-app toggle, the Theme/Accent pickers, and the Start-of-Day clock. 6 new regression tests pin the optimistic-update behaviour per surface; all 31 `OnboardingViewModelPreviewModeTest` cases pass.
 - fix(billing): the `ProxyBillingActivityGuard` no longer relies on
   `Activity.finish()` from `onActivityPreCreated` (which does not skip
   `onCreate`) to dodge the Google Play Billing 8.3.0 NPE. The guard now
