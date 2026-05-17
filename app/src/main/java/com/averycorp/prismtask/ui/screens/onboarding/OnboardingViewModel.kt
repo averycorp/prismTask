@@ -22,6 +22,7 @@ import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.ui.screens.templates.TemplateSelections
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -58,11 +59,14 @@ constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /**
-     * Preview mode — admin replay of the tutorial. When true, every mutating
-     * method (preference setters, task creation, sign-in, template seeding,
-     * and `completeOnboarding()`) short-circuits so the visual flow runs end
-     * to end without changing the account. The screen sets this once via
-     * [setPreviewMode] from the route's `preview` arg.
+     * Preview mode — admin replay of the tutorial. When true, *persistent*
+     * mutations (DataStore / Room / Firestore writes, task creation, sign-in,
+     * template seeding, and `completeOnboarding()`) short-circuit so the
+     * visual flow runs end to end without changing the account. The pref
+     * StateFlows are still mutated locally via [mirror] so toggles, sliders,
+     * pickers, and clock controls visually respond to the admin's taps —
+     * see "preview-friendly UI" caveat on each setter. The screen sets the
+     * mode once via [setPreviewMode] from the route's `preview` arg.
      */
     private val _isPreviewMode = MutableStateFlow(false)
     val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
@@ -75,16 +79,33 @@ constructor(
         if (!_isPreviewMode.value) block()
     }
 
+    /**
+     * Creates a [MutableStateFlow] seeded with [initial] and kept in sync
+     * with [upstream] via an eager `viewModelScope` collector. Setters that
+     * own a mirror write the optimistic value into it BEFORE the gated
+     * DataStore call — in production the upstream emit loops back and the
+     * second `state.value = it` is a no-op; in preview mode the DataStore
+     * write never runs, so the mirror is the sole source of UI truth and
+     * the Switch / Card / Slider thumbs respond to admin taps. The eager
+     * collector replaces the prior `stateIn(WhileSubscribed(5000))` pattern,
+     * which only collects when the StateFlow has subscribers — fine for
+     * read-only state, but fatal for optimistic writes because the mirror
+     * would be discarded between page swipes.
+     */
+    private fun <T> mirror(initial: T, upstream: Flow<T>): MutableStateFlow<T> {
+        val state = MutableStateFlow(initial)
+        viewModelScope.launch { upstream.collect { state.value = it } }
+        return state
+    }
+
     private val _signInState = MutableStateFlow<SignInState>(SignInState.NotSignedIn)
     val signInState: StateFlow<SignInState> = _signInState.asStateFlow()
 
-    val themeMode: StateFlow<String> = themePreferences
-        .getThemeMode()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
+    private val _themeMode = mirror("system", themePreferences.getThemeMode())
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
 
-    val accentColor: StateFlow<String> = themePreferences
-        .getAccentColor()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "#2563EB")
+    private val _accentColor = mirror("#2563EB", themePreferences.getAccentColor())
+    val accentColor: StateFlow<String> = _accentColor.asStateFlow()
 
     private val _templateSelections = MutableStateFlow(TemplateSelections())
     val templateSelections: StateFlow<TemplateSelections> = _templateSelections.asStateFlow()
@@ -100,116 +121,103 @@ constructor(
     private val _tuningSelections = MutableStateFlow<Set<OnboardingPreferenceMapper.TuningOption>>(emptySet())
     val tuningSelections: StateFlow<Set<OnboardingPreferenceMapper.TuningOption>> = _tuningSelections.asStateFlow()
 
-    val selfCareEnabled: StateFlow<Boolean> = habitListPreferences
-        .isSelfCareEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val medicationEnabled: StateFlow<Boolean> = habitListPreferences
-        .isMedicationEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val schoolEnabled: StateFlow<Boolean> = habitListPreferences
-        .isSchoolEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val houseworkEnabled: StateFlow<Boolean> = habitListPreferences
-        .isHouseworkEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val leisureEnabled: StateFlow<Boolean> = habitListPreferences
-        .isLeisureEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    private val _selfCareEnabled = mirror(true, habitListPreferences.isSelfCareEnabled())
+    val selfCareEnabled: StateFlow<Boolean> = _selfCareEnabled.asStateFlow()
+    private val _medicationEnabled = mirror(true, habitListPreferences.isMedicationEnabled())
+    val medicationEnabled: StateFlow<Boolean> = _medicationEnabled.asStateFlow()
+    private val _schoolEnabled = mirror(true, habitListPreferences.isSchoolEnabled())
+    val schoolEnabled: StateFlow<Boolean> = _schoolEnabled.asStateFlow()
+    private val _houseworkEnabled = mirror(true, habitListPreferences.isHouseworkEnabled())
+    val houseworkEnabled: StateFlow<Boolean> = _houseworkEnabled.asStateFlow()
+    private val _leisureEnabled = mirror(true, habitListPreferences.isLeisureEnabled())
+    val leisureEnabled: StateFlow<Boolean> = _leisureEnabled.asStateFlow()
 
-    val reduceMotion: StateFlow<Boolean> = a11yPreferences
-        .getReduceMotion()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val highContrast: StateFlow<Boolean> = a11yPreferences
-        .getHighContrast()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val largeTouchTargets: StateFlow<Boolean> = a11yPreferences
-        .getLargeTouchTargets()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    private val _reduceMotion = mirror(false, a11yPreferences.getReduceMotion())
+    val reduceMotion: StateFlow<Boolean> = _reduceMotion.asStateFlow()
+    private val _highContrast = mirror(false, a11yPreferences.getHighContrast())
+    val highContrast: StateFlow<Boolean> = _highContrast.asStateFlow()
+    private val _largeTouchTargets = mirror(false, a11yPreferences.getLargeTouchTargets())
+    val largeTouchTargets: StateFlow<Boolean> = _largeTouchTargets.asStateFlow()
 
-    val voiceInputEnabled: StateFlow<Boolean> = voicePreferences
-        .getVoiceInputEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    private val _voiceInputEnabled = mirror(true, voicePreferences.getVoiceInputEnabled())
+    val voiceInputEnabled: StateFlow<Boolean> = _voiceInputEnabled.asStateFlow()
 
     // BrainModePage state flows. Replace per-page `var ... by remember`
     // local state with reactive prefs (F8 idiom drift fix). Also lets the
     // page reflect the persisted state if the user backs up to it.
-    // `stateIn` initial value matches the default-on DataStore fallback so
+    // Initial mirror value matches the default-on DataStore fallback so
     // the pre-emission frame doesn't flash OFF for fresh installs.
-    val adhdMode: StateFlow<Boolean> = ndPreferencesDataStore
-        .ndPreferencesFlow
-        .map { it.adhdModeEnabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val calmMode: StateFlow<Boolean> = ndPreferencesDataStore
-        .ndPreferencesFlow
-        .map { it.calmModeEnabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val focusReleaseMode: StateFlow<Boolean> = ndPreferencesDataStore
-        .ndPreferencesFlow
-        .map { it.focusReleaseModeEnabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val aiFeaturesEnabled: StateFlow<Boolean> = userPreferencesDataStore
-        .aiFeaturePrefsFlow
-        .map { it.enabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val forgivenessStreaksEnabled: StateFlow<Boolean> = userPreferencesDataStore
-        .forgivenessFlow
-        .map { it.enabled }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val streakMaxMissedDays: StateFlow<Int> = habitListPreferences
-        .getStreakMaxMissedDays()
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            HabitListPreferences.DEFAULT_STREAK_MAX_MISSED_DAYS
-        )
+    private val _adhdMode = mirror(
+        true,
+        ndPreferencesDataStore.ndPreferencesFlow.map { it.adhdModeEnabled }
+    )
+    val adhdMode: StateFlow<Boolean> = _adhdMode.asStateFlow()
+    private val _calmMode = mirror(
+        true,
+        ndPreferencesDataStore.ndPreferencesFlow.map { it.calmModeEnabled }
+    )
+    val calmMode: StateFlow<Boolean> = _calmMode.asStateFlow()
+    private val _focusReleaseMode = mirror(
+        true,
+        ndPreferencesDataStore.ndPreferencesFlow.map { it.focusReleaseModeEnabled }
+    )
+    val focusReleaseMode: StateFlow<Boolean> = _focusReleaseMode.asStateFlow()
+    private val _aiFeaturesEnabled = mirror(
+        true,
+        userPreferencesDataStore.aiFeaturePrefsFlow.map { it.enabled }
+    )
+    val aiFeaturesEnabled: StateFlow<Boolean> = _aiFeaturesEnabled.asStateFlow()
+    private val _forgivenessStreaksEnabled = mirror(
+        true,
+        userPreferencesDataStore.forgivenessFlow.map { it.enabled }
+    )
+    val forgivenessStreaksEnabled: StateFlow<Boolean> = _forgivenessStreaksEnabled.asStateFlow()
+    private val _streakMaxMissedDays = mirror(
+        HabitListPreferences.DEFAULT_STREAK_MAX_MISSED_DAYS,
+        habitListPreferences.getStreakMaxMissedDays()
+    )
+    val streakMaxMissedDays: StateFlow<Int> = _streakMaxMissedDays.asStateFlow()
 
-    val dailyBriefingEnabled: StateFlow<Boolean> = notificationPreferences
-        .dailyBriefingEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val eveningSummaryEnabled: StateFlow<Boolean> = notificationPreferences
-        .eveningSummaryEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val weeklySummaryEnabled: StateFlow<Boolean> = notificationPreferences
-        .weeklySummaryEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val overloadAlertsEnabled: StateFlow<Boolean> = notificationPreferences
-        .overloadAlertsEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val streakAlertsEnabled: StateFlow<Boolean> = notificationPreferences
-        .streakAlertsEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val reengagementEnabled: StateFlow<Boolean> = notificationPreferences
-        .reengagementEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    private val _dailyBriefingEnabled = mirror(true, notificationPreferences.dailyBriefingEnabled)
+    val dailyBriefingEnabled: StateFlow<Boolean> = _dailyBriefingEnabled.asStateFlow()
+    private val _eveningSummaryEnabled = mirror(true, notificationPreferences.eveningSummaryEnabled)
+    val eveningSummaryEnabled: StateFlow<Boolean> = _eveningSummaryEnabled.asStateFlow()
+    private val _weeklySummaryEnabled = mirror(true, notificationPreferences.weeklySummaryEnabled)
+    val weeklySummaryEnabled: StateFlow<Boolean> = _weeklySummaryEnabled.asStateFlow()
+    private val _overloadAlertsEnabled = mirror(true, notificationPreferences.overloadAlertsEnabled)
+    val overloadAlertsEnabled: StateFlow<Boolean> = _overloadAlertsEnabled.asStateFlow()
+    private val _streakAlertsEnabled = mirror(true, notificationPreferences.streakAlertsEnabled)
+    val streakAlertsEnabled: StateFlow<Boolean> = _streakAlertsEnabled.asStateFlow()
+    private val _reengagementEnabled = mirror(true, notificationPreferences.reengagementEnabled)
+    val reengagementEnabled: StateFlow<Boolean> = _reengagementEnabled.asStateFlow()
 
     // Per-type notification toggles surfaced on the onboarding
     // NotificationsPage. Storage already lives in NotificationPreferences;
     // onboarding writes through the existing setters.
-    val taskRemindersEnabled: StateFlow<Boolean> = notificationPreferences
-        .taskRemindersEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val timerAlertsEnabled: StateFlow<Boolean> = notificationPreferences
-        .timerAlertsEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val medicationRemindersEnabled: StateFlow<Boolean> = notificationPreferences
-        .medicationRemindersEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    private val _taskRemindersEnabled = mirror(true, notificationPreferences.taskRemindersEnabled)
+    val taskRemindersEnabled: StateFlow<Boolean> = _taskRemindersEnabled.asStateFlow()
+    private val _timerAlertsEnabled = mirror(true, notificationPreferences.timerAlertsEnabled)
+    val timerAlertsEnabled: StateFlow<Boolean> = _timerAlertsEnabled.asStateFlow()
+    private val _medicationRemindersEnabled = mirror(
+        true,
+        notificationPreferences.medicationRemindersEnabled
+    )
+    val medicationRemindersEnabled: StateFlow<Boolean> = _medicationRemindersEnabled.asStateFlow()
 
     // Widget theme override surfaced on the onboarding ThemePickerPage.
     // Empty / default value = follow the app theme; a non-default override
     // is set elsewhere (Settings → Appearance). Onboarding only exposes the
     // "follow app theme" toggle.
-    val widgetThemeFollowsApp: StateFlow<Boolean> = themePreferences
-        .getWidgetThemeOverride()
-        .map { it.isBlank() || it == "default" }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    private val _widgetThemeFollowsApp = mirror(
+        true,
+        themePreferences.getWidgetThemeOverride().map { it.isBlank() || it == "default" }
+    )
+    val widgetThemeFollowsApp: StateFlow<Boolean> = _widgetThemeFollowsApp.asStateFlow()
 
-    val startOfDayHour: StateFlow<Int> = taskBehaviorPreferences
-        .getDayStartHour()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 4)
-    val startOfDayMinute: StateFlow<Int> = taskBehaviorPreferences
-        .getDayStartMinute()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    private val _startOfDayHour = mirror(4, taskBehaviorPreferences.getDayStartHour())
+    val startOfDayHour: StateFlow<Int> = _startOfDayHour.asStateFlow()
+    private val _startOfDayMinute = mirror(0, taskBehaviorPreferences.getDayStartMinute())
+    val startOfDayMinute: StateFlow<Int> = _startOfDayMinute.asStateFlow()
 
     init {
         if (authManager.isSignedIn.value) {
@@ -330,10 +338,12 @@ constructor(
     }
 
     fun setThemeMode(mode: String) {
+        _themeMode.value = mode
         ifNotPreview { viewModelScope.launch { themePreferences.setThemeMode(mode) } }
     }
 
     fun setAccentColor(hex: String) {
+        _accentColor.value = hex
         ifNotPreview { viewModelScope.launch { themePreferences.setAccentColor(hex) } }
     }
 
@@ -347,14 +357,17 @@ constructor(
     }
 
     fun setAdhdMode(enabled: Boolean) {
+        _adhdMode.value = enabled
         ifNotPreview { viewModelScope.launch { ndPreferencesDataStore.setAdhdMode(enabled) } }
     }
 
     fun setCalmMode(enabled: Boolean) {
+        _calmMode.value = enabled
         ifNotPreview { viewModelScope.launch { ndPreferencesDataStore.setCalmMode(enabled) } }
     }
 
     fun setFocusReleaseMode(enabled: Boolean) {
+        _focusReleaseMode.value = enabled
         ifNotPreview { viewModelScope.launch { ndPreferencesDataStore.setFocusReleaseMode(enabled) } }
     }
 
@@ -442,46 +455,57 @@ constructor(
     }
 
     fun setSelfCareEnabled(enabled: Boolean) {
+        _selfCareEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { habitListPreferences.setSelfCareEnabled(enabled) } }
     }
 
     fun setMedicationEnabled(enabled: Boolean) {
+        _medicationEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { habitListPreferences.setMedicationEnabled(enabled) } }
     }
 
     fun setSchoolEnabled(enabled: Boolean) {
+        _schoolEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { habitListPreferences.setSchoolEnabled(enabled) } }
     }
 
     fun setHouseworkEnabled(enabled: Boolean) {
+        _houseworkEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { habitListPreferences.setHouseworkEnabled(enabled) } }
     }
 
     fun setLeisureEnabled(enabled: Boolean) {
+        _leisureEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { habitListPreferences.setLeisureEnabled(enabled) } }
     }
 
     fun setReduceMotion(enabled: Boolean) {
+        _reduceMotion.value = enabled
         ifNotPreview { viewModelScope.launch { a11yPreferences.setReduceMotion(enabled) } }
     }
 
     fun setHighContrast(enabled: Boolean) {
+        _highContrast.value = enabled
         ifNotPreview { viewModelScope.launch { a11yPreferences.setHighContrast(enabled) } }
     }
 
     fun setLargeTouchTargets(enabled: Boolean) {
+        _largeTouchTargets.value = enabled
         ifNotPreview { viewModelScope.launch { a11yPreferences.setLargeTouchTargets(enabled) } }
     }
 
     fun setVoiceInputEnabled(enabled: Boolean) {
+        _voiceInputEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { voicePreferences.setVoiceInputEnabled(enabled) } }
     }
 
     fun setAiFeaturesEnabled(enabled: Boolean) {
+        _aiFeaturesEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { userPreferencesDataStore.setAiFeaturesEnabled(enabled) } }
     }
 
     fun setForgivenessStreaksEnabled(enabled: Boolean) {
+        _forgivenessStreaksEnabled.value = enabled
         ifNotPreview {
             viewModelScope.launch {
                 userPreferencesDataStore.setForgivenessPrefs(ForgivenessPrefs(enabled = enabled))
@@ -490,14 +514,17 @@ constructor(
     }
 
     fun setStreakMaxMissedDays(days: Int) {
+        _streakMaxMissedDays.value = days
         ifNotPreview { viewModelScope.launch { habitListPreferences.setStreakMaxMissedDays(days) } }
     }
 
     fun setDailyBriefingEnabled(enabled: Boolean) {
+        _dailyBriefingEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setDailyBriefingEnabled(enabled) } }
     }
 
     fun setEveningSummaryEnabled(enabled: Boolean) {
+        _eveningSummaryEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setEveningSummaryEnabled(enabled) } }
     }
 
@@ -508,6 +535,7 @@ constructor(
      * exposes the two flags separately for fine-grained control.
      */
     fun setWeeklySummaryEnabled(enabled: Boolean) {
+        _weeklySummaryEnabled.value = enabled
         ifNotPreview {
             viewModelScope.launch {
                 notificationPreferences.setWeeklySummaryEnabled(enabled)
@@ -517,26 +545,32 @@ constructor(
     }
 
     fun setOverloadAlertsEnabled(enabled: Boolean) {
+        _overloadAlertsEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setOverloadAlertsEnabled(enabled) } }
     }
 
     fun setStreakAlertsEnabled(enabled: Boolean) {
+        _streakAlertsEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setStreakAlertsEnabled(enabled) } }
     }
 
     fun setReengagementEnabled(enabled: Boolean) {
+        _reengagementEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setReengagementEnabled(enabled) } }
     }
 
     fun setTaskRemindersEnabled(enabled: Boolean) {
+        _taskRemindersEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setTaskRemindersEnabled(enabled) } }
     }
 
     fun setTimerAlertsEnabled(enabled: Boolean) {
+        _timerAlertsEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setTimerAlertsEnabled(enabled) } }
     }
 
     fun setMedicationRemindersEnabled(enabled: Boolean) {
+        _medicationRemindersEnabled.value = enabled
         ifNotPreview { viewModelScope.launch { notificationPreferences.setMedicationRemindersEnabled(enabled) } }
     }
 
@@ -546,6 +580,7 @@ constructor(
      * theme in Settings → Appearance. Onboarding only exposes the toggle.
      */
     fun setWidgetThemeFollowsApp(follow: Boolean) {
+        _widgetThemeFollowsApp.value = follow
         ifNotPreview {
             viewModelScope.launch {
                 themePreferences.setWidgetThemeOverride(if (follow) null else "custom")
@@ -561,6 +596,8 @@ constructor(
      * installs that completed onboarding before this page existed.
      */
     fun setStartOfDay(hour: Int, minute: Int) {
+        _startOfDayHour.value = hour
+        _startOfDayMinute.value = minute
         ifNotPreview { viewModelScope.launch { taskBehaviorPreferences.setStartOfDay(hour, minute) } }
     }
 
