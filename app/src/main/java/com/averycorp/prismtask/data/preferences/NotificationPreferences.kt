@@ -506,8 +506,11 @@ class NotificationPreferences(
                 repeat = medicationRemindersVibrationRepeat.first()
             }
         }
-        return if (follow) NotificationOverrides(loud = false, repeat = false)
-        else NotificationOverrides(loud = loud, repeat = repeat)
+        return if (follow) {
+            NotificationOverrides(loud = false, repeat = false)
+        } else {
+            NotificationOverrides(loud = loud, repeat = repeat)
+        }
     }
 
     // endregion

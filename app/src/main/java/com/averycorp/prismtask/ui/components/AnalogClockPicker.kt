@@ -86,13 +86,19 @@ class AnalogClockState(
 
     var hour: Int
         get() = _hour
-        set(value) { _hour = value.coerceIn(0, 23) }
+        set(value) {
+            _hour = value.coerceIn(0, 23)
+        }
     var minute: Int
         get() = _minute
-        set(value) { _minute = value.coerceIn(0, 59) }
+        set(value) {
+            _minute = value.coerceIn(0, 59)
+        }
     var second: Int
         get() = _second
-        set(value) { _second = value.coerceIn(0, 59) }
+        set(value) {
+            _second = value.coerceIn(0, 59)
+        }
 
     val isAm: Boolean get() = _hour < 12
 
@@ -258,7 +264,8 @@ private fun ClockFace(state: AnalogClockState, diameter: Dp) {
     val minuteHandColor = MaterialTheme.colorScheme.secondary
     val secondHandColor = MaterialTheme.colorScheme.error
     val measurer = rememberTextMeasurer()
-    val numberStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = numberColor, textAlign = TextAlign.Center)
+    val numberStyle =
+        TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = numberColor, textAlign = TextAlign.Center)
     val innerNumberStyle = TextStyle(fontSize = 11.sp, color = numberInnerColor, textAlign = TextAlign.Center)
     val is24 = state.is24Hour
 
@@ -548,5 +555,6 @@ internal fun formatHhMm(hour: Int, minute: Int): String {
 
 @Suppress("unused")
 private const val FULL_CIRCLE_DEGREES = 360
+
 @Suppress("unused")
 private const val RADIANS_TO_DEGREES = 180.0 / PI

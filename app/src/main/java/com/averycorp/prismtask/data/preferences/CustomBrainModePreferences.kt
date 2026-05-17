@@ -75,6 +75,7 @@ constructor(
     companion object {
         private val MODES_KEY = stringPreferencesKey("custom_brain_modes")
         private val ACTIVE_KEY = stringPreferencesKey("custom_brain_mode_active")
+
         // ASCII Unit Separator (0x1F). Spelt as a unicode escape so future
         // file rewrites don't accidentally strip the raw byte from the
         // source.
@@ -138,31 +139,34 @@ constructor(
             }
 
         fun decode(raw: String): List<CustomBrainMode> =
-            if (raw.isBlank()) emptyList()
-            else raw.split(LINE_SEP).mapNotNull { line ->
-                val parts = line.split(FIELD_SEP)
-                if (parts.size < 2) return@mapNotNull null
-                val name = parts.getOrNull(IDX_NAME)?.trim().orEmpty()
-                if (name.isEmpty()) return@mapNotNull null
-                CustomBrainMode(
-                    name = name,
-                    description = parts.getOrNull(IDX_DESCRIPTION)?.trim().orEmpty(),
-                    gentleNotifications = parts.getOrNull(IDX_GENTLE)?.toBooleanStrictOrNull() ?: false,
-                    adhdModeEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_ADHD)),
-                    calmModeEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_CALM)),
-                    focusReleaseModeEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_FOCUS_RELEASE)),
-                    reduceAnimationsOverride = decodeNullableBool(parts.getOrNull(IDX_REDUCE_ANIMATIONS)),
-                    mutedColorPaletteOverride = decodeNullableBool(parts.getOrNull(IDX_MUTED_COLORS)),
-                    quietModeOverride = decodeNullableBool(parts.getOrNull(IDX_QUIET_MODE)),
-                    reduceHapticsOverride = decodeNullableBool(parts.getOrNull(IDX_REDUCE_HAPTICS)),
-                    softContrastOverride = decodeNullableBool(parts.getOrNull(IDX_SOFT_CONTRAST)),
-                    completionAnimationsOverride = decodeNullableBool(parts.getOrNull(IDX_COMPLETION_ANIMATIONS)),
-                    streakCelebrationsOverride = decodeNullableBool(parts.getOrNull(IDX_STREAK_CELEBRATIONS)),
-                    showProgressBarsOverride = decodeNullableBool(parts.getOrNull(IDX_SHOW_PROGRESS_BARS)),
-                    goodEnoughTimersEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_GOOD_ENOUGH)),
-                    antiReworkEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_ANTI_REWORK)),
-                    shipItCelebrationsEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_SHIP_IT))
-                )
+            if (raw.isBlank()) {
+                emptyList()
+            } else {
+                raw.split(LINE_SEP).mapNotNull { line ->
+                    val parts = line.split(FIELD_SEP)
+                    if (parts.size < 2) return@mapNotNull null
+                    val name = parts.getOrNull(IDX_NAME)?.trim().orEmpty()
+                    if (name.isEmpty()) return@mapNotNull null
+                    CustomBrainMode(
+                        name = name,
+                        description = parts.getOrNull(IDX_DESCRIPTION)?.trim().orEmpty(),
+                        gentleNotifications = parts.getOrNull(IDX_GENTLE)?.toBooleanStrictOrNull() ?: false,
+                        adhdModeEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_ADHD)),
+                        calmModeEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_CALM)),
+                        focusReleaseModeEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_FOCUS_RELEASE)),
+                        reduceAnimationsOverride = decodeNullableBool(parts.getOrNull(IDX_REDUCE_ANIMATIONS)),
+                        mutedColorPaletteOverride = decodeNullableBool(parts.getOrNull(IDX_MUTED_COLORS)),
+                        quietModeOverride = decodeNullableBool(parts.getOrNull(IDX_QUIET_MODE)),
+                        reduceHapticsOverride = decodeNullableBool(parts.getOrNull(IDX_REDUCE_HAPTICS)),
+                        softContrastOverride = decodeNullableBool(parts.getOrNull(IDX_SOFT_CONTRAST)),
+                        completionAnimationsOverride = decodeNullableBool(parts.getOrNull(IDX_COMPLETION_ANIMATIONS)),
+                        streakCelebrationsOverride = decodeNullableBool(parts.getOrNull(IDX_STREAK_CELEBRATIONS)),
+                        showProgressBarsOverride = decodeNullableBool(parts.getOrNull(IDX_SHOW_PROGRESS_BARS)),
+                        goodEnoughTimersEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_GOOD_ENOUGH)),
+                        antiReworkEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_ANTI_REWORK)),
+                        shipItCelebrationsEnabledOverride = decodeNullableBool(parts.getOrNull(IDX_SHIP_IT))
+                    )
+                }
             }
     }
 
@@ -184,8 +188,11 @@ constructor(
      */
     fun observeActive(): Flow<CustomBrainMode?> =
         combine(observe(), observeActiveName()) { modes, activeName ->
-            if (activeName.isNullOrBlank()) null
-            else modes.firstOrNull { it.name.equals(activeName, ignoreCase = true) }
+            if (activeName.isNullOrBlank()) {
+                null
+            } else {
+                modes.firstOrNull { it.name.equals(activeName, ignoreCase = true) }
+            }
         }
 
     suspend fun add(mode: CustomBrainMode) {

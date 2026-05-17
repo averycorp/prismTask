@@ -147,7 +147,8 @@ private fun StreakCalendarContent(
     val intensities = data.intensities
     val totalDays = data.activeDays
     val longestStreak = data.longestStreak
-    val openHabitsIntent = openHabitsAtDateIntent(context, startOfWindow + (sourceWeeks * 7L - 1L) * DayBoundary.DAY_MILLIS)
+    val openHabitsIntent =
+        openHabitsAtDateIntent(context, startOfWindow + (sourceWeeks * 7L - 1L) * DayBoundary.DAY_MILLIS)
 
     WidgetScaffold(
         palette = palette,

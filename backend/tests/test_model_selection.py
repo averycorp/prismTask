@@ -95,3 +95,104 @@ def test_nlp_parse_uses_haiku():
         result = parse_task_input("Buy groceries", [], date(2026, 4, 12), tier="PRO")
     assert result.title == "Buy groceries"
     assert mock_client.messages.create.call_args.kwargs["model"] == MODEL_HAIKU
+
+
+def test_admin_override_promotes_haiku_feature_to_sonnet():
+    from app.services.ai_productivity import (
+        MODEL_HAIKU,
+        MODEL_SONNET,
+        admin_model_override,
+        get_model,
+    )
+    assert get_model("eisenhower") == MODEL_HAIKU
+    token = admin_model_override.set("sonnet")
+    try:
+        assert get_model("eisenhower") == MODEL_SONNET
+        assert get_model("nlp") == MODEL_SONNET
+        assert get_model("chat") == MODEL_SONNET
+        assert get_model(None) == MODEL_SONNET
+    finally:
+        admin_model_override.reset(token)
+    assert get_model("eisenhower") == MODEL_HAIKU
+
+
+def test_admin_override_does_not_break_existing_sonnet_features():
+    from app.services.ai_productivity import (
+        MODEL_SONNET,
+        admin_model_override,
+        get_model,
+    )
+    token = admin_model_override.set("sonnet")
+    try:
+        assert get_model("weekly_planner") == MODEL_SONNET
+        assert get_model("monthly_review") == MODEL_SONNET
+    finally:
+        admin_model_override.reset(token)
+
+
+def test_admin_override_dependency_ignores_non_admin():
+    import asyncio
+    from unittest.mock import MagicMock
+
+    from app.middleware.admin_model_override import (
+        HEADER_NAME,
+        apply_admin_model_override,
+    )
+    from app.services.ai_productivity import (
+        MODEL_HAIKU,
+        admin_model_override,
+        get_model,
+    )
+
+    request = MagicMock()
+    request.headers = {HEADER_NAME: "sonnet"}
+    non_admin = MagicMock(is_admin=False)
+
+    async def run() -> str:
+        gen = apply_admin_model_override(request, non_admin)
+        await gen.__anext__()
+        try:
+            return get_model("eisenhower")
+        finally:
+            try:
+                await gen.__anext__()
+            except StopAsyncIteration:
+                pass
+
+    assert asyncio.run(run()) == MODEL_HAIKU
+    # contextvar should be untouched outside the generator scope
+    assert admin_model_override.get() is None
+
+
+def test_admin_override_dependency_applies_for_admin():
+    import asyncio
+    from unittest.mock import MagicMock
+
+    from app.middleware.admin_model_override import (
+        HEADER_NAME,
+        apply_admin_model_override,
+    )
+    from app.services.ai_productivity import (
+        MODEL_SONNET,
+        admin_model_override,
+        get_model,
+    )
+
+    request = MagicMock()
+    request.headers = {HEADER_NAME: "sonnet"}
+    admin = MagicMock(is_admin=True)
+
+    async def run() -> str:
+        gen = apply_admin_model_override(request, admin)
+        await gen.__anext__()
+        try:
+            return get_model("eisenhower")
+        finally:
+            try:
+                await gen.__anext__()
+            except StopAsyncIteration:
+                pass
+
+    assert asyncio.run(run()) == MODEL_SONNET
+    # cleaned up after the dependency exits
+    assert admin_model_override.get() is None

@@ -67,6 +67,7 @@ constructor(
     private val pauseGate: NotificationPauseGate
 ) : ViewModel() {
     private val _now = MutableStateFlow(System.currentTimeMillis())
+
     /**
      * Re-emits every 30s so the "Paused until 4:30 PM" label drops off
      * naturally when the pause expires without requiring the user to

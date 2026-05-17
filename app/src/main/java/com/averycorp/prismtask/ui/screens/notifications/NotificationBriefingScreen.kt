@@ -170,7 +170,7 @@ private fun BriefingHourPickerDialog(
     title: String,
     initialHour: Int,
     onConfirm: (hour: Int) -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val clockState = rememberAnalogClockState(
         initialHour = initialHour.coerceIn(0, 23),

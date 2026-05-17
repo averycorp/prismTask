@@ -68,7 +68,13 @@ class WeeklyPlannerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = WeeklyPlannerViewModel(api, taskRepository, proFeatureGate, taskBehaviorPreferences, io.mockk.mockk(relaxed = true))
+    private fun newViewModel() = WeeklyPlannerViewModel(
+        api,
+        taskRepository,
+        proFeatureGate,
+        taskBehaviorPreferences,
+        io.mockk.mockk(relaxed = true)
+    )
 
     @Test
     fun generatePlan_resolvesCloudIdsToLocalLongs() = runTest(dispatcher) {

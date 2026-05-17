@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.data.local.entity.AssignmentEntity
 import com.averycorp.prismtask.data.local.entity.CourseCompletionEntity
 import com.averycorp.prismtask.data.local.entity.CourseEntity
@@ -14,7 +15,6 @@ import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
 import com.averycorp.prismtask.domain.usecase.ChecklistParsedTask
 import com.averycorp.prismtask.domain.usecase.ChecklistParser
-import com.averycorp.prismtask.data.billing.BillingManager
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow

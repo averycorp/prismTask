@@ -74,8 +74,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.averycorp.prismtask.ui.components.AnalogClockPicker
-import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import com.averycorp.prismtask.data.local.entity.LeisureActivityEntity
 import com.averycorp.prismtask.data.local.entity.LeisureSessionEntity
 import com.averycorp.prismtask.data.preferences.LeisureBudgetPreferences
@@ -83,6 +81,8 @@ import com.averycorp.prismtask.data.preferences.LeisureCategoryDisplay
 import com.averycorp.prismtask.domain.model.CustomLeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureCategory
 import com.averycorp.prismtask.domain.model.LeisureCategoryRef
+import com.averycorp.prismtask.ui.components.AnalogClockPicker
+import com.averycorp.prismtask.ui.components.rememberAnalogClockState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.Instant

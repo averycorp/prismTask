@@ -275,7 +275,7 @@ private fun TimeRow(
             title = {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {

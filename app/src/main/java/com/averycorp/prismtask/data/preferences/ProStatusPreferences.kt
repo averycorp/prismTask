@@ -3,13 +3,16 @@ package com.averycorp.prismtask.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,7 +29,19 @@ constructor(
         private val CACHED_BILLING_PERIOD_KEY = stringPreferencesKey("cached_billing_period")
         private val TIER_EXPIRES_AT_KEY = longPreferencesKey("tier_expires_at")
         private val LAST_VERIFIED_AT_KEY = longPreferencesKey("last_verified_at")
+        private val ADMIN_USE_SONNET_KEY = booleanPreferencesKey("admin_use_sonnet")
     }
+
+    val adminUseSonnet: Flow<Boolean> = context.dataStore.data
+        .map { prefs -> prefs[ADMIN_USE_SONNET_KEY] ?: false }
+
+    suspend fun getAdminUseSonnet(): Boolean = adminUseSonnet.first()
+
+    suspend fun setAdminUseSonnet(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[ADMIN_USE_SONNET_KEY] = enabled }
+    }
+
+    fun getAdminUseSonnetBlocking(): Boolean = runBlocking { getAdminUseSonnet() }
 
     suspend fun getCachedTier(): String = context.dataStore.data
         .map { prefs ->

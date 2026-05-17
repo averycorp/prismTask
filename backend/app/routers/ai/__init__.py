@@ -38,6 +38,7 @@ re-exported here.
 
 from fastapi import APIRouter, Depends
 
+from app.middleware.admin_model_override import apply_admin_model_override
 from app.middleware.ai_gate import require_ai_features_enabled
 
 # ---------------------------------------------------------------------------
@@ -104,7 +105,10 @@ from . import (
 router = APIRouter(
     prefix="/ai",
     tags=["ai"],
-    dependencies=[Depends(require_ai_features_enabled)],
+    dependencies=[
+        Depends(require_ai_features_enabled),
+        Depends(apply_admin_model_override),
+    ],
 )
 
 # Order intentionally matches the original ai.py file layout so the OpenAPI

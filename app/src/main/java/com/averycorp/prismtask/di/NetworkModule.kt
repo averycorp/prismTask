@@ -2,6 +2,7 @@ package com.averycorp.prismtask.di
 
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.data.preferences.AdvancedTuningPreferences
+import com.averycorp.prismtask.data.remote.api.AdminModelOverrideInterceptor
 import com.averycorp.prismtask.data.remote.api.AiFeatureGateInterceptor
 import com.averycorp.prismtask.data.remote.api.AuthInterceptor
 import com.averycorp.prismtask.data.remote.api.CalendarBackendApi
@@ -67,6 +68,7 @@ object NetworkModule {
         loggingInterceptor: HttpLoggingInterceptor,
         authInterceptor: AuthInterceptor,
         aiFeatureGateInterceptor: AiFeatureGateInterceptor,
+        adminModelOverrideInterceptor: AdminModelOverrideInterceptor,
         tokenAuthenticator: TokenAuthenticator,
         advancedTuningPreferences: AdvancedTuningPreferences
     ): OkHttpClient {
@@ -82,6 +84,7 @@ object NetworkModule {
             // Order matters: gate first so we don't waste an auth-token
             // refresh on a request that's about to be short-circuited.
             .addInterceptor(aiFeatureGateInterceptor)
+            .addInterceptor(adminModelOverrideInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .authenticator(tokenAuthenticator)

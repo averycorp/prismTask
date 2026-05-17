@@ -6,10 +6,10 @@ import android.os.Build
 import androidx.test.runner.AndroidJUnitRunner
 import androidx.work.Configuration
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.averycorp.prismtask.data.diagnostics.MigrationInstrumentor
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
-import com.averycorp.prismtask.data.diagnostics.MigrationInstrumentor
 import dagger.hilt.android.testing.HiltTestApplication
 
 class HiltTestRunner : AndroidJUnitRunner() {

@@ -26,7 +26,7 @@ fun StartOfDayPickerDialog(
     initialMinute: Int,
     dismissable: Boolean,
     onConfirm: (hour: Int, minute: Int) -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val clockState = rememberAnalogClockState(
         initialHour = initialHour.coerceIn(0, 23),
@@ -39,7 +39,7 @@ fun StartOfDayPickerDialog(
         title = {
             Text(
                 text = "When Does Your Day Start?",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge
             )
         },
         text = {
@@ -48,7 +48,7 @@ fun StartOfDayPickerDialog(
                     text = "This controls when habits reset and streaks roll over. " +
                         "Most people pick between 3–5 AM. Calendar dates and explicit " +
                         "due dates are unaffected.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 AnalogClockPicker(state = clockState)
@@ -65,7 +65,7 @@ fun StartOfDayPickerDialog(
             }
         } else {
             null
-        },
+        }
     )
 }
 

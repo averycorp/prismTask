@@ -605,9 +605,11 @@ class NotificationProjectorTest {
 
         val result = projector.projectAll(nowMillis = now)
 
-        assertTrue(result.any {
-            it.source == ProjectedNotification.Source.MEDICATION_LEGACY_SPECIFIC_TIME
-        })
+        assertTrue(
+            result.any {
+                it.source == ProjectedNotification.Source.MEDICATION_LEGACY_SPECIFIC_TIME
+            }
+        )
     }
 
     @Test
