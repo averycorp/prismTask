@@ -129,8 +129,9 @@ class TimerForegroundService : Service() {
 
     private fun runTickLoop() {
         tickJob?.cancel()
-        // Stamp the absolute deadline once. The widget reads this on each
-        // composition and renders `(deadline - now) / 1000`.
+        // Stamp the absolute deadline once. The widget binds this to a
+        // RemoteViews <Chronometer> so the launcher self-ticks the
+        // countdown at 1Hz without any per-second IPC.
         sessionEndElapsedRealtime = SystemClock.elapsedRealtime() + secondsRemaining * 1000L
         // Fire-and-forget the lifecycle write so the tick loop isn't gated
         // on Glance / DataStore work.
@@ -148,13 +149,16 @@ class TimerForegroundService : Service() {
                 secondsRemaining -= 1
                 updateOngoingNotification(secondsRemaining)
                 broadcastTick(secondsRemaining)
-                // Push widget refresh on every tick so the home-screen
-                // countdown stays in lockstep. Launching on serviceScope
-                // (instead of awaiting inline) keeps the loop's cadence
-                // at a true 1Hz — a slow Glance recomposition can't
-                // stretch the next `delay(1000)`. Glance serializes
-                // per-widget updates internally so pushes can't pile up.
-                serviceScope.launch { pushWidgetTick() }
+                // No per-second widget push: TimerWidget renders the
+                // countdown via an AndroidRemoteViews <Chronometer>
+                // bound to sessionEndElapsedRealtime, which the
+                // launcher ticks natively at 1Hz. Glance's updateAll()
+                // routes through WorkManager and coalesces rapid calls
+                // — pushing at 1Hz from here produced one update at
+                // start and silence afterward on real devices.
+                // Lifecycle pushes (start/pause/resume/stop/complete)
+                // still flow through pushWidgetRunState and keep the
+                // run-state, deadline, and progress bar in sync.
             }
             if (!isPaused && secondsRemaining <= 0) {
                 onCountdownComplete()
@@ -347,22 +351,6 @@ class TimerForegroundService : Service() {
             TimerWidget().updateAll(this)
         } catch (e: Exception) {
             Log.w("TimerService", "Widget run-state update failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Per-tick widget refresh. Skips the DataStore write — the deadline
-     * stored at start is the only field that needs to be fresh, and the
-     * widget computes displayed seconds from it. Just calls `updateAll`
-     * so Glance re-composes against the cached state. Errors are
-     * swallowed.
-     */
-    private suspend fun pushWidgetTick() {
-        if (!BuildConfig.WIDGETS_ENABLED) return
-        try {
-            TimerWidget().updateAll(this)
-        } catch (e: Exception) {
-            Log.w("TimerService", "Widget tick update failed: ${e.message}")
         }
     }
 
