@@ -161,6 +161,16 @@ constructor(
         private set
     var priority by mutableIntStateOf(0)
         private set
+
+    /**
+     * True iff the user explicitly tapped a priority circle. Auto-press
+     * respects this (won't overwrite a manual pick); tapping the on-screen
+     * "Auto" button forces it back to `false` and re-runs the urgency
+     * keyword classifier. Mirrors [lifeCategoryManuallySet].
+     */
+    var priorityManuallySet by mutableStateOf(false)
+        private set
+
     var projectId by mutableStateOf<Long?>(null)
         private set
     var parentTaskId by mutableStateOf<Long?>(null)
@@ -435,6 +445,7 @@ constructor(
         dueDate = initialDate
         dueTime = null
         priority = 0
+        priorityManuallySet = false
         this.projectId = projectId
         parentTaskId = null
         recurrenceRule = null
@@ -472,6 +483,7 @@ constructor(
                         dueDate = task.dueDate
                         dueTime = task.dueTime
                         priority = task.priority
+                        priorityManuallySet = task.priority != 0
                         this@AddEditTaskViewModel.projectId = task.projectId
                         parentTaskId = task.parentTaskId
                         recurrenceRule = task.recurrenceRule?.let { RecurrenceConverter.fromJson(it) }
@@ -607,6 +619,7 @@ constructor(
 
     fun onPriorityChange(value: Int) {
         priority = value
+        priorityManuallySet = true
     }
 
     fun onProjectIdChange(value: Long?) {
@@ -774,6 +787,24 @@ constructor(
             taskMode = null
         } else if (taskMode == null) {
             taskMode = DEFAULT_TASK_MODE
+        }
+    }
+
+    /**
+     * Auto-press the Priority circle — see [autoPickLifeCategory] for the
+     * shared semantic. Runs the same urgency-keyword regex
+     * [NaturalLanguageParser] uses for QuickAdd: "asap"/"urgent" → 4,
+     * "important" → 3, "soon" → 2. Mirror of the OrganizeTab chip auto-picks,
+     * just operating on the priority Int instead of a chip enum.
+     */
+    fun autoPickPriority(force: Boolean = false) {
+        if (priorityManuallySet && !force) return
+        if (force) priorityManuallySet = false
+        val keywordPriority = if (title.isBlank()) 0 else classifyPriorityFromText(title, description)
+        if (keywordPriority != 0) {
+            priority = keywordPriority
+        } else if (force && priority == 0) {
+            priority = DEFAULT_PRIORITY
         }
     }
 
@@ -1503,5 +1534,23 @@ constructor(
 
         @VisibleForTesting
         internal val DEFAULT_COGNITIVE_LOAD = CognitiveLoad.MEDIUM
+
+        @VisibleForTesting
+        internal const val DEFAULT_PRIORITY = 2
+
+        private val urgencyKeywordPatterns: List<Pair<Regex, Int>> = listOf(
+            Regex("""(?i)\b(asap|urgent|urgently|immediately|critical)\b""") to 4,
+            Regex("""(?i)\b(important|high\s+priority|high-priority)\b""") to 3,
+            Regex("""(?i)\bsoon\b""") to 2
+        )
+
+        @VisibleForTesting
+        internal fun classifyPriorityFromText(title: String, description: String): Int {
+            val haystack = if (description.isBlank()) title else "$title $description"
+            for ((regex, level) in urgencyKeywordPatterns) {
+                if (regex.containsMatchIn(haystack)) return level
+            }
+            return 0
+        }
     }
 }

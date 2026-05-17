@@ -989,6 +989,105 @@ class AddEditTaskViewModelTest {
         assertFalse(vm.lifeCategoryManuallySet)
     }
 
+    // ---------------------------------------------------------------------
+    // Auto-pick Priority (urgency-keyword inference on the Priority row)
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun `autoPickPriority picks Urgent for an urgent keyword`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Reply to urgent client request")
+        vm.autoPickPriority()
+        assertEquals(4, vm.priority)
+        assertFalse(vm.priorityManuallySet)
+    }
+
+    @Test
+    fun `autoPickPriority picks High for an important keyword`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Important quarterly report")
+        vm.autoPickPriority()
+        assertEquals(3, vm.priority)
+    }
+
+    @Test
+    fun `autoPickPriority picks Medium for a soon keyword`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Buy groceries soon")
+        vm.autoPickPriority()
+        assertEquals(2, vm.priority)
+    }
+
+    @Test
+    fun `autoPickPriority leaves priority at zero when title is blank`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.autoPickPriority()
+        assertEquals(0, vm.priority)
+        assertFalse(vm.priorityManuallySet)
+    }
+
+    @Test
+    fun `autoPickPriority respects a prior manual pick`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onPriorityChange(1)
+        assertTrue(vm.priorityManuallySet)
+
+        vm.onTitleChange("Reply to urgent client request")
+        vm.autoPickPriority()
+        assertEquals(1, vm.priority)
+        assertTrue(vm.priorityManuallySet)
+    }
+
+    @Test
+    fun `autoPickPriority with force overrides a manual pick`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onPriorityChange(1)
+        vm.onTitleChange("Reply to urgent client request")
+
+        vm.autoPickPriority(force = true)
+        assertEquals(4, vm.priority)
+        assertFalse(vm.priorityManuallySet)
+    }
+
+    @Test
+    fun `autoPickPriority force assigns default when classifier finds nothing`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("xyzzy")
+        vm.autoPickPriority(force = true)
+        assertEquals(AddEditTaskViewModel.DEFAULT_PRIORITY, vm.priority)
+        assertFalse(vm.priorityManuallySet)
+    }
+
+    @Test
+    fun `autoPickPriority force preserves existing priority when classifier finds nothing`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onPriorityChange(3)
+        vm.onTitleChange("xyzzy")
+        vm.autoPickPriority(force = true)
+        // Force resets manuallySet, but the classifier found no keyword so
+        // the previous priority is kept (we don't downgrade to DEFAULT).
+        assertEquals(3, vm.priority)
+        assertFalse(vm.priorityManuallySet)
+    }
+
+    @Test
+    fun `autoPickPriority infers from description when title has no keyword`() {
+        val vm = newViewModel()
+        vm.initialize(taskId = null, projectId = null, initialDate = null)
+        vm.onTitleChange("Call mom")
+        vm.onDescriptionChange("Need to do this asap before she leaves.")
+        vm.autoPickPriority()
+        assertEquals(4, vm.priority)
+    }
+
     @Test
     fun `autoPickLifeCategory non-force still clears chip when classifier finds nothing`() {
         val vm = newViewModel()

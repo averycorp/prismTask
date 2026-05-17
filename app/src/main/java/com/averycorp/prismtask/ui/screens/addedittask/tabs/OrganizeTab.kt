@@ -948,7 +948,7 @@ internal fun CognitiveLoadSelector(
  * is happening on top of the instant local pick.
  */
 @Composable
-private fun AutoPickButton(onClick: () -> Unit, loading: Boolean = false) {
+internal fun AutoPickButton(onClick: () -> Unit, loading: Boolean = false) {
     val color = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier

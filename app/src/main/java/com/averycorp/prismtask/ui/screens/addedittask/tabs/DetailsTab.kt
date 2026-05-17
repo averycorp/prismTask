@@ -80,7 +80,8 @@ import kotlinx.coroutines.launch
 internal fun PriorityCircleRow(
     selected: Int,
     onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAuto: (() -> Unit)? = null
 ) {
     val priorityColors = LocalPriorityColors.current
     val levels = listOf(
@@ -101,6 +102,9 @@ internal fun PriorityCircleRow(
                 selected = selected == level,
                 onClick = { onSelect(level) }
             )
+        }
+        if (onAuto != null) {
+            AutoPickButton(onClick = onAuto)
         }
     }
 }
