@@ -84,6 +84,9 @@ constructor(
     private val _isAdmin = MutableStateFlow(false)
     val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
 
+    private val _adminUseSonnet = MutableStateFlow(false)
+    val adminUseSonnet: StateFlow<Boolean> = _adminUseSonnet.asStateFlow()
+
     /**
      * Server-validated beta-tester Pro entitlement. Mirrors the [_isAdmin]
      * lever so [applyEffectiveTier] forces PRO when the user has redeemed
@@ -121,6 +124,7 @@ constructor(
 
     fun initialize(activity: Activity) {
         scope.launch {
+            _adminUseSonnet.value = proStatusPreferences.getAdminUseSonnet()
             val cachedTier = proStatusPreferences.getCachedTier()
             val cachedPeriod = proStatusPreferences.getCachedBillingPeriod()
             val expiresAt = proStatusPreferences.tierExpiresAt()
@@ -448,5 +452,16 @@ constructor(
         if (!BuildConfig.DEBUG && !_isAdmin.value) return
         _debugTierOverride.value = null
         applyEffectiveTier(realTier, realPeriod, realState)
+    }
+
+    /**
+     * Admin-only: route AI requests to Sonnet instead of Haiku by stamping
+     * an `X-PrismTask-Admin-Model-Override` header. The backend ignores the
+     * header for non-admin users, so this is safe to leave persisted.
+     */
+    fun setAdminUseSonnet(enabled: Boolean) {
+        if (!BuildConfig.DEBUG && !_isAdmin.value) return
+        _adminUseSonnet.value = enabled
+        scope.launch { proStatusPreferences.setAdminUseSonnet(enabled) }
     }
 }

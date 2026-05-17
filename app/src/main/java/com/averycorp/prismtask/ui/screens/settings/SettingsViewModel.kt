@@ -613,6 +613,7 @@ constructor(
     val subscriptionState: StateFlow<SubscriptionState> = billingManager.proSubscriptionState
     val debugTierOverride: StateFlow<UserTier?> = billingManager.debugTierOverride
     val isAdmin: StateFlow<Boolean> = billingManager.isAdmin
+    val adminUseSonnet: StateFlow<Boolean> = billingManager.adminUseSonnet
 
     // --- Notification Settings (delegated to NotificationSettingsViewModel) ---
     val taskRemindersEnabled: StateFlow<Boolean> get() = notificationSettings.taskRemindersEnabled
@@ -1453,6 +1454,11 @@ constructor(
     /** Debug-only: clear the tier override and revert to the real billing state. */
     fun clearDebugTier() {
         billingManager.clearDebugTier()
+    }
+
+    /** Admin-only: route AI requests to Sonnet instead of Haiku. */
+    fun setAdminUseSonnet(enabled: Boolean) {
+        billingManager.setAdminUseSonnet(enabled)
     }
 
 }

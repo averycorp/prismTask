@@ -1,3 +1,4 @@
+import contextvars
 import json
 import logging
 import os
@@ -20,6 +21,14 @@ MODEL_SONNET = "claude-sonnet-4-20250514"
 # on Haiku. These are the premium AI features baked into the single Pro tier.
 SONNET_FEATURES = {"weekly_planner", "monthly_review"}
 
+# Per-request override. Populated by the admin-gated
+# ``apply_admin_model_override`` dependency when an admin client sends
+# ``X-PrismTask-Admin-Model-Override: sonnet``. Reset at the end of the
+# request scope so it never leaks across users.
+admin_model_override: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "admin_model_override", default=None
+)
+
 
 def get_model(feature: str | None = None) -> str:
     """Return the appropriate Claude model ID for the given AI feature.
@@ -28,6 +37,8 @@ def get_model(feature: str | None = None) -> str:
     Haiku. ``feature`` is a short lowercase identifier (e.g. ``"eisenhower"``,
     ``"weekly_planner"``). Passing ``None`` defaults to Haiku.
     """
+    if admin_model_override.get() == "sonnet":
+        return MODEL_SONNET
     if feature in SONNET_FEATURES:
         return MODEL_SONNET
     return MODEL_HAIKU

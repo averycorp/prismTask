@@ -3,11 +3,14 @@ package com.averycorp.prismtask.ui.screens.settings.sections
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +30,9 @@ import com.averycorp.prismtask.ui.theme.LocalPrismShapes
 fun DebugTierSection(
     debugTierOverride: UserTier?,
     onSetDebugTier: (UserTier) -> Unit,
-    onClearDebugTier: () -> Unit
+    onClearDebugTier: () -> Unit,
+    adminUseSonnet: Boolean,
+    onSetAdminUseSonnet: (Boolean) -> Unit
 ) {
     Spacer(modifier = Modifier.height(24.dp))
     HorizontalDivider()
@@ -96,5 +101,36 @@ fun DebugTierSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+    Text(
+        text = "AI Model:",
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = adminUseSonnet,
+            onCheckedChange = onSetAdminUseSonnet
+        )
+        Spacer(modifier = Modifier.size(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Use Sonnet instead of Haiku",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Routes all AI requests (chat, classify, NLP) to Sonnet. Backend enforces admin gate.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

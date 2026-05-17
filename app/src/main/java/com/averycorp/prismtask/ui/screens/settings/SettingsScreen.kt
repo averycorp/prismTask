@@ -79,6 +79,7 @@ fun SettingsScreen(
 ) {
     val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
     val debugTierOverride by viewModel.debugTierOverride.collectAsStateWithLifecycle()
+    val adminUseSonnet by viewModel.adminUseSonnet.collectAsStateWithLifecycle()
 
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
@@ -424,7 +425,9 @@ fun SettingsScreen(
                         DebugTierSection(
                             debugTierOverride = debugTierOverride,
                             onSetDebugTier = viewModel::setDebugTier,
-                            onClearDebugTier = viewModel::clearDebugTier
+                            onClearDebugTier = viewModel::clearDebugTier,
+                            adminUseSonnet = adminUseSonnet,
+                            onSetAdminUseSonnet = viewModel::setAdminUseSonnet
                         )
 
                         DebugOnboardingSection(
