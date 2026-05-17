@@ -147,15 +147,14 @@ class PomodoroTimerService : Service() {
                 secondsRemaining -= 1
                 updateOngoingNotification(secondsRemaining)
                 broadcastTick(secondsRemaining)
-                // Fire-and-forget the widget refresh on every tick so the
-                // home-screen countdown stays in lockstep with the in-app
-                // timer. Launching on serviceScope (instead of awaiting
-                // inline) keeps this loop's cadence at a true 1Hz: a slow
-                // Glance recomposition or DataStore write no longer
-                // stretches the next `delay(1000)` out by hundreds of ms.
-                // Glance serializes per-widget updates internally so pushes
-                // can't pile up.
-                serviceScope.launch { pushWidgetTick() }
+                // No per-second widget push: TimerWidget binds the deadline
+                // to a RemoteViews <Chronometer> that the launcher ticks
+                // natively at 1Hz. Glance's updateAll() routes through
+                // WorkManager and coalesces rapid calls, so a 1Hz push
+                // from here collapses to (typically) one update at start
+                // — leaving the widget frozen until the next lifecycle
+                // event. Lifecycle pushes still flow through
+                // pushWidgetRunState on start/pause/resume/stop/complete.
             }
             if (!isPaused && secondsRemaining <= 0) {
                 onCountdownComplete()
@@ -331,21 +330,6 @@ class PomodoroTimerService : Service() {
             TimerWidget().updateAll(this)
         } catch (e: Exception) {
             Log.w("PomodoroService", "Widget run-state update failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Per-tick widget refresh. Skips the DataStore write — the deadline
-     * stored at start is the only field that needs to be fresh, and the
-     * widget computes displayed seconds from it. Just calls `updateAll` so
-     * Glance re-composes against the cached state. Errors are swallowed.
-     */
-    private suspend fun pushWidgetTick() {
-        if (!BuildConfig.WIDGETS_ENABLED) return
-        try {
-            TimerWidget().updateAll(this)
-        } catch (e: Exception) {
-            Log.w("PomodoroService", "Widget tick update failed: ${e.message}")
         }
     }
 

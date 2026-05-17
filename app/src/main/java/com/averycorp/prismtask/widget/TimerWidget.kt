@@ -3,7 +3,10 @@ package com.averycorp.prismtask.widget
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
+import android.util.TypedValue
+import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -11,6 +14,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.LinearProgressIndicator
@@ -35,6 +39,8 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.averycorp.prismtask.MainActivity
+import com.averycorp.prismtask.R
+import com.averycorp.prismtask.ui.theme.prismThemeColors
 import com.averycorp.prismtask.widget.launch.WidgetLaunchAction
 
 class TimerWidget : GlanceAppWidget() {
@@ -153,20 +159,42 @@ private fun TimerWidgetContent(
             )
             Spacer(modifier = GlanceModifier.height(4.dp))
 
-            Text(
-                text = timeText,
-                style = if (isLarge) {
-                    WidgetTextStyles.timerLargeThemed(
-                        palette,
-                        if (state.isPaused) palette.onSurfaceVariant else palette.onSurface
+            // Self-ticking Chronometer when running: Glance's
+            // updateAll() routes through WorkManager and coalesces
+            // rapid calls, so per-second pushes from the service can't
+            // sustain 1Hz on real devices. Binding the deadline to a
+            // <Chronometer> lets the launcher tick it natively without
+            // any IPC. Paused state falls through to static Text since
+            // a stopped Chronometer isn't reliably stationary.
+            val activelyTicking =
+                state.isRunning && !state.isPaused && state.sessionEndElapsedRealtime > 0L
+            if (activelyTicking) {
+                val chronoColor = prismThemeColors(palette.theme).onBackground.toArgb()
+                AndroidRemoteViews(
+                    remoteViews = buildChronometerRemoteViews(
+                        context = context,
+                        baseElapsedRealtime = state.sessionEndElapsedRealtime,
+                        textSizeSp = if (isLarge) 38f else 28f,
+                        textColorArgb = chronoColor,
+                        started = true
                     )
-                } else {
-                    WidgetTextStyles.timerSmallThemed(
-                        palette,
-                        if (state.isPaused) palette.onSurfaceVariant else palette.onSurface
-                    )
-                }
-            )
+                )
+            } else {
+                Text(
+                    text = timeText,
+                    style = if (isLarge) {
+                        WidgetTextStyles.timerLargeThemed(
+                            palette,
+                            if (state.isPaused) palette.onSurfaceVariant else palette.onSurface
+                        )
+                    } else {
+                        WidgetTextStyles.timerSmallThemed(
+                            palette,
+                            if (state.isPaused) palette.onSurfaceVariant else palette.onSurface
+                        )
+                    }
+                )
+            }
 
             if (isLarge && state.currentTaskTitle != null) {
                 Text(
@@ -309,6 +337,32 @@ private fun PomodoroSessionDots(
             ) {}
         }
     }
+}
+
+/**
+ * Build a RemoteViews containing a single `<Chronometer>` configured to
+ * count down to [baseElapsedRealtime]. The launcher will tick the
+ * Chronometer natively at 1Hz without requiring Glance recompositions —
+ * this is the only reliable way to render a per-second countdown in an
+ * AppWidget, since Glance's `updateAll()` is debounced through
+ * WorkManager and can't sustain a true 1Hz refresh.
+ */
+private fun buildChronometerRemoteViews(
+    context: Context,
+    baseElapsedRealtime: Long,
+    textSizeSp: Float,
+    textColorArgb: Int,
+    started: Boolean
+): RemoteViews {
+    val rv = RemoteViews(context.packageName, R.layout.timer_widget_chronometer)
+    // `format = null` selects the platform default ("MM:SS" / "H:MM:SS"),
+    // `started = true` calls Chronometer.start() so the view begins
+    // ticking immediately when the launcher inflates it.
+    rv.setChronometer(R.id.timer_chronometer, baseElapsedRealtime, null, started)
+    rv.setChronometerCountDown(R.id.timer_chronometer, true)
+    rv.setTextColor(R.id.timer_chronometer, textColorArgb)
+    rv.setTextViewTextSize(R.id.timer_chronometer, TypedValue.COMPLEX_UNIT_SP, textSizeSp)
+    return rv
 }
 
 class TimerWidgetReceiver : GlanceAppWidgetReceiver() {
