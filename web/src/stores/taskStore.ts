@@ -44,6 +44,15 @@ interface TaskState {
   deleteTask: (taskId: string) => Promise<void>;
   completeTask: (taskId: string) => Promise<Task>;
   uncompleteTask: (taskId: string) => Promise<Task>;
+  /**
+   * Mirrors Android `TaskRepository.logAdditionalCompletion`. Records
+   * another completion entry for a recurring task that is already done
+   * for the current cycle, without flipping the row back to incomplete
+   * or spawning another next-occurrence (the first `completeTask` call
+   * already did the spawn). No-op for non-recurring tasks or tasks not
+   * currently in `done` state.
+   */
+  logAdditionalCompletion: (taskId: string) => Promise<void>;
 
   // Subtasks
   createSubtask: (parentId: string, data: SubtaskCreate) => Promise<Task>;
@@ -453,6 +462,39 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // so the analytics surface stays in sync with the toggle.
     void deleteTaskCompletionRow(uid, taskId);
     return updated;
+  },
+
+  /**
+   * "Log Again" path for recurring tasks already completed today.
+   * Mirrors Android `TaskRepository.logAdditionalCompletion` — refreshes
+   * the `task_completions` history row's `completedAtTime` without
+   * touching `tasks.status` (still `done`) and without spawning another
+   * next-occurrence (that happened on the first `completeTask`).
+   *
+   * No-op when the task is missing, not recurring, or not currently
+   * marked done. Failures are swallowed for the same reason
+   * `writeTaskCompletionRow` swallows them: the user toggled an already-
+   * complete row, the row is still done after this call, and a missed
+   * analytics-history refresh isn't worth surfacing an error toast for.
+   */
+  logAdditionalCompletion: async (taskId) => {
+    const uid = getUid();
+    const existing =
+      get().tasks.find((t) => t.id === taskId) ??
+      get().todayTasks.find((t) => t.id === taskId) ??
+      get().overdueTasks.find((t) => t.id === taskId) ??
+      get().upcomingTasks.find((t) => t.id === taskId);
+    if (!existing) return;
+    if (!existing.recurrence_json) return;
+    if (existing.status !== 'done') return;
+    // `recordTaskCompletion` is merge-semantics on the deterministic
+    // `(taskId, completedDateLocal)` doc id, so calling it a second
+    // time on the same logical day refreshes `completedAtTime` on the
+    // existing row rather than creating a duplicate. That matches the
+    // user-visible Android behavior ("the log reflects the more recent
+    // time") even though the on-disk shape diverges — Android inserts
+    // a separate Room row, web mutates the canonical Firestore doc.
+    void writeTaskCompletionRow(uid, existing);
   },
 
   createSubtask: async (parentId, data) => {
