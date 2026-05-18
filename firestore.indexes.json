@@ -1,4 +1,13 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isCompleted", "order": "ASCENDING"},
+        {"fieldPath": "completedAt", "order": "ASCENDING"}
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

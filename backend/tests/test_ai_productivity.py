@@ -912,6 +912,32 @@ class TestTimeBlockRouterHorizon:
 
 class TestNewAIEndpoints:
     @pytest.mark.asyncio
+    async def test_daily_briefing_missing_firestore_index_returns_503(
+        self, client: AsyncClient, pro_auth_headers: dict
+    ):
+        """If the composite index on (isCompleted, completedAt) is missing
+        from Firestore, the recently-completed-tasks query raises
+        FailedPrecondition. The handler must surface that as 503, not 500."""
+        from google.api_core.exceptions import FailedPrecondition
+
+        from app.routers.ai import briefing_rate_limiter
+        briefing_rate_limiter._requests.clear()
+
+        with patch(
+            "app.routers.ai.fetch_incomplete_tasks",
+            new=AsyncMock(return_value=[]),
+        ), patch(
+            "app.routers.ai.fetch_recently_completed_tasks",
+            new=AsyncMock(side_effect=FailedPrecondition("The query requires an index.")),
+        ):
+            resp = await client.post(
+                "/api/v1/ai/daily-briefing",
+                json={"date": "2026-05-18"},
+                headers=pro_auth_headers,
+            )
+        assert resp.status_code == 503, resp.text
+
+    @pytest.mark.asyncio
     async def test_daily_briefing_rate_limiting(self, client: AsyncClient, pro_auth_headers: dict):
         auth_headers = pro_auth_headers
         from app.routers.ai import briefing_rate_limiter
