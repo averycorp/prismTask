@@ -108,8 +108,11 @@ fun MedicationScreen(
     var editingState by remember { mutableStateOf<EditingMedicationState?>(null) }
     val coroutineScope = rememberCoroutineScope()
     var archivingMed by remember { mutableStateOf<MedicationEntity?>(null) }
-    // Slot whose intended_time is being edited (long-press → time sheet).
-    var timeEditingSlotState by remember { mutableStateOf<MedicationSlotTodayState?>(null) }
+    // Slot + target tier being edited via long-press → time sheet.
+    // The picked time both backdates the slot's doses and marks it at
+    // `tier`, so long-pressing any tier (not just the active one) is a
+    // single explicit action: "I achieved this tier at time T".
+    var timeEditingTarget by remember { mutableStateOf<TierTimeEditTarget?>(null) }
     // Long-press → per-dose time-edit sheet. Target captures the
     // (medication, slot, existing-dose-if-any) tuple so the sheet can
     // either retime / remove an existing row or backdate a new one.
@@ -232,7 +235,9 @@ fun MedicationScreen(
                                 // tier — the click is idempotent.
                                 viewModel.bulkMark(BulkMarkScope.SLOT, state.slot.id, tier)
                             },
-                            onLongPressTier = { timeEditingSlotState = state },
+                            onLongPressTier = { tier ->
+                                timeEditingTarget = TierTimeEditTarget(state, tier)
+                            },
                             onLongPressMedication = { med ->
                                 doseTimeEditTarget = DoseTimeEditTarget(
                                     medication = med,
@@ -423,7 +428,7 @@ fun MedicationScreen(
         )
     }
 
-    timeEditingSlotState?.let { state ->
+    timeEditingTarget?.let { target ->
         // The sheet anchors the user-picked HH:mm to the slot card's logical
         // day (not wall-clock). When the SoD-boundary window is open
         // (wall-clock has crossed midnight but the logical day has not yet
@@ -435,13 +440,13 @@ fun MedicationScreen(
                 .getOrDefault(java.time.LocalDate.now())
         }
         MedicationTimeEditSheet(
-            initialIntendedTime = state.intendedTime,
-            slotName = state.slot.name,
+            initialIntendedTime = target.state.intendedTime,
+            slotName = target.state.slot.name,
             logicalDay = logicalDay,
-            onDismiss = { timeEditingSlotState = null },
-            onSave = { intendedTime ->
-                viewModel.setIntendedTimeForSlot(state.slot, intendedTime)
-                timeEditingSlotState = null
+            onDismiss = { timeEditingTarget = null },
+            onSave = { takenAt ->
+                viewModel.applyTierAtTime(target.state.slot, target.tier, takenAt)
+                timeEditingTarget = null
             }
         )
     }
@@ -488,7 +493,7 @@ private fun SlotTodayCard(
     editMode: Boolean,
     onToggleDose: (MedicationEntity) -> Unit,
     onSelectTier: (AchievedTier) -> Unit,
-    onLongPressTier: () -> Unit,
+    onLongPressTier: (AchievedTier) -> Unit,
     onLongPressMedication: (MedicationEntity) -> Unit
 ) {
     Column(
@@ -518,7 +523,7 @@ private fun SlotTodayCard(
             isUserSet = state.isUserSet,
             isBacklogged = state.isBacklogged,
             onSelectTier = onSelectTier,
-            onLongPressActiveTier = onLongPressTier
+            onLongPressTier = onLongPressTier
         )
         if (state.medications.isEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
@@ -545,12 +550,15 @@ private fun SlotTodayCard(
 
 /**
  * Four-button segmented selector — one button per [AchievedTier]. Tapping
- * an inactive tier records it as `USER_SET`; tapping the active tier when
- * it's already a user override clears the override (auto-compute resumes).
+ * a tier marks the slot at that rung; tapping the active tier with an
+ * existing override clears it back to auto-compute.
  *
- * Long-press on the active tier opens the intended-time edit sheet —
- * mirrors the legacy single-chip long-press affordance so the gesture
- * stays discoverable.
+ * Long-press on **any** tier opens the time edit sheet. Saving the sheet
+ * commits "mark this slot at tier T as taken at time X" in one action —
+ * existing dose rows are backdated and any newly-needed dose rows are
+ * inserted with the picked wall-clock. Long-press on the same tier as
+ * the active rung is the pure "backdate without changing tier" case;
+ * long-pressing a different tier rolls both into one save.
  */
 @Composable
 private fun TierSegmentedRow(
@@ -558,7 +566,7 @@ private fun TierSegmentedRow(
     isUserSet: Boolean,
     isBacklogged: Boolean,
     onSelectTier: (AchievedTier) -> Unit,
-    onLongPressActiveTier: () -> Unit
+    onLongPressTier: (AchievedTier) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -573,7 +581,7 @@ private fun TierSegmentedRow(
                 isUserSet = active && isUserSet,
                 isBacklogged = active && isBacklogged,
                 onClick = { onSelectTier(tier) },
-                onLongClick = if (active) onLongPressActiveTier else null,
+                onLongClick = { onLongPressTier(tier) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -855,7 +863,17 @@ private data class DoseDialogTarget(
 )
 
 /**
- * Long-press → time-edit target. [existingDose] is non-null when the
+ * The (slot, tier) pair the user just long-pressed. Saving the time sheet
+ * commits both — the slot lands at [tier] with `taken_at = picked time`.
+ * Holding both lets the sheet open from any tier, not just the active one.
+ */
+private data class TierTimeEditTarget(
+    val state: MedicationSlotTodayState,
+    val tier: AchievedTier
+)
+
+/**
+ * Long-press → dose-time-edit target. [existingDose] is non-null when the
  * sheet should retime / remove an already-logged row; null means the
  * sheet logs a fresh dose at the chosen wall-clock (backdated). [slot]
  * is null for unscheduled-section meds; non-null for slot-card rows.

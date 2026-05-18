@@ -325,6 +325,54 @@ constructor(
     }
 
     /**
+     * Long-press-on-tier flow: mark the slot at [tier] AND backdate every
+     * existing + newly-logged real dose for the slot/today to [takenAt].
+     *
+     * Composes three writes so the visible "Taken at HH:mm" labels actually
+     * move when the user picks a different time:
+     *  1. Update `taken_at` on every existing real dose for this slot today
+     *     so already-taken meds reflect the user's backdate.
+     *  2. Run [bulkMarkInternal] with `takenAtOverride = takenAt` so any
+     *     newly-inserted dose rows (meds at-or-below [tier] not yet taken)
+     *     carry the same wall-clock instead of `now`.
+     *  3. Persist `intended_time = takenAt` on every per-med tier-state row
+     *     for the slot — the backlog clock icon depends on this.
+     *
+     * For [AchievedTier.SKIPPED] the bulk-mark path deletes existing real
+     * doses and inserts synthetic skip rows; the explicit pre-pass on step 1
+     * is therefore a no-op (deleted rows have nothing left to update), which
+     * matches the data model — a skipped slot has no "taken time" to display.
+     */
+    fun applyTierAtTime(
+        slot: MedicationSlotEntity,
+        tier: AchievedTier,
+        takenAt: Long
+    ) {
+        viewModelScope.launch {
+            val slotKey = slot.id.toString()
+            val existing = todaysDoses.value.filter {
+                it.slotKey == slotKey && !it.isSyntheticSkip && it.medicationId != null
+            }
+            existing.forEach { dose ->
+                if (dose.takenAt != takenAt) {
+                    medicationRepository.updateDose(dose.copy(takenAt = takenAt))
+                }
+            }
+            bulkMarkInternal(BulkMarkScope.SLOT, slot.id, tier, takenAtOverride = takenAt)
+            val date = todayDate.value
+            val meds = medicationsForSlotOnce(slot.id)
+            meds.forEach { med ->
+                slotRepository.setTierStateIntendedTime(
+                    medicationId = med.id,
+                    slotId = slot.id,
+                    date = date,
+                    intendedTime = takenAt
+                )
+            }
+        }
+    }
+
+    /**
      * Retime an existing dose row to [newTakenAt]. Recomputes
      * `taken_date_local` from the SoD-anchored boundary so a retime that
      * crosses a logical-day edge re-files the row under the correct day.
@@ -663,11 +711,17 @@ constructor(
      * without spinning up a full `viewModelScope` lifecycle. Returns
      * the [BatchOperationsRepository.BatchApplyResult] of the apply
      * call, or `null` if the scope produced zero targets.
+     *
+     * [takenAtOverride] — when non-null, every newly-inserted dose row
+     * carries this wall-clock as its `taken_at` instead of `now`. Used by
+     * the long-press-tier-and-pick-time flow so the displayed per-med
+     * "Taken at HH:mm" labels reflect the user's backdated choice.
      */
     internal suspend fun bulkMarkInternal(
         scope: BulkMarkScope,
         slotId: Long?,
-        tier: AchievedTier
+        tier: AchievedTier,
+        takenAtOverride: Long? = null
     ): BatchOperationsRepository.BatchApplyResult? {
         val date = todayDate.value
         val rawTargets: List<Pair<MedicationEntity, MedicationSlotEntity>> = when (scope) {
@@ -686,6 +740,7 @@ constructor(
         val mutations: List<ProposedMutationResponse>
         val storageTier = tier.toStorage()
         val now = System.currentTimeMillis()
+        val doseTakenAt = takenAtOverride ?: now
 
         if (tier == AchievedTier.SKIPPED) {
             mutations = rawTargets.map { (med, slot) ->
@@ -728,7 +783,7 @@ constructor(
                             "slot_key" to slot.id.toString(),
                             "date" to date,
                             "tier" to storageTier,
-                            "taken_at" to now
+                            "taken_at" to doseTakenAt
                         ),
                         humanReadableDescription = "Mark ${med.name} (${slot.name}) taken"
                     )
