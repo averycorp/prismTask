@@ -72,6 +72,39 @@ data class HabitEntity(
      */
     @ColumnInfo(name = "today_skip_before_schedule_days", defaultValue = "-1")
     val todaySkipBeforeScheduleDays: Int = -1,
+    /**
+     * Per-habit override for the streak grace period (how many consecutive
+     * missed days end a streak). -1 = inherit the global default from
+     * [com.averycorp.prismtask.data.preferences.HabitListPreferences.getStreakMaxMissedDays];
+     * >=1 = use this many days for this habit. Resolved via
+     * [com.averycorp.prismtask.domain.usecase.HabitForgivenessResolver.resolveMaxMissedDays].
+     */
+    @ColumnInfo(name = "streak_max_missed_days", defaultValue = "-1")
+    val streakMaxMissedDays: Int = -1,
+    /**
+     * Per-habit override for the forgiveness-first toggle (whether the
+     * forgiveness window applies to this habit's streak). Three-state because
+     * the global toggle is independent of the slider values:
+     * -1 = inherit the global setting, 0 = force off, 1 = force on. Resolved
+     * via [com.averycorp.prismtask.domain.usecase.HabitForgivenessResolver.resolveForgivenessConfig].
+     */
+    @ColumnInfo(name = "forgiveness_enabled", defaultValue = "-1")
+    val forgivenessEnabled: Int = -1,
+    /**
+     * Per-habit override for the forgiveness "allowed misses" budget — how
+     * many missed days the rolling grace window tolerates. -1 = inherit the
+     * global default; >=0 = use this value (0 is a valid opt-in to a
+     * zero-miss budget for this habit).
+     */
+    @ColumnInfo(name = "forgiveness_allowed_misses", defaultValue = "-1")
+    val forgivenessAllowedMisses: Int = -1,
+    /**
+     * Per-habit override for the forgiveness grace period window length in
+     * days. -1 = inherit the global default; >=1 = use this many days for
+     * this habit.
+     */
+    @ColumnInfo(name = "forgiveness_grace_period_days", defaultValue = "-1")
+    val forgivenessGracePeriodDays: Int = -1,
     @ColumnInfo(name = "is_built_in", defaultValue = "0")
     val isBuiltIn: Boolean = false,
     @ColumnInfo(name = "template_key")

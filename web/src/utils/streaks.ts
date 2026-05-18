@@ -141,6 +141,79 @@ export const DEFAULT_FORGIVENESS: ForgivenessConfig = {
 };
 
 /**
+ * Per-habit override knobs that compose with (and take precedence over)
+ * the global `ForgivenessConfig`. Each field is optional — `undefined`
+ * means "inherit from the global". Mirrors Android's
+ * `HabitForgivenessResolver` semantics (see
+ * `app/.../domain/usecase/HabitForgivenessResolver.kt`):
+ *
+ *   - `streakMaxMissedDays`: 1..7. Currently round-tripped for cross-
+ *     device parity but not used by the web streak walk — the web
+ *     `forgivenessDailyWalk` uses `allowedMisses` + `gracePeriodDays`
+ *     directly. Reserved for a future "strict-streak grace" path.
+ *   - `forgivenessEnabled`: `0` → force OFF for this habit, `1` → force
+ *     ON, `undefined` → inherit. Three-state because the global toggle
+ *     is independent of the slider.
+ *   - `forgivenessAllowedMisses`: 0..5. `>= 0` wins, `undefined` inherits.
+ *   - `forgivenessGracePeriodDays`: 1..30. `>= 1` wins, `undefined`
+ *     inherits.
+ */
+export interface HabitForgivenessOverrides {
+  streakMaxMissedDays?: number;
+  forgivenessEnabled?: number;
+  forgivenessAllowedMisses?: number;
+  forgivenessGracePeriodDays?: number;
+}
+
+/**
+ * Resolve a per-habit `ForgivenessConfig` by overlaying the optional
+ * per-habit overrides on top of the global config. Mirrors Android's
+ * `HabitForgivenessResolver.resolveForgivenessConfig`:
+ *
+ *   - `forgivenessEnabled`: `0` → false, `1` → true, anything else
+ *     inherits `globalConfig.enabled`.
+ *   - `forgivenessAllowedMisses` >= 0 wins, else inherit.
+ *   - `forgivenessGracePeriodDays` >= 1 wins, else inherit.
+ *
+ * The `byMode` map is carried through from the global — per-habit
+ * overrides take precedence over the per-mode overrides for habit
+ * surfaces (habits never thread a `taskMode`, so `byMode` is ignored
+ * downstream in `resolveForgivenessForMode`).
+ *
+ * Exported so consumers (notably `habitStore.getStreakData`) can build
+ * the resolved config once and thread it into `calculateStreaks` without
+ * mutating the global Advanced Tuning state.
+ */
+export function resolveHabitForgiveness(
+  globalConfig: ForgivenessConfig,
+  overrides: HabitForgivenessOverrides | null | undefined,
+): ForgivenessConfig {
+  if (!overrides) return globalConfig;
+  const enabled =
+    overrides.forgivenessEnabled === 0
+      ? false
+      : overrides.forgivenessEnabled === 1
+        ? true
+        : globalConfig.enabled;
+  const allowed =
+    overrides.forgivenessAllowedMisses !== undefined &&
+    overrides.forgivenessAllowedMisses >= 0
+      ? overrides.forgivenessAllowedMisses
+      : globalConfig.allowedMisses;
+  const grace =
+    overrides.forgivenessGracePeriodDays !== undefined &&
+    overrides.forgivenessGracePeriodDays >= 1
+      ? overrides.forgivenessGracePeriodDays
+      : globalConfig.gracePeriodDays;
+  return {
+    enabled,
+    allowedMisses: allowed,
+    gracePeriodDays: grace,
+    byMode: globalConfig.byMode,
+  };
+}
+
+/**
  * Resolve the effective forgiveness knobs for a given task mode. Reads
  * `byMode[mode]` when present; falls back to the base
  * `{gracePeriodDays, allowedMisses}` fields otherwise. The top-level
@@ -454,6 +527,14 @@ function strictDailyWalk(
  *   Habits don't carry a mode in either platform's schema today, so
  *   habit callers leave this undefined; task-completion streak surfaces
  *   that ship later will pass the task's mode through.
+ * @param habitOverrides Optional per-habit override knobs that override
+ *   the global `forgivenessConfig` on a field-by-field basis. Mirrors
+ *   Android's `HabitForgivenessResolver` (see
+ *   `app/.../domain/usecase/HabitForgivenessResolver.kt`). When
+ *   `undefined` (or every field is `undefined`), behavior matches the
+ *   pre-override path exactly. When a field is set it takes precedence
+ *   over the global, per the sentinel rules documented on
+ *   `HabitForgivenessOverrides`.
  */
 export function calculateStreaks(
   completions: CompletionEntry[],
@@ -463,6 +544,7 @@ export function calculateStreaks(
   forgivenessConfig: ForgivenessConfig = DEFAULT_FORGIVENESS,
   restDays: Set<string> = new Set<string>(),
   taskMode?: StreakTaskMode | null,
+  habitOverrides?: HabitForgivenessOverrides | null,
 ): StreakData {
   const today = startOfDay(new Date());
   const completionMap = new Map<string, number>();
@@ -528,7 +610,17 @@ export function calculateStreaks(
   // when present. Habit callers (no mode) pass `taskMode=undefined`,
   // which short-circuits to the base config — habit streak strictness is
   // unchanged.
-  const resolvedConfig = resolveForgivenessForMode(forgivenessConfig, taskMode);
+  //
+  // Per-habit overrides (`HabitForgivenessOverrides`) are applied first
+  // so they win over the per-mode `byMode` resolution. Habit callers
+  // don't pass `taskMode`, so the second step is a no-op for them; task-
+  // completion streak surfaces that ship later won't pass habit
+  // overrides, so the two layers don't fight in practice.
+  const habitResolvedConfig = resolveHabitForgiveness(
+    forgivenessConfig,
+    habitOverrides,
+  );
+  const resolvedConfig = resolveForgivenessForMode(habitResolvedConfig, taskMode);
   const walk = forgivenessDailyWalk(
     completionMap,
     today,

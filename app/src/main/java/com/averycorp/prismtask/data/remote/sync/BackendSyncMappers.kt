@@ -121,6 +121,10 @@ internal fun habitToOperation(habit: HabitEntity): SyncOperation {
         addProperty("nag_suppression_days_override", habit.nagSuppressionDaysOverride)
         addProperty("today_skip_after_complete_days", habit.todaySkipAfterCompleteDays)
         addProperty("today_skip_before_schedule_days", habit.todaySkipBeforeScheduleDays)
+        addProperty("streak_max_missed_days", habit.streakMaxMissedDays)
+        addProperty("forgiveness_enabled", habit.forgivenessEnabled)
+        addProperty("forgiveness_allowed_misses", habit.forgivenessAllowedMisses)
+        addProperty("forgiveness_grace_period_days", habit.forgivenessGracePeriodDays)
         addProperty("created_at", habit.createdAt)
         addProperty("updated_at", habit.updatedAt)
     }

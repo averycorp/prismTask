@@ -114,6 +114,42 @@ class StreakCalculatorTest {
         assertEquals(0, streak)
     }
 
+    // --- Per-habit override (resolver-fed maxMissedDays) ---
+
+    @Test
+    fun test_currentStreak_perHabitMaxMissedDaysOverrideExtendsStreak() {
+        // Pattern: done, done, MISS, done, done, MISS, done — counted from today backwards.
+        // With graceLimit = 1 (strict) the streak hard-resets at the first miss.
+        // With graceLimit = 3 (per-habit override above the global default of 1),
+        // single-day misses are tolerated and the streak walks back further.
+        val today = LocalDate.of(2025, 6, 10)
+        val completions = listOf(
+            completion(date = today), // today
+            completion(date = today.minusDays(1)),
+            // miss day -2
+            completion(date = today.minusDays(3)),
+            completion(date = today.minusDays(4)),
+            // miss day -5
+            completion(date = today.minusDays(6))
+        )
+
+        val strict = StreakCalculator.calculateCurrentStreak(
+            completions = completions,
+            habit = dailyHabit(),
+            today = today,
+            maxMissedDays = 1
+        )
+        assertEquals(2, strict)
+
+        val resolved = StreakCalculator.calculateCurrentStreak(
+            completions = completions,
+            habit = dailyHabit(),
+            today = today,
+            maxMissedDays = 3
+        )
+        assertEquals(5, resolved)
+    }
+
     // --- Longest Streak ---
 
     @Test

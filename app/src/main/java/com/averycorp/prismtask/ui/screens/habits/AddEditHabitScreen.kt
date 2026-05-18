@@ -869,6 +869,179 @@ fun AddEditHabitScreen(
                 )
             }
 
+            SectionLabel("Streak Forgiveness")
+
+            // Per-habit streak grace period override
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Override Streak Grace Period",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = if (viewModel.streakMaxMissedDaysOverrideEnabled) {
+                            "Override global setting for this habit"
+                        } else {
+                            val days = viewModel.globalStreakMaxMissedDays
+                            "Using global setting (${if (days == 1) "1 missed day" else "$days missed days"})"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = viewModel.streakMaxMissedDaysOverrideEnabled,
+                    onCheckedChange = viewModel::onStreakMaxMissedDaysOverrideEnabledChange
+                )
+            }
+
+            if (viewModel.streakMaxMissedDaysOverrideEnabled) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 4.dp)
+                ) {
+                    Text(
+                        text = "Missed Days That End a Streak",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = if (viewModel.streakMaxMissedDays == 1) "1 day" else "${viewModel.streakMaxMissedDays} days",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Slider(
+                    value = viewModel.streakMaxMissedDays.toFloat(),
+                    onValueChange = { viewModel.onStreakMaxMissedDaysChange(it.toInt()) },
+                    valueRange = 1f..7f,
+                    steps = 5,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                )
+            }
+
+            // Per-habit forgiveness window override (enabled + allowed misses + grace window)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Override Forgiveness Window",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = if (viewModel.forgivenessOverrideEnabled) {
+                            "Override global setting for this habit"
+                        } else {
+                            val prefs = viewModel.globalForgivenessPrefs
+                            if (prefs.enabled) {
+                                "Using global setting (${prefs.allowedMisses} misses / ${prefs.gracePeriodDays}-day window)"
+                            } else {
+                                "Global setting: disabled"
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = viewModel.forgivenessOverrideEnabled,
+                    onCheckedChange = viewModel::onForgivenessOverrideEnabledChange
+                )
+            }
+
+            if (viewModel.forgivenessOverrideEnabled) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Forgive the Occasional Miss",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "One missed day still counts as part of the streak",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.forgivenessEnabledLocal,
+                        onCheckedChange = viewModel::onForgivenessEnabledLocalChange
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 4.dp)
+                ) {
+                    Text(
+                        text = "Allowed Misses",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "${viewModel.forgivenessAllowedMisses}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Slider(
+                    value = viewModel.forgivenessAllowedMisses.toFloat(),
+                    onValueChange = { viewModel.onForgivenessAllowedMissesChange(it.toInt()) },
+                    valueRange = 0f..5f,
+                    steps = 4,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 4.dp)
+                ) {
+                    Text(
+                        text = "Grace Window",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = if (viewModel.forgivenessGracePeriodDays == 1) "1 day" else "${viewModel.forgivenessGracePeriodDays} days",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Slider(
+                    value = viewModel.forgivenessGracePeriodDays.toFloat(),
+                    onValueChange = { viewModel.onForgivenessGracePeriodDaysChange(it.toInt()) },
+                    valueRange = 1f..30f,
+                    steps = 28,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                )
+            }
+
+            Text(
+                text = "Defaults live in Settings > Habits & Streaks.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(

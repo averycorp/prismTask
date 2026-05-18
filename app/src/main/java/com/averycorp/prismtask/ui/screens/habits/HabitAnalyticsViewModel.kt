@@ -8,6 +8,7 @@ import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
 import com.averycorp.prismtask.data.repository.HabitRepository
+import com.averycorp.prismtask.domain.usecase.HabitForgivenessResolver
 import com.averycorp.prismtask.domain.usecase.StreakCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +55,11 @@ constructor(
         viewModelScope.launch {
             val habit = habitRepository.getHabitByIdOnce(habitId) ?: return@launch
             val completions = habitRepository.getCompletionsForHabitOnce(habitId)
-            val streakMaxMissedDays = habitListPreferences.getStreakMaxMissedDays().first()
+            val globalStreakMaxMissedDays = habitListPreferences.getStreakMaxMissedDays().first()
+            val streakMaxMissedDays = HabitForgivenessResolver.resolveMaxMissedDays(
+                habit,
+                globalStreakMaxMissedDays
+            )
             val firstDayOfWeek = taskBehaviorPreferences.getFirstDayOfWeek().first()
             val today = LocalDate.now()
             val gridStart = today.minusWeeks(11).with(TemporalAdjusters.previousOrSame(firstDayOfWeek))

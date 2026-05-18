@@ -200,6 +200,59 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
   const [skipBeforeScheduleDays, setSkipBeforeScheduleDays] = useState(
     Math.max(0, habit?.today_skip_before_schedule_days ?? 0),
   );
+
+  // Per-habit streak-forgiveness overrides (parity audit § B.6 / spec
+  // `docs/superpowers/specs/2026-05-18-per-habit-forgiveness-design.md`).
+  // Mirrors Android's `AddEditHabitScreen` toggle-reveals-slider pattern.
+  // Storage shape: `undefined` ⇔ "inherit global"; a number means "use
+  // this value for this habit". The override switches are on iff the
+  // stored value is set (numeric) — same polarity as the Today-skip
+  // rows above.
+  const [streakGraceOverride, setStreakGraceOverride] = useState(
+    habit?.streak_max_missed_days !== undefined &&
+      habit?.streak_max_missed_days !== null &&
+      habit.streak_max_missed_days >= 1,
+  );
+  const [streakGraceDays, setStreakGraceDays] = useState(
+    Math.min(7, Math.max(1, habit?.streak_max_missed_days ?? 1)),
+  );
+
+  // Forgiveness-window override is a single switch that reveals the
+  // on/off subswitch + two paired sliders (allowed misses + grace window
+  // days). The switch is on iff ANY of the three Firestore fields is
+  // numerically set on this habit.
+  const initialForgivenessOverride =
+    (habit?.forgiveness_enabled !== undefined &&
+      habit?.forgiveness_enabled !== null) ||
+    (habit?.forgiveness_allowed_misses !== undefined &&
+      habit?.forgiveness_allowed_misses !== null &&
+      habit.forgiveness_allowed_misses >= 0) ||
+    (habit?.forgiveness_grace_period_days !== undefined &&
+      habit?.forgiveness_grace_period_days !== null &&
+      habit.forgiveness_grace_period_days >= 1);
+  const [forgivenessOverride, setForgivenessOverride] = useState(
+    initialForgivenessOverride,
+  );
+  // `forgiveness_enabled` is a three-state int on the wire (0/1/null).
+  // The reveal sub-switch is bound to a boolean; treat 0/null as OFF and
+  // 1 as ON. When the master override switch is OFF, this value is
+  // ignored on save (we persist `null`).
+  const [forgivenessEnabled, setForgivenessEnabled] = useState(
+    habit?.forgiveness_enabled === 1,
+  );
+  const [forgivenessAllowedMisses, setForgivenessAllowedMisses] = useState(
+    Math.min(
+      5,
+      Math.max(0, habit?.forgiveness_allowed_misses ?? 1),
+    ),
+  );
+  const [forgivenessGraceDays, setForgivenessGraceDays] = useState(
+    Math.min(
+      30,
+      Math.max(1, habit?.forgiveness_grace_period_days ?? 7),
+    ),
+  );
+
   const [saving, setSaving] = useState(false);
 
   // Get unique categories from existing habits for autocomplete
@@ -232,6 +285,24 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
       const effectiveSkipBeforeSchedule = skipBeforeScheduleOverride
         ? skipBeforeScheduleDays
         : -1;
+      // Per-habit streak-forgiveness overrides. When the override switch
+      // is OFF we persist `null` so the Firestore doc carries NULL,
+      // which `docToHabit` reads back as `undefined` — the TS contract
+      // for "inherit global". When ON we write the slider value.
+      const effectiveStreakMaxMissed = streakGraceOverride
+        ? streakGraceDays
+        : null;
+      const effectiveForgivenessEnabled = forgivenessOverride
+        ? forgivenessEnabled
+          ? 1
+          : 0
+        : null;
+      const effectiveForgivenessAllowedMisses = forgivenessOverride
+        ? forgivenessAllowedMisses
+        : null;
+      const effectiveForgivenessGracePeriodDays = forgivenessOverride
+        ? forgivenessGraceDays
+        : null;
       const data = {
         name: name.trim(),
         description: description.trim() || undefined,
@@ -246,6 +317,10 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
             : undefined,
         today_skip_after_complete_days: effectiveSkipAfterComplete,
         today_skip_before_schedule_days: effectiveSkipBeforeSchedule,
+        streak_max_missed_days: effectiveStreakMaxMissed,
+        forgiveness_enabled: effectiveForgivenessEnabled,
+        forgiveness_allowed_misses: effectiveForgivenessAllowedMisses,
+        forgiveness_grace_period_days: effectiveForgivenessGracePeriodDays,
       };
 
       if (isEditing) {
@@ -514,6 +589,171 @@ export function HabitModal({ habit, onClose }: HabitModalProps) {
             }}
             onDaysChange={setSkipBeforeScheduleDays}
           />
+        </div>
+
+        {/* Streak Forgiveness (per-habit overrides; parity audit § B.6).
+            Mirrors Android `AddEditHabitScreen` Streak Forgiveness
+            section. Three blocks total: (1) override Streak Grace Period,
+            (2) override Forgiveness Window (forgiveness on/off + allowed
+            misses + grace window paired sliders), (3) footer caption. */}
+        <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40 p-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">
+              Streak Forgiveness
+            </span>
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              Override the global streak tolerance for this habit only.
+            </span>
+          </div>
+
+          {/* Block 1 — Streak Grace Period (1..7) */}
+          <div className="flex flex-col gap-1.5">
+            <label className="flex items-center justify-between gap-3">
+              <div className="flex flex-col">
+                <span className="text-sm text-[var(--color-text-primary)]">
+                  Override Streak Grace Period
+                </span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {streakGraceOverride
+                    ? 'Use this many missed days before the streak breaks'
+                    : 'Using global setting'}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={streakGraceOverride}
+                onChange={(e) => setStreakGraceOverride(e.target.checked)}
+                className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--color-border)] transition-colors checked:bg-[var(--color-accent)] relative after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform checked:after:translate-x-4"
+                aria-label="Override streak grace period"
+              />
+            </label>
+            {streakGraceOverride && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    Missed days tolerated
+                  </span>
+                  <span className="text-xs font-medium text-[var(--color-accent)]">
+                    {streakGraceDays} day{streakGraceDays === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={7}
+                  step={1}
+                  value={streakGraceDays}
+                  onChange={(e) =>
+                    setStreakGraceDays(parseInt(e.target.value, 10))
+                  }
+                  className="w-full accent-[var(--color-accent)]"
+                  aria-label="Streak grace period days"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Block 2 — Forgiveness Window (on/off + allowed misses + grace
+              window). The two sliders reveal together because they pair
+              semantically (mirrors Android Settings → Forgiveness-First
+              Streaks). */}
+          <div className="flex flex-col gap-1.5">
+            <label className="flex items-center justify-between gap-3">
+              <div className="flex flex-col">
+                <span className="text-sm text-[var(--color-text-primary)]">
+                  Override Forgiveness Window
+                </span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {forgivenessOverride
+                    ? 'Use a custom forgiveness window for this habit'
+                    : 'Using global setting'}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={forgivenessOverride}
+                onChange={(e) => setForgivenessOverride(e.target.checked)}
+                className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--color-border)] transition-colors checked:bg-[var(--color-accent)] relative after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform checked:after:translate-x-4"
+                aria-label="Override forgiveness window"
+              />
+            </label>
+            {forgivenessOverride && (
+              <div className="flex flex-col gap-3 pl-1">
+                {/* Forgiveness on/off subswitch */}
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    Forgiveness {forgivenessEnabled ? 'enabled' : 'disabled'}
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={forgivenessEnabled}
+                    onChange={(e) => setForgivenessEnabled(e.target.checked)}
+                    className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--color-border)] transition-colors checked:bg-[var(--color-accent)] relative after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform checked:after:translate-x-4"
+                    aria-label="Forgiveness enabled for this habit"
+                  />
+                </label>
+
+                {/* Allowed Misses slider (0..5) */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      Allowed misses
+                    </span>
+                    <span className="text-xs font-medium text-[var(--color-accent)]">
+                      {forgivenessAllowedMisses}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={5}
+                    step={1}
+                    value={forgivenessAllowedMisses}
+                    onChange={(e) =>
+                      setForgivenessAllowedMisses(parseInt(e.target.value, 10))
+                    }
+                    className="w-full accent-[var(--color-accent)]"
+                    aria-label="Allowed misses inside the grace window"
+                    disabled={!forgivenessEnabled}
+                  />
+                </div>
+
+                {/* Grace Window slider (1..30) */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      Grace window
+                    </span>
+                    <span className="text-xs font-medium text-[var(--color-accent)]">
+                      {forgivenessGraceDays} day
+                      {forgivenessGraceDays === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={forgivenessGraceDays}
+                    onChange={(e) =>
+                      setForgivenessGraceDays(parseInt(e.target.value, 10))
+                    }
+                    className="w-full accent-[var(--color-accent)]"
+                    aria-label="Forgiveness grace window days"
+                    disabled={!forgivenessEnabled}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Block 3 — footer caption */}
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Defaults live in Settings.
+          </p>
         </div>
       </div>
     </Modal>

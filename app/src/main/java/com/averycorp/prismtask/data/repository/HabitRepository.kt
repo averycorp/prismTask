@@ -11,9 +11,12 @@ import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.HabitLogEntity
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.SyncTracker
 import com.averycorp.prismtask.domain.automation.AutomationEvent
 import com.averycorp.prismtask.domain.automation.AutomationEventBus
+import com.averycorp.prismtask.domain.usecase.ForgivenessConfig
+import com.averycorp.prismtask.domain.usecase.HabitForgivenessResolver
 import com.averycorp.prismtask.domain.usecase.StreakCalculator
 import com.averycorp.prismtask.notifications.HabitReminderScheduler
 import com.averycorp.prismtask.util.DayBoundary
@@ -76,7 +79,8 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val habitListPreferences: HabitListPreferences,
     private val widgetUpdateManager: WidgetUpdateManager,
-    private val automationEventBus: AutomationEventBus
+    private val automationEventBus: AutomationEventBus,
+    private val userPreferencesDataStore: UserPreferencesDataStore
 ) {
     private suspend fun currentDayStartHour(): Int = taskBehaviorPreferences.getDayStartHour().first()
 
@@ -138,19 +142,40 @@ constructor(
      * configured grace window. Daily habits use the forgiving walk;
      * other frequencies fall back to strict (see
      * [com.averycorp.prismtask.domain.usecase.StreakCalculator.calculateResilientStreak]).
+     *
+     * If [config] is left null the resolver reads the global forgiveness flow
+     * and lets [HabitForgivenessResolver] apply any per-habit overrides. The
+     * project-streak callers that need the global directly should pass an
+     * explicit [ForgivenessConfig] (e.g. `ForgivenessConfig.DEFAULT`).
      */
     suspend fun getResilientStreak(
         habitId: Long,
-        config: com.averycorp.prismtask.domain.usecase.ForgivenessConfig =
-            com.averycorp.prismtask.domain.usecase.ForgivenessConfig.DEFAULT
+        config: ForgivenessConfig? = null
     ): com.averycorp.prismtask.domain.usecase.StreakResult? {
         val habit = habitDao.getHabitByIdOnce(habitId) ?: return null
         val completions = completionDao.getCompletionsForHabitOnce(habitId)
         val skippedDates = completionDao.getSkippedLocalDatesForHabitOnce(habitId)
             .mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
             .toSet()
-        return com.averycorp.prismtask.domain.usecase.StreakCalculator
-            .calculateResilientStreak(completions, habit, config = config, restDays = skippedDates)
+        val resolved = if (config != null) {
+            config
+        } else {
+            val globalPrefs = userPreferencesDataStore.forgivenessFlow.first()
+            HabitForgivenessResolver.resolveForgivenessConfig(
+                habit,
+                ForgivenessConfig(
+                    enabled = globalPrefs.enabled,
+                    gracePeriodDays = globalPrefs.gracePeriodDays,
+                    allowedMisses = globalPrefs.allowedMisses
+                )
+            )
+        }
+        return StreakCalculator.calculateResilientStreak(
+            completions,
+            habit,
+            config = resolved,
+            restDays = skippedDates
+        )
     }
 
     suspend fun archiveHabit(id: Long) {
@@ -607,7 +632,10 @@ constructor(
                             completionsForStreak,
                             habit,
                             todayLocal,
-                            streakMaxMissedDays,
+                            HabitForgivenessResolver.resolveMaxMissedDays(
+                                habit,
+                                streakMaxMissedDays
+                            ),
                             firstDayOfWeek
                         ),
                         completionsThisWeek = periodCompletions,

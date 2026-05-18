@@ -2664,7 +2664,23 @@ val MIGRATION_83_84 = object : Migration(83, 84) {
     }
 }
 
-const val CURRENT_DB_VERSION = 84
+// Per-habit streak forgiveness overrides: four nullable-by-sentinel knobs on
+// the `habits` table that let a habit opt out of the global streak grace
+// period (`streak_max_missed_days`) and the global forgiveness window
+// (`forgiveness_enabled` / `forgiveness_allowed_misses` /
+// `forgiveness_grace_period_days`). -1 = inherit global default (the existing
+// sentinel idiom from `today_skip_after_complete_days`); legacy rows pick up
+// -1 across the board so behavior is byte-identical until the user opts in.
+val MIGRATION_84_85 = object : Migration(84, 85) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE habits ADD COLUMN streak_max_missed_days INTEGER NOT NULL DEFAULT -1")
+        db.execSQL("ALTER TABLE habits ADD COLUMN forgiveness_enabled INTEGER NOT NULL DEFAULT -1")
+        db.execSQL("ALTER TABLE habits ADD COLUMN forgiveness_allowed_misses INTEGER NOT NULL DEFAULT -1")
+        db.execSQL("ALTER TABLE habits ADD COLUMN forgiveness_grace_period_days INTEGER NOT NULL DEFAULT -1")
+    }
+}
+
+const val CURRENT_DB_VERSION = 85
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2749,5 +2765,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_80_81,
     MIGRATION_81_82,
     MIGRATION_82_83,
-    MIGRATION_83_84
+    MIGRATION_83_84,
+    MIGRATION_84_85
 )

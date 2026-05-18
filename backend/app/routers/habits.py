@@ -46,6 +46,14 @@ def _habit_response(habit: Habit) -> HabitResponse:
         today_skip_before_schedule_days=getattr(
             habit, "today_skip_before_schedule_days", -1
         ),
+        streak_max_missed_days=getattr(habit, "streak_max_missed_days", None),
+        forgiveness_enabled=getattr(habit, "forgiveness_enabled", None),
+        forgiveness_allowed_misses=getattr(
+            habit, "forgiveness_allowed_misses", None
+        ),
+        forgiveness_grace_period_days=getattr(
+            habit, "forgiveness_grace_period_days", None
+        ),
         created_at=habit.created_at,
         updated_at=habit.updated_at,
     )

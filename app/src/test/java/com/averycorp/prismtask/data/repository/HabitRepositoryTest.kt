@@ -9,8 +9,10 @@ import com.averycorp.prismtask.data.local.database.DatabaseTransactionRunner
 import com.averycorp.prismtask.data.local.entity.HabitCompletionEntity
 import com.averycorp.prismtask.data.local.entity.HabitEntity
 import com.averycorp.prismtask.data.local.entity.HabitLogEntity
+import com.averycorp.prismtask.data.preferences.ForgivenessPrefs
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.SyncTracker
 import com.averycorp.prismtask.notifications.HabitReminderScheduler
 import com.averycorp.prismtask.util.DayBoundary
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,6 +49,7 @@ class HabitRepositoryTest {
     private lateinit var taskBehaviorPreferences: TaskBehaviorPreferences
     private lateinit var habitListPreferences: HabitListPreferences
     private lateinit var widgetUpdateManager: WidgetUpdateManager
+    private lateinit var userPreferencesDataStore: UserPreferencesDataStore
     private lateinit var repo: HabitRepository
 
     @Before
@@ -59,8 +63,10 @@ class HabitRepositoryTest {
         taskBehaviorPreferences = mockk(relaxed = true)
         habitListPreferences = mockk(relaxed = true)
         widgetUpdateManager = mockk(relaxed = true)
+        userPreferencesDataStore = mockk(relaxed = true)
         every { taskBehaviorPreferences.getDayStartHour() } returns flowOf(0)
         every { habitListPreferences.getStreakMaxMissedDays() } returns flowOf(1)
+        every { userPreferencesDataStore.forgivenessFlow } returns flowOf(ForgivenessPrefs())
 
         repo = HabitRepository(
             inlineTransactionRunner(),
@@ -73,7 +79,8 @@ class HabitRepositoryTest {
             taskBehaviorPreferences,
             habitListPreferences,
             widgetUpdateManager,
-            com.averycorp.prismtask.domain.automation.AutomationEventBus()
+            com.averycorp.prismtask.domain.automation.AutomationEventBus(),
+            userPreferencesDataStore
         )
     }
 
@@ -262,6 +269,76 @@ class HabitRepositoryTest {
 
         repo.uncompleteHabit(id, today)
         assertEquals(0, completionDao.getCompletionsForHabitOnce(id).size)
+    }
+
+    // ---------------------------------------------------------------------
+    // Per-habit forgiveness overrides
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun getResilientStreak_inheritsGlobalConfigWhenHabitHasNoOverrides() = runBlocking {
+        every { userPreferencesDataStore.forgivenessFlow } returns flowOf(
+            ForgivenessPrefs(enabled = true, allowedMisses = 2, gracePeriodDays = 14)
+        )
+        val id = habitDao.insert(HabitEntity(name = "Inherits"))
+        // Seed today's completion so the walk produces a non-empty result and
+        // gracePeriodRemaining reflects the global allowedMisses (2) verbatim.
+        repo.completeHabit(id, DayBoundary.startOfCurrentDay(0))
+
+        val result = repo.getResilientStreak(id)
+        assertNotNull(result)
+        assertEquals(2, result!!.gracePeriodRemaining)
+    }
+
+    @Test
+    fun getResilientStreak_perHabitOverrideWinsOverGlobal() = runBlocking {
+        every { userPreferencesDataStore.forgivenessFlow } returns flowOf(
+            ForgivenessPrefs(enabled = false, allowedMisses = 0, gracePeriodDays = 1)
+        )
+        // Force forgiveness on for this habit with explicit allowed misses + window
+        val id = habitDao.insert(
+            HabitEntity(
+                name = "Override",
+                forgivenessEnabled = 1,
+                forgivenessAllowedMisses = 3,
+                forgivenessGracePeriodDays = 21
+            )
+        )
+        repo.completeHabit(id, DayBoundary.startOfCurrentDay(0))
+
+        val result = repo.getResilientStreak(id)
+        assertNotNull(result)
+        // The resilient streak walk uses the per-habit values; verify by
+        // confirming gracePeriodRemaining reflects the per-habit allowedMisses
+        // (3) — the global says 0 misses and forgiveness off, so without
+        // override resolution we'd get 0 here.
+        assertEquals(3, result!!.gracePeriodRemaining)
+    }
+
+    @Test
+    fun getResilientStreak_explicitConfigBypassesGlobalAndOverrides() = runBlocking {
+        // The project-streak-style use case: caller passes an explicit config
+        // and the resolver should NOT touch it.
+        val id = habitDao.insert(
+            HabitEntity(
+                name = "Explicit",
+                forgivenessEnabled = 1,
+                forgivenessAllowedMisses = 5,
+                forgivenessGracePeriodDays = 30
+            )
+        )
+        repo.completeHabit(id, DayBoundary.startOfCurrentDay(0))
+        val explicit = com.averycorp.prismtask.domain.usecase.ForgivenessConfig(
+            enabled = true,
+            allowedMisses = 1,
+            gracePeriodDays = 7
+        )
+
+        val result = repo.getResilientStreak(id, config = explicit)
+        assertNotNull(result)
+        // Explicit config wins — gracePeriodRemaining tracks the explicit
+        // allowedMisses value, not the per-habit override.
+        assertEquals(1, result!!.gracePeriodRemaining)
     }
 
     // ---------------------------------------------------------------------
@@ -579,6 +656,38 @@ class HabitRepositoryTest {
 
         override suspend fun deleteAll() {
             completions.clear()
+        }
+
+        override fun getSkipsForDateLocal(date: String): Flow<List<HabitCompletionEntity>> =
+            flowOf(completions.filter { it.completedDateLocal == date && it.isSkipped })
+
+        override suspend fun isSkippedOnDateLocalOnce(habitId: Long, date: String): Boolean =
+            completions.any { it.habitId == habitId && it.completedDateLocal == date && it.isSkipped }
+
+        override suspend fun getSkipCountForHabitInLocalRangeOnce(
+            habitId: Long,
+            startDate: String,
+            endDate: String
+        ): Int = completions.count { entry ->
+            val date = entry.completedDateLocal ?: return@count false
+            entry.habitId == habitId && entry.isSkipped && date in startDate..endDate
+        }
+
+        override suspend fun getSkippedLocalDatesForHabitOnce(habitId: Long): List<String> =
+            completions
+                .filter { it.habitId == habitId && it.isSkipped && it.completedDateLocal != null }
+                .mapNotNull { it.completedDateLocal }
+                .sorted()
+
+        override suspend fun getSkipByHabitAndDateLocal(habitId: Long, date: String): HabitCompletionEntity? =
+            completions.firstOrNull {
+                it.habitId == habitId && it.completedDateLocal == date && it.isSkipped
+            }
+
+        override suspend fun deleteSkipByHabitAndDateLocal(habitId: Long, date: String) {
+            completions.removeAll {
+                it.habitId == habitId && it.completedDateLocal == date && it.isSkipped
+            }
         }
     }
 
