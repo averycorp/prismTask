@@ -244,8 +244,80 @@ preference for sub-agent parallelism, dispatch in one batch.
 
 ## Phase 3 — Bundle summary
 
-*Appended after Phase 2 PRs land. PR numbers + post-merge notes inline.*
+All 11 PROCEED items shipped + auto-merged on 2026-05-18 in a single
+parallel fan-out. One follow-up build-fix PR landed shortly after to
+unbreak `main` (PR-race between #1652 and #1650 introduced an arity
+mismatch).
+
+| Item | Audit rank | PR     | Title                                                                                |
+|------|------------|--------|--------------------------------------------------------------------------------------|
+| 1+2  | 1, 2       | #1650  | fix(web): anchor recurrence to completion + roll back spawn on uncomplete            |
+| 3    | 3          | #1646  | feat(web): infer task priority from urgency keywords in NLP                          |
+| 4    | 4          | #1647  | feat(web): auto-classify task mode + cognitive load on title/description edit        |
+| 5    | 5          | #1649  | feat(web): add MorningCheckInPromptCutoff slider to Advanced Tuning                  |
+| 6    | 6          | #1648  | feat(web): forward task-context snapshot to AI chat backend                          |
+| 7    | 7          | #1651  | feat(web): auto-log task timings on Pomodoro session complete                        |
+| 8    | 8          | #1652  | feat(web): add Log Again option for completed recurring tasks in Done sheet          |
+| 9    | 9          | #1655  | feat(web): add Logged Time section to task editor Schedule tab                       |
+| 10   | 10         | #1654  | feat(web): surface Archive/Reopen on projects list + tighten picker filters          |
+| 11   | 11         | #1653  | feat(web): show per-task field detail in import preview                              |
+| —    | (follow-up)| #1656  | fix(web): pass completedAt to writeTaskCompletionRow in logAdditionalCompletion      |
+
+Audit doc itself shipped as PR #1645.
+
+### Post-merge notes
+
+- **PR #1648 (chat task-context)** is wire-format only; no current web
+  UI calls `setContextTask(task)`. Add a "Chat about this task" affordance
+  in a follow-up PR (the audit doc didn't require UI parity yet because
+  no Android entry point requires it either today — Android pulls a
+  default snapshot from the active screen instead of an explicit "pin
+  this task" gesture).
+- **PR #1650 (recurrence anchor + rollback)** introduces an additive
+  `spawnedTaskId` field on the `task_completions` Firestore doc. Android
+  ignores unknown keys via `mapToTaskCompletion`, so no schema break;
+  Android keeps using its own `spawnedRecurrenceId` Room column.
+- **PR #1652 (Log Again)** uses canonical-id merge semantics
+  (`${taskId}__${dateLocal}`) instead of Android's append-row behavior.
+  User-visible result matches ("the log reflects the more recent time")
+  but on-disk shape diverges. Documented in `logAdditionalCompletion`.
+- **PR #1655 vs #1651 (Pomodoro + Logged Time)** had a near-collision:
+  #1651's `addTaskTiming` + `logTiming` actions landed first; #1655
+  rebased and reused them rather than introducing a second writer.
+- **PR #1654 (project archive)** added a shared `projectFilters.ts`
+  helper (`nonArchivedProjects`, `pickerProjects`) and tightened 12
+  picker call-sites. Watch for any new project picker added post-audit —
+  the new helper should be the default.
+- **PR #1656 (build-fix)** root cause: parallel fan-out worked, but two
+  PRs touching the same `taskStore.ts` function signature merged in an
+  order where the second PR didn't see the first's signature change.
+  Future bundle PRs touching shared helpers should rebase before merging
+  even when auto-merge is queued.
+
+### Re-baselined wall-clock-per-PR
+
+11 PRs (12 counting the build-fix) shipped within a single parallel
+dispatch wave. Median worker turnaround was ~10 minutes; longest was the
+Logged Time section (~20 min) due to a Pomodoro-PR merge collision.
+
+### Memory entry candidates
+
+- **Parallel PR fan-out can race on shared helper signatures.**
+  Workers branched from the same `origin/main` SHA didn't see each
+  other's signature changes. Mitigation: any PR touching a function
+  added by an in-flight PR should wait or rebase before merge. Worth a
+  memory entry only if this happens again — once is a coincidence.
+
+### Schedule for next audit
+
+- **Leisure / School Today modes** (audit item 12 — deferred from this
+  pass). Scope a dedicated brainstorm + audit covering mode toggle UX,
+  per-class checkable row semantics, and how the modes interact with
+  Daily Essentials.
+- **Time-tracking analytics charts on `AnalyticsScreen.tsx`** (anti-pattern
+  list item). Pro-gated charts mirroring Android's
+  productivity-score + time-tracking bar chart. Needs design pass first.
 
 ## Phase 4 — Claude Chat handoff
 
-*Emitted to stdout once Phase 2 is dispatched.*
+*Emitted to stdout at end of run.*
