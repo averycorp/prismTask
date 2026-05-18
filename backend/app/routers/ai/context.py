@@ -564,3 +564,9 @@ async def load_habits_today(db, user_id: int, today: date) -> dict:
     """Public wrapper around ``_load_habits_with_history`` for the
     ``get_habits`` tool handler. Same shape, same data."""
     return await _load_habits_with_history(db, user_id, today)
+
+
+async def load_active_projects(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_active_projects`` for the
+    ``get_projects`` tool handler. Same shape, same data."""
+    return await _load_active_projects(db, user_id, today)
