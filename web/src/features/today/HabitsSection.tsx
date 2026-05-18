@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
-import type { Habit } from '@/types/habit';
+import type { Habit, HabitCompletion, HabitFrequency } from '@/types/habit';
+import { isRecurringFrequency } from '@/types/habit';
 
 /**
  * Today-screen Habits section — row-style checkable habits. Web port of
@@ -17,6 +17,12 @@ import type { Habit } from '@/types/habit';
  * two ways: rows are task-shaped (full-width, checkbox + name + streak
  * badge) instead of pill chips, and the section is collapsible to match
  * the rest of the Today screen's `TaskSection` chrome.
+ *
+ * Habits are grouped into "Daily" (frequency=daily) and "Recurring"
+ * (weekly / fortnightly / monthly / bimonthly / quarterly) sub-buckets,
+ * matching the segmented filter on Android's `HabitListScreen`. The
+ * sub-headers are only rendered when both buckets are non-empty —
+ * otherwise the section collapses back to a single flat list.
  *
  * Tapping the checkbox toggles `habit_completions` for the logical day
  * (Start-of-Day-aware). The streak badge surfaces when the habit's
@@ -40,9 +46,47 @@ function saveCollapsed(collapsed: boolean) {
   }
 }
 
+function completionsThisWeek(
+  list: readonly HabitCompletion[] | undefined,
+  todayIso: string,
+): number {
+  if (!list || list.length === 0) return 0;
+  const todayDate = new Date(todayIso + 'T12:00:00');
+  const startOfWeek = new Date(todayDate);
+  startOfWeek.setDate(todayDate.getDate() - ((todayDate.getDay() + 6) % 7));
+  startOfWeek.setHours(0, 0, 0, 0);
+  return list.reduce((sum, c) => {
+    const d = new Date(c.date + 'T00:00:00');
+    return d >= startOfWeek && d <= todayDate ? sum + c.count : sum;
+  }, 0);
+}
+
+function frequencyLabel(
+  frequency: HabitFrequency,
+  target: number,
+  todayCount: number,
+  weekCount: number,
+): string {
+  switch (frequency) {
+    case 'daily':
+      return target > 1 ? `${todayCount}/${target} today` : 'Daily';
+    case 'weekly':
+      return `${weekCount}/${target} this week`;
+    case 'fortnightly':
+      return `${weekCount}/${target} this fortnight`;
+    case 'monthly':
+      return `${weekCount}/${target} this month`;
+    case 'bimonthly':
+      return `${weekCount}/${target} this period`;
+    case 'quarterly':
+      return `${weekCount}/${target} this quarter`;
+  }
+}
+
 export function HabitsSection() {
   const navigate = useNavigate();
   const habits = useHabitStore((s) => s.habits);
+  const completions = useHabitStore((s) => s.completions);
   const toggleCompletion = useHabitStore((s) => s.toggleCompletion);
   const isTodayCompleted = useHabitStore((s) => s.isTodayCompleted);
   const getTodayCount = useHabitStore((s) => s.getTodayCount);
@@ -52,14 +96,12 @@ export function HabitsSection() {
 
   const [collapsed, setCollapsed] = useState<boolean>(loadCollapsed);
 
-  // Medication is its own top-level destination since v1.6 (Android
-  // `HabitListViewModel` filters it out of every habit-list surface);
-  // mirror that so the Medication built-in habit row doesn't appear as
-  // a checkable habit row here.
-  const activeHabits = habits.filter(
-    (h) => h.is_active && !isMedicationBuiltInHabit(h),
-  );
+  const activeHabits = habits.filter((h) => h.is_active);
   if (activeHabits.length === 0) return null;
+
+  const dailyHabits = activeHabits.filter((h) => h.frequency === 'daily');
+  const recurringHabits = activeHabits.filter((h) => isRecurringFrequency(h.frequency));
+  const showSubHeaders = dailyHabits.length > 0 && recurringHabits.length > 0;
 
   const doneCount = activeHabits.filter((h) => isTodayCompleted(h.id)).length;
 
@@ -70,6 +112,25 @@ export function HabitsSection() {
       return next;
     });
   };
+
+  const renderRow = (habit: Habit) => (
+    <HabitRow
+      key={habit.id}
+      habit={habit}
+      completed={isTodayCompleted(habit.id)}
+      currentCount={getTodayCount(habit.id)}
+      weekCount={completionsThisWeek(completions[habit.id], todayIso)}
+      streak={getStreakData(habit.id)?.currentStreak ?? 0}
+      onToggle={async () => {
+        try {
+          await toggleCompletion(habit.id, todayIso);
+        } catch {
+          toast.error('Failed to update habit');
+        }
+      }}
+      onClick={() => navigate(`/habits/${habit.id}/logs`)}
+    />
+  );
 
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
@@ -109,23 +170,18 @@ export function HabitsSection() {
       </div>
       {!collapsed && (
         <ul id="today-habits-rows" className="px-1 pb-2">
-          {activeHabits.map((habit) => (
-            <HabitRow
-              key={habit.id}
-              habit={habit}
-              completed={isTodayCompleted(habit.id)}
-              currentCount={getTodayCount(habit.id)}
-              streak={getStreakData(habit.id)?.currentStreak ?? 0}
-              onToggle={async () => {
-                try {
-                  await toggleCompletion(habit.id, todayIso);
-                } catch {
-                  toast.error('Failed to update habit');
-                }
-              }}
-              onClick={() => navigate(`/habits/${habit.id}/logs`)}
-            />
-          ))}
+          {showSubHeaders && dailyHabits.length > 0 && (
+            <li className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Daily
+            </li>
+          )}
+          {dailyHabits.map(renderRow)}
+          {showSubHeaders && recurringHabits.length > 0 && (
+            <li className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Recurring
+            </li>
+          )}
+          {recurringHabits.map(renderRow)}
         </ul>
       )}
     </div>
@@ -136,6 +192,7 @@ interface HabitRowProps {
   habit: Habit;
   completed: boolean;
   currentCount: number;
+  weekCount: number;
   streak: number;
   onToggle: () => void;
   onClick: () => void;
@@ -145,6 +202,7 @@ function HabitRow({
   habit,
   completed,
   currentCount,
+  weekCount,
   streak,
   onToggle,
   onClick,
@@ -155,6 +213,7 @@ function HabitRow({
   // `HabitEntity.showStreak`; until that lands on web, the >0 check
   // matches the user-visible default (streak hidden when 0).
   const showStreak = streak > 0;
+  const label = frequencyLabel(habit.frequency, habit.target_count, currentCount, weekCount);
   return (
     <li className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-[var(--color-bg-secondary)]">
       <button
@@ -193,11 +252,9 @@ function HabitRow({
         >
           {habit.name}
         </span>
-        {habit.target_count > 1 && (
-          <span className="rounded-full bg-[var(--color-bg-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
-            {currentCount}/{habit.target_count}
-          </span>
-        )}
+        <span className="ml-auto shrink-0 rounded-full bg-[var(--color-bg-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+          {label}
+        </span>
       </button>
       {showStreak && (
         <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-500">
