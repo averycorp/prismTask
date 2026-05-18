@@ -16,6 +16,8 @@ import {
   ChevronRight,
   FolderInput,
   Tags,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTaskStore } from '@/stores/taskStore';
@@ -69,6 +71,7 @@ const STATUS_FILTERS: { value: TaskStatus; label: string }[] = [
 
 const LS_SORT_KEY = 'prismtask_tasklist_sort';
 const LS_VIEW_KEY = 'prismtask_tasklist_view';
+const LS_SHOW_COMPLETED_KEY = 'prismtask_tasklist_show_completed';
 
 export function TaskListScreen() {
   const {
@@ -110,10 +113,13 @@ export function TaskListScreen() {
 
   // Sort & view
   const [sortKey, setSortKey] = useState<SortKey>(
-    () => (localStorage.getItem(LS_SORT_KEY) as SortKey) || 'priority',
+    () => (localStorage.getItem(LS_SORT_KEY) as SortKey) || 'due_date',
   );
   const [viewMode, setViewMode] = useState<ViewMode>(
     () => (localStorage.getItem(LS_VIEW_KEY) as ViewMode) || 'list',
+  );
+  const [showCompleted, setShowCompleted] = useState<boolean>(
+    () => localStorage.getItem(LS_SHOW_COMPLETED_KEY) === 'true',
   );
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -165,6 +171,9 @@ export function TaskListScreen() {
   useEffect(() => {
     localStorage.setItem(LS_VIEW_KEY, viewMode);
   }, [viewMode]);
+  useEffect(() => {
+    localStorage.setItem(LS_SHOW_COMPLETED_KEY, String(showCompleted));
+  }, [showCompleted]);
 
   // Close sort dropdown on outside click
   useEffect(() => {
@@ -208,8 +217,13 @@ export function TaskListScreen() {
     return source.filter((task) => {
       if (priorityFilter.length > 0 && !priorityFilter.includes(task.priority))
         return false;
-      if (statusFilter.length > 0 && !statusFilter.includes(task.status))
-        return false;
+      if (statusFilter.length > 0) {
+        if (!statusFilter.includes(task.status)) return false;
+      } else if (!showCompleted) {
+        // Default: hide completed (`done`) and discarded (`cancelled`) tasks.
+        // An explicit status filter overrides this default.
+        if (task.status === 'done' || task.status === 'cancelled') return false;
+      }
       if (projectFilter.length > 0 && !projectFilter.includes(task.project_id))
         return false;
       if (tagFilter.length > 0) {
@@ -227,6 +241,7 @@ export function TaskListScreen() {
     searchResults,
     priorityFilter,
     statusFilter,
+    showCompleted,
     projectFilter,
     tagFilter,
     dueDateStart,
@@ -557,6 +572,25 @@ export function TaskListScreen() {
                 tagFilter.length}
             </span>
           )}
+        </Button>
+
+        {/* Show Completed Toggle */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowCompleted((v) => !v)}
+          title={
+            showCompleted
+              ? 'Currently showing completed and cancelled tasks. Click to hide.'
+              : 'Currently hiding completed and cancelled tasks. Click to show.'
+          }
+        >
+          {showCompleted ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
+          {showCompleted ? 'Hide Completed' : 'Show Completed'}
         </Button>
 
         {/* View Toggle */}
