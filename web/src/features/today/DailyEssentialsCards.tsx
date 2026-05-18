@@ -13,20 +13,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSelfCareStore } from '@/stores/selfCareStore';
-import { useHabitStore } from '@/stores/habitStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useCourseStore } from '@/stores/courseStore';
-import { useAssignmentStore } from '@/stores/assignmentStore';
-import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
-import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
-import { logicalToday, startOfLogicalDayMs } from '@/utils/dayBoundary';
+import { startOfLogicalDayMs } from '@/utils/dayBoundary';
 import { parseCompletedStepsForDisplay } from '@/api/firestore/selfCare';
-import {
-  getTierOrder,
-  resolveSelectedTier,
-  tierIncludes,
-} from '@/utils/selfCareTiers';
-import type { SelfCareTierDefaults } from '@/api/firestore/advancedTuningPreferences';
 import {
   getDailyEssentialsPreferences,
   subscribeToDailyEssentialsPreferences,
@@ -36,23 +25,33 @@ import {
 } from '@/api/firestore/dailyEssentialsPreferences';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
-import type { Habit } from '@/types/habit';
 
 /**
  * Daily Essentials section — web port of Android's
  * `DailyEssentialsSection.kt` and `DailyEssentialsUseCase.kt` (parity
  * unit 6 of 23, Today screen A).
  *
- * Card order mirrors Android:
+ * Card order:
  *   1. Morning routine (self-care steps)
- *   2. Housework habit (user-pinned habit)
- *   3. Housework routine (self-care steps)
- *   4. Schoolwork (courses + assignments due today)
- *   5. Bedtime routine (self-care steps)
+ *   2. Housework routine (self-care steps)
+ *   3. Bedtime routine (self-care steps)
  *
  * Cards hide individually when empty. The whole section collapses to a
  * single "Set Up Your Daily Essentials" hint when nothing is configured
  * AND the user has not dismissed the hint via `has_seen_hint`.
+ *
+ * The legacy single-checkbox "Housework habit" card was retired here —
+ * the multi-step Housework Routine above already surfaces housework
+ * work in checkable rows (mirroring how PR #1326 retired the Leisure
+ * Minimum card). The `housework_habit_id` / `show_housework_habit`
+ * Firestore fields remain readable for Android parity but are unused
+ * on web.
+ *
+ * Schoolwork is intentionally NOT included here — it already renders
+ * inline above the dashboard sections via the standalone
+ * `SchoolworkTodayCard`, which mirrors Android's `SchoolworkTodayCard`
+ * shape with assignments-due grouping. Duplicating it would split the
+ * source of truth.
  *
  * Title Capitalization per CLAUDE.md user-facing strings convention.
  */
@@ -62,33 +61,6 @@ export function DailyEssentialsCards() {
   const selfCareLogs = useSelfCareStore((s) => s.logs);
   const selfCareSteps = useSelfCareStore((s) => s.steps);
   const toggleSelfCareStep = useSelfCareStore((s) => s.toggleStep);
-
-  const habits = useHabitStore((s) => s.habits);
-  const toggleHabitCompletion = useHabitStore((s) => s.toggleCompletion);
-  const isHabitDoneToday = useHabitStore((s) => s.isTodayCompleted);
-
-  // Mirror SchoolworkTodayCard's gating so the slot only appears when
-  // there's actual content. Cheap reads — both stores are already
-  // populated for the standalone path on the same screen.
-  const courses = useCourseStore((s) => s.courses);
-  const assignments = useAssignmentStore((s) => s.assignments);
-  const hasSchoolworkContent = useMemo(() => {
-    const activeCount = courses.reduce((n, c) => (c.active ? n + 1 : n), 0);
-    if (activeCount > 0) return true;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const todayMidnight = now.getTime();
-    const tomorrowMidnight = todayMidnight + 24 * 60 * 60 * 1000;
-    return assignments.some(
-      (a) =>
-        !a.completed &&
-        a.dueDate != null &&
-        a.dueDate >= todayMidnight &&
-        a.dueDate < tomorrowMidnight,
-    );
-  }, [courses, assignments]);
-
-  const tierDefaults = useAdvancedTuningStore((s) => s.prefs.selfCareTierDefaults);
 
   const [prefs, setPrefs] = useState<DailyEssentialsSnapshot>(
     DEFAULT_DAILY_ESSENTIALS,
@@ -132,29 +104,16 @@ export function DailyEssentialsCards() {
   );
 
   const morningCard = useMemo(
-    () =>
-      buildRoutineCard('morning', selfCareSteps, selfCareLogs, todayMs, tierDefaults),
-    [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
+    () => buildRoutineCard('morning', selfCareSteps, selfCareLogs, todayMs),
+    [selfCareSteps, selfCareLogs, todayMs],
   );
   const bedtimeCard = useMemo(
-    () =>
-      buildRoutineCard('bedtime', selfCareSteps, selfCareLogs, todayMs, tierDefaults),
-    [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
+    () => buildRoutineCard('bedtime', selfCareSteps, selfCareLogs, todayMs),
+    [selfCareSteps, selfCareLogs, todayMs],
   );
   const houseworkRoutineCard = useMemo(
-    () =>
-      buildRoutineCard('housework', selfCareSteps, selfCareLogs, todayMs, tierDefaults),
-    [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
-  );
-
-  // Housework habit card — the user pins one habit as the housework
-  // pointer (Android's `housework_habit_id`). When unset, fall back to
-  // the first habit whose name contains "house" or "clean" so the card
-  // surfaces something useful for users who haven't configured it yet.
-  const houseworkHabit = useMemo(
-    () =>
-      pickHouseworkHabit(habits, prefs.houseworkHabitId),
-    [habits, prefs.houseworkHabitId],
+    () => buildRoutineCard('housework', selfCareSteps, selfCareLogs, todayMs),
+    [selfCareSteps, selfCareLogs, todayMs],
   );
 
   const visibleCards: VisibleCard[] = useMemo(() => {
@@ -162,17 +121,8 @@ export function DailyEssentialsCards() {
     if (prefs.showMorningRoutine && morningCard) {
       cards.push({ kind: 'morning', card: morningCard });
     }
-    if (prefs.showHouseworkHabit && houseworkHabit) {
-      cards.push({ kind: 'housework_habit', habit: houseworkHabit });
-    }
     if (prefs.showHouseworkRoutine && houseworkRoutineCard) {
       cards.push({ kind: 'housework_routine', card: houseworkRoutineCard });
-    }
-    if (hasSchoolworkContent) {
-      // Schoolwork sits between housework_routine and bedtime to match
-      // Android's DailyEssentialsSection order. Gated on actual content
-      // so empty Daily Essentials still collapses to the hint card.
-      cards.push({ kind: 'schoolwork' });
     }
     if (prefs.showBedtimeRoutine && bedtimeCard) {
       cards.push({ kind: 'bedtime', card: bedtimeCard });
@@ -180,14 +130,11 @@ export function DailyEssentialsCards() {
     return cards;
   }, [
     prefs.showMorningRoutine,
-    prefs.showHouseworkHabit,
     prefs.showHouseworkRoutine,
     prefs.showBedtimeRoutine,
     morningCard,
-    houseworkHabit,
     houseworkRoutineCard,
     bedtimeCard,
-    hasSchoolworkContent,
   ]);
 
   const isEmpty = visibleCards.length === 0;
@@ -240,35 +187,15 @@ export function DailyEssentialsCards() {
               onSetUp={() => navigate('/settings')}
             />
           ) : (
-            visibleCards.map((entry, idx) => {
-              if (entry.kind === 'morning' || entry.kind === 'bedtime' || entry.kind === 'housework_routine') {
-                return (
-                  <RoutineCardView
-                    key={`${entry.kind}-${idx}`}
-                    card={entry.card}
-                    onToggleStep={(stepId) =>
-                      handleToggleStep(entry.card.routineType, stepId)
-                    }
-                  />
-                );
-              }
-              if (entry.kind === 'housework_habit') {
-                return (
-                  <HabitCardView
-                    key={`housework-${entry.habit.id}`}
-                    habit={entry.habit}
-                    completed={isHabitDoneToday(entry.habit.id)}
-                    onToggle={() =>
-                      handleToggleHabit(entry.habit.id)
-                    }
-                  />
-                );
-              }
-              if (entry.kind === 'schoolwork') {
-                return <SchoolworkTodayCard key="schoolwork" />;
-              }
-              return null;
-            })
+            visibleCards.map((entry, idx) => (
+              <RoutineCardView
+                key={`${entry.kind}-${idx}`}
+                card={entry.card}
+                onToggleStep={(stepId) =>
+                  handleToggleStep(entry.card.routineType, stepId)
+                }
+              />
+            ))
           )}
         </div>
       )}
@@ -282,22 +209,12 @@ export function DailyEssentialsCards() {
       toast.error('Failed to update step');
     }
   }
-
-  async function handleToggleHabit(habitId: string) {
-    try {
-      await toggleHabitCompletion(habitId, logicalToday(Date.now(), startOfDayHour));
-    } catch {
-      toast.error('Failed to update habit');
-    }
-  }
 }
 
 type VisibleCard =
   | { kind: 'morning'; card: RoutineCardState }
   | { kind: 'bedtime'; card: RoutineCardState }
-  | { kind: 'housework_routine'; card: RoutineCardState }
-  | { kind: 'housework_habit'; habit: Habit }
-  | { kind: 'schoolwork' };
+  | { kind: 'housework_routine'; card: RoutineCardState };
 
 interface StepState {
   stepId: string;
@@ -317,7 +234,6 @@ export function buildRoutineCard(
   steps: SelfCareStep[],
   logs: SelfCareLog[],
   todayMs: number,
-  tierDefaults: SelfCareTierDefaults,
 ): RoutineCardState | null {
   const routineSteps = steps
     .filter((s) => s.routine_type === routineType)
@@ -326,17 +242,6 @@ export function buildRoutineCard(
   const log =
     logs.find((l) => l.routine_type === routineType && l.date === todayMs) ??
     null;
-  const tierOrder = getTierOrder(routineType);
-  const selectedTier = resolveSelectedTier(
-    log?.selected_tier,
-    tierOrder,
-    tierDefaults[routineType],
-  );
-  if (!selectedTier) return null;
-  const visibleSteps = routineSteps.filter((s) =>
-    tierIncludes(tierOrder, selectedTier, s.tier),
-  );
-  if (visibleSteps.length === 0) return null;
   const completedIds = new Set(
     log ? parseCompletedStepsForDisplay(log.completed_steps) : [],
   );
@@ -349,37 +254,12 @@ export function buildRoutineCard(
   return {
     routineType,
     displayName,
-    steps: visibleSteps.map((s) => ({
+    steps: routineSteps.map((s) => ({
       stepId: s.step_id,
       label: s.label,
       completed: completedIds.has(s.step_id),
     })),
   };
-}
-
-/**
- * Resolve the "housework habit" — the habit that powers the Housework
- * card. Android stores a pinned habit id; web mirrors it via Firestore.
- * When unset, fall back to the first active habit whose name contains
- * "house" or "clean" so the card has something to render before the
- * user wires it explicitly.
- */
-// eslint-disable-next-line react-refresh/only-export-components -- parity batch follow-up; see #1573
-export function pickHouseworkHabit(
-  habits: Habit[],
-  pinnedId: string | null,
-): Habit | null {
-  if (pinnedId) {
-    const pinned = habits.find((h) => h.id === pinnedId);
-    if (pinned && pinned.is_active) return pinned;
-  }
-  const candidate = habits.find(
-    (h) =>
-      h.is_active &&
-      (h.name.toLowerCase().includes('house') ||
-        h.name.toLowerCase().includes('clean')),
-  );
-  return candidate ?? null;
 }
 
 function RoutineCardView({
@@ -447,45 +327,6 @@ function RoutineCardView({
   );
 }
 
-function HabitCardView({
-  habit,
-  completed,
-  onToggle,
-}: {
-  habit: Habit;
-  completed: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 text-left hover:bg-[var(--color-bg-card)]"
-      aria-pressed={completed}
-      aria-label={`Housework — ${habit.name}`}
-    >
-      <Home className="h-4 w-4 text-[var(--color-accent)]" aria-hidden="true" />
-      <div className="flex-1">
-        <p
-          className={
-            completed
-              ? 'text-sm font-medium text-[var(--color-text-secondary)] line-through'
-              : 'text-sm font-medium text-[var(--color-text-primary)]'
-          }
-        >
-          {habit.icon ? `${habit.icon} ` : ''}
-          {habit.name}
-        </p>
-      </div>
-      {completed ? (
-        <CheckCircle2 className="h-5 w-5 text-[var(--color-accent)]" />
-      ) : (
-        <Circle className="h-5 w-5 text-[var(--color-text-secondary)]" />
-      )}
-    </button>
-  );
-}
-
 function EmptyHint({
   onDismiss,
   onSetUp,
@@ -529,4 +370,3 @@ function EmptyHint({
     </div>
   );
 }
-
