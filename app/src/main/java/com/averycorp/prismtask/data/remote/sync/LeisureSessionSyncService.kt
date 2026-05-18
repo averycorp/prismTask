@@ -56,6 +56,7 @@ constructor(
 ) {
     companion object {
         const val ENTITY_TYPE = "leisure_session"
+
         // Backend caps `limit` at 1000; pull the largest window we can to
         // make orphan reconciliation reliable for typical users.
         private const val PULL_LIMIT = 1000
