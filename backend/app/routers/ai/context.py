@@ -576,3 +576,9 @@ async def load_medications(db, user_id: int, today: date) -> dict:
     """Public wrapper around ``_load_medications`` for the ``get_medications``
     tool handler. Same shape: today + last_7_days + active list."""
     return await _load_medications(db, user_id, today)
+
+
+async def load_leisure(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_leisure`` for the ``get_leisure_logs``
+    tool handler. Returns today + last_7_days aggregates by category."""
+    return await _load_leisure(db, user_id, today)
