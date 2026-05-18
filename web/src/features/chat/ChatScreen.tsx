@@ -209,7 +209,7 @@ export function ChatScreen() {
           <Sparkles className="h-5 w-5 text-[var(--color-accent)]" />
           <div>
             <h1 className="text-base font-semibold text-[var(--color-text-primary)]">
-              AI Coach
+              AI Executive Assistant
             </h1>
             <p className="text-xs text-[var(--color-text-secondary)]">
               {subtitle}
@@ -249,7 +249,7 @@ export function ChatScreen() {
         <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
           <AlertTriangle className="h-3.5 w-3.5" />
           <span>
-            AI Coach is a Pro feature.{' '}
+            AI Executive Assistant is a Pro feature.{' '}
             <button
               type="button"
               className="underline"
@@ -304,8 +304,8 @@ export function ChatScreen() {
       <ProUpgradeModal
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
-        featureName="AI Coach"
-        featureDescription="Chat with an AI coach about your tasks, plans, and what feels stuck."
+        featureName="AI Executive Assistant"
+        featureDescription="Chat with an AI assistant about your tasks, plans, and what feels stuck."
       />
 
       {showDisclosure && (
@@ -319,7 +319,7 @@ export function ChatScreen() {
           }
         >
           <p>
-            Your messages are processed by AI to provide coaching, along with
+            Your messages are processed by AI to provide assistance, along with
             the last few turns of conversation for context. When chat is opened
             from a task, the AI also sees that task's title, description, due
             date, priority, project name, and completion state. Conversations

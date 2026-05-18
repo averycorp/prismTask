@@ -54,7 +54,7 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       { to: '/calendar', icon: Calendar, label: 'Calendar' },
       { to: '/briefing', icon: Sparkles, label: 'Briefing' },
-      { to: '/chat', icon: MessageSquare, label: 'AI Coach' },
+      { to: '/chat', icon: MessageSquare, label: 'AI Executive Assistant' },
       { to: '/eisenhower', icon: LayoutGrid, label: 'Eisenhower' },
       { to: '/planner', icon: CalendarDays, label: 'Planner' },
       { to: '/timeblock', icon: CalendarClock, label: 'Time Block' },
