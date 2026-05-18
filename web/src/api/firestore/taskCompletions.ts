@@ -79,6 +79,19 @@ export interface TaskCompletion {
   was_overdue: boolean;
   days_to_complete: number | null;
   tags: string | null;
+  /**
+   * Firestore doc id of the next-occurrence task spawned when this
+   * completion was recorded for a recurring task. `null` for
+   * non-recurring tasks or when the spawn failed. Mirrors Android's
+   * `task_completions.spawned_recurrence_id` column but stores the
+   * Firestore cloud id (vs Android's local Room id) so web's
+   * uncomplete path can roll back the spawn cross-reload.
+   *
+   * Parity audit item 2: toggle-uncomplete rolls back spawned
+   * recurrence. Android ignores this field on read (`mapToTaskCompletion`
+   * ignores unknown keys), so it's additive.
+   */
+  spawned_task_id: string | null;
 }
 
 function docToTaskCompletion(
@@ -108,6 +121,10 @@ function docToTaskCompletion(
     days_to_complete:
       typeof data.daysToComplete === 'number' ? data.daysToComplete : null,
     tags: typeof data.tags === 'string' ? data.tags : null,
+    spawned_task_id:
+      typeof data.spawnedTaskId === 'string' && data.spawnedTaskId.length > 0
+        ? data.spawnedTaskId
+        : null,
   };
 }
 
@@ -142,6 +159,16 @@ export interface RecordTaskCompletionInput {
   daysToComplete?: number;
   /** Comma-separated tag names — Android stores them this way. */
   tags?: string;
+  /**
+   * Firestore doc id of the next-occurrence task spawned when this
+   * completion was recorded. Pass when the caller has just inserted a
+   * recurring next-instance task; the uncomplete path uses this to
+   * roll back the spawn. `undefined` / omitted for non-recurring tasks.
+   *
+   * Web-only addition (parity audit item 2). Android ignores unknown
+   * keys on its read path; this field is additive.
+   */
+  spawnedTaskId?: string;
 }
 
 export async function recordTaskCompletion(
@@ -171,12 +198,19 @@ export async function recordTaskCompletion(
     wasOverdue: input.wasOverdue ?? false,
     daysToComplete: input.daysToComplete ?? null,
     tags: input.tags ?? null,
-    // `projectId` and `spawnedRecurrenceId` are intentionally omitted
-    // on the web write path — projectId is denormalised on Android
-    // only for FK back-reference (Android's `task_completions` row
-    // has a `project_id` Room FK) and `spawnedRecurrenceId` is the
-    // local Android Room id of the next-instance row, which is
-    // meaningless from web's perspective.
+    // `projectId` is intentionally omitted on the web write path —
+    // it's denormalised on Android only for the FK back-reference
+    // (Android's `task_completions` row has a `project_id` Room FK).
+    //
+    // `spawnedTaskId` is the cloud doc id of the next-occurrence task
+    // spawned when this completion was recorded. Web-only field used
+    // by `uncompleteTask` to roll back the spawned task. Android's
+    // local-id `spawnedRecurrenceId` is a separate concept; Android
+    // ignores this key on its read path (additive only). Set only when
+    // the caller has a spawned-task id to record.
+    ...(input.spawnedTaskId !== undefined
+      ? { spawnedTaskId: input.spawnedTaskId }
+      : {}),
   };
 
   await setDoc(ref, payload, { merge: true });

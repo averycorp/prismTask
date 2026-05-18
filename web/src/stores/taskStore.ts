@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Task, TaskCreate, TaskUpdate, SubtaskCreate } from '@/types/task';
 import * as firestoreTasks from '@/api/firestore/tasks';
 import {
+  getAllTaskCompletions,
   recordTaskCompletion,
   removeTaskCompletion,
   subscribeToTaskCompletions,
@@ -61,6 +62,19 @@ interface TaskState {
   // Analytics history mirror (`task_completions`, parity audit B.6)
   taskCompletions: TaskCompletion[];
 
+  /**
+   * In-memory map from completed-task id → spawned next-occurrence
+   * task id. Populated by `completeTask` when a recurring task spawns
+   * its next instance; read by `uncompleteTask` to roll back the spawn
+   * (parity audit item 2 — toggle-uncomplete rolls back spawned
+   * recurrence).
+   *
+   * Persistence for cross-reload rollback lives on the
+   * `task_completions` Firestore row (`spawned_task_id`); this map is
+   * the fast same-session path that avoids a Firestore round-trip.
+   */
+  spawnedRecurrenceByTaskId: Map<string, string>;
+
   // Local
   setSelectedTask: (task: Task | null) => void;
   clearError: () => void;
@@ -99,10 +113,18 @@ function removeFromArray(arr: Task[], id: string): Task[] {
  * Failures are swallowed because the user-visible `tasks.status`
  * update already succeeded; an analytics-history miss must not flip
  * the toggle back. Parity audit B.6.
+ *
+ * `spawnedTaskId` (if provided) records the next-occurrence task
+ * spawned for a recurring task so `uncompleteTask` can roll back the
+ * spawn. Parity audit item 2.
  */
-async function writeTaskCompletionRow(uid: string, task: Task): Promise<void> {
+async function writeTaskCompletionRow(
+  uid: string,
+  task: Task,
+  completedAt: number,
+  spawnedTaskId?: string,
+): Promise<void> {
   try {
-    const completedAt = Date.now();
     const completedDateLocal = logicalToday(completedAt, 0);
     const wasOverdue = computeWasOverdue(task, completedDateLocal);
     const daysToComplete = computeDaysToComplete(task.created_at, completedAt);
@@ -117,10 +139,25 @@ async function writeTaskCompletionRow(uid: string, task: Task): Promise<void> {
       wasOverdue,
       daysToComplete: daysToComplete ?? undefined,
       tags: tagNames.length > 0 ? tagNames.join(',') : undefined,
+      spawnedTaskId,
     });
   } catch {
     // Silently fail — analytics-history row is best-effort.
   }
+}
+
+/**
+ * Format an epoch-ms instant as a local-calendar `YYYY-MM-DD` string.
+ * Used to anchor recurrence to the completion moment rather than the
+ * task's original due date — Android does the same via
+ * `RecurrenceEngine` passing `completedAt`. Parity audit item 1.
+ */
+function epochToLocalDateString(epochMs: number): string {
+  const d = new Date(epochMs);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** Mirror of Android's `TaskCompletionRepository.wasOverdue` check. */
@@ -138,6 +175,51 @@ function computeDaysToComplete(
   if (!Number.isFinite(createdMs)) return null;
   const dayMs = 24 * 60 * 60 * 1000;
   return Math.max(0, Math.floor((completedAtMs - createdMs) / dayMs));
+}
+
+/**
+ * Roll back the next-occurrence task spawned for a previously completed
+ * recurring task. Parity audit item 2.
+ *
+ * Strategy:
+ *   1. If the caller already knows the spawned task id (the in-memory
+ *      map populated by `completeTask`), use it directly — no read.
+ *   2. Otherwise scan the Firestore `task_completions` collection for a
+ *      row keyed to `taskId` and read its `spawned_task_id`. This
+ *      handles the cross-reload case where the in-memory map is empty.
+ *
+ * Failures are swallowed — uncomplete already succeeded on the task
+ * status row, and an orphaned spawned-task is a lesser evil than the
+ * uncomplete-toggle silently failing.
+ */
+async function rollbackSpawnedRecurrence(
+  uid: string,
+  taskId: string,
+  knownSpawnedTaskId: string | undefined,
+): Promise<void> {
+  try {
+    let spawnedId = knownSpawnedTaskId;
+    if (!spawnedId) {
+      // Look up the persisted row. Single round-trip; the natural-key
+      // shape (`taskId__completedDateLocal`) means we have to scan the
+      // collection by `taskId` to find the row without knowing the
+      // logical-day key. The collection size is bounded by per-user
+      // completions so this is acceptable for the uncomplete path.
+      const completions = await getAllTaskCompletions(uid);
+      const row = completions.find(
+        (c) => c.task_id === taskId && !!c.spawned_task_id,
+      );
+      spawnedId = row?.spawned_task_id ?? undefined;
+    }
+    if (!spawnedId) return;
+    await firestoreTasks.deleteTask(uid, spawnedId);
+    // Best-effort local cleanup — the realtime listener will also
+    // remove the row on next snapshot, but doing it here keeps the
+    // post-uncomplete UI consistent immediately.
+    useTaskStore.getState().removeTaskFromLists(spawnedId);
+  } catch {
+    // Silently fail — see contract above.
+  }
 }
 
 async function deleteTaskCompletionRow(
@@ -177,6 +259,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   error: null,
   selectedTaskIds: new Set(),
   taskCompletions: [],
+  spawnedRecurrenceByTaskId: new Map(),
 
   toggleTaskSelection: (id) =>
     set((state) => {
@@ -288,18 +371,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const updated = await firestoreTasks.updateTask(uid, taskId, { status: 'done' });
     get().updateTaskInLists(updated);
 
-    // Parity audit B.6: write a `task_completions` history row so the
-    // analytics chart (completion grid, day-of-week distribution,
-    // on-time rate) picks up web-completed tasks. Android writes this
-    // row in `TaskCompletionRepository.recordCompletion`; web was
-    // skipping it, leaving the analytics chart blank for web toggles.
-    void writeTaskCompletionRow(uid, updated);
+    // Capture the completion moment up front so the recurrence anchor,
+    // the `task_completions` row, and the spawned-task ID record agree
+    // on the same instant. Parity audit items 1 + 2.
+    const completedAt = Date.now();
 
     // Handle recurrence: create next occurrence if applicable
-    if (existingTask?.recurrence_json && existingTask.due_date) {
+    let spawnedTaskId: string | undefined;
+    if (existingTask?.recurrence_json) {
       const rule = parseRecurrenceRule(existingTask.recurrence_json);
       if (rule) {
-        const nextDate = calculateNextOccurrence(existingTask.due_date, rule);
+        // Parity audit item 1: anchor to completion time, not the
+        // original `due_date`. Android `RecurrenceEngine` uses
+        // `completedAt` so a task done late still spawns the next
+        // occurrence relative to *now*. Fall back to `due_date` only
+        // when completion time isn't available (it always is here),
+        // matching the Android fallback.
+        const anchor = epochToLocalDateString(completedAt);
+        const nextDate = calculateNextOccurrence(anchor, rule);
         if (nextDate) {
           try {
             const nextTask = await firestoreTasks.createTask(uid, {
@@ -311,8 +400,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
               recurrence_json: existingTask.recurrence_json ?? undefined,
               project_id: existingTask.project_id,
             } as Partial<Task> & { title: string });
+            spawnedTaskId = nextTask.id;
             set((state) => ({
               tasks: [...state.tasks, nextTask],
+              spawnedRecurrenceByTaskId: new Map(
+                state.spawnedRecurrenceByTaskId,
+              ).set(taskId, nextTask.id),
             }));
             (updated as Task & { _nextDate?: string })._nextDate = nextDate;
           } catch {
@@ -322,6 +415,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
     }
 
+    // Parity audit B.6: write a `task_completions` history row so the
+    // analytics chart (completion grid, day-of-week distribution,
+    // on-time rate) picks up web-completed tasks. Android writes this
+    // row in `TaskCompletionRepository.recordCompletion`; web was
+    // skipping it, leaving the analytics chart blank for web toggles.
+    //
+    // The row also records the spawned next-occurrence id so the
+    // uncomplete path can roll back the spawn across reloads. Parity
+    // audit item 2.
+    void writeTaskCompletionRow(uid, updated, completedAt, spawnedTaskId);
+
     return updated;
   },
 
@@ -329,6 +433,22 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const uid = getUid();
     const updated = await firestoreTasks.updateTask(uid, taskId, { status: 'todo' });
     get().updateTaskInLists(updated);
+
+    // Parity audit item 2: roll back the spawned next-occurrence task
+    // when the user uncompletes a recurring task. Check the in-memory
+    // map first (covers the same-session flow without a Firestore read)
+    // and fall back to the persisted `task_completions` row so the
+    // rollback survives reloads.
+    const inMemorySpawned = get().spawnedRecurrenceByTaskId.get(taskId);
+    void rollbackSpawnedRecurrence(uid, taskId, inMemorySpawned);
+    if (inMemorySpawned) {
+      set((state) => {
+        const next = new Map(state.spawnedRecurrenceByTaskId);
+        next.delete(taskId);
+        return { spawnedRecurrenceByTaskId: next };
+      });
+    }
+
     // Parity audit B.6: roll back the `task_completions` history row
     // so the analytics surface stays in sync with the toggle.
     void deleteTaskCompletionRow(uid, taskId);
@@ -353,8 +473,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       ids.map((id) => firestoreTasks.updateTask(uid, id, { status: 'done' })),
     );
     // Parity audit B.6: write history rows for each completed task.
+    // Bulk path does not spawn next-occurrence recurrences (matches
+    // pre-fix behaviour); pass undefined for spawnedTaskId.
+    const completedAt = Date.now();
     for (const t of completedTasks) {
-      void writeTaskCompletionRow(uid, t);
+      void writeTaskCompletionRow(uid, t, completedAt);
     }
     set((state) => ({
       tasks: state.tasks.map((t) =>
