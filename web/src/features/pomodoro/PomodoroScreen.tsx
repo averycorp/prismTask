@@ -17,6 +17,7 @@ import { format, subDays } from 'date-fns';
 
 import { useProFeature } from '@/hooks/useProFeature';
 import { useTaskStore } from '@/stores/taskStore';
+import { useTaskTimingsStore } from '@/stores/taskTimingsStore';
 import { goalsApi } from '@/api/goals';
 import { projectsApi } from '@/api/projects';
 import { tasksApi } from '@/api/tasks';
@@ -82,6 +83,7 @@ function formatTimer(seconds: number): string {
 export function PomodoroScreen() {
   const { isPro } = useProFeature();
   const { completeTask } = useTaskStore();
+  const logTiming = useTaskTimingsStore((s) => s.logTiming);
 
   // Planning state
   const [allTasks, setAllTasks] = useState<Task[]>([]);
@@ -182,6 +184,46 @@ export function PomodoroScreen() {
     loadTasks();
   }, [loadTasks]);
 
+  /**
+   * Mirror of Android `SmartPomodoroViewModel.autoLogPomodoroSessionTime`.
+   * When a work block completes naturally, write one `task_timing` row
+   * per session task crediting its planned `allocated_minutes`. The
+   * `started_at` / `ended_at` window covers the full session — per-task
+   * splits inside a session aren't tracked client-side (Android matches
+   * this allocation strategy verbatim).
+   *
+   * Logging failures are swallowed — the session UX should never
+   * surface a "couldn't log time" error after a successful focus block.
+   * Skipped silently when the user is signed-out.
+   */
+  const autoLogPomodoroSessionTime = useCallback(
+    (sessionIdx: number, startedAt: number | null) => {
+      const session = sessions[sessionIdx];
+      if (!session || session.tasks.length === 0) return;
+      const endedAt = Date.now();
+      let uid: string;
+      try {
+        uid = getFirebaseUid();
+      } catch {
+        // Local-only / signed-out — no Firestore write possible.
+        return;
+      }
+      for (const task of session.tasks) {
+        if (task.allocated_minutes <= 0) continue;
+        void logTiming(uid, {
+          taskCloudId: task.task_id,
+          durationMinutes: task.allocated_minutes,
+          source: 'pomodoro',
+          startedAt: startedAt ?? null,
+          endedAt,
+        }).catch(() => {
+          // Swallow — best-effort, matches Android's try/catch.
+        });
+      }
+    },
+    [sessions, logTiming],
+  );
+
   // Timer logic
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
@@ -196,6 +238,16 @@ export function PomodoroScreen() {
             // Auto-transition
             if (phase === 'work') {
               toast('Work session complete! Take a break.', { duration: 3000 });
+              // Auto-log task timings before clearing the work-start
+              // anchor so the row carries the real wall-clock window.
+              // Matches Android `SmartPomodoroViewModel` behavior of
+              // logging on natural session completion only (early
+              // "Good Enough" ship intentionally does not log a
+              // timing — that case logs a focus_release_logs entry).
+              autoLogPomodoroSessionTime(
+                currentSessionIdx,
+                workStartedAtRef.current,
+              );
               setPhase('break');
               // Work block done — clear the work-start anchor so the next
               // ND ship handler doesn't carry the previous block's start.
@@ -224,7 +276,16 @@ export function PomodoroScreen() {
       }, 1000);
     }
     return () => clearInterval(timerRef.current);
-  }, [isRunning, timeLeft, phase, currentSessionIdx, sessions.length, breakLength, sessionLength]);
+  }, [
+    isRunning,
+    timeLeft,
+    phase,
+    currentSessionIdx,
+    sessions.length,
+    breakLength,
+    sessionLength,
+    autoLogPomodoroSessionTime,
+  ]);
 
   const toggleTaskSelection = (taskId: string) => {
     setSelectedTaskIds((prev) => {
