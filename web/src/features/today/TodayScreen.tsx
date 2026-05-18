@@ -25,7 +25,6 @@ import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
 import { SelfCareNudgeCard } from '@/features/today/SelfCareNudgeCard';
 import { TodayLeisureMinimumRow } from '@/features/today/TodayLeisureMinimumRow';
-import { SchoolworkSection } from '@/features/today/SchoolworkSection';
 import { HabitsSection } from '@/features/today/HabitsSection';
 import { BurnoutBadgeSection } from '@/features/today/BurnoutBadgeSection';
 import { SelfCareRoutineSection } from '@/features/today/SelfCareRoutineSection';
@@ -437,8 +436,6 @@ export function TodayScreen() {
             // retained for callers that haven't migrated yet — currently
             // unused but kept compile-safe.
             return <HabitsSection key={sectionKey} />;
-          case 'schoolwork':
-            return <SchoolworkSection key={sectionKey} />;
           case 'overdue':
             return activeOverdue.length > 0 ? (
               <TaskSection

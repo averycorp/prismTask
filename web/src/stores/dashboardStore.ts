@@ -78,14 +78,27 @@ function currentUid(): string | null {
 }
 
 /**
+ * Section keys that used to live in DEFAULT_SECTION_ORDER but have
+ * since been folded into another section. Stripped from stored user
+ * preferences so legacy entries don't surface as labelless rows in
+ * the Settings reorder UI or render as no-op slots on Today.
+ *
+ * - `schoolwork`: collapsed into the Daily Essentials card list to
+ *   match Android's `DailyEssentialsSection` order.
+ */
+const REMOVED_SECTIONS = new Set<string>(['schoolwork']);
+
+/**
  * If the user customized their order before a new section key was
  * introduced, append the missing keys so the Settings UI surface
  * still shows them. Mirrors Android's `DashboardPreferences.getSectionOrder`
- * append-missing-defaults behavior.
+ * append-missing-defaults behavior. Also strips any keys that have
+ * been retired since the user last saved.
  */
 function reconcileOrder(stored: string[]): string[] {
-  const missing = DEFAULT_SECTION_ORDER.filter((k) => !stored.includes(k));
-  return missing.length === 0 ? stored : [...stored, ...missing];
+  const filtered = stored.filter((k) => !REMOVED_SECTIONS.has(k));
+  const missing = DEFAULT_SECTION_ORDER.filter((k) => !filtered.includes(k));
+  return missing.length === 0 ? filtered : [...filtered, ...missing];
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({

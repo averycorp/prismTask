@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import { useSelfCareStore } from '@/stores/selfCareStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useCourseStore } from '@/stores/courseStore';
+import { useAssignmentStore } from '@/stores/assignmentStore';
+import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
 import { logicalToday, startOfLogicalDayMs } from '@/utils/dayBoundary';
 import { parseCompletedStepsForDisplay } from '@/api/firestore/selfCare';
@@ -44,17 +47,12 @@ import type { Habit } from '@/types/habit';
  *   1. Morning routine (self-care steps)
  *   2. Housework habit (user-pinned habit)
  *   3. Housework routine (self-care steps)
- *   4. Bedtime routine (self-care steps)
+ *   4. Schoolwork (courses + assignments due today)
+ *   5. Bedtime routine (self-care steps)
  *
  * Cards hide individually when empty. The whole section collapses to a
  * single "Set Up Your Daily Essentials" hint when nothing is configured
  * AND the user has not dismissed the hint via `has_seen_hint`.
- *
- * Schoolwork is intentionally NOT included here — it already renders
- * inline above the dashboard sections via the standalone
- * `SchoolworkTodayCard`, which mirrors Android's `SchoolworkTodayCard`
- * shape with assignments-due grouping. Duplicating it would split the
- * source of truth.
  *
  * Title Capitalization per CLAUDE.md user-facing strings convention.
  */
@@ -68,6 +66,27 @@ export function DailyEssentialsCards() {
   const habits = useHabitStore((s) => s.habits);
   const toggleHabitCompletion = useHabitStore((s) => s.toggleCompletion);
   const isHabitDoneToday = useHabitStore((s) => s.isTodayCompleted);
+
+  // Mirror SchoolworkTodayCard's gating so the slot only appears when
+  // there's actual content. Cheap reads — both stores are already
+  // populated for the standalone path on the same screen.
+  const courses = useCourseStore((s) => s.courses);
+  const assignments = useAssignmentStore((s) => s.assignments);
+  const hasSchoolworkContent = useMemo(() => {
+    const activeCount = courses.reduce((n, c) => (c.active ? n + 1 : n), 0);
+    if (activeCount > 0) return true;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const todayMidnight = now.getTime();
+    const tomorrowMidnight = todayMidnight + 24 * 60 * 60 * 1000;
+    return assignments.some(
+      (a) =>
+        !a.completed &&
+        a.dueDate != null &&
+        a.dueDate >= todayMidnight &&
+        a.dueDate < tomorrowMidnight,
+    );
+  }, [courses, assignments]);
 
   const tierDefaults = useAdvancedTuningStore((s) => s.prefs.selfCareTierDefaults);
 
@@ -149,6 +168,12 @@ export function DailyEssentialsCards() {
     if (prefs.showHouseworkRoutine && houseworkRoutineCard) {
       cards.push({ kind: 'housework_routine', card: houseworkRoutineCard });
     }
+    if (hasSchoolworkContent) {
+      // Schoolwork sits between housework_routine and bedtime to match
+      // Android's DailyEssentialsSection order. Gated on actual content
+      // so empty Daily Essentials still collapses to the hint card.
+      cards.push({ kind: 'schoolwork' });
+    }
     if (prefs.showBedtimeRoutine && bedtimeCard) {
       cards.push({ kind: 'bedtime', card: bedtimeCard });
     }
@@ -162,6 +187,7 @@ export function DailyEssentialsCards() {
     houseworkHabit,
     houseworkRoutineCard,
     bedtimeCard,
+    hasSchoolworkContent,
   ]);
 
   const isEmpty = visibleCards.length === 0;
@@ -238,6 +264,9 @@ export function DailyEssentialsCards() {
                   />
                 );
               }
+              if (entry.kind === 'schoolwork') {
+                return <SchoolworkTodayCard key="schoolwork" />;
+              }
               return null;
             })
           )}
@@ -267,7 +296,8 @@ type VisibleCard =
   | { kind: 'morning'; card: RoutineCardState }
   | { kind: 'bedtime'; card: RoutineCardState }
   | { kind: 'housework_routine'; card: RoutineCardState }
-  | { kind: 'housework_habit'; habit: Habit };
+  | { kind: 'housework_habit'; habit: Habit }
+  | { kind: 'schoolwork' };
 
 interface StepState {
   stepId: string;
@@ -436,14 +466,11 @@ function HabitCardView({
     >
       <Home className="h-4 w-4 text-[var(--color-accent)]" aria-hidden="true" />
       <div className="flex-1">
-        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-          Housework
-        </p>
         <p
           className={
             completed
-              ? 'text-xs text-[var(--color-text-secondary)] line-through'
-              : 'text-xs text-[var(--color-text-secondary)]'
+              ? 'text-sm font-medium text-[var(--color-text-secondary)] line-through'
+              : 'text-sm font-medium text-[var(--color-text-primary)]'
           }
         >
           {habit.icon ? `${habit.icon} ` : ''}
