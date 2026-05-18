@@ -53,7 +53,6 @@ export const DEFAULT_SECTION_ORDER: ReadonlyArray<string> = [
   'burnout_badge',
   'self_care_nudge',
   'habits',
-  'schoolwork',
   'overdue',
   'today_tasks',
   'plan_more',
