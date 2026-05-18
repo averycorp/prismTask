@@ -552,3 +552,15 @@ async def load_user_context_bundle(
         "leisure_today": leisure["today"],
         "medications_today": medications["today"],
     }
+
+
+# --- Phase 1 (AI Assistant tool-use loop) public re-exports ---
+# Tool handlers in ``app/routers/ai/tools/`` import these public names so
+# their unit tests can patch a single symbol per loader instead of the
+# private builder. Logic lives in the private implementations above; the
+# public surface is intentionally thin.
+
+async def load_habits_today(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_habits_with_history`` for the
+    ``get_habits`` tool handler. Same shape, same data."""
+    return await _load_habits_with_history(db, user_id, today)
