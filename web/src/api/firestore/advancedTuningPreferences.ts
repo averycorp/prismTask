@@ -85,6 +85,15 @@ const FIELD_LOAD_CK_EASY = 'load_custom_keywords_easy';
 const FIELD_LOAD_CK_MEDIUM = 'load_custom_keywords_medium';
 const FIELD_LOAD_CK_HARD = 'load_custom_keywords_hard';
 
+// Self-care first-display tier per routine. Mirrors
+// `AdvancedTuningPreferences.kt:407-410`. Android owns the writes; web
+// only reads so the user's "Minimum / Regular / Deluxe"-style choice is
+// honoured on the Today screen's Daily Essentials routine cards.
+const FIELD_SC_TIER_MORNING = 'selfcare_default_tier_morning';
+const FIELD_SC_TIER_BEDTIME = 'selfcare_default_tier_bedtime';
+const FIELD_SC_TIER_MEDICATION = 'selfcare_default_tier_medication';
+const FIELD_SC_TIER_HOUSEWORK = 'selfcare_default_tier_housework';
+
 const META_TYPES = '__pref_types';
 const META_UPDATED_AT = '__pref_updated_at';
 
@@ -98,6 +107,18 @@ export interface CognitiveLoadCustomKeywords {
   easy: string;
   medium: string;
   hard: string;
+}
+
+/**
+ * First-display tier per self-care routine. Defaults match Android's
+ * `SelfCareTierDefaults` in `AdvancedTuningPreferences.kt` so a brand-new
+ * account renders identical step counts cross-device.
+ */
+export interface SelfCareTierDefaults {
+  morning: string;
+  bedtime: string;
+  medication: string;
+  housework: string;
 }
 
 /**
@@ -141,6 +162,13 @@ export interface AdvancedTuningPreferences {
   taskModeKeywords: TaskModeCustomKeywords;
   /** Custom keyword CSVs per Cognitive Load tier. Default empty strings. */
   cognitiveLoadKeywords: CognitiveLoadCustomKeywords;
+  /**
+   * Per-routine default tier applied when today's `SelfCareLog` has no
+   * `selectedTier` set. Read-only on web; the Settings UI lives on Android
+   * (`AdvancedTuningSection`). Mirrors `AdvancedTuningPreferences.kt`
+   * `SelfCareTierDefaults` defaults.
+   */
+  selfCareTierDefaults: SelfCareTierDefaults;
 }
 
 /**
@@ -183,6 +211,12 @@ export const DEFAULT_ADVANCED_TUNING_PREFERENCES: AdvancedTuningPreferences = {
   },
   taskModeKeywords: { work: '', play: '', relax: '' },
   cognitiveLoadKeywords: { easy: '', medium: '', hard: '' },
+  selfCareTierDefaults: {
+    morning: 'solid',
+    bedtime: 'solid',
+    medication: 'prescription',
+    housework: 'regular',
+  },
 };
 
 function prefsDoc(uid: string) {
@@ -276,6 +310,24 @@ function read(data: DocumentData | undefined): AdvancedTuningPreferences {
       easy: readString(data[FIELD_LOAD_CK_EASY], ''),
       medium: readString(data[FIELD_LOAD_CK_MEDIUM], ''),
       hard: readString(data[FIELD_LOAD_CK_HARD], ''),
+    },
+    selfCareTierDefaults: {
+      morning: readString(
+        data[FIELD_SC_TIER_MORNING],
+        defaults.selfCareTierDefaults.morning,
+      ),
+      bedtime: readString(
+        data[FIELD_SC_TIER_BEDTIME],
+        defaults.selfCareTierDefaults.bedtime,
+      ),
+      medication: readString(
+        data[FIELD_SC_TIER_MEDICATION],
+        defaults.selfCareTierDefaults.medication,
+      ),
+      housework: readString(
+        data[FIELD_SC_TIER_HOUSEWORK],
+        defaults.selfCareTierDefaults.housework,
+      ),
     },
   };
 }
