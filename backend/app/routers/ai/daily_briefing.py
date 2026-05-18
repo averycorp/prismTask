@@ -1,8 +1,10 @@
 """Daily briefing endpoint."""
 
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from google.api_core.exceptions import FailedPrecondition
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,8 @@ from app.services.firestore_tasks import (
 )
 
 from ._common import _log_empty_short_circuit, _require_firebase_uid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,9 +61,20 @@ async def daily_briefing(
     habits_result = await db.execute(habits_query)
     habits = [{"name": h.name, "frequency": h.frequency.value} for h in habits_result.scalars().all()]
 
-    # Recently completed (last 24h) comes from Firestore too now.
+    # Recently completed (last 24h) comes from Firestore too now. The query
+    # is equality + range across two fields, which requires the composite
+    # index defined in firestore.indexes.json. Surface a missing index as
+    # 503 (with a loud log line) instead of an opaque 500 so an unprovisioned
+    # environment is diagnosable from the response alone.
     yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
-    completed_dtos = await _ai_pkg.fetch_recently_completed_tasks(uid, yesterday)
+    try:
+        completed_dtos = await _ai_pkg.fetch_recently_completed_tasks(uid, yesterday)
+    except FailedPrecondition as exc:
+        logger.error("daily-briefing Firestore index missing: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="Daily briefing temporarily unavailable — backend index is rebuilding",
+        ) from exc
     completed_tasks = [{"task_id": t.task_id, "title": t.title} for t in completed_dtos]
 
     all_tasks = overdue_tasks + today_tasks + planned_tasks
