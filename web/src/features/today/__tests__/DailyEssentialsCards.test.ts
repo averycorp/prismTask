@@ -5,6 +5,14 @@ import {
 } from '@/features/today/DailyEssentialsCards';
 import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
 import type { Habit } from '@/types/habit';
+import type { SelfCareTierDefaults } from '@/api/firestore/advancedTuningPreferences';
+
+const TIER_DEFAULTS: SelfCareTierDefaults = {
+  morning: 'solid',
+  bedtime: 'solid',
+  medication: 'prescription',
+  housework: 'regular',
+};
 
 /**
  * Pure-function tests for the Daily Essentials section card builders.
@@ -68,7 +76,7 @@ const TODAY_MS = 1_700_000_000_000;
 
 describe('buildRoutineCard (parity unit 6)', () => {
   it('returns null when no steps exist for the routine', () => {
-    const card = buildRoutineCard('morning', [], [], TODAY_MS);
+    const card = buildRoutineCard('morning', [], [], TODAY_MS, TIER_DEFAULTS);
     expect(card).toBeNull();
   });
 
@@ -83,7 +91,7 @@ describe('buildRoutineCard (parity unit 6)', () => {
       date: TODAY_MS,
       completed_steps: '["s1"]',
     });
-    const card = buildRoutineCard('morning', steps, [todayLog], TODAY_MS);
+    const card = buildRoutineCard('morning', steps, [todayLog], TODAY_MS, TIER_DEFAULTS);
     expect(card).not.toBeNull();
     expect(card!.routineType).toBe('morning');
     expect(card!.displayName).toBe('Morning Routine');
@@ -99,23 +107,90 @@ describe('buildRoutineCard (parity unit 6)', () => {
       date: TODAY_MS - 24 * 60 * 60 * 1000,
       completed_steps: '["s1"]',
     });
-    const card = buildRoutineCard('morning', steps, [yesterdayLog], TODAY_MS);
+    const card = buildRoutineCard(
+      'morning',
+      steps,
+      [yesterdayLog],
+      TODAY_MS,
+      TIER_DEFAULTS,
+    );
     expect(card!.steps[0].completed).toBe(false);
   });
 
   it('maps the bedtime + housework display names', () => {
     const morningSteps = [step({ step_id: 's1', routine_type: 'morning' })];
     const bedtimeSteps = [step({ step_id: 's1', routine_type: 'bedtime' })];
-    const houseworkSteps = [step({ step_id: 's1', routine_type: 'housework' })];
-    expect(buildRoutineCard('bedtime', bedtimeSteps, [], TODAY_MS)!.displayName).toBe(
-      'Bedtime Routine',
-    );
+    const houseworkSteps = [
+      step({ step_id: 's1', routine_type: 'housework', tier: 'quick' }),
+    ];
     expect(
-      buildRoutineCard('housework', houseworkSteps, [], TODAY_MS)!.displayName,
+      buildRoutineCard('bedtime', bedtimeSteps, [], TODAY_MS, TIER_DEFAULTS)!
+        .displayName,
+    ).toBe('Bedtime Routine');
+    expect(
+      buildRoutineCard('housework', houseworkSteps, [], TODAY_MS, TIER_DEFAULTS)!
+        .displayName,
     ).toBe('Housework');
-    expect(buildRoutineCard('morning', morningSteps, [], TODAY_MS)!.displayName).toBe(
-      'Morning Routine',
-    );
+    expect(
+      buildRoutineCard('morning', morningSteps, [], TODAY_MS, TIER_DEFAULTS)!
+        .displayName,
+    ).toBe('Morning Routine');
+  });
+});
+
+describe('buildRoutineCard tier filtering (Android parity)', () => {
+  /**
+   * Mirrors Android `DailyEssentialsUseCase.observeRoutineCard` filtering:
+   * each step is only visible when its `tier` is at or below the active
+   * tier in the routine's tier order. The active tier comes from today's
+   * `SelfCareLog.selected_tier` if set, else the user's
+   * `selfcare_default_tier_<routine>` preference, else the routine's
+   * penultimate tier.
+   */
+  const morningSteps = [
+    step({ step_id: 'low', routine_type: 'morning', tier: 'survival', sort_order: 1 }),
+    step({ step_id: 'mid', routine_type: 'morning', tier: 'solid', sort_order: 2 }),
+    step({ step_id: 'top', routine_type: 'morning', tier: 'full', sort_order: 3 }),
+  ];
+
+  it('hides higher-tier steps when the active tier sits below them', () => {
+    const card = buildRoutineCard('morning', morningSteps, [], TODAY_MS, {
+      ...TIER_DEFAULTS,
+      morning: 'survival',
+    });
+    expect(card!.steps.map((s) => s.stepId)).toEqual(['low']);
+  });
+
+  it("respects today's log tier over the user default", () => {
+    const todayLog = log({
+      routine_type: 'morning',
+      date: TODAY_MS,
+      selected_tier: 'full',
+    });
+    const card = buildRoutineCard('morning', morningSteps, [todayLog], TODAY_MS, {
+      ...TIER_DEFAULTS,
+      morning: 'survival',
+    });
+    expect(card!.steps.map((s) => s.stepId)).toEqual(['low', 'mid', 'top']);
+  });
+
+  it('falls back to the user default when no log exists', () => {
+    const card = buildRoutineCard('morning', morningSteps, [], TODAY_MS, {
+      ...TIER_DEFAULTS,
+      morning: 'solid',
+    });
+    expect(card!.steps.map((s) => s.stepId)).toEqual(['low', 'mid']);
+  });
+
+  it('returns null when the active tier filters every step out', () => {
+    const onlyTopSteps = [
+      step({ step_id: 'top', routine_type: 'morning', tier: 'full' }),
+    ];
+    const card = buildRoutineCard('morning', onlyTopSteps, [], TODAY_MS, {
+      ...TIER_DEFAULTS,
+      morning: 'survival',
+    });
+    expect(card).toBeNull();
   });
 });
 
