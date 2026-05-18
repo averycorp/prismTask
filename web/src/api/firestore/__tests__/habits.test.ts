@@ -303,6 +303,67 @@ describe('updateHabit (web → Firestore merge-on-write parity)', () => {
       Object.prototype.hasOwnProperty.call(patch, 'todaySkipBeforeScheduleDays'),
     ).toBe(false);
   });
+
+  // Per-habit streak-forgiveness overrides (spec
+  // `docs/superpowers/specs/2026-05-18-per-habit-forgiveness-design.md`).
+  // Same conditional-include / no-clobber contract as the Today-skip
+  // overrides above.
+  it('writes streak-forgiveness overrides when the caller supplies them', async () => {
+    updateDocMock.mockResolvedValueOnce(undefined);
+
+    await updateHabit('uid-1', 'habit-1', {
+      streak_max_missed_days: 3,
+      forgiveness_enabled: 1,
+      forgiveness_allowed_misses: 2,
+      forgiveness_grace_period_days: 14,
+    });
+
+    expect(updateDocMock).toHaveBeenCalledTimes(1);
+    const patch = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(patch.streakMaxMissedDays).toBe(3);
+    expect(patch.forgivenessEnabled).toBe(1);
+    expect(patch.forgivenessAllowedMisses).toBe(2);
+    expect(patch.forgivenessGracePeriodDays).toBe(14);
+  });
+
+  it('writes null streak-forgiveness fields as the explicit clear signal', async () => {
+    updateDocMock.mockResolvedValueOnce(undefined);
+
+    await updateHabit('uid-1', 'habit-1', {
+      streak_max_missed_days: null,
+      forgiveness_enabled: null,
+      forgiveness_allowed_misses: null,
+      forgiveness_grace_period_days: null,
+    });
+
+    const patch = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    // `null` is the explicit "inherit global" signal — it must reach
+    // Firestore so older non-null values get cleared.
+    expect(patch.streakMaxMissedDays).toBeNull();
+    expect(patch.forgivenessEnabled).toBeNull();
+    expect(patch.forgivenessAllowedMisses).toBeNull();
+    expect(patch.forgivenessGracePeriodDays).toBeNull();
+  });
+
+  it('omits streak-forgiveness overrides when the caller does not touch them', async () => {
+    updateDocMock.mockResolvedValueOnce(undefined);
+
+    await updateHabit('uid-1', 'habit-1', { name: 'Just rename' });
+
+    const patch = updateDocMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(
+      Object.prototype.hasOwnProperty.call(patch, 'streakMaxMissedDays'),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(patch, 'forgivenessEnabled'),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(patch, 'forgivenessAllowedMisses'),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(patch, 'forgivenessGracePeriodDays'),
+    ).toBe(false);
+  });
 });
 
 describe('toggleCompletion (writes completedDateLocal for cross-device DST parity)', () => {

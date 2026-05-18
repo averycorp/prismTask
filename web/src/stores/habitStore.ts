@@ -300,6 +300,18 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     // in `useFirestoreSync` keeps the underlying set in sync.
     const restDays = useRestDayStore.getState().restDates;
 
+    // Per-habit streak-forgiveness overrides (parity audit § B.6).
+    // Mirrors Android's `HabitForgivenessResolver`: any of the four
+    // fields set on the habit takes precedence over the global config
+    // for this habit only. `undefined` fields inherit. The resolver
+    // inside `calculateStreaks` does the field-by-field substitution.
+    const habitOverrides = {
+      streakMaxMissedDays: habit.streak_max_missed_days,
+      forgivenessEnabled: habit.forgiveness_enabled,
+      forgivenessAllowedMisses: habit.forgiveness_allowed_misses,
+      forgivenessGracePeriodDays: habit.forgiveness_grace_period_days,
+    };
+
     return calculateStreaks(
       completions.map((c) => ({ date: c.date, count: c.count })),
       habit.frequency,
@@ -307,6 +319,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       habit.target_count,
       forgiveness,
       restDays,
+      undefined, // taskMode — habits don't carry one
+      habitOverrides,
     );
   },
 

@@ -163,3 +163,89 @@ async def test_habit_stats(client: AsyncClient, auth_headers: dict):
 async def test_get_nonexistent_habit(client: AsyncClient, auth_headers: dict):
     resp = await client.get("/api/v1/habits/9999", headers=auth_headers)
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_habit_forgiveness_fields_roundtrip(
+    client: AsyncClient, auth_headers: dict
+):
+    """POST with all four per-habit forgiveness overrides set, then GET
+    and PATCH — values must round-trip unchanged. Server is pure
+    pass-through; the Android resolver interprets them."""
+
+    create_resp = await client.post(
+        "/api/v1/habits",
+        json={
+            "name": "Strict Daily Med",
+            "streak_max_missed_days": 1,
+            "forgiveness_enabled": 0,
+            "forgiveness_allowed_misses": 0,
+            "forgiveness_grace_period_days": 1,
+        },
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    created = create_resp.json()
+    assert created["streak_max_missed_days"] == 1
+    assert created["forgiveness_enabled"] == 0
+    assert created["forgiveness_allowed_misses"] == 0
+    assert created["forgiveness_grace_period_days"] == 1
+
+    habit_id = created["id"]
+    get_resp = await client.get(
+        f"/api/v1/habits/{habit_id}", headers=auth_headers
+    )
+    assert get_resp.status_code == 200
+    fetched = get_resp.json()
+    assert fetched["streak_max_missed_days"] == 1
+    assert fetched["forgiveness_enabled"] == 0
+    assert fetched["forgiveness_allowed_misses"] == 0
+    assert fetched["forgiveness_grace_period_days"] == 1
+
+    patch_resp = await client.patch(
+        f"/api/v1/habits/{habit_id}",
+        json={
+            "streak_max_missed_days": 5,
+            "forgiveness_enabled": 1,
+            "forgiveness_allowed_misses": 3,
+            "forgiveness_grace_period_days": 14,
+        },
+        headers=auth_headers,
+    )
+    assert patch_resp.status_code == 200
+    patched = patch_resp.json()
+    assert patched["streak_max_missed_days"] == 5
+    assert patched["forgiveness_enabled"] == 1
+    assert patched["forgiveness_allowed_misses"] == 3
+    assert patched["forgiveness_grace_period_days"] == 14
+
+
+@pytest.mark.asyncio
+async def test_habit_forgiveness_fields_default_null(
+    client: AsyncClient, auth_headers: dict
+):
+    """A habit created without any forgiveness overrides comes back with
+    all four fields null (= inherit global)."""
+
+    create_resp = await client.post(
+        "/api/v1/habits",
+        json={"name": "Inheriting Habit"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    created = create_resp.json()
+    assert created["streak_max_missed_days"] is None
+    assert created["forgiveness_enabled"] is None
+    assert created["forgiveness_allowed_misses"] is None
+    assert created["forgiveness_grace_period_days"] is None
+
+    habit_id = created["id"]
+    get_resp = await client.get(
+        f"/api/v1/habits/{habit_id}", headers=auth_headers
+    )
+    assert get_resp.status_code == 200
+    fetched = get_resp.json()
+    assert fetched["streak_max_missed_days"] is None
+    assert fetched["forgiveness_enabled"] is None
+    assert fetched["forgiveness_allowed_misses"] is None
+    assert fetched["forgiveness_grace_period_days"] is None

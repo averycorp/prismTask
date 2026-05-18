@@ -106,6 +106,27 @@ function docToHabit(docId: string, data: DocumentData, uid: string): Habit {
       typeof data.todaySkipBeforeScheduleDays === 'number'
         ? data.todaySkipBeforeScheduleDays
         : null,
+    // Per-habit streak-forgiveness overrides. Missing/null on the
+    // Firestore doc parses as `undefined` — the TS type contract for
+    // "inherit global". Android writes `-1` for inherit too, so legacy
+    // Android-authored docs round-trip as `-1` here (still > undefined,
+    // but resolved to "inherit" by the streaks util's per-field check).
+    streak_max_missed_days:
+      typeof data.streakMaxMissedDays === 'number'
+        ? data.streakMaxMissedDays
+        : undefined,
+    forgiveness_enabled:
+      typeof data.forgivenessEnabled === 'number'
+        ? data.forgivenessEnabled
+        : undefined,
+    forgiveness_allowed_misses:
+      typeof data.forgivenessAllowedMisses === 'number'
+        ? data.forgivenessAllowedMisses
+        : undefined,
+    forgiveness_grace_period_days:
+      typeof data.forgivenessGracePeriodDays === 'number'
+        ? data.forgivenessGracePeriodDays
+        : undefined,
   };
 }
 
@@ -182,6 +203,10 @@ function habitCreateToDoc(data: {
   active_days_json?: string;
   today_skip_after_complete_days?: number;
   today_skip_before_schedule_days?: number;
+  streak_max_missed_days?: number | null;
+  forgiveness_enabled?: number | null;
+  forgiveness_allowed_misses?: number | null;
+  forgiveness_grace_period_days?: number | null;
 }): Record<string, unknown> {
   const now = Date.now();
   const doc: Record<string, unknown> = {
@@ -216,6 +241,22 @@ function habitCreateToDoc(data: {
   }
   if (data.today_skip_before_schedule_days !== undefined) {
     doc.todaySkipBeforeScheduleDays = data.today_skip_before_schedule_days;
+  }
+  // Per-habit streak-forgiveness overrides. Same conditional-include
+  // pattern as the Today-skip overrides above so we never clobber
+  // Android-side state on creates that don't touch the override
+  // switches.
+  if (data.streak_max_missed_days !== undefined) {
+    doc.streakMaxMissedDays = data.streak_max_missed_days;
+  }
+  if (data.forgiveness_enabled !== undefined) {
+    doc.forgivenessEnabled = data.forgiveness_enabled;
+  }
+  if (data.forgiveness_allowed_misses !== undefined) {
+    doc.forgivenessAllowedMisses = data.forgiveness_allowed_misses;
+  }
+  if (data.forgiveness_grace_period_days !== undefined) {
+    doc.forgivenessGracePeriodDays = data.forgiveness_grace_period_days;
   }
   return doc;
 }
@@ -253,6 +294,23 @@ function habitUpdateToDoc(
   if (data.today_skip_before_schedule_days !== undefined) {
     result.todaySkipBeforeScheduleDays = data.today_skip_before_schedule_days;
   }
+  // Per-habit streak-forgiveness overrides. Same conditional-include
+  // pattern: only write when the caller actually supplied a value so the
+  // Android-side values stay untouched on patches that don't touch the
+  // override switches. `null` is the explicit "clear" signal — write it
+  // through so Firestore stores NULL and Android resolves to inherit.
+  if (data.streak_max_missed_days !== undefined) {
+    result.streakMaxMissedDays = data.streak_max_missed_days;
+  }
+  if (data.forgiveness_enabled !== undefined) {
+    result.forgivenessEnabled = data.forgiveness_enabled;
+  }
+  if (data.forgiveness_allowed_misses !== undefined) {
+    result.forgivenessAllowedMisses = data.forgiveness_allowed_misses;
+  }
+  if (data.forgiveness_grace_period_days !== undefined) {
+    result.forgivenessGracePeriodDays = data.forgiveness_grace_period_days;
+  }
   return result;
 }
 
@@ -281,6 +339,12 @@ export async function createHabit(
     frequency?: string;
     target_count?: number;
     active_days_json?: string;
+    today_skip_after_complete_days?: number;
+    today_skip_before_schedule_days?: number;
+    streak_max_missed_days?: number | null;
+    forgiveness_enabled?: number | null;
+    forgiveness_allowed_misses?: number | null;
+    forgiveness_grace_period_days?: number | null;
   },
 ): Promise<Habit> {
   const firestoreData = habitCreateToDoc(data);

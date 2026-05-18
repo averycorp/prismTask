@@ -280,6 +280,13 @@ class Habit(Base):
     nag_suppression_days_override = Column(Integer, default=-1)
     today_skip_after_complete_days = Column(Integer, default=-1)
     today_skip_before_schedule_days = Column(Integer, default=-1)
+    # Per-habit streak forgiveness overrides. NULL means "inherit global";
+    # Android client converts the on-device ``-1`` sentinel to/from NULL on
+    # the wire. Server treats these as opaque pass-through Optional[int].
+    streak_max_missed_days = Column(Integer, nullable=True)
+    forgiveness_enabled = Column(Integer, nullable=True)
+    forgiveness_allowed_misses = Column(Integer, nullable=True)
+    forgiveness_grace_period_days = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc))
 

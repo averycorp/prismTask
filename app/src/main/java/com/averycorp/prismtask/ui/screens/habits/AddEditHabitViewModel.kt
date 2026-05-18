@@ -9,8 +9,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.local.entity.HabitEntity
+import com.averycorp.prismtask.data.preferences.ForgivenessPrefs
 import com.averycorp.prismtask.data.preferences.HabitListPreferences
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.repository.HabitRepository
 import com.averycorp.prismtask.notifications.HabitReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +31,7 @@ constructor(
     private val medicationReminderScheduler: HabitReminderScheduler,
     private val notificationPreferences: NotificationPreferences,
     private val habitListPreferences: HabitListPreferences,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val _errorMessages = MutableSharedFlow<String>()
@@ -99,6 +102,22 @@ constructor(
         private set
     var globalSkipBeforeScheduleDays by mutableIntStateOf(HabitListPreferences.DEFAULT_TODAY_SKIP_BEFORE_SCHEDULE_DAYS)
         private set
+    var streakMaxMissedDaysOverrideEnabled by mutableStateOf(false)
+        private set
+    var streakMaxMissedDays by mutableIntStateOf(HabitListPreferences.DEFAULT_STREAK_MAX_MISSED_DAYS)
+        private set
+    var globalStreakMaxMissedDays by mutableIntStateOf(HabitListPreferences.DEFAULT_STREAK_MAX_MISSED_DAYS)
+        private set
+    var forgivenessOverrideEnabled by mutableStateOf(false)
+        private set
+    var forgivenessEnabledLocal by mutableStateOf(true)
+        private set
+    var forgivenessAllowedMisses by mutableIntStateOf(1)
+        private set
+    var forgivenessGracePeriodDays by mutableIntStateOf(7)
+        private set
+    var globalForgivenessPrefs by mutableStateOf(ForgivenessPrefs())
+        private set
     var nameError by mutableStateOf(false)
         private set
     var customCategories by mutableStateOf<List<String>>(emptyList())
@@ -110,6 +129,19 @@ constructor(
             globalSuppressionDays = notificationPreferences.getHabitNagSuppressionDaysOnce()
             globalSkipAfterCompleteDays = habitListPreferences.getTodaySkipAfterCompleteDays().first()
             globalSkipBeforeScheduleDays = habitListPreferences.getTodaySkipBeforeScheduleDays().first()
+            globalStreakMaxMissedDays = habitListPreferences.getStreakMaxMissedDays().first()
+            globalForgivenessPrefs = userPreferencesDataStore.forgivenessFlow.first()
+            // Seed the slider defaults from the freshly-loaded globals so a
+            // user flipping the override on for a new habit starts from the
+            // global value, not the hardcoded constructor defaults.
+            if (!streakMaxMissedDaysOverrideEnabled) {
+                streakMaxMissedDays = globalStreakMaxMissedDays
+            }
+            if (!forgivenessOverrideEnabled) {
+                forgivenessEnabledLocal = globalForgivenessPrefs.enabled
+                forgivenessAllowedMisses = globalForgivenessPrefs.allowedMisses
+                forgivenessGracePeriodDays = globalForgivenessPrefs.gracePeriodDays
+            }
         }
         if (habitId != null) {
             viewModelScope.launch {
@@ -136,6 +168,32 @@ constructor(
                     todaySkipAfterCompleteDays = habit.todaySkipAfterCompleteDays.coerceAtLeast(0)
                     todaySkipBeforeScheduleOverrideEnabled = habit.todaySkipBeforeScheduleDays >= 0
                     todaySkipBeforeScheduleDays = habit.todaySkipBeforeScheduleDays.coerceAtLeast(0)
+                    streakMaxMissedDaysOverrideEnabled = habit.streakMaxMissedDays >= 1
+                    streakMaxMissedDays = if (habit.streakMaxMissedDays >= 1) {
+                        habit.streakMaxMissedDays
+                    } else {
+                        globalStreakMaxMissedDays
+                    }
+                    // Forgiveness override is "on" if any of the three axes
+                    // is non-sentinel. The three move together in the UI.
+                    forgivenessOverrideEnabled = habit.forgivenessEnabled != -1 ||
+                        habit.forgivenessAllowedMisses >= 0 ||
+                        habit.forgivenessGracePeriodDays >= 1
+                    forgivenessEnabledLocal = when (habit.forgivenessEnabled) {
+                        0 -> false
+                        1 -> true
+                        else -> globalForgivenessPrefs.enabled
+                    }
+                    forgivenessAllowedMisses = if (habit.forgivenessAllowedMisses >= 0) {
+                        habit.forgivenessAllowedMisses
+                    } else {
+                        globalForgivenessPrefs.allowedMisses
+                    }
+                    forgivenessGracePeriodDays = if (habit.forgivenessGracePeriodDays >= 1) {
+                        habit.forgivenessGracePeriodDays
+                    } else {
+                        globalForgivenessPrefs.gracePeriodDays
+                    }
                     if (habit.reminderTime != null) {
                         reminderEnabled = true
                         reminderHour = (habit.reminderTime / (60 * 60 * 1000)).toInt()
@@ -298,6 +356,43 @@ constructor(
         todaySkipBeforeScheduleDays = value.coerceIn(0, HabitListPreferences.MAX_TODAY_SKIP_DAYS)
     }
 
+    fun onStreakMaxMissedDaysOverrideEnabledChange(value: Boolean) {
+        streakMaxMissedDaysOverrideEnabled = value
+        if (value) {
+            streakMaxMissedDays = streakMaxMissedDays.coerceIn(
+                HabitListPreferences.MIN_STREAK_MAX_MISSED_DAYS,
+                HabitListPreferences.MAX_STREAK_MAX_MISSED_DAYS
+            )
+        }
+    }
+
+    fun onStreakMaxMissedDaysChange(value: Int) {
+        streakMaxMissedDays = value.coerceIn(
+            HabitListPreferences.MIN_STREAK_MAX_MISSED_DAYS,
+            HabitListPreferences.MAX_STREAK_MAX_MISSED_DAYS
+        )
+    }
+
+    fun onForgivenessOverrideEnabledChange(value: Boolean) {
+        forgivenessOverrideEnabled = value
+        if (value) {
+            forgivenessAllowedMisses = forgivenessAllowedMisses.coerceIn(0, 5)
+            forgivenessGracePeriodDays = forgivenessGracePeriodDays.coerceIn(1, 30)
+        }
+    }
+
+    fun onForgivenessEnabledLocalChange(value: Boolean) {
+        forgivenessEnabledLocal = value
+    }
+
+    fun onForgivenessAllowedMissesChange(value: Int) {
+        forgivenessAllowedMisses = value.coerceIn(0, 5)
+    }
+
+    fun onForgivenessGracePeriodDaysChange(value: Int) {
+        forgivenessGracePeriodDays = value.coerceIn(1, 30)
+    }
+
     suspend fun saveHabit(): Boolean {
         if (name.isBlank()) {
             nameError = true
@@ -349,6 +444,31 @@ constructor(
                 -1
             }
 
+            val effectiveStreakMaxMissedDays = if (streakMaxMissedDaysOverrideEnabled) {
+                streakMaxMissedDays.coerceIn(
+                    HabitListPreferences.MIN_STREAK_MAX_MISSED_DAYS,
+                    HabitListPreferences.MAX_STREAK_MAX_MISSED_DAYS
+                )
+            } else {
+                -1
+            }
+
+            val effectiveForgivenessEnabled = if (forgivenessOverrideEnabled) {
+                if (forgivenessEnabledLocal) 1 else 0
+            } else {
+                -1
+            }
+            val effectiveForgivenessAllowedMisses = if (forgivenessOverrideEnabled) {
+                forgivenessAllowedMisses.coerceIn(0, 5)
+            } else {
+                -1
+            }
+            val effectiveForgivenessGracePeriodDays = if (forgivenessOverrideEnabled) {
+                forgivenessGracePeriodDays.coerceIn(1, 30)
+            } else {
+                -1
+            }
+
             val existing = existingHabit
             if (existing != null) {
                 habitRepository.updateHabit(
@@ -373,7 +493,11 @@ constructor(
                         nagSuppressionOverrideEnabled = nagSuppressionOverrideEnabled,
                         nagSuppressionDaysOverride = effectiveNagOverride,
                         todaySkipAfterCompleteDays = effectiveSkipAfterComplete,
-                        todaySkipBeforeScheduleDays = effectiveSkipBeforeSchedule
+                        todaySkipBeforeScheduleDays = effectiveSkipBeforeSchedule,
+                        streakMaxMissedDays = effectiveStreakMaxMissedDays,
+                        forgivenessEnabled = effectiveForgivenessEnabled,
+                        forgivenessAllowedMisses = effectiveForgivenessAllowedMisses,
+                        forgivenessGracePeriodDays = effectiveForgivenessGracePeriodDays
                     )
                 )
                 // Cancel every alarm previously registered for this habit
@@ -407,7 +531,11 @@ constructor(
                         nagSuppressionOverrideEnabled = nagSuppressionOverrideEnabled,
                         nagSuppressionDaysOverride = effectiveNagOverride,
                         todaySkipAfterCompleteDays = effectiveSkipAfterComplete,
-                        todaySkipBeforeScheduleDays = effectiveSkipBeforeSchedule
+                        todaySkipBeforeScheduleDays = effectiveSkipBeforeSchedule,
+                        streakMaxMissedDays = effectiveStreakMaxMissedDays,
+                        forgivenessEnabled = effectiveForgivenessEnabled,
+                        forgivenessAllowedMisses = effectiveForgivenessAllowedMisses,
+                        forgivenessGracePeriodDays = effectiveForgivenessGracePeriodDays
                     )
                 )
                 // New habit may have a daily-time reminder that needs an

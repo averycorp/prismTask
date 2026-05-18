@@ -17,6 +17,12 @@ class HabitCreate(BaseModel):
     nag_suppression_days_override: int = -1
     today_skip_after_complete_days: int = -1
     today_skip_before_schedule_days: int = -1
+    # Per-habit streak-forgiveness overrides; ``None`` ↔ inherit global
+    # (Android maps these to/from its ``-1`` sentinel on the wire).
+    streak_max_missed_days: Optional[int] = None
+    forgiveness_enabled: Optional[int] = None
+    forgiveness_allowed_misses: Optional[int] = None
+    forgiveness_grace_period_days: Optional[int] = None
 
 
 class HabitUpdate(BaseModel):
@@ -33,6 +39,10 @@ class HabitUpdate(BaseModel):
     nag_suppression_days_override: Optional[int] = None
     today_skip_after_complete_days: Optional[int] = None
     today_skip_before_schedule_days: Optional[int] = None
+    streak_max_missed_days: Optional[int] = None
+    forgiveness_enabled: Optional[int] = None
+    forgiveness_allowed_misses: Optional[int] = None
+    forgiveness_grace_period_days: Optional[int] = None
 
 
 class HabitResponse(BaseModel):
@@ -51,6 +61,10 @@ class HabitResponse(BaseModel):
     nag_suppression_days_override: int = -1
     today_skip_after_complete_days: int = -1
     today_skip_before_schedule_days: int = -1
+    streak_max_missed_days: Optional[int] = None
+    forgiveness_enabled: Optional[int] = None
+    forgiveness_allowed_misses: Optional[int] = None
+    forgiveness_grace_period_days: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

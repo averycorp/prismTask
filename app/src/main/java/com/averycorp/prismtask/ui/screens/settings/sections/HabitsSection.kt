@@ -130,9 +130,12 @@ private fun subtitleForSkipCap(cap: Int): String = when (cap) {
     else -> "$cap long-press skips per habit per 7 days"
 }
 
-private fun subtitleForMissedDays(days: Int): String = when (days) {
-    1 -> "1 missed day ends a streak"
-    else -> "$days missed days end a streak"
+private fun subtitleForMissedDays(days: Int): String {
+    val base = when (days) {
+        1 -> "1 missed day ends a streak"
+        else -> "$days missed days end a streak"
+    }
+    return "$base; habits can override this default"
 }
 
 private fun subtitleForSkipDays(days: Int, scopeText: String): String = when {

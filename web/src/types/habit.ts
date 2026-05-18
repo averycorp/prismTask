@@ -84,6 +84,36 @@ export interface Habit {
    * `>=1` semantics as `today_skip_after_complete_days`.
    */
   today_skip_before_schedule_days?: number | null;
+  /**
+   * Per-habit override for the strict streak-grace window (1..7 days).
+   * Mirrors Android `HabitEntity.streak_max_missed_days`. Sentinel-aligned
+   * with Android: `undefined` ⇔ NULL on server ⇔ Android `-1` ⇔ "inherit
+   * the global `streakMaxMissedDays` from `HabitListPreferences`". A value
+   * `>= 1` means "use this many missed days as this habit's tolerance".
+   */
+  streak_max_missed_days?: number;
+  /**
+   * Per-habit override for the forgiveness-on/off master switch. Three
+   * states (matches Android `HabitEntity.forgiveness_enabled`):
+   *   `undefined` / NULL ⇔ inherit global `ForgivenessConfig.enabled`,
+   *   `0` ⇔ force forgiveness OFF for this habit,
+   *   `1` ⇔ force forgiveness ON for this habit.
+   * The three-state shape is required because the global toggle is
+   * independent of the slider — Android stores `-1` for inherit.
+   */
+  forgiveness_enabled?: number;
+  /**
+   * Per-habit override for `ForgivenessConfig.allowedMisses` (0..5).
+   * Mirrors Android `HabitEntity.forgiveness_allowed_misses`. `undefined`
+   * ⇔ inherit the global; `>= 0` means "use this many allowed misses".
+   */
+  forgiveness_allowed_misses?: number;
+  /**
+   * Per-habit override for `ForgivenessConfig.gracePeriodDays` (1..30).
+   * Mirrors Android `HabitEntity.forgiveness_grace_period_days`.
+   * `undefined` ⇔ inherit the global; `>= 1` means "use this many days".
+   */
+  forgiveness_grace_period_days?: number;
 }
 
 export interface HabitCreate {
@@ -97,6 +127,14 @@ export interface HabitCreate {
   active_days_json?: string;
   today_skip_after_complete_days?: number;
   today_skip_before_schedule_days?: number;
+  // Per-habit streak-forgiveness overrides. See the corresponding fields
+  // on `Habit` for sentinel semantics. `undefined` / `null` ⇔ inherit
+  // global; `null` is the explicit "clear" signal on cross-platform
+  // writes (Firestore stores NULL, Android resolves to inherit).
+  streak_max_missed_days?: number | null;
+  forgiveness_enabled?: number | null;
+  forgiveness_allowed_misses?: number | null;
+  forgiveness_grace_period_days?: number | null;
 }
 
 export interface HabitUpdate {
@@ -118,6 +156,14 @@ export interface HabitUpdate {
   today_skip_after_complete_days?: number;
   /** -1 / 0 / >=1 — see `Habit.today_skip_before_schedule_days`. */
   today_skip_before_schedule_days?: number;
+  // Per-habit streak-forgiveness overrides. `undefined` ⇔ "don't touch
+  // the field" on update; `null` is the explicit "clear" signal — both
+  // resolve to "inherit global" downstream. See the corresponding fields
+  // on `Habit` for full sentinel semantics.
+  streak_max_missed_days?: number | null;
+  forgiveness_enabled?: number | null;
+  forgiveness_allowed_misses?: number | null;
+  forgiveness_grace_period_days?: number | null;
 }
 
 export interface HabitCompletion {
