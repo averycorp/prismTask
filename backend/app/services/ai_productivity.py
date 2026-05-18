@@ -2141,7 +2141,7 @@ def _extract_chat_payload_from_blocks(ai_message: Any) -> dict:
     }
 
 
-def generate_chat_response(
+async def generate_chat_response(
     message: str,
     conversation_id: str,
     task_context_id: int | None = None,
@@ -2150,18 +2150,17 @@ def generate_chat_response(
     user_preferences: list[dict] | None = None,
     current_state: dict | None = None,
     user_context: dict | None = None,
+    db=None,  # Optional[AsyncSession]; required for Postgres-backed tools
 ) -> dict:
-    """Call Claude Haiku to produce a conversational chat reply + optional actions.
+    """Call Claude with an agentic read-tool loop.
 
-    The backend is stateless from the conversation's POV: the client owns
-    the rolling history and forwards it on every turn via ``history``. The
-    list arrives as ``[{"role": "user"|"assistant", "content": "..."}]``
-    in chronological order, capped to 12 entries (last 6 user/assistant
-    pairs) by ``ChatRequest`` validation.
-
-    ``task_context`` is the snapshot of the task the user is talking about,
-    forwarded by the client when chat is opened from a task. Without it the
-    AI has only the opaque ``task_context_id`` integer to echo into actions.
+    Phase 1: when ``AI_ASSISTANT_TOOL_USE_ENABLED`` is True, Claude may
+    invoke up to 10 read tools (see ``READ_TOOL_NAMES``); each is
+    executed server-side and its result fed back as a ``tool_result``
+    block on the next loop iteration. Write tool_uses (the existing
+    chip catalog) and memory tool_uses pass straight through as final
+    actions, matching today's behavior. When the flag is off the path
+    collapses to the original single-shot call — no behavior change.
 
     Returns a dict with shape::
 
@@ -2169,57 +2168,172 @@ def generate_chat_response(
           "message": "<assistant reply text>",
           "actions": [<0..N action dicts>],
           "tokens_used": {"input": int, "output": int},
+          "tool_calls": [{"name": str, "input": dict, "result_summary": str},
+                         ...]  # empty list when loop didn't run
         }
-
-    D12 Item A (B.1): uses native Anthropic ``tool_use`` blocks instead of
-    the legacy JSON-in-text protocol. The wire contract on the response
-    side (``ChatResponse.actions[]``) is unchanged — only the
-    backend-internal extraction is migrated.
 
     Raises:
         RuntimeError: Anthropic client unavailable / API key missing.
         ValueError:   AI returned a malformed (non-content-blocks) response after retry.
     """
+    import json as _json
+    from datetime import date as _date
+
+    from app.config import settings
+    from app.routers.ai.tool_registry import (
+        READ_TOOL_NAMES,
+        build_tool_error_result,
+        default_registry,
+    )
+    from app.routers.ai.tools._base import ToolError
+
     client = _get_client()
     model = get_model("chat")
     anthropic_messages = _build_chat_messages_array(
-        message,
-        conversation_id,
-        task_context_id,
-        task_context,
-        history,
-        user_preferences,
-        user_context,
+        message, conversation_id, task_context_id, task_context,
+        history, user_preferences, user_context,
     )
     system_prompt = _format_chat_system_prompt(
-        user_preferences, current_state, user_context
+        user_preferences, current_state, user_context,
     )
+
+    use_loop = bool(getattr(settings, "AI_ASSISTANT_TOOL_USE_ENABLED", False))
+    registry = default_registry() if use_loop else None
+    tools = list(_CHAT_TOOL_DEFINITIONS)
+    if use_loop:
+        tools.extend(registry.claude_schemas())
+
+    # Logical today comes from the user_context payload the Android client
+    # forwards; falls back to UTC date if missing/malformed.
+    today = _date.today()
+    if isinstance(user_context, dict) and isinstance(user_context.get("today"), str):
+        try:
+            today = _date.fromisoformat(user_context["today"])
+        except ValueError:
+            pass
+
+    # User shim — handlers read .id (int, for Postgres-backed tools) and
+    # .firebase_uid (str, for Firestore-backed tools) off this object.
+    class _UserShim:
+        def __init__(self, ctx: dict | None):
+            self.id = (ctx or {}).get("user_id")
+            self.firebase_uid = (ctx or {}).get("firebase_uid")
+    user_shim = _UserShim(user_context)
+
+    tool_calls: list[dict] = []
+    tool_calls_made = 0
+    TOOL_CALL_BUDGET = 10
 
     last_error: Exception | None = None
     for attempt in range(2):
         try:
-            ai_message = client.messages.create(
-                model=model,
-                max_tokens=1024,
-                system=system_prompt,
-                tools=_CHAT_TOOL_DEFINITIONS,
-                messages=anthropic_messages,
-            )
-            return _extract_chat_payload_from_blocks(ai_message)
+            while True:
+                ai_message = client.messages.create(
+                    model=model,
+                    max_tokens=1024,
+                    system=system_prompt,
+                    tools=tools,
+                    messages=anthropic_messages,
+                )
+                content_blocks = list(getattr(ai_message, "content", []) or [])
+
+                if not use_loop:
+                    return {**_extract_chat_payload_from_blocks(ai_message), "tool_calls": []}
+
+                read_blocks = [
+                    b for b in content_blocks
+                    if getattr(b, "type", None) == "tool_use"
+                    and getattr(b, "name", None) in READ_TOOL_NAMES
+                ]
+                if not read_blocks:
+                    payload = _extract_chat_payload_from_blocks(ai_message)
+                    return {**payload, "tool_calls": tool_calls}
+
+                # Append the assistant's tool-using turn so the next loop
+                # iteration carries it as the prior message.
+                anthropic_messages.append({
+                    "role": "assistant",
+                    "content": [_block_to_dict(b) for b in content_blocks],
+                })
+
+                tool_calls_made += len(read_blocks)
+                if tool_calls_made > TOOL_CALL_BUDGET:
+                    anthropic_messages.append({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": read_blocks[0].id,
+                            "content": _json.dumps({
+                                "error": "tool-call budget exceeded; "
+                                         "stop calling tools and reply with what you have",
+                            }),
+                            "is_error": True,
+                        }],
+                    })
+                    continue
+
+                tool_result_blocks: list[dict] = []
+                for block in read_blocks:
+                    try:
+                        result = await registry.dispatch(
+                            user=user_shim, db=db,
+                            name=block.name, args=block.input or {},
+                            logical_today=today,
+                        )
+                        tool_calls.append({
+                            "name": block.name,
+                            "input": dict(block.input or {}),
+                            "result_summary": result.summary,
+                        })
+                        tool_result_blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": _json.dumps(result.data, default=str),
+                        })
+                    except ToolError as e:
+                        tool_calls.append({
+                            "name": block.name,
+                            "input": dict(block.input or {}),
+                            "result_summary": f"error: {e.message}",
+                        })
+                        tool_result_blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": _json.dumps(build_tool_error_result(e)),
+                            "is_error": True,
+                        })
+
+                anthropic_messages.append({
+                    "role": "user",
+                    "content": tool_result_blocks,
+                })
         except (KeyError, TypeError, IndexError, ValueError) as e:
             last_error = e
-            logger.error(
-                f"Failed to extract chat response (attempt {attempt + 1}): {e}"
-            )
+            logger.error(f"Failed to extract chat response (attempt {attempt + 1}): {e}")
             if attempt == 0:
                 continue
-            raise ValueError(
-                f"Failed to extract chat response after retry: {e}"
-            ) from e
+            raise ValueError(f"Failed to extract chat response after retry: {e}") from e
         except Exception as e:
             logger.error(f"Chat AI error: {type(e).__name__}: {e}")
             raise
     raise ValueError(f"Failed to extract chat response: {last_error}")
+
+
+def _block_to_dict(block) -> dict:
+    """Serialize an Anthropic content block back to the dict shape
+    ``messages.create`` accepts on the input side. Required to round-trip
+    the assistant's tool_use turn into the next request."""
+    btype = getattr(block, "type", None)
+    if btype == "text":
+        return {"type": "text", "text": getattr(block, "text", "")}
+    if btype == "tool_use":
+        return {
+            "type": "tool_use",
+            "id": getattr(block, "id", ""),
+            "name": getattr(block, "name", ""),
+            "input": getattr(block, "input", None) or {},
+        }
+    return {"type": btype}
 
 
 def generate_chat_response_stream(

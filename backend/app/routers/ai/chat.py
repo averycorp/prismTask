@@ -137,7 +137,7 @@ async def chat(
         try:
             from app.services.ai_productivity import generate_chat_response
 
-            result = generate_chat_response(
+            result = await generate_chat_response(
                 message=data.message,
                 conversation_id=data.conversation_id,
                 task_context_id=data.task_context_id,
@@ -154,6 +154,7 @@ async def chat(
                     if data.user_context is not None
                     else None
                 ),
+                db=db,
             )
         except RuntimeError:
             raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
