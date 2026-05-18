@@ -142,6 +142,15 @@ export function TaskListScreen() {
     [projects],
   );
 
+  // Hide archived projects from the filter chip row + bulk-move dropdown
+  // (mirrors Android `pickerProjects`). The project-name lookup `projectMap`
+  // above still covers archived rows so an already-assigned task still
+  // resolves its project label correctly.
+  const visibleProjects = useMemo(
+    () => projects.filter((p) => p.status !== 'archived'),
+    [projects],
+  );
+
   // Fetch all data
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -706,7 +715,7 @@ export function TaskListScreen() {
                 Project
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {projects.map((p) => (
+                {visibleProjects.map((p) => (
                   <button
                     key={p.id}
                     onClick={() =>
@@ -871,7 +880,7 @@ export function TaskListScreen() {
               </Button>
               {bulkMoveOpen && (
                 <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] p-1 shadow-lg max-h-48 overflow-y-auto">
-                  {projects.map((p) => (
+                  {visibleProjects.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => handleBulkMove(p.id)}

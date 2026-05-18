@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
-import type { Project, ProjectDetail } from '@/types/project';
+import type { Project, ProjectDetail, ProjectStatus } from '@/types/project';
 import { timestampToIso } from './converters';
 
 // ── Collection reference ──────────────────────────────────────
@@ -26,6 +26,23 @@ function projectDoc(uid: string, projectId: string) {
   return doc(firestore, 'users', uid, 'projects', projectId);
 }
 
+// Android writes `status` using the Kotlin enum name (`ACTIVE`, `ARCHIVED`,
+// `COMPLETED`, `ON_HOLD`). The web type is lowercased, so normalize at the
+// read boundary so every web filter / picker can compare against the web
+// `ProjectStatus` union without re-checking casing.
+const WEB_STATUSES: ReadonlySet<ProjectStatus> = new Set([
+  'active',
+  'completed',
+  'on_hold',
+  'archived',
+]);
+
+function normalizeStatus(raw: unknown): ProjectStatus {
+  if (typeof raw !== 'string') return 'active';
+  const lower = raw.toLowerCase();
+  return (WEB_STATUSES.has(lower as ProjectStatus) ? lower : 'active') as ProjectStatus;
+}
+
 // ── Firestore doc → Web Project ──────────────────────────────
 
 function docToProject(docId: string, data: DocumentData, uid: string): Project {
@@ -35,7 +52,7 @@ function docToProject(docId: string, data: DocumentData, uid: string): Project {
     user_id: uid,
     title: data.name ?? '',
     description: data.description ?? null,
-    status: data.status ?? 'active',
+    status: normalizeStatus(data.status),
     due_date: null,
     color: data.color ?? '#4A90D9',
     icon: data.icon ?? '📁',

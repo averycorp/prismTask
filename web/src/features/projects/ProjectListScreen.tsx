@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderKanban, Plus, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, FolderKanban, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProjectStore } from '@/stores/projectStore';
 import { Button } from '@/components/ui/Button';
@@ -17,6 +17,8 @@ export function ProjectListScreen() {
     fetchAllProjects,
     createProject,
     deleteProject,
+    archiveProject,
+    reopenProject,
   } = useProjectStore();
 
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,24 @@ export function ProjectListScreen() {
     }
   };
 
+  const handleArchive = async (project: Project) => {
+    try {
+      await archiveProject(project.id);
+      toast.success('Project Archived');
+    } catch {
+      toast.error('Failed to archive project');
+    }
+  };
+
+  const handleReopen = async (project: Project) => {
+    try {
+      await reopenProject(project.id);
+      toast.success('Project Reopened');
+    } catch {
+      toast.error('Failed to reopen project');
+    }
+  };
+
   const activeProjects = projects.filter((p) => p.status !== 'archived');
   const archivedProjects = projects.filter((p) => p.status === 'archived');
 
@@ -115,6 +135,8 @@ export function ProjectListScreen() {
                 project={project}
                 onClick={() => navigate(`/projects/${project.id}`)}
                 onDelete={() => setDeleteTarget(project)}
+                onArchive={() => handleArchive(project)}
+                onReopen={() => handleReopen(project)}
               />
             ))}
             <button
@@ -140,6 +162,8 @@ export function ProjectListScreen() {
                     project={project}
                     onClick={() => navigate(`/projects/${project.id}`)}
                     onDelete={() => setDeleteTarget(project)}
+                    onArchive={() => handleArchive(project)}
+                    onReopen={() => handleReopen(project)}
                   />
                 ))}
               </div>
@@ -213,10 +237,14 @@ function ProjectCard({
   project,
   onClick,
   onDelete,
+  onArchive,
+  onReopen,
 }: {
   project: Project;
   onClick: () => void;
   onDelete: () => void;
+  onArchive: () => void;
+  onReopen: () => void;
 }) {
   const statusColors: Record<string, string> = {
     active: '#22c55e',
@@ -227,6 +255,7 @@ function ProjectCard({
   const statusLabel =
     project.status.charAt(0).toUpperCase() +
     project.status.slice(1).replace('_', ' ');
+  const isArchived = project.status === 'archived';
 
   return (
     <div
@@ -259,12 +288,38 @@ function ProjectCard({
         </p>
       )}
 
-      <div className="mt-auto pt-3">
+      <div className="mt-auto flex items-center gap-3 pt-3">
+        {isArchived ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onReopen();
+            }}
+            aria-label="Reopen project"
+            className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] opacity-0 transition-all hover:text-[var(--color-accent)] group-hover:opacity-100"
+          >
+            <ArchiveRestore className="h-3 w-3" />
+            Reopen
+          </button>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive();
+            }}
+            aria-label="Archive project"
+            className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] opacity-0 transition-all hover:text-[var(--color-accent)] group-hover:opacity-100"
+          >
+            <Archive className="h-3 w-3" />
+            Archive
+          </button>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
+          aria-label="Delete project"
           className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
         >
           <Trash2 className="h-3 w-3" />

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
+import { nonArchivedProjects } from '@/utils/projectFilters';
 import { NLPInput } from '@/components/shared/NLPInput';
 import { SearchModal } from '@/components/shared/SearchModal';
 import { Avatar } from '@/components/ui/Avatar';
@@ -42,10 +43,14 @@ export function Header() {
       priority?: number;
       project_suggestion?: string;
     }) => {
-      // Find a matching project or use the first one
-      let targetProjectId = projects[0]?.id;
+      // Find a matching project or use the first one. Skip archived
+      // projects when picking a default landing spot so quick-add via the
+      // header never silently routes a new task into an archived bucket
+      // (Android parity).
+      const candidates = nonArchivedProjects(projects);
+      let targetProjectId = candidates[0]?.id;
       if (data.project_suggestion) {
-        const match = projects.find((p) =>
+        const match = candidates.find((p) =>
           p.title.toLowerCase().includes(data.project_suggestion!.toLowerCase()),
         );
         if (match) targetProjectId = match.id;

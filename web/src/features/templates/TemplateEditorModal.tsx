@@ -7,6 +7,7 @@ import { useTemplateStore } from '@/stores/templateStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
 import { PRIORITY_CONFIG } from '@/utils/priority';
+import { pickerProjects as filterPickerProjects } from '@/utils/projectFilters';
 import type { TaskTemplate, TemplateCreate, TemplateUpdate } from '@/types/template';
 import type { TaskPriority } from '@/types/task';
 
@@ -344,7 +345,7 @@ export function TemplateEditorModal({
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
               >
                 <option value="">No Project</option>
-                {projects.map((p) => (
+                {filterPickerProjects(projects, templateProjectId).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.title}
                   </option>

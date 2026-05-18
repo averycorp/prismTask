@@ -37,6 +37,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('@/lib/firebase', () => ({ firestore: {} }));
 
 import { updateProject } from '@/api/firestore/projects';
+import type { Project } from '@/types/project';
 
 beforeEach(() => {
   addDocMock.mockReset();
@@ -123,5 +124,48 @@ describe('updateProject LWW timestamp guard (parity A.2)', () => {
     expect('themeColorKey' in payload).toBe(false);
     expect('archivedAt' in payload).toBe(false);
     expect('completedAt' in payload).toBe(false);
+  });
+});
+
+describe('docToProject status normalization (Android-uppercase → web-lowercase)', () => {
+  it('lowercases status so web filters can compare against the union type', async () => {
+    // Android writes the Kotlin enum name (e.g. `ARCHIVED`). Without
+    // normalization at the read boundary, web filters like
+    // `project.status === 'archived'` would silently miss those rows.
+    getDocMock.mockResolvedValue({
+      id: 'proj-archived',
+      exists: () => true,
+      data: () => ({
+        name: 'Old project',
+        status: 'ARCHIVED',
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      }),
+    });
+
+    const result: Project = await updateProject('uid-1', 'proj-archived', {
+      title: 'rename',
+    });
+
+    expect(result.status).toBe('archived');
+  });
+
+  it('falls back to `active` for unknown / missing status values', async () => {
+    getDocMock.mockResolvedValue({
+      id: 'proj-unknown',
+      exists: () => true,
+      data: () => ({
+        name: 'Old project',
+        status: 'SOMETHING_NEW',
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      }),
+    });
+
+    const result: Project = await updateProject('uid-1', 'proj-unknown', {
+      title: 'rename',
+    });
+
+    expect(result.status).toBe('active');
   });
 });

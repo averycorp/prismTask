@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Plus, Trash2, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ClassificationChipRow } from '@/features/tasks/ClassificationChipRow';
 import { DependencyEditor } from '@/features/tasks/DependencyEditor';
+import { pickerProjects as filterPickerProjects } from '@/utils/projectFilters';
 import type {
   CognitiveLoad,
   LifeCategory,
@@ -217,6 +219,14 @@ export function OrganizeTab(props: OrganizeTabProps) {
     onRequestDelete,
   } = props;
 
+  // Hide archived projects from the picker, but keep the currently-assigned
+  // one visible so the row keeps rendering its current value after a project
+  // got archived (mirrors `OrganizeTab.kt :: pickerProjects`).
+  const visibleProjects = useMemo(
+    () => filterPickerProjects(projects, projectId),
+    [projects, projectId],
+  );
+
   return (
     <div className="flex flex-col gap-4" data-testid="task-editor-organize-tab">
       {/* Project */}
@@ -234,7 +244,7 @@ export function OrganizeTab(props: OrganizeTabProps) {
           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
         >
           <option value="">No Project</option>
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
             </option>
