@@ -135,4 +135,47 @@ describe('HabitsSection', () => {
     expect(screen.getByText('0/2')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /toggle drink water/i })).toBeInTheDocument();
   });
+
+  it('groups habits into Daily and Recurring sub-headers when both buckets are non-empty', () => {
+    useHabitStore.setState({
+      habits: [
+        habit('h1', { name: 'Meditate', frequency: 'daily' }),
+        habit('h2', { name: 'Long Run', frequency: 'weekly', target_count: 3 }),
+        habit('h3', { name: 'Plan Budget', frequency: 'quarterly', target_count: 1 }),
+      ],
+      completions: {},
+    });
+    render(
+      <MemoryRouter>
+        <HabitsSection />
+      </MemoryRouter>,
+    );
+    // "Daily" appears twice: once as the sub-header, once as the
+    // frequency label on the Meditate row (target=1, daily → "Daily").
+    // "Recurring" only appears as the sub-header — non-daily rows say
+    // "this week" / "this quarter" instead.
+    expect(screen.getAllByText('Daily')).toHaveLength(2);
+    expect(screen.getByText('Recurring')).toBeInTheDocument();
+    expect(screen.getByText('0/3 this week')).toBeInTheDocument();
+    expect(screen.getByText('0/1 this quarter')).toBeInTheDocument();
+  });
+
+  it('omits sub-headers when only one bucket has habits', () => {
+    useHabitStore.setState({
+      habits: [
+        habit('h1', { name: 'Meditate', frequency: 'daily' }),
+        habit('h2', { name: 'Drink Water', frequency: 'daily' }),
+      ],
+      completions: {},
+    });
+    render(
+      <MemoryRouter>
+        <HabitsSection />
+      </MemoryRouter>,
+    );
+    // "Daily" appears as the frequency label on each row (target=1),
+    // but not as a section sub-header. Easier to assert on "Recurring"
+    // — it must not appear at all when no recurring habits exist.
+    expect(screen.queryByText('Recurring')).not.toBeInTheDocument();
+  });
 });
