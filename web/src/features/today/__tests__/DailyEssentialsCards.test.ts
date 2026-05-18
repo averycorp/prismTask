@@ -1,18 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  buildRoutineCard,
-  pickHouseworkHabit,
-} from '@/features/today/DailyEssentialsCards';
+import { buildRoutineCard } from '@/features/today/DailyEssentialsCards';
 import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
-import type { Habit } from '@/types/habit';
-import type { SelfCareTierDefaults } from '@/api/firestore/advancedTuningPreferences';
-
-const TIER_DEFAULTS: SelfCareTierDefaults = {
-  morning: 'solid',
-  bedtime: 'solid',
-  medication: 'prescription',
-  housework: 'regular',
-};
 
 /**
  * Pure-function tests for the Daily Essentials section card builders.
@@ -54,29 +42,11 @@ function log(over: Partial<SelfCareLog> & { routine_type: string; date: number }
   };
 }
 
-function habit(over: Partial<Habit> & { id: string; name: string }): Habit {
-  return {
-    id: over.id,
-    user_id: 'u',
-    name: over.name,
-    description: over.description ?? null,
-    icon: over.icon ?? '🏠',
-    color: over.color ?? '#000',
-    category: over.category ?? null,
-    frequency: over.frequency ?? 'daily',
-    target_count: over.target_count ?? 1,
-    active_days_json: over.active_days_json ?? null,
-    is_active: over.is_active ?? true,
-    created_at: over.created_at ?? '2026-01-01T00:00:00Z',
-    updated_at: over.updated_at ?? '2026-01-01T00:00:00Z',
-  };
-}
-
 const TODAY_MS = 1_700_000_000_000;
 
 describe('buildRoutineCard (parity unit 6)', () => {
   it('returns null when no steps exist for the routine', () => {
-    const card = buildRoutineCard('morning', [], [], TODAY_MS, TIER_DEFAULTS);
+    const card = buildRoutineCard('morning', [], [], TODAY_MS);
     expect(card).toBeNull();
   });
 
@@ -91,7 +61,7 @@ describe('buildRoutineCard (parity unit 6)', () => {
       date: TODAY_MS,
       completed_steps: '["s1"]',
     });
-    const card = buildRoutineCard('morning', steps, [todayLog], TODAY_MS, TIER_DEFAULTS);
+    const card = buildRoutineCard('morning', steps, [todayLog], TODAY_MS);
     expect(card).not.toBeNull();
     expect(card!.routineType).toBe('morning');
     expect(card!.displayName).toBe('Morning Routine');
@@ -107,120 +77,22 @@ describe('buildRoutineCard (parity unit 6)', () => {
       date: TODAY_MS - 24 * 60 * 60 * 1000,
       completed_steps: '["s1"]',
     });
-    const card = buildRoutineCard(
-      'morning',
-      steps,
-      [yesterdayLog],
-      TODAY_MS,
-      TIER_DEFAULTS,
-    );
+    const card = buildRoutineCard('morning', steps, [yesterdayLog], TODAY_MS);
     expect(card!.steps[0].completed).toBe(false);
   });
 
   it('maps the bedtime + housework display names', () => {
     const morningSteps = [step({ step_id: 's1', routine_type: 'morning' })];
     const bedtimeSteps = [step({ step_id: 's1', routine_type: 'bedtime' })];
-    const houseworkSteps = [
-      step({ step_id: 's1', routine_type: 'housework', tier: 'quick' }),
-    ];
+    const houseworkSteps = [step({ step_id: 's1', routine_type: 'housework' })];
+    expect(buildRoutineCard('bedtime', bedtimeSteps, [], TODAY_MS)!.displayName).toBe(
+      'Bedtime Routine',
+    );
     expect(
-      buildRoutineCard('bedtime', bedtimeSteps, [], TODAY_MS, TIER_DEFAULTS)!
-        .displayName,
-    ).toBe('Bedtime Routine');
-    expect(
-      buildRoutineCard('housework', houseworkSteps, [], TODAY_MS, TIER_DEFAULTS)!
-        .displayName,
+      buildRoutineCard('housework', houseworkSteps, [], TODAY_MS)!.displayName,
     ).toBe('Housework');
-    expect(
-      buildRoutineCard('morning', morningSteps, [], TODAY_MS, TIER_DEFAULTS)!
-        .displayName,
-    ).toBe('Morning Routine');
-  });
-});
-
-describe('buildRoutineCard tier filtering (Android parity)', () => {
-  /**
-   * Mirrors Android `DailyEssentialsUseCase.observeRoutineCard` filtering:
-   * each step is only visible when its `tier` is at or below the active
-   * tier in the routine's tier order. The active tier comes from today's
-   * `SelfCareLog.selected_tier` if set, else the user's
-   * `selfcare_default_tier_<routine>` preference, else the routine's
-   * penultimate tier.
-   */
-  const morningSteps = [
-    step({ step_id: 'low', routine_type: 'morning', tier: 'survival', sort_order: 1 }),
-    step({ step_id: 'mid', routine_type: 'morning', tier: 'solid', sort_order: 2 }),
-    step({ step_id: 'top', routine_type: 'morning', tier: 'full', sort_order: 3 }),
-  ];
-
-  it('hides higher-tier steps when the active tier sits below them', () => {
-    const card = buildRoutineCard('morning', morningSteps, [], TODAY_MS, {
-      ...TIER_DEFAULTS,
-      morning: 'survival',
-    });
-    expect(card!.steps.map((s) => s.stepId)).toEqual(['low']);
-  });
-
-  it("respects today's log tier over the user default", () => {
-    const todayLog = log({
-      routine_type: 'morning',
-      date: TODAY_MS,
-      selected_tier: 'full',
-    });
-    const card = buildRoutineCard('morning', morningSteps, [todayLog], TODAY_MS, {
-      ...TIER_DEFAULTS,
-      morning: 'survival',
-    });
-    expect(card!.steps.map((s) => s.stepId)).toEqual(['low', 'mid', 'top']);
-  });
-
-  it('falls back to the user default when no log exists', () => {
-    const card = buildRoutineCard('morning', morningSteps, [], TODAY_MS, {
-      ...TIER_DEFAULTS,
-      morning: 'solid',
-    });
-    expect(card!.steps.map((s) => s.stepId)).toEqual(['low', 'mid']);
-  });
-
-  it('returns null when the active tier filters every step out', () => {
-    const onlyTopSteps = [
-      step({ step_id: 'top', routine_type: 'morning', tier: 'full' }),
-    ];
-    const card = buildRoutineCard('morning', onlyTopSteps, [], TODAY_MS, {
-      ...TIER_DEFAULTS,
-      morning: 'survival',
-    });
-    expect(card).toBeNull();
-  });
-});
-
-describe('pickHouseworkHabit (parity unit 6)', () => {
-  it('returns null when no habits exist', () => {
-    expect(pickHouseworkHabit([], null)).toBeNull();
-  });
-
-  it('returns the pinned habit when active', () => {
-    const a = habit({ id: 'a', name: 'Stretch' });
-    const b = habit({ id: 'b', name: 'House Stuff' });
-    expect(pickHouseworkHabit([a, b], 'b')).toBe(b);
-  });
-
-  it('falls back to a name-matched habit when pin is missing', () => {
-    const a = habit({ id: 'a', name: 'Stretch' });
-    const b = habit({ id: 'b', name: 'Clean Kitchen' });
-    expect(pickHouseworkHabit([a, b], null)).toBe(b);
-  });
-
-  it('skips inactive pinned habits and falls back', () => {
-    const a = habit({ id: 'a', name: 'Stretch' });
-    const b = habit({ id: 'b', name: 'House Stuff', is_active: false });
-    const c = habit({ id: 'c', name: 'Cleanup Routine' });
-    expect(pickHouseworkHabit([a, b, c], 'b')).toBe(c);
-  });
-
-  it('returns null when no candidate matches', () => {
-    const a = habit({ id: 'a', name: 'Stretch' });
-    const b = habit({ id: 'b', name: 'Walk' });
-    expect(pickHouseworkHabit([a, b], null)).toBeNull();
+    expect(buildRoutineCard('morning', morningSteps, [], TODAY_MS)!.displayName).toBe(
+      'Morning Routine',
+    );
   });
 });
