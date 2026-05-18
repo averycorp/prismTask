@@ -7,6 +7,7 @@ import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
+import type { Task } from '@/types/task';
 
 /**
  * "Completed Today" bottom sheet — web port of Android's
@@ -34,11 +35,19 @@ export function DoneCounterSheet({ isOpen, onClose }: DoneCounterSheetProps) {
   const todayIso = useLogicalToday(startOfDayHour);
   const todayTasks = useTaskStore((s) => s.todayTasks);
   const uncompleteTask = useTaskStore((s) => s.uncompleteTask);
+  const logAdditionalCompletion = useTaskStore(
+    (s) => s.logAdditionalCompletion,
+  );
   const habits = useHabitStore((s) => s.habits);
   const completions = useHabitStore((s) => s.completions);
   const toggleCompletion = useHabitStore((s) => s.toggleCompletion);
 
   const [busy, setBusy] = useState<string | null>(null);
+  // When the user taps a row for a completed *recurring* task we
+  // mirror Android's choice dialog ("Already Completed") instead of
+  // running Undo straight through. Non-recurring rows skip the dialog
+  // entirely — the button row still has a direct Undo affordance.
+  const [choiceTask, setChoiceTask] = useState<Task | null>(null);
 
   const completedTasks = useMemo(
     () => todayTasks.filter((t) => t.status === 'done'),
@@ -96,6 +105,28 @@ export function DoneCounterSheet({ isOpen, onClose }: DoneCounterSheetProps) {
     }
   };
 
+  const onLogAgain = async (taskId: string) => {
+    setBusy(taskId);
+    try {
+      await logAdditionalCompletion(taskId);
+      toast.success('Logged Another Completion');
+    } catch {
+      toast.error('Failed To Log Completion');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Tap-on-row handler — mirrors Android `CompletedTaskItem.handleTap`.
+   *  Recurring + done → show the choice dialog; otherwise → straight Undo. */
+  const onRowTap = (task: Task) => {
+    if (task.recurrence_json) {
+      setChoiceTask(task);
+    } else {
+      void onUndoTask(task.id);
+    }
+  };
+
   const onUndoHabit = async (habitId: string) => {
     setBusy(habitId);
     try {
@@ -135,32 +166,103 @@ export function DoneCounterSheet({ isOpen, onClose }: DoneCounterSheetProps) {
               Tasks ({completedTasks.length})
             </h3>
             <ul className="space-y-1">
-              {completedTasks.map((task) => (
-                <li
-                  key={`task_${task.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-2"
-                >
-                  <CheckCircle2
-                    className="h-4 w-4 shrink-0 text-[var(--color-accent)]"
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)] line-through opacity-80">
-                    {task.title}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void onUndoTask(task.id)}
-                    disabled={busy === task.id}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    aria-label={`Undo Task ${task.title}`}
+              {completedTasks.map((task) => {
+                const isRecurring = Boolean(task.recurrence_json);
+                return (
+                  <li
+                    key={`task_${task.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-2"
                   >
-                    <RotateCcw className="h-3 w-3" aria-hidden="true" />
-                    Undo
-                  </button>
-                </li>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => onRowTap(task)}
+                      disabled={busy === task.id}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label={
+                        isRecurring
+                          ? `Choose Action For Completed Task ${task.title}`
+                          : `Completed Task ${task.title}`
+                      }
+                    >
+                      <CheckCircle2
+                        className="h-4 w-4 shrink-0 text-[var(--color-accent)]"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)] line-through opacity-80">
+                        {task.title}
+                      </span>
+                    </button>
+                    {isRecurring ? (
+                      <button
+                        type="button"
+                        onClick={() => void onLogAgain(task.id)}
+                        disabled={busy === task.id}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label={`Log Again ${task.title}`}
+                        title="Log Again"
+                      >
+                        <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                        Log Again
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void onUndoTask(task.id)}
+                        disabled={busy === task.id}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label={`Undo Task ${task.title}`}
+                      >
+                        <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                        Undo
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
+        )}
+
+        {/* Choice dialog — recurring task that's already done today.
+         *  Mirrors Android `CompletedTaskItem`'s AlertDialog: title
+         *  "Already Completed", body quoting the task title, confirm
+         *  "Log Again" + dismiss "Mark Incomplete". Strings are
+         *  byte-identical to Android's so QA / docs can diff them. */}
+        {choiceTask && (
+          <Modal
+            isOpen={Boolean(choiceTask)}
+            onClose={() => setChoiceTask(null)}
+            title="Already Completed"
+            size="sm"
+          >
+            <p className="text-sm text-[var(--color-text-primary)]">
+              {`"${choiceTask.title}" is already checked off for today. Log another completion or mark it incomplete?`}
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const id = choiceTask.id;
+                  setChoiceTask(null);
+                  void onUndoTask(id);
+                }}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]"
+              >
+                Mark Incomplete
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = choiceTask.id;
+                  setChoiceTask(null);
+                  void onLogAgain(id);
+                }}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10"
+              >
+                Log Again
+              </button>
+            </div>
+          </Modal>
         )}
 
         {completedHabits.length > 0 && (
