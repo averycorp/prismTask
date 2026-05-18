@@ -16,6 +16,9 @@ vi.mock('sonner', () => ({
 }));
 
 import { useChatStore, __internals } from '@/stores/chatStore';
+import { useProjectStore } from '@/stores/projectStore';
+import type { Task } from '@/types/task';
+import type { Project } from '@/types/project';
 
 beforeEach(() => {
   aiChatMock.mockReset();
@@ -175,6 +178,154 @@ describe('chatStore — conversation id pattern', () => {
     // SoD hour 0 means today.
     const out = __internals.isoDateForStartOfDay(t, 0);
     expect(out).toMatch(/^2026-05-15$/);
+  });
+});
+
+describe('chatStore — task_context forwarding', () => {
+  const makeTask = (overrides: Partial<Task> = {}): Task => ({
+    id: 't1',
+    project_id: 'p1',
+    user_id: 'u1',
+    parent_id: null,
+    title: 'Write Spec',
+    description: 'Outline the proposal.',
+    notes: null,
+    status: 'todo',
+    priority: 3,
+    due_date: '2026-05-20',
+    due_time: null,
+    planned_date: null,
+    completed_at: null,
+    urgency_score: 0.5,
+    recurrence_json: null,
+    eisenhower_quadrant: null,
+    eisenhower_updated_at: null,
+    estimated_duration: null,
+    actual_duration: null,
+    sort_order: 0,
+    depth: 0,
+    created_at: '2026-05-15T00:00:00Z',
+    updated_at: '2026-05-15T00:00:00Z',
+    ...overrides,
+  });
+
+  const seedProject = (project: Project): void => {
+    useProjectStore.setState({ projects: [project] });
+  };
+
+  beforeEach(() => {
+    useProjectStore.setState({ projects: [] });
+  });
+
+  it('buildTaskContextSnapshot returns null for null input', () => {
+    expect(__internals.buildTaskContextSnapshot(null)).toBeNull();
+  });
+
+  it('buildTaskContextSnapshot resolves project_name from the project store', () => {
+    seedProject({
+      id: 'p1',
+      goal_id: 'g1',
+      user_id: 'u1',
+      title: 'Q3 Goals',
+      description: null,
+      status: 'active',
+      due_date: null,
+      color: '#fff',
+      icon: 'flag',
+      sort_order: 0,
+      created_at: 'x',
+      updated_at: 'x',
+    });
+    const snap = __internals.buildTaskContextSnapshot(makeTask());
+    expect(snap).toEqual({
+      title: 'Write Spec',
+      description: 'Outline the proposal.',
+      due_date: '2026-05-20',
+      priority: 3,
+      project_name: 'Q3 Goals',
+      is_completed: false,
+    });
+  });
+
+  it('omits priority when zero and description when blank', () => {
+    const snap = __internals.buildTaskContextSnapshot(
+      makeTask({
+        priority: 0 as unknown as Task['priority'],
+        description: '   ',
+        project_id: '',
+      }),
+    );
+    expect(snap?.priority).toBeNull();
+    expect(snap?.description).toBeNull();
+    expect(snap?.project_name).toBeNull();
+  });
+
+  it('marks is_completed true when status is done', () => {
+    const snap = __internals.buildTaskContextSnapshot(
+      makeTask({ status: 'done' }),
+    );
+    expect(snap?.is_completed).toBe(true);
+  });
+
+  it('forwards task_context in sendMessage when a context task is pinned', async () => {
+    aiChatHistoryMock.mockResolvedValue({ messages: [], next_before: null });
+    await useChatStore.getState().initialize(0);
+
+    seedProject({
+      id: 'p1',
+      goal_id: 'g1',
+      user_id: 'u1',
+      title: 'Q3 Goals',
+      description: null,
+      status: 'active',
+      due_date: null,
+      color: '#fff',
+      icon: 'flag',
+      sort_order: 0,
+      created_at: 'x',
+      updated_at: 'x',
+    });
+    useChatStore.getState().setContextTask(makeTask());
+
+    aiChatMock.mockResolvedValue({
+      message: 'ok',
+      actions: [],
+      conversation_id: useChatStore.getState().conversationId,
+      user_preferences: [],
+    });
+
+    await useChatStore.getState().sendMessage('what now?');
+
+    expect(aiChatMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'what now?',
+        task_context: {
+          title: 'Write Spec',
+          description: 'Outline the proposal.',
+          due_date: '2026-05-20',
+          priority: 3,
+          project_name: 'Q3 Goals',
+          is_completed: false,
+        },
+      }),
+    );
+  });
+
+  it('omits task_context entirely when no context task is set', async () => {
+    aiChatHistoryMock.mockResolvedValue({ messages: [], next_before: null });
+    await useChatStore.getState().initialize(0);
+
+    aiChatMock.mockResolvedValue({
+      message: 'ok',
+      actions: [],
+      conversation_id: useChatStore.getState().conversationId,
+      user_preferences: [],
+    });
+
+    await useChatStore.getState().sendMessage('hi');
+
+    const payload = aiChatMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('task_context');
   });
 });
 

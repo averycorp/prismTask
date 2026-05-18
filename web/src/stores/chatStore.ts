@@ -6,7 +6,10 @@ import type {
   ChatHistoryEntry,
   ChatMessageRecord,
   ChatRole,
+  ChatTaskContext,
 } from '@/types/chat';
+import { useProjectStore } from '@/stores/projectStore';
+import type { Task } from '@/types/task';
 
 const MAX_HISTORY_PAIRS = 6;
 const DISCLOSURE_FLAG_KEY = 'prismtask.chat.disclosureShownV3';
@@ -40,9 +43,20 @@ interface ChatState {
   showClearConfirm: boolean;
   /** Latest error to surface as a toast (consumed once). */
   error: string | null;
+  /**
+   * Optional task the user opened chat from. When set, every `sendMessage`
+   * forwards a `task_context` snapshot to the backend so the AI can
+   * reference the task's title / due date / priority / project name.
+   * Mirrors Android `ChatViewModel._contextTask`. Held imperatively (never
+   * subscribed by selectors that drive UI re-renders) so chat doesn't
+   * re-render on every task mutation.
+   */
+  contextTask: Task | null;
 
   initialize: (startOfDayHour: number) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
+  /** Pin (or clear) the task forwarded as `task_context` on each send. */
+  setContextTask: (task: Task | null) => void;
   dismissDisclosure: () => void;
   requestClearConversation: () => void;
   dismissClearConfirm: () => void;
@@ -92,6 +106,32 @@ function buildHistoryPayload(messages: ChatUiMessage[]): ChatHistoryEntry[] {
   }));
 }
 
+/**
+ * Build the `task_context` snapshot the backend forwards to Anthropic.
+ * Mirrors Android `ChatViewModel.buildTaskContextSnapshot` — same field
+ * set, same omit-when-blank semantics, same priority-when-nonzero rule.
+ *
+ * `due_date` is the YYYY-MM-DD prefix of `task.due_date` (which is already
+ * stored that way on the web `Task` model). The project name is looked
+ * up imperatively against the project store so we don't subscribe and
+ * re-render on unrelated project edits.
+ */
+function buildTaskContextSnapshot(task: Task | null): ChatTaskContext | null {
+  if (!task) return null;
+  const project = task.project_id
+    ? useProjectStore.getState().projects.find((p) => p.id === task.project_id)
+    : undefined;
+  const description = task.description?.trim();
+  return {
+    title: task.title,
+    description: description && description.length > 0 ? description : null,
+    due_date: task.due_date ?? null,
+    priority: task.priority && task.priority > 0 ? task.priority : null,
+    project_name: project?.title ?? null,
+    is_completed: task.status === 'done',
+  };
+}
+
 function readBoolFlag(key: string): boolean {
   try {
     return localStorage.getItem(key) === 'true';
@@ -121,6 +161,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   showDisclosure: false,
   showClearConfirm: false,
   error: null,
+  contextTask: null,
 
   initialize: async (startOfDayHour: number) => {
     const dateIso = isoDateForStartOfDay(new Date(), startOfDayHour);
@@ -182,10 +223,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     try {
+      const taskContext = buildTaskContextSnapshot(state.contextTask);
       const response = await aiChat({
         message: trimmed,
         conversation_id: state.conversationId,
         history: buildHistoryPayload(state.messages),
+        ...(taskContext ? { task_context: taskContext } : {}),
       });
       // Replace the optimistic placeholder with the server-confirmed user
       // turn (so a subsequent history pull doesn't double-render it), then
@@ -214,6 +257,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         error: message,
       });
     }
+  },
+
+  setContextTask: (task: Task | null) => {
+    set({ contextTask: task });
   },
 
   dismissDisclosure: () => {
@@ -275,6 +322,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       showDisclosure: false,
       showClearConfirm: false,
       error: null,
+      contextTask: null,
     }),
 }));
 
@@ -282,6 +330,7 @@ export const __internals = {
   isoDateForStartOfDay,
   newConversationId,
   buildHistoryPayload,
+  buildTaskContextSnapshot,
   recordToUi,
   DISCLOSURE_FLAG_KEY,
   CLEAR_SKIP_FLAG_KEY,
