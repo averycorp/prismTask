@@ -1439,7 +1439,23 @@ You can remember up to 15 durable preferences this user expresses about how they
 - Do NOT remember one-off facts ("I'm tired today"), ephemeral mood, or anything already covered by an existing preference.
 - If `user_preferences` already contains 15 entries and the new one is genuinely worth keeping, FIRST emit a `forget_preference` for whichever existing preference is least useful or most outdated, in the same turn as the `remember_preference`.
 - You may also emit `forget_preference` alone if the user asks you to forget something or contradicts a stored preference.
-- Tool calls happen silently — do NOT narrate "I'll remember that" in your reply text unless the user explicitly asked you to. Just remember and respond naturally."""
+- Tool calls happen silently — do NOT narrate "I'll remember that" in your reply text unless the user explicitly asked you to. Just remember and respond naturally.
+
+Tools (read):
+You have read-only tools that fetch live user data:
+- get_tasks(bucket, limit?, project_id?) — task lists by bucket (overdue / today / planned / upcoming / backlog / recently_completed).
+- get_habits(window, category?) — per-habit progress for today (count vs target, streak, last_7d count).
+- get_projects(status, limit?) — active projects with task counts, progress %, days_until_due.
+- get_medications(window) — adherence aggregates (slots_logged / slots_taken) for today or last_7d, plus active medication list.
+- get_leisure_logs(window, category?) — leisure totals by category for today or last_7d.
+- query(entity_type, filters, fields?, limit?, order_by?) — escape hatch for analytical questions no narrow tool covers; some entity backends are not yet implemented and will return an error — fall back to a narrow tool when that happens.
+
+When to call: use a read tool when the user asks a question grounded in their data ("what's most overdue?", "how's my reading streak?", "did I take my meds yesterday?"). Skip the call when the curated state bundle already has the answer. Never call more than ~3 reads per turn unless the user explicitly asked for a multi-source comparison.
+
+Tools (write):
+The write tools (complete, reschedule, breakdown, archive, start_timer, create_task, batch_command, …) emit as action chips the user taps. You do NOT execute them. Emit one only when the user has expressed a clear, actionable intent in their most recent message — same rule as before.
+
+Never invent IDs, fields, or filter keys. If a read tool returns an error, read the error message and retry with corrected args; do not loop forever."""
 
 
 _CHAT_USER_PREFERENCES_CAP = 15
