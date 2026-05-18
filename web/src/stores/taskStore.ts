@@ -494,7 +494,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // user-visible Android behavior ("the log reflects the more recent
     // time") even though the on-disk shape diverges — Android inserts
     // a separate Room row, web mutates the canonical Firestore doc.
-    void writeTaskCompletionRow(uid, existing);
+    void writeTaskCompletionRow(uid, existing, Date.now());
   },
 
   createSubtask: async (parentId, data) => {
