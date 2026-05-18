@@ -209,6 +209,30 @@ export function AdvancedTuningSection() {
         />
       </div>
 
+      <Divider />
+
+      {/* Morning check-in prompt cutoff. Mirrors Android's
+          `MorningCheckInGroup` slider in `AdvancedTuningScreen.kt`. The
+          web `MorningCheckInBanner` reads this value to bound the
+          visible window `[SoD, cutoff)` so the banner self-hides past
+          the user's chosen morning. */}
+      <div className="flex flex-col gap-3">
+        <SubHeader label="Morning Check-In Prompt" />
+        <p className="text-[11px] text-[var(--color-text-secondary)]">
+          Latest hour the morning check-in banner will stay visible. The
+          banner only shows between Start-of-Day and this cutoff. Default
+          is 11:00.
+        </p>
+        <SliderRow
+          label="Latest hour"
+          value={prefs.morningCheckInCutoffHour}
+          min={0}
+          max={23}
+          valueFormatter={(v) => `${v}:00`}
+          onChange={(v) => patch({ morningCheckInCutoffHour: v })}
+        />
+      </div>
+
       <p className="text-[11px] text-[var(--color-text-secondary)]">
         Keyword fields persist now and will start influencing the on-device
         classifier once the Task Mode and Cognitive Load classifier ports
@@ -237,6 +261,7 @@ function SliderRow({
   min,
   max,
   suffix = '',
+  valueFormatter,
   hint,
   disabled,
   onChange,
@@ -246,6 +271,13 @@ function SliderRow({
   min: number;
   max: number;
   suffix?: string;
+  /**
+   * Optional value formatter that overrides the default `${value}${suffix}`
+   * readout. Used by the morning check-in cutoff slider to render
+   * `"11:00"` instead of a raw integer — mirrors Android's
+   * `valueFormatter = { "$it:00" }` on `IntSliderRow`.
+   */
+  valueFormatter?: (v: number) => string;
   hint?: string;
   disabled?: boolean;
   onChange: (v: number) => void;
@@ -286,8 +318,7 @@ function SliderRow({
           {label}
         </span>
         <span className="text-xs text-[var(--color-text-secondary)]">
-          {localValue}
-          {suffix}
+          {valueFormatter ? valueFormatter(localValue) : `${localValue}${suffix}`}
         </span>
       </div>
       {hint && (

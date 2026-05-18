@@ -202,6 +202,30 @@ describe('AdvancedTuningSection', () => {
     expect(relaxMisses.value).toBe('2');
   });
 
+  it('renders the morning check-in cutoff slider with the default hour', () => {
+    render(<AdvancedTuningSection />);
+    const slider = screen.getByLabelText('Latest hour') as HTMLInputElement;
+    expect(slider.value).toBe('11');
+    expect(slider.min).toBe('0');
+    expect(slider.max).toBe('23');
+  });
+
+  it('persists the morning check-in cutoff slider through the debounce', () => {
+    render(<AdvancedTuningSection />);
+    const slider = screen.getByLabelText('Latest hour') as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: '9' } });
+    expect(patchMock).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(patchMock).toHaveBeenCalledWith('uid-123', {
+      morningCheckInCutoffHour: 9,
+    });
+    expect(useAdvancedTuningStore.getState().prefs.morningCheckInCutoffHour).toBe(
+      9,
+    );
+  });
+
   it('persists a per-mode slider tweak without clobbering siblings', () => {
     render(<AdvancedTuningSection />);
     const playGrace = screen.getByLabelText(

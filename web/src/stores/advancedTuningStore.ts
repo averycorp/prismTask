@@ -94,6 +94,8 @@ export const useAdvancedTuningStore = create<AdvancedTuningState>((set, get) => 
         ...prev.cognitiveLoadKeywords,
         ...(patch.cognitiveLoadKeywords ?? {}),
       },
+      morningCheckInCutoffHour:
+        patch.morningCheckInCutoffHour ?? prev.morningCheckInCutoffHour,
     };
     set({ prefs: next });
     if (!uid) return; // signed-out: local-only edit
