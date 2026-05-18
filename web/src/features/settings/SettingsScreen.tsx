@@ -70,7 +70,8 @@ import {
   requestNotificationPermission,
   getNotificationPermission,
 } from '@/utils/notifications';
-import type { ImportPreview } from '@/utils/import';
+import type { ImportPreview, PreviewTask } from '@/utils/import';
+import { formatDate } from '@/utils/dates';
 
 function SettingsSection({
   icon,
@@ -939,7 +940,7 @@ export function SettingsScreen() {
           setImportFile(null);
         }}
         title="Import Data"
-        size="sm"
+        size="md"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -984,6 +985,30 @@ export function SettingsScreen() {
                 )}
               </div>
             </div>
+
+            {importPreview.tasks.length > 0 && (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]">
+                  Tasks Preview
+                </label>
+                <div
+                  className="max-h-64 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-2"
+                  data-testid="import-preview-tasks"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    {importPreview.tasks.map((task, idx) => (
+                      <ImportTaskPreviewRow key={idx} task={task} />
+                    ))}
+                  </div>
+                  {importPreview.taskCount > importPreview.tasks.length && (
+                    <p className="mt-2 px-1 text-xs text-[var(--color-text-secondary)]">
+                      …and {importPreview.taskCount - importPreview.tasks.length}{' '}
+                      More
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]">
@@ -1116,6 +1141,65 @@ function StartOfDayPickerModal({
         onCancel={onClose}
       />
     </Modal>
+  );
+}
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
+};
+
+function ImportTaskPreviewRow({
+  task,
+  depth = 0,
+}: {
+  task: PreviewTask;
+  depth?: number;
+}) {
+  const priorityLabel =
+    task.priority !== null ? PRIORITY_LABELS[task.priority] : undefined;
+  const bits: string[] = [];
+  if (priorityLabel) bits.push(priorityLabel);
+  if (task.dueDate) bits.push(`Due ${formatDate(task.dueDate)}`);
+  const indent = depth > 0 ? { paddingLeft: `${depth * 12}px` } : undefined;
+
+  return (
+    <div className="flex flex-col gap-1" style={indent}>
+      <div className="flex items-baseline gap-1.5">
+        {depth > 0 && (
+          <span className="text-xs text-[var(--color-text-secondary)]">↳</span>
+        )}
+        <span className="text-sm font-medium text-[var(--color-text-primary)] break-words">
+          {task.title || '(Untitled Task)'}
+        </span>
+      </div>
+      {bits.length > 0 && (
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          {bits.join('  •  ')}
+        </p>
+      )}
+      {task.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {task.tags.map((tag, i) => (
+            <span
+              key={i}
+              className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-card)] px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)]"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
+      {task.subtasks.length > 0 && (
+        <div className="mt-1 flex flex-col gap-1">
+          {task.subtasks.map((sub, i) => (
+            <ImportTaskPreviewRow key={i} task={sub} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
