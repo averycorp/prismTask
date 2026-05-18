@@ -60,6 +60,87 @@ describe('nlp utils', () => {
       });
     });
 
+    describe('urgency keyword inference', () => {
+      // Mirrors Android `NaturalLanguageParser.kt` ~L408. Android numbering
+      // is 0=None/4=Urgent; web uses Todoist-style 1=urgent/4=low, so the
+      // numeric tiers below are remapped from Android (asap→1, important→2,
+      // soon→3) while preserving the same keyword sets.
+
+      it('infers priority 1 (urgent) from "asap"', () => {
+        const result = parseQuickAdd('do this asap');
+        expect(result.priority).toBe(1);
+      });
+
+      it('infers priority 1 (urgent) from "urgent"', () => {
+        const result = parseQuickAdd('urgent client call');
+        expect(result.priority).toBe(1);
+      });
+
+      it('infers priority 1 (urgent) from "critical"', () => {
+        const result = parseQuickAdd('critical bug fix');
+        expect(result.priority).toBe(1);
+      });
+
+      it('infers priority 2 (high) from "important"', () => {
+        const result = parseQuickAdd('important meeting');
+        expect(result.priority).toBe(2);
+      });
+
+      it('infers priority 2 (high) from "high priority"', () => {
+        const result = parseQuickAdd('high priority report');
+        expect(result.priority).toBe(2);
+      });
+
+      it('infers priority 2 (high) from "high-priority" (hyphenated)', () => {
+        const result = parseQuickAdd('high-priority review');
+        expect(result.priority).toBe(2);
+      });
+
+      it('infers priority 3 (medium) from "soon"', () => {
+        const result = parseQuickAdd('buy milk soon');
+        expect(result.priority).toBe(3);
+      });
+
+      it('is case-insensitive', () => {
+        const result = parseQuickAdd('Fix bug ASAP');
+        expect(result.priority).toBe(1);
+      });
+
+      it('does NOT match keyword inside other words (e.g. "asapinger")', () => {
+        const result = parseQuickAdd('asapinger task');
+        expect(result.priority).toBeNull();
+      });
+
+      it('does NOT match "soon" as a substring (e.g. "soonish")', () => {
+        const result = parseQuickAdd('finish soonish');
+        expect(result.priority).toBeNull();
+      });
+
+      it('keeps urgency keyword in the title (does not strip)', () => {
+        const result = parseQuickAdd('urgent client call');
+        expect(result.title).toBe('urgent client call');
+      });
+
+      it('highest tier wins when multiple urgency keywords appear', () => {
+        // "urgent" (1) outranks "important" (2)
+        const result = parseQuickAdd('important and urgent task');
+        expect(result.priority).toBe(1);
+      });
+
+      it('explicit !high wins over urgency keyword "urgent"', () => {
+        // !high → 2 explicit; keyword "urgent" → 1 inferred.
+        // Mirrors Android: explicit `!` priority always wins, keyword
+        // inference only runs when no explicit marker was matched.
+        const result = parseQuickAdd('urgent fix !high');
+        expect(result.priority).toBe(2);
+      });
+
+      it('does not override explicit !low with keyword "urgent"', () => {
+        const result = parseQuickAdd('urgent fix !low');
+        expect(result.priority).toBe(4);
+      });
+    });
+
     describe('tag extraction', () => {
       it('extracts a single tag', () => {
         const result = parseQuickAdd('Buy milk #shopping');

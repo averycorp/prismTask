@@ -110,6 +110,31 @@ export function parseQuickAdd(input: string): LocalParseResult {
     }
   }
 
+  // Urgency-keyword inference — only when no explicit `!` priority was set
+  // above. Keywords are left in the title (they are natural language the
+  // user probably wants to keep, e.g. "urgent client call") and the
+  // highest-tier match wins. Order matters: urgent keywords are checked
+  // before high before medium so a title that mentions both "urgent" and
+  // "important" lands on urgent.
+  //
+  // Mirrors Android `NaturalLanguageParser.kt` ~L408 — the Android source
+  // uses 0=None/4=Urgent semantics; web uses Todoist-style 1=urgent/4=low,
+  // so the numeric tiers are remapped here (asap → 1, important → 2,
+  // soon → 3) but the keyword set and word-boundary matching are identical.
+  if (priority === null) {
+    const urgencyPatterns: Array<[RegExp, TaskPriority]> = [
+      [/\b(?:asap|urgent|urgently|immediately|critical)\b/i, 1],
+      [/\b(?:important|high\s+priority|high-priority)\b/i, 2],
+      [/\bsoon\b/i, 3],
+    ];
+    for (const [regex, level] of urgencyPatterns) {
+      if (regex.test(text)) {
+        priority = level;
+        break;
+      }
+    }
+  }
+
   // Extract special-suffix hashtags first so they don't get picked up as
   // generic tags below. The `-mode` / `-load` suffixes exist specifically
   // so `#work` (LifeCategory) and `#work-mode` (TaskMode) don't collide.
