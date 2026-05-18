@@ -85,6 +85,14 @@ const FIELD_LOAD_CK_EASY = 'load_custom_keywords_easy';
 const FIELD_LOAD_CK_MEDIUM = 'load_custom_keywords_medium';
 const FIELD_LOAD_CK_HARD = 'load_custom_keywords_hard';
 
+// Morning check-in prompt cutoff hour (0..23). Mirrors
+// `AdvancedTuningPreferences.kt:337` `MORNING_LATEST`. Latest wall-clock
+// hour after Start-of-Day that the morning check-in banner stays
+// visible — read by `MorningCheckInBanner` to bound the visible window
+// `[SoD, cutoff)`. Default `11` matches Android's
+// `MorningCheckInPromptCutoff(latestHour = 11)`.
+const FIELD_MORNING_CHECKIN_LATEST_HOUR = 'morning_checkin_latest_hour';
+
 // Self-care first-display tier per routine. Mirrors
 // `AdvancedTuningPreferences.kt:407-410`. Android owns the writes; web
 // only reads so the user's "Minimum / Regular / Deluxe"-style choice is
@@ -163,6 +171,13 @@ export interface AdvancedTuningPreferences {
   /** Custom keyword CSVs per Cognitive Load tier. Default empty strings. */
   cognitiveLoadKeywords: CognitiveLoadCustomKeywords;
   /**
+   * Latest wall-clock hour (0..23) the morning check-in banner stays
+   * visible after Start-of-Day. Mirrors Android's
+   * `MorningCheckInPromptCutoff(latestHour)` slider on
+   * `AdvancedTuningScreen.MorningCheckInGroup`. Default `11`.
+   */
+  morningCheckInCutoffHour: number;
+  /**
    * Per-routine default tier applied when today's `SelfCareLog` has no
    * `selectedTier` set. Read-only on web; the Settings UI lives on Android
    * (`AdvancedTuningSection`). Mirrors `AdvancedTuningPreferences.kt`
@@ -187,6 +202,7 @@ export interface AdvancedTuningPatch {
   };
   taskModeKeywords?: Partial<TaskModeCustomKeywords>;
   cognitiveLoadKeywords?: Partial<CognitiveLoadCustomKeywords>;
+  morningCheckInCutoffHour?: number;
 }
 
 /**
@@ -211,6 +227,7 @@ export const DEFAULT_ADVANCED_TUNING_PREFERENCES: AdvancedTuningPreferences = {
   },
   taskModeKeywords: { work: '', play: '', relax: '' },
   cognitiveLoadKeywords: { easy: '', medium: '', hard: '' },
+  morningCheckInCutoffHour: 11,
   selfCareTierDefaults: {
     morning: 'solid',
     bedtime: 'solid',
@@ -311,6 +328,12 @@ function read(data: DocumentData | undefined): AdvancedTuningPreferences {
       medium: readString(data[FIELD_LOAD_CK_MEDIUM], ''),
       hard: readString(data[FIELD_LOAD_CK_HARD], ''),
     },
+    morningCheckInCutoffHour: clampInt(
+      data[FIELD_MORNING_CHECKIN_LATEST_HOUR],
+      0,
+      23,
+      defaults.morningCheckInCutoffHour,
+    ),
     selfCareTierDefaults: {
       morning: readString(
         data[FIELD_SC_TIER_MORNING],
@@ -480,6 +503,16 @@ export async function patchAdvancedTuningPreferences(
       payload[FIELD_LOAD_CK_HARD] = k.hard;
       typeTags[FIELD_LOAD_CK_HARD] = 'string';
     }
+  }
+
+  if (patch.morningCheckInCutoffHour !== undefined) {
+    payload[FIELD_MORNING_CHECKIN_LATEST_HOUR] = clampInt(
+      patch.morningCheckInCutoffHour,
+      0,
+      23,
+      DEFAULT_ADVANCED_TUNING_PREFERENCES.morningCheckInCutoffHour,
+    );
+    typeTags[FIELD_MORNING_CHECKIN_LATEST_HOUR] = 'int';
   }
 
   if (Object.keys(payload).length === 0) return;

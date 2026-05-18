@@ -3,6 +3,7 @@ import { Sun, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { startOfLogicalDayMs } from '@/utils/dayBoundary';
 import {
@@ -53,6 +54,14 @@ function writeDismissedIso(iso: string): void {
 export function MorningCheckInBanner() {
   const featureEnabled = useSettingsStore((s) => s.showMorningCheckIn);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  // Read the cutoff hour from Advanced Tuning prefs (synced cross-device
+  // with Android via Firestore). Falls back to the
+  // `DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR` constant (11) when the store
+  // hasn't loaded yet — matches Android's
+  // `MorningCheckInPromptCutoff(latestHour = 11)` default.
+  const cutoffHour = useAdvancedTuningStore(
+    (s) => s.prefs.morningCheckInCutoffHour,
+  );
   const todayIso = useLogicalToday(startOfDayHour);
 
   // Pull check-in logs from the existing store. We watch the cached
@@ -92,7 +101,7 @@ export function MorningCheckInBanner() {
     todayStart,
     sodHour: startOfDayHour,
     sodMinute: 0,
-    cutoffHour: DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR,
+    cutoffHour: cutoffHour ?? DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR,
     featureEnabled,
     alreadyCheckedInToday,
     dismissedToday,
