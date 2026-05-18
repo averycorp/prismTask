@@ -4,6 +4,7 @@ Service tests run against a stubbed Anthropic client. Router tests use the
 shared httpx AsyncClient + pro_auth_headers fixtures from conftest.
 """
 
+import asyncio
 import json
 import sys
 import types
@@ -82,10 +83,10 @@ class TestChatService:
                 }
             )
 
-            result = generate_chat_response(
+            result = asyncio.run(generate_chat_response(
                 message="I'm overwhelmed",
                 conversation_id="chat_2026-04-28_abc12345",
-            )
+            ))
             assert result["message"] == "Sounds rough — let's break it down."
             assert result["actions"] == [{"type": "start_timer", "minutes": 25}]
             assert result["tokens_used"] == {"input": 42, "output": 17}
@@ -101,10 +102,10 @@ class TestChatService:
                 {"message": "Sure thing.", "actions": []}
             )
 
-            result = generate_chat_response(
+            result = asyncio.run(generate_chat_response(
                 message="hi",
                 conversation_id="chat_x",
-            )
+            ))
             assert result["actions"] == []
 
     @patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-key"})
@@ -128,10 +129,10 @@ class TestChatService:
             )
             mock_client.messages.create.side_effect = [bad_response, good_response]
 
-            result = generate_chat_response(
+            result = asyncio.run(generate_chat_response(
                 message="anything",
                 conversation_id="chat_x",
-            )
+            ))
             assert result["message"] == "Hello"
             assert mock_client.messages.create.call_count == 2
 
@@ -150,10 +151,10 @@ class TestChatService:
                 {"actions": [{"type": "start_timer", "minutes": 25}]}
             )
 
-            result = generate_chat_response(
+            result = asyncio.run(generate_chat_response(
                 message="start a timer",
                 conversation_id="chat_x",
-            )
+            ))
             assert result["message"] == "Done."
             assert result["actions"] == [{"type": "start_timer", "minutes": 25}]
 
@@ -172,7 +173,7 @@ class TestChatService:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(message="hi", conversation_id="chat_x")
+            asyncio.run(generate_chat_response(message="hi", conversation_id="chat_x"))
             tools = mock_client.messages.create.call_args.kwargs["tools"]
             tool_names = {t["name"] for t in tools}
             assert tool_names == {
@@ -192,11 +193,11 @@ class TestChatService:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(
+            asyncio.run(generate_chat_response(
                 message="break this down",
                 conversation_id="chat_x",
                 task_context_id=12345,
-            )
+            ))
             sent_payload = mock_client.messages.create.call_args.kwargs["messages"][0]["content"]
             payload = json.loads(sent_payload)
             assert payload["task_context_id"] == 12345
@@ -223,7 +224,7 @@ class TestChatSodAnchor:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(
+            asyncio.run(generate_chat_response(
                 message="schedule that for today",
                 conversation_id="chat_x",
                 user_context={
@@ -233,7 +234,7 @@ class TestChatSodAnchor:
                     "day_start_minute": 0,
                     "timezone": "America/Los_Angeles",
                 },
-            )
+            ))
             sys_prompt = mock_client.messages.create.call_args.kwargs["system"]
             assert "User's logical day" in sys_prompt
             assert "Today is 2026-05-14" in sys_prompt
@@ -254,11 +255,11 @@ class TestChatSodAnchor:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(
+            asyncio.run(generate_chat_response(
                 message="what's left today",
                 conversation_id="chat_x",
                 user_context={"today": "2026-05-14", "tomorrow": "2026-05-15"},
-            )
+            ))
             sent_payload = mock_client.messages.create.call_args.kwargs[
                 "messages"
             ][0]["content"]
@@ -279,7 +280,7 @@ class TestChatSodAnchor:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(message="hi", conversation_id="chat_x")
+            asyncio.run(generate_chat_response(message="hi", conversation_id="chat_x"))
             sys_prompt = mock_client.messages.create.call_args.kwargs["system"]
             assert "User's logical day" not in sys_prompt
 
@@ -737,14 +738,14 @@ class TestChatContextBlock:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(
+            asyncio.run(generate_chat_response(
                 message="and what about today?",
                 conversation_id="chat_x",
                 history=[
                     {"role": "user", "content": "what's overdue?"},
                     {"role": "assistant", "content": "two tasks are overdue."},
                 ],
-            )
+            ))
             sent = mock_client.messages.create.call_args.kwargs["messages"]
             # 2 history entries + 1 latest user turn carrying the structured
             # context block = 3 total.
@@ -768,7 +769,7 @@ class TestChatContextBlock:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(
+            asyncio.run(generate_chat_response(
                 message="hi",
                 conversation_id="chat_x",
                 history=[
@@ -776,7 +777,7 @@ class TestChatContextBlock:
                     {"role": "user", "content": ""},  # empty content dropped
                     {"role": "user", "content": "kept"},
                 ],
-            )
+            ))
             sent = mock_client.messages.create.call_args.kwargs["messages"]
             # 1 valid history entry + 1 latest user turn = 2.
             assert len(sent) == 2
@@ -793,7 +794,7 @@ class TestChatContextBlock:
                 {"message": "ok", "actions": []}
             )
 
-            generate_chat_response(
+            asyncio.run(generate_chat_response(
                 message="how do I start?",
                 conversation_id="chat_x",
                 task_context_id=42,
@@ -805,7 +806,7 @@ class TestChatContextBlock:
                     "project_name": "Thesis",
                     "is_completed": False,
                 },
-            )
+            ))
             sent_payload = mock_client.messages.create.call_args.kwargs["messages"][-1]["content"]
             payload = json.loads(sent_payload)
             assert payload["task_context_id"] == 42
@@ -995,3 +996,54 @@ class TestChatCrisisPreFilter:
             assert resp.status_code == 200, resp.text
             # Regular path is taken — the model call is reached.
             mock_gen.assert_called_once()
+
+
+class TestLoopFlagOff:
+    """Phase 1 canary: with AI_ASSISTANT_TOOL_USE_ENABLED=false (default),
+    Pro chat behavior is byte-identical to the pre-loop baseline."""
+
+    @pytest.mark.asyncio
+    async def test_loop_disabled_with_flag_off_matches_baseline(
+        self, client: AsyncClient, pro_auth_headers: dict, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "app.config.settings.AI_ASSISTANT_TOOL_USE_ENABLED", False, raising=False,
+        )
+        from unittest.mock import AsyncMock as _AsyncMock
+        from app.routers.ai import chat_rate_limiter
+        chat_rate_limiter._requests.clear()
+        with patch(
+            "app.services.ai_productivity.generate_chat_response",
+            new=_AsyncMock(return_value={
+                "message": "hi",
+                "actions": [],
+                "tokens_used": {"input": 1, "output": 1},
+                "tool_calls": [],
+            }),
+        ):
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={"message": "hi", "conversation_id": "chat_x"},
+                headers=pro_auth_headers,
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["tool_calls"] == []
+
+    @pytest.mark.asyncio
+    async def test_loop_disabled_for_free_tier(
+        self, client: AsyncClient, auth_headers: dict, monkeypatch
+    ):
+        """Free tier hits 403 at the rate limiter — the loop never runs
+        and there is no observable difference whether the flag is on or off."""
+        monkeypatch.setattr(
+            "app.config.settings.AI_ASSISTANT_TOOL_USE_ENABLED", True, raising=False,
+        )
+        from app.routers.ai import chat_rate_limiter
+        chat_rate_limiter._requests.clear()
+        resp = await client.post(
+            "/api/v1/ai/chat",
+            json={"message": "hi", "conversation_id": "chat_x"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 403

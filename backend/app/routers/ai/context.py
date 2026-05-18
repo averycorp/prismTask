@@ -552,3 +552,71 @@ async def load_user_context_bundle(
         "leisure_today": leisure["today"],
         "medications_today": medications["today"],
     }
+
+
+# --- Phase 1 (AI Assistant tool-use loop) public re-exports ---
+# Tool handlers in ``app/routers/ai/tools/`` import these public names so
+# their unit tests can patch a single symbol per loader instead of the
+# private builder. Logic lives in the private implementations above; the
+# public surface is intentionally thin.
+
+async def load_habits_today(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_habits_with_history`` for the
+    ``get_habits`` tool handler. Same shape, same data."""
+    return await _load_habits_with_history(db, user_id, today)
+
+
+async def load_active_projects(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_active_projects`` for the
+    ``get_projects`` tool handler. Same shape, same data."""
+    return await _load_active_projects(db, user_id, today)
+
+
+async def load_medications(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_medications`` for the ``get_medications``
+    tool handler. Same shape: today + last_7_days + active list."""
+    return await _load_medications(db, user_id, today)
+
+
+async def load_leisure(db, user_id: int, today: date) -> dict:
+    """Public wrapper around ``_load_leisure`` for the ``get_leisure_logs``
+    tool handler. Returns today + last_7_days aggregates by category."""
+    return await _load_leisure(db, user_id, today)
+
+
+# --- Phase 1 escape-hatch query stubs (one per entity type) -----------------
+# Stubbed minimal implementations. The QueryHandler's filter validation
+# is the load-bearing safety boundary; these helpers only need to honor
+# the closed-set filter contract once their backends land. Until then,
+# raising NotImplementedError surfaces a clean ToolError to the model.
+
+async def query_tasks(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_tasks: Phase 1 follow-on")
+
+
+async def query_habits(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_habits: Phase 1 follow-on")
+
+
+async def query_projects(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_projects: Phase 1 follow-on")
+
+
+async def query_medications(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_medications: Phase 1 follow-on")
+
+
+async def query_mood_logs(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_mood_logs: Phase 1 follow-on")
+
+
+async def query_leisure_logs(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_leisure_logs: Phase 1 follow-on")
+
+
+async def query_check_ins(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_check_ins: Phase 1 follow-on")
+
+
+async def query_goals(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_goals: Phase 1 follow-on")

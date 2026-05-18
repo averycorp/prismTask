@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     ADMIN_EMAILS: list[str] = [
         "avery.karlin@gmail.com",
     ]
+    # Phase 1 feature flag for the AI Assistant agentic read-tool loop.
+    # When False, chat falls back to today's single-shot Claude call with
+    # the curated context bundle + write-chip tools only — exactly the
+    # pre-loop behavior. Default off so prod can flip the loop on per env.
+    AI_ASSISTANT_TOOL_USE_ENABLED: bool = False
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

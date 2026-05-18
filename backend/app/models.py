@@ -821,6 +821,7 @@ class ChatMessage(Base):
     role = Column(String(16), nullable=False)
     content = Column(Text, nullable=False)
     actions = Column(JSON, nullable=True)
+    tool_calls = Column(JSON, nullable=True)
     task_context_snapshot = Column(JSON, nullable=True)
     tokens_input = Column(Integer, nullable=True)
     tokens_output = Column(Integer, nullable=True)
