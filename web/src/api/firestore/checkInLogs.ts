@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
-  orderBy,
   query,
   deleteDoc,
   type DocumentData,
@@ -107,11 +106,14 @@ export async function getRecentCheckIns(
   uid: string,
   limit = 60,
 ): Promise<CheckInLog[]> {
-  // Firestore doc IDs are the ISO dates, so ordering by __name__ is
-  // equivalent to ordering by date. Pulling everything and slicing is
-  // cheap for a sixty-day streak-check window.
-  const snap = await getDocs(query(logsCol(uid), orderBy('__name__', 'desc')));
-  return snap.docs.slice(0, limit).map((d) => docToLog(d.id, d.data()));
+  // Doc IDs are ISO dates. We pull everything (cheap for a 60-day streak
+  // window) and sort client-side instead of relying on
+  // `orderBy('__name__', 'desc')`, which would force a Firestore
+  // single-field descending-name index exemption.
+  const snap = await getDocs(query(logsCol(uid)));
+  const logs = snap.docs.map((d) => docToLog(d.id, d.data()));
+  logs.sort((a, b) => (a.date_iso < b.date_iso ? 1 : a.date_iso > b.date_iso ? -1 : 0));
+  return logs.slice(0, limit);
 }
 
 // ── Real-time listener ───────────────────────────────────────
@@ -122,15 +124,17 @@ export async function getRecentCheckIns(
  * the web check-in card + streak count without a refresh. Closes
  * parity audit § A.1b residual for `check_in_logs`.
  *
- * Doc IDs are ISO dates so `orderBy('__name__', 'desc')` yields a
- * recent-first list — mirrors `getRecentCheckIns` so any limit-on-read
- * consumer can drop in the same slicing logic.
+ * No `orderBy` clause: Firestore's default `__name__ ASC` is implied,
+ * which avoids the composite-index requirement an explicit
+ * `__name__ DESC` would impose. Live consumers (`MorningCheckInBanner`
+ * checks `logs.some((l) => l.date_iso === todayIso)`; the store just
+ * caches the array) don't depend on iteration order.
  */
 export function subscribeToCheckIns(
   uid: string,
   callback: (logs: CheckInLog[]) => void,
 ): Unsubscribe {
-  const q = query(logsCol(uid), orderBy('__name__', 'desc'));
+  const q = query(logsCol(uid));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => docToLog(d.id, d.data())));
   });
