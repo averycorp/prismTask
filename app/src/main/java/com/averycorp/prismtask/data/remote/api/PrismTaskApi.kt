@@ -340,4 +340,30 @@ interface PrismTaskApi {
     ): retrofit2.Response<Unit>
 
     // endregion
+
+    // region Leisure Budget v2.0 — session history (cross-device sync)
+
+    @GET("api/v1/leisure/sessions")
+    suspend fun listLeisureSessions(
+        @Query("since") since: String? = null,
+        @Query("limit") limit: Int? = null
+    ): List<LeisureSessionRemoteResponse>
+
+    @POST("api/v1/leisure/sessions")
+    suspend fun createLeisureSession(
+        @Body body: LeisureSessionCreateRequest
+    ): LeisureSessionRemoteResponse
+
+    @PATCH("api/v1/leisure/sessions/{sessionId}")
+    suspend fun updateLeisureSession(
+        @Path("sessionId") sessionId: String,
+        @Body body: LeisureSessionUpdateRequest
+    ): LeisureSessionRemoteResponse
+
+    @DELETE("api/v1/leisure/sessions/{sessionId}")
+    suspend fun deleteLeisureSession(
+        @Path("sessionId") sessionId: String
+    ): retrofit2.Response<Unit>
+
+    // endregion
 }
