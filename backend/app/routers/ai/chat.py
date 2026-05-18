@@ -74,7 +74,7 @@ async def chat(
     current_user: User = Depends(get_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Conversational coaching chat backed by Claude Haiku.
+    """Conversational coaching chat backed by Claude Sonnet.
 
     Stateless from the backend's POV: the client owns the rolling history
     (last N=6 user/assistant pairs) and re-sends it on every turn via

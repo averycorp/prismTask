@@ -726,7 +726,7 @@ class BatchParseResponse(BaseModel):
 
 # --- Conversational AI Coach (chat) ---
 #
-# Free-form coaching chat backed by Haiku. Stateless from the backend's POV:
+# Free-form coaching chat backed by Sonnet. Stateless from the backend's POV:
 # the client owns the rolling conversation history (10 pairs) and only sends
 # the latest user message plus the conversation_id used for client-side
 # correlation. The backend echoes conversation_id back unchanged.
@@ -889,7 +889,7 @@ class ChatRequest(BaseModel):
     # Forwarded from the client for telemetry only — the server uses
     # ``resolve_effective_tier(current_user, db)`` for actual gating
     # (admin override + stored tier + active beta-code redemption).
-    # Accepted for backward compat but ignored: chat always uses Haiku
+    # Accepted for backward compat but ignored: chat always uses Sonnet
     # regardless of tier (see ``ai_productivity.get_model``).
     tier: Optional[str] = None
 

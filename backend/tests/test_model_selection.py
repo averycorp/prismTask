@@ -1,6 +1,7 @@
 """Tests for feature-based AI model selection.
 
-Weekly planner and monthly review use Sonnet; all other AI features use Haiku.
+Weekly planner, monthly review, and the AI Assistant chat use Sonnet;
+all other AI features use Haiku.
 """
 
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,11 @@ def test_get_model_weekly_planner_returns_sonnet():
 def test_get_model_monthly_review_returns_sonnet():
     from app.services.ai_productivity import get_model, MODEL_SONNET
     assert get_model("monthly_review") == MODEL_SONNET
+
+
+def test_get_model_chat_returns_sonnet():
+    from app.services.ai_productivity import get_model, MODEL_SONNET
+    assert get_model("chat") == MODEL_SONNET
 
 
 def test_get_model_eisenhower_returns_haiku():

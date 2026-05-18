@@ -19,7 +19,7 @@ MODEL_SONNET = "claude-sonnet-4-20250514"
 
 # AI features that use Sonnet for higher-quality output. Everything else runs
 # on Haiku. These are the premium AI features baked into the single Pro tier.
-SONNET_FEATURES = {"weekly_planner", "monthly_review"}
+SONNET_FEATURES = {"weekly_planner", "monthly_review", "chat"}
 
 # Per-request override. Populated by the admin-gated
 # ``apply_admin_model_override`` dependency when an admin client sends
@@ -33,9 +33,10 @@ admin_model_override: contextvars.ContextVar[str | None] = contextvars.ContextVa
 def get_model(feature: str | None = None) -> str:
     """Return the appropriate Claude model ID for the given AI feature.
 
-    Weekly planner and monthly review use Sonnet; everything else uses
-    Haiku. ``feature`` is a short lowercase identifier (e.g. ``"eisenhower"``,
-    ``"weekly_planner"``). Passing ``None`` defaults to Haiku.
+    Weekly planner, monthly review, and the AI Assistant chat use Sonnet;
+    everything else uses Haiku. ``feature`` is a short lowercase identifier
+    (e.g. ``"eisenhower"``, ``"weekly_planner"``, ``"chat"``). Passing
+    ``None`` defaults to Haiku.
     """
     if admin_model_override.get() == "sonnet":
         return MODEL_SONNET
@@ -44,9 +45,9 @@ def get_model(feature: str | None = None) -> str:
     return MODEL_HAIKU
 
 # Sonnet pricing (~$3/M input, ~$15/M output) vs Haiku (~$0.25/M, ~$1.25/M).
-# Weekly planner / monthly review are Sonnet-backed; all other AI features
-# use Haiku to keep the margin healthy at the single $7.99/mo (or $5/mo
-# annual at $59.99/yr) Pro tier.
+# Weekly planner, monthly review, and the AI Assistant chat are Sonnet-backed;
+# all other AI features use Haiku to keep the margin healthy at the single
+# $7.99/mo (or $5/mo annual at $59.99/yr) Pro tier.
 
 
 def _get_client():
