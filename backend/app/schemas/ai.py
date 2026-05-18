@@ -894,6 +894,18 @@ class ChatRequest(BaseModel):
     tier: Optional[str] = None
 
 
+class ChatToolCallRecord(BaseModel):
+    """One read-tool invocation the assistant made during this turn.
+
+    Phase 1: name + input args + a short result_summary the AI saw.
+    Full result data is intentionally dropped to keep ``chat_messages``
+    rows compact; clients render this as an audit trail, not a replay."""
+
+    name: str = Field(min_length=1, max_length=64)
+    input: dict[str, Any] = Field(default_factory=dict)
+    result_summary: str = Field(default="", max_length=500)
+
+
 class ChatResponse(BaseModel):
     message: str
     actions: list[ChatActionPayload] = Field(default_factory=list)
@@ -913,6 +925,7 @@ class ChatResponse(BaseModel):
     # the full list with a REPLACE-all on every response, keeping
     # cross-device state consistent without a separate GET round-trip.
     user_preferences: list[UserAiPreferenceRecord] = Field(default_factory=list)
+    tool_calls: list[ChatToolCallRecord] = Field(default_factory=list)
 
 
 class ChatMessageRecord(BaseModel):
@@ -932,6 +945,7 @@ class ChatMessageRecord(BaseModel):
     task_context_snapshot: Optional[ChatTaskContext] = None
     tokens_used: Optional[ChatTokensUsed] = None
     created_at: str  # ISO-8601 timestamp
+    tool_calls: list[ChatToolCallRecord] = Field(default_factory=list)
 
 
 class ChatHistoryResponse(BaseModel):

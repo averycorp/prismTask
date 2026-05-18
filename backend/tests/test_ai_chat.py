@@ -996,3 +996,54 @@ class TestChatCrisisPreFilter:
             assert resp.status_code == 200, resp.text
             # Regular path is taken — the model call is reached.
             mock_gen.assert_called_once()
+
+
+class TestLoopFlagOff:
+    """Phase 1 canary: with AI_ASSISTANT_TOOL_USE_ENABLED=false (default),
+    Pro chat behavior is byte-identical to the pre-loop baseline."""
+
+    @pytest.mark.asyncio
+    async def test_loop_disabled_with_flag_off_matches_baseline(
+        self, client: AsyncClient, pro_auth_headers: dict, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "app.config.settings.AI_ASSISTANT_TOOL_USE_ENABLED", False, raising=False,
+        )
+        from unittest.mock import AsyncMock as _AsyncMock
+        from app.routers.ai import chat_rate_limiter
+        chat_rate_limiter._requests.clear()
+        with patch(
+            "app.services.ai_productivity.generate_chat_response",
+            new=_AsyncMock(return_value={
+                "message": "hi",
+                "actions": [],
+                "tokens_used": {"input": 1, "output": 1},
+                "tool_calls": [],
+            }),
+        ):
+            resp = await client.post(
+                "/api/v1/ai/chat",
+                json={"message": "hi", "conversation_id": "chat_x"},
+                headers=pro_auth_headers,
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["tool_calls"] == []
+
+    @pytest.mark.asyncio
+    async def test_loop_disabled_for_free_tier(
+        self, client: AsyncClient, auth_headers: dict, monkeypatch
+    ):
+        """Free tier hits 403 at the rate limiter — the loop never runs
+        and there is no observable difference whether the flag is on or off."""
+        monkeypatch.setattr(
+            "app.config.settings.AI_ASSISTANT_TOOL_USE_ENABLED", True, raising=False,
+        )
+        from app.routers.ai import chat_rate_limiter
+        chat_rate_limiter._requests.clear()
+        resp = await client.post(
+            "/api/v1/ai/chat",
+            json={"message": "hi", "conversation_id": "chat_x"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 403

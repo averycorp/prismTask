@@ -26,6 +26,7 @@ from app.schemas.ai import (
     ChatResponse,
     ChatTaskContext,
     ChatTokensUsed,
+    ChatToolCallRecord,
     ChatUserContext,
 )
 from app.services.beta_codes import resolve_effective_tier
@@ -231,6 +232,7 @@ async def chat(
             role="assistant",
             content=result["message"],
             actions=[a.model_dump() for a in validated_actions] or None,
+            tool_calls=result.get("tool_calls") or None,
             tokens_input=tokens_used.input,
             tokens_output=tokens_used.output,
             # +1µs so chronological retrieval orders user-then-assistant
@@ -270,6 +272,16 @@ async def chat(
 
     updated_prefs = await _load_user_preferences(db, current_user.id)
 
+    raw_tool_calls = result.get("tool_calls") or []
+    parsed_tool_calls: list[ChatToolCallRecord] = []
+    for tc in raw_tool_calls:
+        if not isinstance(tc, dict):
+            continue
+        try:
+            parsed_tool_calls.append(ChatToolCallRecord(**tc))
+        except ValidationError:
+            continue
+
     return ChatResponse(
         message=result["message"],
         actions=validated_actions,
@@ -278,6 +290,7 @@ async def chat(
         user_message_id=user_msg_id,
         assistant_message_id=assistant_msg_id,
         user_preferences=[_to_preference_record(p) for p in updated_prefs],
+        tool_calls=parsed_tool_calls,
     )
 
 
@@ -351,6 +364,18 @@ async def chat_history(
                 input=row.tokens_input or 0,
                 output=row.tokens_output or 0,
             )
+        # Parse persisted tool_calls (Phase 1 audit trail) defensively.
+        tool_calls_payload = row.tool_calls or []
+        parsed_tool_calls: list[ChatToolCallRecord] = []
+        if isinstance(tool_calls_payload, list):
+            for tc in tool_calls_payload:
+                if not isinstance(tc, dict):
+                    continue
+                try:
+                    parsed_tool_calls.append(ChatToolCallRecord(**tc))
+                except ValidationError:
+                    continue
+
         records.append(
             ChatMessageRecord(
                 id=row.id,
@@ -361,6 +386,7 @@ async def chat_history(
                 task_context_snapshot=ctx,
                 tokens_used=tokens,
                 created_at=row.created_at.isoformat(),
+                tool_calls=parsed_tool_calls,
             )
         )
 
