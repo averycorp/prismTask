@@ -397,7 +397,7 @@ dependencies {
     // The `androidTestUtil` configuration installs the orchestrator APK
     // alongside the test APK rather than bundling it.
     androidTestUtil("androidx.test:orchestrator:1.5.1")
-    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:runner:1.7.0")
     kspAndroidTest("com.google.dagger:hilt-compiler:2.59.2")
 
     // Debug
