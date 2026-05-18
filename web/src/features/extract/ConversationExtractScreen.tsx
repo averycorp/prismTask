@@ -37,15 +37,19 @@ const PRIORITY_LABELS: Record<number, string> = {
 
 function resolveProjectId(
   suggestion: string | null | undefined,
-  projects: { id: string; title: string }[],
+  projects: { id: string; title: string; status: string }[],
 ): string | null {
-  if (!suggestion) return projects[0]?.id ?? null;
+  // Skip archived projects so extracted tasks never silently land in an
+  // archived bucket (Android `OrganizeTab` parity). The caller passes the
+  // full project list; we filter here once.
+  const candidates = projects.filter((p) => p.status !== 'archived');
+  if (!suggestion) return candidates[0]?.id ?? null;
   const lower = suggestion.toLowerCase();
-  const match = projects.find((p) => p.title.toLowerCase().includes(lower));
+  const match = candidates.find((p) => p.title.toLowerCase().includes(lower));
   if (match) return match.id;
-  // Fall back to the first project so the task lands somewhere. Users can
-  // move it from the task list if that's wrong.
-  return projects[0]?.id ?? null;
+  // Fall back to the first non-archived project so the task lands
+  // somewhere. Users can move it from the task list if that's wrong.
+  return candidates[0]?.id ?? null;
 }
 
 export function ConversationExtractScreen() {
@@ -256,14 +260,14 @@ export function ConversationExtractScreen() {
             </Button>
           </div>
 
-          {projects.length === 0 && (
+          {projects.filter((p) => p.status !== 'archived').length === 0 && (
             <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-600 dark:text-amber-400">
               <TriangleAlert
                 className="mt-0.5 h-4 w-4 shrink-0"
                 aria-hidden="true"
               />
-              You need at least one project before tasks can be created. Create
-              one from the Projects screen first.
+              You need at least one active project before tasks can be created.
+              Create or reopen a project from the Projects screen first.
             </p>
           )}
         </>

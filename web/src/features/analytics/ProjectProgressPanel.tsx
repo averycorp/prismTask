@@ -17,6 +17,7 @@ import * as firestoreTasks from '@/api/firestore/tasks';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useProjectStore } from '@/stores/projectStore';
 import { computeProjectBurndown } from '@/utils/projectBurndown';
+import { pickerProjects as filterPickerProjects } from '@/utils/projectFilters';
 import type { ProjectProgressResponse } from '@/types/analytics';
 import type { Task } from '@/types/task';
 
@@ -47,13 +48,20 @@ export function ProjectProgressPanel({ startIso, endIso }: ProjectProgressPanelP
     fetchAllProjects();
   }, [fetchAllProjects]);
 
-  // Default to the first available project once the list loads.
+  // Hide archived projects from the burndown picker but keep the
+  // currently-selected one visible (mirrors Android `pickerProjects`).
+  const visibleProjects = useMemo(
+    () => filterPickerProjects(projects, selectedProjectId),
+    [projects, selectedProjectId],
+  );
+
+  // Default to the first available non-archived project once the list loads.
   useEffect(() => {
-    if (!selectedProjectId && projects.length > 0) {
+    if (!selectedProjectId && visibleProjects.length > 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- form-init: pick first project as default once async list arrives
-      setSelectedProjectId(projects[0].id);
+      setSelectedProjectId(visibleProjects[0].id);
     }
-  }, [projects, selectedProjectId]);
+  }, [visibleProjects, selectedProjectId]);
 
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === selectedProjectId) ?? null,
@@ -103,10 +111,10 @@ export function ProjectProgressPanel({ startIso, endIso }: ProjectProgressPanelP
     [progress],
   );
 
-  if (projects.length === 0) {
+  if (visibleProjects.length === 0) {
     return (
       <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4 text-sm text-[var(--color-text-secondary)]">
-        No projects yet — create one to see burndown data.
+        No active projects yet — create or reopen one to see burndown data.
       </section>
     );
   }
@@ -150,7 +158,7 @@ export function ProjectProgressPanel({ startIso, endIso }: ProjectProgressPanelP
           aria-label="Project"
           className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
         >
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
             </option>

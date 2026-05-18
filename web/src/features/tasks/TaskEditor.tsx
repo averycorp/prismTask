@@ -21,6 +21,7 @@ import { aiLifeCategoryClassifyText } from '@/api/ai/chat';
 import { formatRelative } from '@/utils/dates';
 import { classifyTaskMode } from '@/utils/taskModeClassifier';
 import { classifyCognitiveLoad } from '@/utils/cognitiveLoadClassifier';
+import { nonArchivedProjects } from '@/utils/projectFilters';
 import { DetailsTab } from '@/features/tasks/tabs/DetailsTab';
 import { ScheduleTab } from '@/features/tasks/tabs/ScheduleTab';
 import { OrganizeTab, TAG_COLORS } from '@/features/tasks/tabs/OrganizeTab';
@@ -592,7 +593,11 @@ export default function TaskEditor({
       toast.error('Title Is Required');
       return;
     }
-    const targetProjectId = projectId || projects[0]?.id;
+    // Pick an unarchived project to land freshly-created tasks in. If the
+    // user explicitly selected an archived one via the picker we honour it
+    // (`projectId` wins); otherwise default to the first non-archived
+    // project, mirroring Android's `OrganizeTab` fallback.
+    const targetProjectId = projectId || nonArchivedProjects(projects)[0]?.id;
     if (!targetProjectId) {
       toast.error('No Project Available. Create a Project First.');
       return;
@@ -638,7 +643,10 @@ export default function TaskEditor({
 
   const handleDuplicate = async () => {
     if (!task) return;
-    const targetProjectId = task.project_id || projects[0]?.id;
+    // Duplicate into the source task's project (even if it's now archived,
+    // the original assignment is preserved). If the source task had no
+    // project, fall back to the first non-archived project.
+    const targetProjectId = task.project_id || nonArchivedProjects(projects)[0]?.id;
     if (!targetProjectId) return;
     try {
       const newTask = await createTask(targetProjectId, {

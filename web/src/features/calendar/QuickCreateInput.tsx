@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
+import { nonArchivedProjects } from '@/utils/projectFilters';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { parseQuickAdd } from '@/utils/nlp';
 import { parseApi } from '@/api/parse';
@@ -72,7 +73,9 @@ export function QuickCreateInput({
   };
 
   const insertTask = async (draft: TaskConfirmDraft) => {
-    const projectId = projects[0]?.id;
+    // Quick-create lands in the first non-archived project — never auto-route
+    // a new task into an archived bucket (Android `OrganizeTab` parity).
+    const projectId = nonArchivedProjects(projects)[0]?.id;
     if (!projectId) {
       toast.error('No project available. Create a project first.');
       return;

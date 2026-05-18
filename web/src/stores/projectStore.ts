@@ -25,6 +25,8 @@ interface ProjectState {
   fetchProject: (projectId: string) => Promise<ProjectDetail>;
   createProject: (goalId: string, data: ProjectCreate) => Promise<Project>;
   updateProject: (projectId: string, data: ProjectUpdate) => Promise<Project>;
+  archiveProject: (projectId: string) => Promise<Project>;
+  reopenProject: (projectId: string) => Promise<Project>;
   deleteProject: (projectId: string) => Promise<void>;
 
   // Real-time
@@ -118,6 +120,36 @@ export const useProjectStore = create<ProjectState>((set) => ({
   updateProject: async (projectId, data) => {
     const uid = getUid();
     const updated = await firestoreProjects.updateProject(uid, projectId, data as Record<string, unknown>);
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? updated : p,
+      ),
+    }));
+    return updated;
+  },
+
+  // Lifecycle helpers — mirror Android `ProjectRepository.archiveProject` /
+  // `reopenProject` (which flip status + stamp/clear `archived_at`). The web
+  // doc only owns `status`; `archivedAt` / `completedAt` are Android-only
+  // fields gated by the LWW guard in `firestore/projects.ts` (parity A.2).
+  archiveProject: async (projectId) => {
+    const uid = getUid();
+    const updated = await firestoreProjects.updateProject(uid, projectId, {
+      status: 'archived',
+    });
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? updated : p,
+      ),
+    }));
+    return updated;
+  },
+
+  reopenProject: async (projectId) => {
+    const uid = getUid();
+    const updated = await firestoreProjects.updateProject(uid, projectId, {
+      status: 'active',
+    });
     set((state) => ({
       projects: state.projects.map((p) =>
         p.id === projectId ? updated : p,
