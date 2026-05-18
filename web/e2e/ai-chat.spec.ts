@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Smoke test for the AI Coach chat route. The E2E suite in this repo does
+ * Smoke test for the AI Executive Assistant chat route. The E2E suite in this repo does
  * not log users in (same pattern as `batch.spec.ts` and
  * `navigation.spec.ts`), so we verify the route is wired up and that
  * unauthenticated hits land back on login — protecting against a regression
@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
  * would require a Pro-tier authed fixture and a live backend, which the
  * existing e2e suite intentionally skips.
  */
-test.describe('AI Coach chat route', () => {
+test.describe('AI Executive Assistant chat route', () => {
   test('unauthenticated /chat bounces to login', async ({ page }) => {
     await page.goto('/chat');
     await expect(page).toHaveURL(/\/(login)?$/);

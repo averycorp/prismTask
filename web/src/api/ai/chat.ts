@@ -8,7 +8,7 @@ import type {
 } from '@/types/chat';
 
 /**
- * REST helpers for the AI Coach chat surface (D11 E.3 + Batch 3 parity).
+ * REST helpers for the AI Executive Assistant chat surface (D11 E.3 + Batch 3 parity).
  *
  * The backend is the source of truth (Postgres `chat_messages`). Web does
  * NOT mirror to a local store — `pullHistory()` re-fetches on screen mount,

@@ -1,5 +1,5 @@
 /**
- * AI Coach action chip — the per-message chip rendered under an assistant
+ * AI Executive Assistant action chip — the per-message chip rendered under an assistant
  * bubble (Mark Complete / Reschedule / Just Drop It / Preview Batch / ...).
  *
  * Idempotency: the parent passes an `actionsInFlight` set keyed by the chip's

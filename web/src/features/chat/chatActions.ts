@@ -1,5 +1,5 @@
 /**
- * Action-chip dispatcher for AI Coach chat. Mirrors the Android
+ * Action-chip dispatcher for AI Executive Assistant chat. Mirrors the Android
  * `ChatViewModel.executeAction` switch (`app/.../ChatViewModel.kt:418-447`)
  * for the 8 action types the backend can return.
  *
