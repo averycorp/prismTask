@@ -10,7 +10,7 @@ pydantic[email]==2.10.4
 pydantic-settings==2.7.1
 httpx==0.28.1
 anthropic==0.42.0
-gunicorn==23.0.0
+gunicorn==26.0.0
 python-multipart==0.0.27
 google-api-python-client==2.153.0
 google-auth==2.36.0
