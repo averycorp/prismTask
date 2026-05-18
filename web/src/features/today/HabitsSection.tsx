@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
 import type { Habit } from '@/types/habit';
 
 /**
@@ -51,7 +52,13 @@ export function HabitsSection() {
 
   const [collapsed, setCollapsed] = useState<boolean>(loadCollapsed);
 
-  const activeHabits = habits.filter((h) => h.is_active);
+  // Medication is its own top-level destination since v1.6 (Android
+  // `HabitListViewModel` filters it out of every habit-list surface);
+  // mirror that so the Medication built-in habit row doesn't appear as
+  // a checkable habit row here.
+  const activeHabits = habits.filter(
+    (h) => h.is_active && !isMedicationBuiltInHabit(h),
+  );
   if (activeHabits.length === 0) return null;
 
   const doneCount = activeHabits.filter((h) => isTodayCompleted(h.id)).length;

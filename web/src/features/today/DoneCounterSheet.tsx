@@ -6,6 +6,7 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
 
 /**
  * "Completed Today" bottom sheet — web port of Android's
@@ -59,6 +60,10 @@ export function DoneCounterSheet({ isOpen, onClose }: DoneCounterSheetProps) {
     }> = [];
     for (const habit of habits) {
       if (!habit.is_active) continue;
+      // Medication is its own top-level destination (parity with
+      // Android's `HabitListViewModel`); don't surface it here as a
+      // completed habit row.
+      if (isMedicationBuiltInHabit(habit)) continue;
       const list = completions[habit.id] || [];
       const todayCompletion = list.find((c) => c.date === todayIso);
       const count = todayCompletion?.count ?? 0;
