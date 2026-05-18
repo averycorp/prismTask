@@ -143,6 +143,7 @@ internal fun habitCompletionToOperation(completion: HabitCompletionEntity): Sync
             completion.completedDateLocal ?: millisToLocalDate(completion.completedDate)
         )
         addProperty("completed_at", completion.completedAt)
+        addProperty("is_skipped", completion.isSkipped)
         if (completion.notes != null) addProperty("notes", completion.notes)
     }
     return SyncOperation(

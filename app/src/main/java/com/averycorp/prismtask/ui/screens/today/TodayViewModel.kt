@@ -981,6 +981,34 @@ constructor(
         }
     }
 
+    /**
+     * Long-press handler: toggle today's skip-marker for the habit. Falls back
+     * to a snackbar when the global skip cap is reached so the user knows why
+     * the gesture didn't take.
+     */
+    fun onToggleHabitSkip(habitId: Long, isCurrentlySkipped: Boolean) {
+        viewModelScope.launch {
+            try {
+                if (isCurrentlySkipped) {
+                    habitRepository.unskipHabitForToday(habitId)
+                } else {
+                    when (val result = habitRepository.skipHabitForToday(habitId)) {
+                        is com.averycorp.prismtask.data.repository.HabitSkipResult.CapReached -> {
+                            snackbarHostState.showSnackbar(
+                                "Skip cap reached (${result.cap} per 7 days). " +
+                                    "Adjust in Settings → Habits & Streaks."
+                            )
+                        }
+                        com.averycorp.prismtask.data.repository.HabitSkipResult.HabitMissing,
+                        com.averycorp.prismtask.data.repository.HabitSkipResult.Skipped -> Unit
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("TodayVM", "Failed to toggle habit skip", e)
+            }
+        }
+    }
+
     // Plan for Today
     val tasksNotInToday: StateFlow<List<TaskEntity>> =
         combine(dayStart, dayEnd) { start, end -> start to end }

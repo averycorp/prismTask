@@ -348,6 +348,36 @@ constructor(
         }
     }
 
+    private val _userMessages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val userMessages: kotlinx.coroutines.flow.SharedFlow<String> = _userMessages
+
+    /**
+     * Long-press handler on the Habits list. Routes to the repository's skip
+     * pathway and emits a snackbar message when the cap rejects the gesture.
+     */
+    fun onToggleSkip(habitId: Long, isCurrentlySkipped: Boolean) {
+        viewModelScope.launch {
+            try {
+                if (isCurrentlySkipped) {
+                    habitRepository.unskipHabitForToday(habitId)
+                } else {
+                    when (val result = habitRepository.skipHabitForToday(habitId)) {
+                        is com.averycorp.prismtask.data.repository.HabitSkipResult.CapReached -> {
+                            _userMessages.tryEmit(
+                                "Skip cap reached (${result.cap} per 7 days). " +
+                                    "Adjust in Settings → Habits & Streaks."
+                            )
+                        }
+                        com.averycorp.prismtask.data.repository.HabitSkipResult.HabitMissing,
+                        com.averycorp.prismtask.data.repository.HabitSkipResult.Skipped -> Unit
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("HabitListVM", "Failed to toggle habit skip", e)
+            }
+        }
+    }
+
     fun completeWithNotes(habitId: Long, notes: String?) {
         viewModelScope.launch {
             try {

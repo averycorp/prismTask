@@ -40,8 +40,27 @@ data class HabitWithStatus(
     val previousPeriodCompletions: Int = 0,
     val previousPeriodMet: Boolean = false,
     val lastLogDate: Long? = null,
-    val logCount: Int = 0
+    val logCount: Int = 0,
+    /**
+     * True when the user long-pressed the habit circle to skip today. Today
+     * is treated as "kept" for the forgiveness streak (no grace burned) and
+     * the circle renders in a distinct skipped style.
+     */
+    val isSkippedToday: Boolean = false
 )
+
+/** Outcome of a long-press "skip today" gesture. */
+sealed class HabitSkipResult {
+    object Skipped : HabitSkipResult()
+
+    /**
+     * Cap rejection: [usedSkips] skips already exist in the trailing 7-day
+     * window vs. [cap] allowed. ViewModel surfaces a snackbar explaining why
+     * the gesture didn't take.
+     */
+    data class CapReached(val cap: Int, val usedSkips: Int) : HabitSkipResult()
+    object HabitMissing : HabitSkipResult()
+}
 
 @Singleton
 class HabitRepository
@@ -127,8 +146,11 @@ constructor(
     ): com.averycorp.prismtask.domain.usecase.StreakResult? {
         val habit = habitDao.getHabitByIdOnce(habitId) ?: return null
         val completions = completionDao.getCompletionsForHabitOnce(habitId)
+        val skippedDates = completionDao.getSkippedLocalDatesForHabitOnce(habitId)
+            .mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
+            .toSet()
         return com.averycorp.prismtask.domain.usecase.StreakCalculator
-            .calculateResilientStreak(completions, habit, config = config)
+            .calculateResilientStreak(completions, habit, config = config, restDays = skippedDates)
     }
 
     suspend fun archiveHabit(id: Long) {
@@ -217,6 +239,82 @@ constructor(
                 totalDoses = habit.reminderTimesPerDay
             )
         }
+    }
+
+    /**
+     * Long-press gesture target: declare today off for this habit.
+     *
+     * - Deletes any completion rows on today (partial multi-daily counts are
+     *   discarded — the user is saying "I'm done with this for today").
+     * - Inserts a skip marker (`is_skipped = 1`). The forgiveness streak
+     *   folds the date into the kept-day bucket via [getSkippedLocalDatesForHabitOnce].
+     * - Enforces the global per-habit cap from [HabitListPreferences.getSkipCapPerWeek];
+     *   a cap of 0 disables enforcement.
+     *
+     * Returns [HabitSkipResult] describing what happened so the ViewModel can
+     * snackbar a cap rejection.
+     */
+    suspend fun skipHabitForToday(habitId: Long): HabitSkipResult {
+        val habit = habitDao.getHabitByIdOnce(habitId) ?: return HabitSkipResult.HabitMissing
+        val now = System.currentTimeMillis()
+        val normalizedDate = normalizeForToday(now)
+        val normalizedLocalDate = epochToLocalDateString(normalizedDate)
+
+        val cap = habitListPreferences.getSkipCapPerWeek().first()
+        if (cap > 0) {
+            val windowDays = com.averycorp.prismtask.data.preferences.HabitListPreferences
+                .SKIP_CAP_WINDOW_DAYS
+            val windowStart = LocalDate.parse(normalizedLocalDate)
+                .minusDays((windowDays - 1).toLong())
+                .toString()
+            val alreadySkipped = completionDao.isSkippedOnDateLocalOnce(habitId, normalizedLocalDate)
+            if (!alreadySkipped) {
+                val priorSkips = completionDao.getSkipCountForHabitInLocalRangeOnce(
+                    habitId,
+                    windowStart,
+                    normalizedLocalDate
+                )
+                if (priorSkips >= cap) {
+                    return HabitSkipResult.CapReached(cap = cap, usedSkips = priorSkips)
+                }
+            }
+        }
+
+        val skipId = transactionRunner.withTransaction {
+            completionDao.deleteByHabitAndDateLocal(habitId, normalizedLocalDate)
+            val existing = completionDao.getSkipByHabitAndDateLocal(habitId, normalizedLocalDate)
+            if (existing != null) {
+                existing.id
+            } else {
+                completionDao.insert(
+                    HabitCompletionEntity(
+                        habitId = habitId,
+                        completedDate = normalizedDate,
+                        completedAt = now,
+                        completedDateLocal = normalizedLocalDate,
+                        isSkipped = true
+                    )
+                )
+            }
+        }
+
+        medicationReminderScheduler.cancelAll(habit.id)
+        medicationReminderScheduler.cancelFollowUp(habit.id)
+        syncTracker.trackCreate(skipId, "habit_completion")
+        widgetUpdateManager.updateHabitWidgets()
+        return HabitSkipResult.Skipped
+    }
+
+    /** Undoes a prior [skipHabitForToday]; safe to call when no skip exists. */
+    suspend fun unskipHabitForToday(habitId: Long) {
+        val now = System.currentTimeMillis()
+        val normalizedDate = normalizeForToday(now)
+        val normalizedLocalDate = epochToLocalDateString(normalizedDate)
+        val existing = completionDao.getSkipByHabitAndDateLocal(habitId, normalizedLocalDate)
+            ?: return
+        syncTracker.trackDelete(existing.id, "habit_completion")
+        completionDao.deleteSkipByHabitAndDateLocal(habitId, normalizedLocalDate)
+        widgetUpdateManager.updateHabitWidgets()
     }
 
     suspend fun uncompleteHabit(habitId: Long, date: Long) {
@@ -353,9 +451,11 @@ constructor(
             val todayLocalString = DayBoundary.currentLocalDateString(dayStartHour)
             combine(
                 habitDao.getActiveHabits(),
-                completionDao.getCompletionsForDateLocal(todayLocalString)
-            ) { habits, todayCompletions ->
+                completionDao.getCompletionsForDateLocal(todayLocalString),
+                completionDao.getSkipsForDateLocal(todayLocalString)
+            ) { habits, todayCompletions, todaySkips ->
                 val countByHabit = todayCompletions.groupBy { it.habitId }.mapValues { it.value.size }
+                val skippedHabitIds = todaySkips.map { it.habitId }.toSet()
                 habits.map { habit ->
                     val target = if (habit.reminderIntervalMillis != null) {
                         habit.reminderTimesPerDay
@@ -365,13 +465,15 @@ constructor(
                         1
                     }
                     val count = countByHabit[habit.id] ?: 0
+                    val isSkippedToday = habit.id in skippedHabitIds
                     HabitWithStatus(
                         habit = habit,
-                        isCompletedToday = count >= target,
+                        isCompletedToday = count >= target || isSkippedToday,
                         currentStreak = 0,
                         completionsThisWeek = 0,
                         completionsToday = count,
-                        dailyTarget = target
+                        dailyTarget = target,
+                        isSkippedToday = isSkippedToday
                     )
                 }
             }
@@ -393,13 +495,18 @@ constructor(
             combine(
                 habitDao.getActiveHabits(),
                 completionDao.getCompletionsForDateLocal(todayLocalString),
+                completionDao.getSkipsForDateLocal(todayLocalString),
                 habitLogDao.getAllLogs(),
                 habitListPreferences.getStreakMaxMissedDays()
-            ) { habits, todayCompletions, allLogs, streakMaxMissedDays ->
+            ) { habits, todayCompletions, todaySkips, allLogs, streakMaxMissedDays ->
                 val countByHabit = todayCompletions.groupBy { it.habitId }.mapValues { it.value.size }
+                val skippedHabitIds = todaySkips.map { it.habitId }.toSet()
                 val logsByHabit = allLogs.groupBy { it.habitId }
                 habits.map { habit ->
                     val completions = completionDao.getCompletionsForHabitOnce(habit.id)
+                    val skippedDates = completionDao.getSkippedLocalDatesForHabitOnce(habit.id)
+                        .mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
+                        .toSet()
                     val target = if (habit.reminderIntervalMillis != null) {
                         habit.reminderTimesPerDay
                     } else if (habit.frequencyPeriod == "daily") {
@@ -408,6 +515,7 @@ constructor(
                         1
                     }
                     val count = countByHabit[habit.id] ?: 0
+                    val isSkippedToday = habit.id in skippedHabitIds
 
                     val periodStart: Long
                     val periodEnd: Long
@@ -441,8 +549,29 @@ constructor(
 
                     // For non-daily habits, "completed today" means the period target is met
                     val isCompleted = when (habit.frequencyPeriod) {
-                        "daily" -> count >= target
+                        "daily" -> count >= target || isSkippedToday
                         else -> periodCompletions >= habit.targetFrequency
+                    }
+
+                    // Fold skipped dates into the completion list as synthetic "met" rows
+                    // so the strict streak walk treats them as kept days. Each skip
+                    // contributes exactly enough entries to clear the daily target.
+                    val zoneId = java.time.ZoneId.systemDefault()
+                    val completionsForStreak = if (skippedDates.isEmpty()) {
+                        completions
+                    } else {
+                        val synthetic = skippedDates.flatMap { date ->
+                            val epoch = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+                            List(target.coerceAtLeast(1)) {
+                                com.averycorp.prismtask.data.local.entity.HabitCompletionEntity(
+                                    habitId = habit.id,
+                                    completedDate = epoch,
+                                    completedAt = epoch,
+                                    completedDateLocal = date.toString()
+                                )
+                            }
+                        }
+                        completions + synthetic
                     }
 
                     // Previous-period completion tracking
@@ -475,7 +604,7 @@ constructor(
                         habit = habit,
                         isCompletedToday = isCompleted,
                         currentStreak = StreakCalculator.calculateCurrentStreak(
-                            completions,
+                            completionsForStreak,
                             habit,
                             todayLocal,
                             streakMaxMissedDays,
@@ -489,7 +618,8 @@ constructor(
                         previousPeriodCompletions = previousCount,
                         previousPeriodMet = previousMet,
                         lastLogDate = lastLog?.date,
-                        logCount = logTotal
+                        logCount = logTotal,
+                        isSkippedToday = isSkippedToday
                     )
                 }
             }

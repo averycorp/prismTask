@@ -474,7 +474,8 @@ object SyncMapper {
                 ?: epochToLocalDateString(completion.completedDate)
             ),
         "completedAt" to completion.completedAt,
-        "notes" to completion.notes
+        "notes" to completion.notes,
+        "isSkipped" to completion.isSkipped
     )
 
     fun mapToHabitCompletion(
@@ -498,7 +499,8 @@ object SyncMapper {
             completedDate = completedDate,
             completedAt = (data["completedAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
             notes = data["notes"] as? String,
-            completedDateLocal = completedDateLocal
+            completedDateLocal = completedDateLocal,
+            isSkipped = (data["isSkipped"] as? Boolean) ?: false
         )
     }
 

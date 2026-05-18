@@ -39,6 +39,7 @@ fun HabitsStreaksScreen(
     val restDayUi by viewModel.restDayUiSnapshot.collectAsStateWithLifecycle()
     val todaySkipAfterCompleteDays by viewModel.todaySkipAfterCompleteDays.collectAsStateWithLifecycle()
     val todaySkipBeforeScheduleDays by viewModel.todaySkipBeforeScheduleDays.collectAsStateWithLifecycle()
+    val skipCapPerWeek by viewModel.skipCapPerWeek.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -65,7 +66,9 @@ fun HabitsStreaksScreen(
                 todaySkipAfterCompleteDays = todaySkipAfterCompleteDays,
                 onTodaySkipAfterCompleteDaysChange = viewModel::setTodaySkipAfterCompleteDays,
                 todaySkipBeforeScheduleDays = todaySkipBeforeScheduleDays,
-                onTodaySkipBeforeScheduleDaysChange = viewModel::setTodaySkipBeforeScheduleDays
+                onTodaySkipBeforeScheduleDaysChange = viewModel::setTodaySkipBeforeScheduleDays,
+                skipCapPerWeek = skipCapPerWeek,
+                onSkipCapPerWeekChange = viewModel::setSkipCapPerWeek
             )
 
             ForgivenessStreakSection(

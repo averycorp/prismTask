@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Redo
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,6 +73,7 @@ internal fun HabitItem(
     habitWithStatus: HabitWithStatus,
     onToggle: () -> Unit,
     onDecrement: () -> Unit,
+    onSkipToggle: () -> Unit,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -80,13 +85,15 @@ internal fun HabitItem(
     val fonts = LocalPrismFonts.current.body
     val attrs = LocalPrismAttrs.current
     val displayFont = LocalPrismFonts.current.display
+    val haptics = LocalHapticFeedback.current
 
     val habitColor = try {
         Color(android.graphics.Color.parseColor(habit.color))
     } catch (_: Exception) {
         colors.primary
     }
-    val isComplete = habitWithStatus.isCompletedToday
+    val isSkipped = habitWithStatus.isSkippedToday
+    val isComplete = habitWithStatus.isCompletedToday && !isSkipped
 
     val scale by animateFloatAsState(
         targetValue = 1.0f,
@@ -310,6 +317,24 @@ internal fun HabitItem(
                 )
             }
 
+            // Inline minus button for multi-daily habits with at least one
+            // completion logged today. Replaces the previous long-press-to-
+            // decrement gesture so long-press can mean "skip today".
+            val showDecrement = !isSkipped &&
+                habitWithStatus.dailyTarget > 1 &&
+                habitWithStatus.completionsToday > 0 &&
+                !isComplete
+            if (showDecrement) {
+                IconButton(onClick = onDecrement, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = "Remove one completion",
+                        modifier = Modifier.size(18.dp),
+                        tint = habitColor.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.width(4.dp))
 
             // Circular checkbox / counter; shape respects chipShape token
@@ -318,42 +343,52 @@ internal fun HabitItem(
             } else {
                 CircleShape
             }
+            val skippedFill = colors.muted.copy(alpha = 0.55f)
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .scale(scale)
                     .clip(checkShape)
                     .then(
-                        if (isComplete) {
-                            Modifier.background(habitColor)
-                        } else if (habitWithStatus.completionsToday > 0) {
-                            Modifier.background(habitColor.copy(alpha = 0.3f))
-                        } else {
-                            Modifier.border(2.dp, habitColor, checkShape)
+                        when {
+                            isSkipped -> Modifier.background(skippedFill)
+                            isComplete -> Modifier.background(habitColor)
+                            habitWithStatus.completionsToday > 0 ->
+                                Modifier.background(habitColor.copy(alpha = 0.3f))
+                            else -> Modifier.border(2.dp, habitColor, checkShape)
                         }
                     )
-                    .pointerInput(isComplete, habitWithStatus.completionsToday) {
+                    .pointerInput(isComplete, isSkipped, habitWithStatus.completionsToday) {
                         detectTapGestures(
-                            onTap = { onToggle() },
-                            onLongPress = { onDecrement() }
+                            onTap = { if (isSkipped) onSkipToggle() else onToggle() },
+                            onLongPress = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onSkipToggle()
+                            }
                         )
                     },
                 contentAlignment = Alignment.Center
             ) {
-                if (isComplete) {
-                    Icon(
+                when {
+                    isSkipped -> Icon(
+                        Icons.Default.Redo,
+                        contentDescription = "Skipped today",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    isComplete -> Icon(
                         Icons.Default.Check,
                         contentDescription = "Completed",
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
-                } else if (habitWithStatus.dailyTarget > 1 && habitWithStatus.completionsToday > 0) {
-                    Text(
-                        text = "${habitWithStatus.completionsToday}",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    habitWithStatus.dailyTarget > 1 && habitWithStatus.completionsToday > 0 ->
+                        Text(
+                            text = "${habitWithStatus.completionsToday}",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                 }
             }
         }

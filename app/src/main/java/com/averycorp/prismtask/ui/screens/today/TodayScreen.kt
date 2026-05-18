@@ -830,6 +830,12 @@ fun TodayScreen(
                                                     hws.isCompletedToday
                                                 )
                                             },
+                                            onSkipToggle = {
+                                                viewModel.onToggleHabitSkip(
+                                                    hws.habit.id,
+                                                    hws.isSkippedToday
+                                                )
+                                            },
                                             onClick = {
                                                 navController.navigate(
                                                     PrismTaskRoute.HabitDetail.createRoute(hws.habit.id)

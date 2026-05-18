@@ -163,7 +163,7 @@ import com.averycorp.prismtask.data.local.entity.WeeklyReviewEntity
     // Database" failure, which then breaks ktlint's no-unused-imports
     // resolution and triggers an autofix-strips-imports cascade. Keep this
     // in sync with `CURRENT_DB_VERSION` in Migrations.kt.
-    version = 83,
+    version = 84,
     exportSchema = false
 )
 abstract class PrismTaskDatabase : RoomDatabase() {
