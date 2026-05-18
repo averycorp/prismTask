@@ -132,6 +132,15 @@ export default function TaskEditor({
   const [lifeCategory, setLifeCategory] = useState<LifeCategory | ''>('');
   const [cognitiveLoad, setCognitiveLoad] = useState<CognitiveLoad | ''>('');
   const [taskMode, setTaskMode] = useState<TaskMode | ''>('');
+  // "Manually set" flags for the Organize-tab auto-classify chips. Mirror
+  // of Android `AddEditTaskViewModel.{taskMode,cognitiveLoad}ManuallySet`
+  // — the debounced auto-classify effect below short-circuits when the
+  // user (or the DB load) has already picked a real chip, so we never
+  // clobber an explicit choice. Refs (not state) so the effect can read
+  // the latest value without re-running on flag flips. See Android
+  // `OrganizeTab.kt:95-99` for the trigger this mirrors.
+  const taskModeManuallySetRef = useRef(false);
+  const cognitiveLoadManuallySetRef = useRef(false);
   const [goodEnoughOverrideEnabled, setGoodEnoughOverrideEnabled] =
     useState(false);
   const [goodEnoughMinutes, setGoodEnoughMinutes] = useState<string>('');
@@ -176,6 +185,8 @@ export default function TaskEditor({
       setLifeCategory('');
       setCognitiveLoad('');
       setTaskMode('');
+      taskModeManuallySetRef.current = false;
+      cognitiveLoadManuallySetRef.current = false;
       setGoodEnoughOverrideEnabled(false);
       setGoodEnoughMinutes('');
       setMaxRevisionsOverrideEnabled(false);
@@ -199,6 +210,11 @@ export default function TaskEditor({
     setLifeCategory((task.life_category as LifeCategory | null) ?? '');
     setCognitiveLoad((task.cognitive_load as CognitiveLoad | null) ?? '');
     setTaskMode((task.task_mode as TaskMode | null) ?? '');
+    // Mirror Android: `xManuallySet = (value != null)` after DB load, so a
+    // saved chip survives subsequent title edits but an empty chip
+    // remains eligible for auto-classify.
+    taskModeManuallySetRef.current = !!task.task_mode;
+    cognitiveLoadManuallySetRef.current = !!task.cognitive_load;
     const ge = task.good_enough_minutes_override;
     setGoodEnoughOverrideEnabled(typeof ge === 'number');
     setGoodEnoughMinutes(typeof ge === 'number' ? String(ge) : '');
@@ -292,6 +308,53 @@ export default function TaskEditor({
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, []);
+
+  // Debounced auto-classify on title/description edit (Android parity).
+  // Mirrors `OrganizeTab.kt:95-99` LaunchedEffect that re-runs
+  // `autoPickTaskMode` / `autoPickCognitiveLoad` on every text edit.
+  // Sticky once the user has manually picked a chip (or the DB load
+  // seeded one) — see the manuallySet refs above. 400 ms debounce so
+  // we classify on settled text, not every keystroke.
+  useEffect(() => {
+    const haystack = title.trim();
+    // Empty title: clear any auto-picked chip so the next real edit
+    // gets a fresh classification (matches Android's force=false path
+    // where UNCATEGORIZED clears the chip). Manual picks survive.
+    if (!haystack) {
+      if (!taskModeManuallySetRef.current && taskMode !== '') {
+        setTaskMode('');
+        autoSave({ taskMode: null });
+      }
+      if (!cognitiveLoadManuallySetRef.current && cognitiveLoad !== '') {
+        setCognitiveLoad('');
+        autoSave({ cognitiveLoad: null });
+      }
+      return;
+    }
+    const handle = setTimeout(() => {
+      if (!taskModeManuallySetRef.current) {
+        const guess = classifyTaskMode(title, description.trim() || null);
+        const next = guess === 'UNCATEGORIZED' ? '' : guess;
+        if (next !== taskMode) {
+          setTaskMode(next);
+          autoSave({ taskMode: next === '' ? null : next });
+        }
+      }
+      if (!cognitiveLoadManuallySetRef.current) {
+        const guess = classifyCognitiveLoad(
+          title,
+          description.trim() || null,
+        );
+        const next = guess === 'UNCATEGORIZED' ? '' : guess;
+        if (next !== cognitiveLoad) {
+          setCognitiveLoad(next);
+          autoSave({ cognitiveLoad: next === '' ? null : next });
+        }
+      }
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description]);
 
   // ---- Field change handlers (debounced auto-save) ----
   const handleTitleChange = (v: string) => {
@@ -404,11 +467,16 @@ export default function TaskEditor({
 
   const handleCognitiveLoadChange = (v: CognitiveLoad | '') => {
     setCognitiveLoad(v);
+    // Manual pick is sticky — see ref declaration above. Picking the
+    // empty chip clears the flag so the debounced effect can run again.
+    cognitiveLoadManuallySetRef.current = v !== '';
     autoSave({ cognitiveLoad: v === '' ? null : v });
   };
 
   const handleTaskModeChange = (v: TaskMode | '') => {
     setTaskMode(v);
+    // Manual pick is sticky — see ref declaration above.
+    taskModeManuallySetRef.current = v !== '';
     autoSave({ taskMode: v === '' ? null : v });
   };
 
@@ -431,6 +499,11 @@ export default function TaskEditor({
           return;
         }
         handleTaskModeChange(next);
+        // Mirror Android `autoPickTaskMode(force=true)`: explicit Auto
+        // press leaves the chip eligible for auto-refresh on the next
+        // title edit. handleTaskModeChange sets the flag to true; undo
+        // that so the debounced effect can run again.
+        taskModeManuallySetRef.current = false;
         toast.success(
           `Set Task Mode: ${next.charAt(0)}${next.slice(1).toLowerCase()}`,
         );
@@ -460,6 +533,10 @@ export default function TaskEditor({
           return;
         }
         handleCognitiveLoadChange(next);
+        // Mirror Android `autoPickCognitiveLoad(force=true)`: explicit
+        // Auto press leaves the chip eligible for auto-refresh on the
+        // next title edit.
+        cognitiveLoadManuallySetRef.current = false;
         toast.success(
           `Set Cognitive Load: ${next.charAt(0)}${next.slice(1).toLowerCase()}`,
         );
