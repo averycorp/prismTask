@@ -1,9 +1,13 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
+  updateDoc,
   type DocumentData,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -15,11 +19,11 @@ import { firestore } from '@/lib/firebase';
  * (see Android `TaskTimingEntity` + `TaskTimingRepository`).
  *
  * Read path lit up first (cross-device Pomodoro / manual log / timer
- * entries from Android land in the analytics surface). Write parity
- * shipped in audit item 7 — Pomodoro session-complete on web now
- * auto-logs one row per session task, mirroring Android's
- * `SmartPomodoroViewModel.autoLogPomodoroSessionTime`. Manual "Log
- * time" UI on web is a separate follow-up.
+ * entries from Android land in the analytics surface). Pomodoro
+ * session-complete on web auto-logs through `addTaskTiming`
+ * (`source: 'pomodoro'`). Manual "Log Time" UI on the task editor
+ * Schedule tab uses the same `addTaskTiming` plus `updateTaskTiming` /
+ * `deleteTaskTiming` for per-row edits.
  *
  * Snake_case keys on the UI side; the Android push uses camelCase keys
  * (`taskId`, `startedAt`, `endedAt`, `durationMinutes`, `source`,
@@ -50,6 +54,10 @@ export interface TaskTiming {
 
 function timingsCol(uid: string) {
   return collection(firestore, 'users', uid, 'task_timings');
+}
+
+function timingDocRef(uid: string, timingId: string) {
+  return doc(firestore, 'users', uid, 'task_timings', timingId);
 }
 
 function docToTaskTiming(docId: string, data: DocumentData): TaskTiming {
@@ -142,4 +150,60 @@ export async function addTaskTiming(
   };
   const ref = await addDoc(timingsCol(uid), payload);
   return docToTaskTiming(ref.id, payload);
+}
+
+/** Patch shape for `updateTaskTiming`. Every field is optional; only
+ *  the ones the caller wants to change need to be set. */
+export interface UpdateTaskTimingInput {
+  durationMinutes?: number;
+  startedAt?: number | null;
+  endedAt?: number | null;
+  notes?: string | null;
+  source?: TaskTimingSource;
+}
+
+/**
+ * Patch an existing `task_timings` row. `task_timings` is append-only
+ * on Android (no `updatedAt` column, no edit UI), so this write only
+ * races with itself — a plain `updateDoc` is safe. Powers the
+ * task-editor Schedule-tab edit affordance; the snapshot listener
+ * surfaces the patched row shortly after the write commits.
+ */
+export async function updateTaskTiming(
+  uid: string,
+  timingId: string,
+  input: UpdateTaskTimingInput,
+): Promise<TaskTiming> {
+  if (
+    input.durationMinutes !== undefined &&
+    !(input.durationMinutes > 0)
+  ) {
+    throw new Error(
+      `durationMinutes must be > 0 (got ${input.durationMinutes})`,
+    );
+  }
+  const patch: Record<string, unknown> = {};
+  if (input.durationMinutes !== undefined)
+    patch.durationMinutes = input.durationMinutes;
+  if (input.startedAt !== undefined) patch.startedAt = input.startedAt;
+  if (input.endedAt !== undefined) patch.endedAt = input.endedAt;
+  if (input.notes !== undefined) patch.notes = input.notes;
+  if (input.source !== undefined) patch.source = input.source;
+  if (Object.keys(patch).length > 0) {
+    await updateDoc(timingDocRef(uid, timingId), patch);
+  }
+  const snap = await getDoc(timingDocRef(uid, timingId));
+  if (!snap.exists()) {
+    throw new Error(`task_timing ${timingId} not found after update`);
+  }
+  return docToTaskTiming(snap.id, snap.data());
+}
+
+/** Delete a `task_timings` row. Powers the task-editor Schedule-tab
+ *  delete affordance. */
+export async function deleteTaskTiming(
+  uid: string,
+  timingId: string,
+): Promise<void> {
+  await deleteDoc(timingDocRef(uid, timingId));
 }

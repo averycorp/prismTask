@@ -788,6 +788,7 @@ export default function TaskEditor({
             {activeTab === 'schedule' && (
               <ScheduleTab
                 isCreate={isCreate}
+                taskId={task?.id ?? null}
                 dueDate={dueDate}
                 onDueDateChange={handleDueDateChange}
                 dueTime={dueTime}
