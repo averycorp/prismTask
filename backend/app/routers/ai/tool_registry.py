@@ -25,10 +25,14 @@ from .tools._base import ToolError, ToolHandler, ToolResult
 from .tools.habits import GetHabitsHandler
 from .tools.leisure import GetLeisureLogsHandler
 from .tools.medications import GetMedicationsHandler
-from .tools.mood import GetMoodLogsHandler
 from .tools.projects import GetProjectsHandler
 from .tools.query import QueryHandler
 from .tools.tasks import GetTasksHandler
+
+# NOTE: ``get_mood_logs`` is deferred to a Phase 1 follow-up. The Android
+# ``MoodEnergyLogEntity`` does not yet have a Postgres mirror, so the tool
+# has no data source. Stub remains at ``tools/mood.py`` but is not
+# registered or exposed in ``READ_TOOL_NAMES``.
 
 
 READ_TOOL_NAMES: frozenset[str] = frozenset({
@@ -36,7 +40,6 @@ READ_TOOL_NAMES: frozenset[str] = frozenset({
     "get_habits",
     "get_projects",
     "get_medications",
-    "get_mood_logs",
     "get_leisure_logs",
     "query",
 })
@@ -84,7 +87,6 @@ def default_registry() -> ToolRegistry:
         GetHabitsHandler(),
         GetProjectsHandler(),
         GetMedicationsHandler(),
-        GetMoodLogsHandler(),
         GetLeisureLogsHandler(),
         QueryHandler(),
     ])
