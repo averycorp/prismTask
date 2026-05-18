@@ -87,6 +87,14 @@
         {"fieldPath": "medicationCloudId", "order": "ASCENDING"},
         {"fieldPath": "takenDateLocal", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "nlp_shortcuts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "sortOrder", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

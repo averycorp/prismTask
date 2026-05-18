@@ -5,7 +5,6 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -113,9 +112,11 @@ export async function unmarkRestDay(
 
 /** One-shot fetch of every rest-day ISO date the user has marked. */
 export async function getAllRestDays(uid: string): Promise<Set<string>> {
-  const snap = await getDocs(
-    query(restDaysCol(uid), orderBy('__name__', 'desc')),
-  );
+  // No `orderBy` — every consumer dumps the result into a `Set<string>`,
+  // and an explicit `__name__ DESC` would require a Firestore single-
+  // field descending-name index exemption that isn't worth the deploy
+  // friction. Default `__name__ ASC` is implicit.
+  const snap = await getDocs(query(restDaysCol(uid)));
   return new Set(snap.docs.map((d) => d.id));
 }
 
@@ -133,15 +134,14 @@ export async function isRestDay(uid: string, isoDate: string): Promise<boolean> 
  * (streak fold + Today banner) without a refresh, and vice versa.
  *
  * Yields a `Set<string>` of ISO dates because every downstream consumer
- * (streak walk, banner) cares about set-membership, not metadata.
- * Doc IDs are ISO dates so `orderBy('__name__', 'desc')` keeps the
- * snapshot in a deterministic recent-first order.
+ * (streak walk, banner) cares about set-membership, not metadata — the
+ * snapshot's iteration order is irrelevant once the IDs land in a Set.
  */
 export function subscribeToRestDays(
   uid: string,
   callback: (dates: Set<string>) => void,
 ): Unsubscribe {
-  const q = query(restDaysCol(uid), orderBy('__name__', 'desc'));
+  const q = query(restDaysCol(uid));
   return onSnapshot(q, (snap) => {
     callback(new Set(snap.docs.map((d) => d.id)));
   });
@@ -155,8 +155,12 @@ export function subscribeToRestDays(
  * cadence without re-querying.
  */
 export async function getAllRestDayRows(uid: string): Promise<RestDay[]> {
-  const snap = await getDocs(
-    query(restDaysCol(uid), orderBy('__name__', 'desc')),
-  );
-  return snap.docs.map((d) => docToRestDay(d.id, d.data()));
+  // Pull unordered + sort client-side. See `getAllRestDays` for why we
+  // don't `orderBy('__name__', 'desc')` (avoids a desc-name index
+  // exemption). Sorts ISO dates descending so the recent-first
+  // analytics shape matches the neighbouring `getRecent*` helpers.
+  const snap = await getDocs(query(restDaysCol(uid)));
+  const rows = snap.docs.map((d) => docToRestDay(d.id, d.data()));
+  rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return rows;
 }
