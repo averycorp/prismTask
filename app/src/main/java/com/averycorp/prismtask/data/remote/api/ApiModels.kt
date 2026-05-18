@@ -1255,4 +1255,43 @@ data class LeisureActivityRemoteResponse(
 )
 // endregion
 
+// region Leisure Budget v2.0 — Session History
+// Mirrors backend/app/schemas/leisure.py LeisureSession*. Session ids are
+// client-generated UUID strings; `activity_id` is the cloud_id of the
+// activity (null for orphan/free-text sessions). `source` is TIMER or
+// MANUAL. PATCH currently accepts logged_at only — see the backend
+// schema comment for the scope reasoning.
+
+data class LeisureSessionCreateRequest(
+    val id: String,
+    @SerializedName("activity_id")
+    val activityId: String? = null,
+    val category: String,
+    @SerializedName("duration_minutes")
+    val durationMinutes: Int,
+    @SerializedName("logged_at")
+    val loggedAt: String,
+    val source: String
+)
+
+data class LeisureSessionUpdateRequest(
+    @SerializedName("logged_at")
+    val loggedAt: String? = null
+)
+
+data class LeisureSessionRemoteResponse(
+    val id: String,
+    @SerializedName("activity_id")
+    val activityId: String? = null,
+    val category: String,
+    @SerializedName("duration_minutes")
+    val durationMinutes: Int,
+    @SerializedName("logged_at")
+    val loggedAt: String,
+    val source: String,
+    @SerializedName("created_at")
+    val createdAt: String
+)
+// endregion
+
 // endregion

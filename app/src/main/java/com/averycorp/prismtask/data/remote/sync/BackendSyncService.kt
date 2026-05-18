@@ -64,7 +64,8 @@ constructor(
     private val authManager: AuthManager,
     private val logger: PrismSyncLogger,
     private val syncStateRepository: SyncStateRepository,
-    private val leisureSyncService: LeisureSyncService
+    private val leisureSyncService: LeisureSyncService,
+    private val leisureSessionSyncService: LeisureSessionSyncService
 ) {
     /**
      * True when the user has backend JWTs stored (i.e. they've logged into or
@@ -105,6 +106,23 @@ constructor(
                 0
             }
             pushed += leisureOps
+            // Sessions follow activities: the activity_id Long ↔ cloud_id
+            // String mapping needs the activity row already round-tripped
+            // so its cloud_id is populated. Failures here are also
+            // non-fatal — the generic /sync and the activity sync already
+            // succeeded, and the next cycle will retry.
+            val leisureSessionOps = try {
+                leisureSessionSyncService.sync()
+            } catch (e: Exception) {
+                logger.warn(
+                    operation = "sync.leisure_session",
+                    status = "failed",
+                    detail = "non-fatal — generic /sync + activity sync already succeeded",
+                    throwable = e
+                )
+                0
+            }
+            pushed += leisureSessionOps
             val summary = SyncSummary(
                 pushed = pushed,
                 pulled = pulled,

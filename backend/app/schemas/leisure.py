@@ -57,6 +57,14 @@ class LeisureSessionCreate(BaseModel):
     source: LeisureSourceT
 
 
+class LeisureSessionUpdate(BaseModel):
+    # Android's `LeisureBudgetRepository.updateSessionTime` re-stamps the
+    # logged_at of a previously-recorded session; nothing else mutates
+    # after insert. Keep the patch surface to that one field — broader
+    # edits can be added when a UI flow actually needs them.
+    logged_at: Optional[datetime] = None
+
+
 class LeisureSessionResponse(BaseModel):
     id: str
     activity_id: Optional[str] = None

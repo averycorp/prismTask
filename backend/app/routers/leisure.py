@@ -4,7 +4,9 @@ Three resource collections under ``/api/v1/leisure``:
 
 * ``GET / POST / PATCH / DELETE /activities`` — manage the user's
   leisure-activity pool.
-* ``GET / POST /sessions`` — leisure-session history (timer + manual).
+* ``GET / POST / PATCH / DELETE /sessions`` — leisure-session history
+  (timer + manual). PATCH currently accepts ``logged_at`` only — that's
+  the lone field Android's ``updateSessionTime`` mutates after insert.
 * ``GET / PATCH /settings`` — singleton per-user settings.
 
 The settings PATCH is gated by ``require_leisure_enforcement_choice``
@@ -31,6 +33,7 @@ from app.schemas.leisure import (
     LeisureActivityUpdate,
     LeisureSessionCreate,
     LeisureSessionResponse,
+    LeisureSessionUpdate,
     LeisureSettingsResponse,
     LeisureSettingsUpdate,
 )
@@ -280,6 +283,58 @@ async def create_session(
             activity.updated_at = now
     await db.flush()
     return LeisureSessionResponse.model_validate(row, from_attributes=True)
+
+
+@router.patch(
+    "/sessions/{session_id}", response_model=LeisureSessionResponse
+)
+async def update_session(
+    session_id: str,
+    body: LeisureSessionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LeisureSessionResponse:
+    result = await db.execute(
+        select(LeisureSession).where(
+            LeisureSession.id == session_id,
+            LeisureSession.user_id == current_user.id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+    if body.logged_at is not None:
+        row.logged_at = body.logged_at
+    await db.flush()
+    await db.refresh(row)
+    return LeisureSessionResponse.model_validate(row, from_attributes=True)
+
+
+@router.delete(
+    "/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    result = await db.execute(
+        select(LeisureSession).where(
+            LeisureSession.id == session_id,
+            LeisureSession.user_id == current_user.id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+    await db.delete(row)
+    await db.flush()
 
 
 @router.get("/settings", response_model=LeisureSettingsResponse)

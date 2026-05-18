@@ -80,4 +80,13 @@ interface LeisureSessionDao {
 
     @Query("SELECT * FROM leisure_sessions ORDER BY logged_at DESC LIMIT :limit")
     fun getRecent(limit: Int = 50): Flow<List<LeisureSessionEntity>>
+
+    @Query("SELECT * FROM leisure_sessions ORDER BY logged_at DESC")
+    suspend fun getAllOnce(): List<LeisureSessionEntity>
+
+    @Query("SELECT * FROM leisure_sessions WHERE cloud_id = :cloudId LIMIT 1")
+    suspend fun getByCloudIdOnce(cloudId: String): LeisureSessionEntity?
+
+    @Query("UPDATE leisure_sessions SET cloud_id = :cloudId WHERE id = :id")
+    suspend fun setCloudId(id: Long, cloudId: String)
 }
