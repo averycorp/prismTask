@@ -828,6 +828,11 @@ class ChatMessage(Base):
     role = Column(String(16), nullable=False)
     content = Column(Text, nullable=False)
     actions = Column(JSON, nullable=True)
+    # Phase 1 (AI Assistant tool-use loop): summary of read-tool calls the
+    # assistant invoked during this turn — [{name, input, result_summary},
+    # ...]. NULL for user-role rows and for assistant rows that did not
+    # invoke any read tool. Lets ``GET /chat/history`` re-render what the
+    # AI looked up for cross-device debugging.
     tool_calls = Column(JSON, nullable=True)
     task_context_snapshot = Column(JSON, nullable=True)
     tokens_input = Column(Integer, nullable=True)
