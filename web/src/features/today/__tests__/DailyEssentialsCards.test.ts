@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { buildRoutineCard } from '@/features/today/DailyEssentialsCards';
 import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
+import type { SelfCareTierDefaults } from '@/api/firestore/advancedTuningPreferences';
 
 /**
  * Pure-function tests for the Daily Essentials section card builders.
  * Mirrors Android's `DailyEssentialsUseCase.observeRoutineCard` shape
  * (parity unit 6 of 23). No DOM, no Firestore.
  */
+
+const TIER_DEFAULTS: SelfCareTierDefaults = {
+  morning: 'solid',
+  bedtime: 'solid',
+  medication: 'prescription',
+  housework: 'regular',
+};
 
 function step(over: Partial<SelfCareStep> & { step_id: string; routine_type: string }): SelfCareStep {
   return {
@@ -46,7 +54,7 @@ const TODAY_MS = 1_700_000_000_000;
 
 describe('buildRoutineCard (parity unit 6)', () => {
   it('returns null when no steps exist for the routine', () => {
-    const card = buildRoutineCard('morning', [], [], TODAY_MS);
+    const card = buildRoutineCard('morning', [], [], TODAY_MS, TIER_DEFAULTS);
     expect(card).toBeNull();
   });
 
@@ -61,7 +69,13 @@ describe('buildRoutineCard (parity unit 6)', () => {
       date: TODAY_MS,
       completed_steps: '["s1"]',
     });
-    const card = buildRoutineCard('morning', steps, [todayLog], TODAY_MS);
+    const card = buildRoutineCard(
+      'morning',
+      steps,
+      [todayLog],
+      TODAY_MS,
+      TIER_DEFAULTS,
+    );
     expect(card).not.toBeNull();
     expect(card!.routineType).toBe('morning');
     expect(card!.displayName).toBe('Morning Routine');
@@ -77,22 +91,72 @@ describe('buildRoutineCard (parity unit 6)', () => {
       date: TODAY_MS - 24 * 60 * 60 * 1000,
       completed_steps: '["s1"]',
     });
-    const card = buildRoutineCard('morning', steps, [yesterdayLog], TODAY_MS);
+    const card = buildRoutineCard(
+      'morning',
+      steps,
+      [yesterdayLog],
+      TODAY_MS,
+      TIER_DEFAULTS,
+    );
     expect(card!.steps[0].completed).toBe(false);
   });
 
   it('maps the bedtime + housework display names', () => {
     const morningSteps = [step({ step_id: 's1', routine_type: 'morning' })];
     const bedtimeSteps = [step({ step_id: 's1', routine_type: 'bedtime' })];
-    const houseworkSteps = [step({ step_id: 's1', routine_type: 'housework' })];
-    expect(buildRoutineCard('bedtime', bedtimeSteps, [], TODAY_MS)!.displayName).toBe(
-      'Bedtime Routine',
-    );
+    const houseworkSteps = [
+      step({ step_id: 's1', routine_type: 'housework', tier: 'quick' }),
+    ];
     expect(
-      buildRoutineCard('housework', houseworkSteps, [], TODAY_MS)!.displayName,
+      buildRoutineCard('bedtime', bedtimeSteps, [], TODAY_MS, TIER_DEFAULTS)!
+        .displayName,
+    ).toBe('Bedtime Routine');
+    expect(
+      buildRoutineCard('housework', houseworkSteps, [], TODAY_MS, TIER_DEFAULTS)!
+        .displayName,
     ).toBe('Housework');
-    expect(buildRoutineCard('morning', morningSteps, [], TODAY_MS)!.displayName).toBe(
-      'Morning Routine',
+    expect(
+      buildRoutineCard('morning', morningSteps, [], TODAY_MS, TIER_DEFAULTS)!
+        .displayName,
+    ).toBe('Morning Routine');
+  });
+
+  it('hides steps above the configured tier default (regression for #1659)', () => {
+    // Housework tier order: quick < regular < deep. A "regular" default
+    // must show quick + regular steps but hide the deep one.
+    const steps = [
+      step({ step_id: 'hQuick', routine_type: 'housework', tier: 'quick', sort_order: 1 }),
+      step({ step_id: 'hReg', routine_type: 'housework', tier: 'regular', sort_order: 2 }),
+      step({ step_id: 'hDeep', routine_type: 'housework', tier: 'deep', sort_order: 3 }),
+    ];
+    const card = buildRoutineCard(
+      'housework',
+      steps,
+      [],
+      TODAY_MS,
+      { ...TIER_DEFAULTS, housework: 'regular' },
     );
+    expect(card!.steps.map((s) => s.stepId)).toEqual(['hQuick', 'hReg']);
+  });
+
+  it("today's log selectedTier overrides the prefs default", () => {
+    const steps = [
+      step({ step_id: 'hQuick', routine_type: 'housework', tier: 'quick', sort_order: 1 }),
+      step({ step_id: 'hReg', routine_type: 'housework', tier: 'regular', sort_order: 2 }),
+      step({ step_id: 'hDeep', routine_type: 'housework', tier: 'deep', sort_order: 3 }),
+    ];
+    const todayLog = log({
+      routine_type: 'housework',
+      date: TODAY_MS,
+      selected_tier: 'deep',
+    });
+    const card = buildRoutineCard(
+      'housework',
+      steps,
+      [todayLog],
+      TODAY_MS,
+      { ...TIER_DEFAULTS, housework: 'quick' },
+    );
+    expect(card!.steps.map((s) => s.stepId)).toEqual(['hQuick', 'hReg', 'hDeep']);
   });
 });
