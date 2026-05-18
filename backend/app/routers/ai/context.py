@@ -582,3 +582,41 @@ async def load_leisure(db, user_id: int, today: date) -> dict:
     """Public wrapper around ``_load_leisure`` for the ``get_leisure_logs``
     tool handler. Returns today + last_7_days aggregates by category."""
     return await _load_leisure(db, user_id, today)
+
+
+# --- Phase 1 escape-hatch query stubs (one per entity type) -----------------
+# Stubbed minimal implementations. The QueryHandler's filter validation
+# is the load-bearing safety boundary; these helpers only need to honor
+# the closed-set filter contract once their backends land. Until then,
+# raising NotImplementedError surfaces a clean ToolError to the model.
+
+async def query_tasks(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_tasks: Phase 1 follow-on")
+
+
+async def query_habits(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_habits: Phase 1 follow-on")
+
+
+async def query_projects(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_projects: Phase 1 follow-on")
+
+
+async def query_medications(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_medications: Phase 1 follow-on")
+
+
+async def query_mood_logs(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_mood_logs: Phase 1 follow-on")
+
+
+async def query_leisure_logs(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_leisure_logs: Phase 1 follow-on")
+
+
+async def query_check_ins(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_check_ins: Phase 1 follow-on")
+
+
+async def query_goals(user, db, *, filters, fields, limit, today):
+    raise NotImplementedError("query_goals: Phase 1 follow-on")
