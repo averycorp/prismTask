@@ -30,6 +30,7 @@ import {
 } from '@/utils/builtInHabitReconciler';
 import { HabitBookingDialog } from './HabitBookingDialog';
 import { HabitLogDialog } from '@/components/HabitLogDialog';
+import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
 import { isRecurringFrequency, type Habit } from '@/types/habit';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -113,7 +114,13 @@ export function HabitListScreen() {
   // `HabitListViewModel.kt:213-252`. Without this, cloud-synced rows
   // leak into web's list and make it longer than mobile's.
   const activeHabits = useMemo(
-    () => habits.filter((h) => h.is_active && !META_HABIT_NAMES.has(h.name)),
+    () =>
+      habits.filter(
+        (h) =>
+          h.is_active &&
+          !META_HABIT_NAMES.has(h.name) &&
+          !isMedicationBuiltInHabit(h),
+      ),
     [habits],
   );
 
