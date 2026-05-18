@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -65,7 +66,14 @@ data class MedicationSlotTodayState(
      * summary; this map gives finer-grained per-row times for users who
      * stagger their meds within a single slot.
      */
-    val takenAtByMedicationId: Map<Long, Long> = emptyMap()
+    val takenAtByMedicationId: Map<Long, Long> = emptyMap(),
+    /**
+     * Latest non-synthetic dose row per medication. Carried alongside
+     * [takenAtByMedicationId] so the long-press time-edit sheet can
+     * retime / remove the exact row that's surfacing in the UI without
+     * a second repository round-trip.
+     */
+    val latestDoseByMedicationId: Map<Long, MedicationDoseEntity> = emptyMap()
 ) {
     /**
      * True when the user backdated this slot — i.e. intended_time was
@@ -91,7 +99,14 @@ data class MedicationSlotTodayState(
 data class UnslottedMedicationState(
     val medication: MedicationEntity,
     val takenToday: Boolean,
-    val takenAt: Long? = null
+    val takenAt: Long? = null,
+    /**
+     * Every non-synthetic dose row for this medication today. Multiple
+     * rows happen because the Unscheduled "Record Taken" button inserts
+     * a fresh row per tap (no toggle). The long-press time-edit flow
+     * disambiguates via [DosePickerSheet] when the list has >1 entry.
+     */
+    val dosesToday: List<MedicationDoseEntity> = emptyList()
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -189,6 +204,12 @@ constructor(
             val takenAtByMed: Map<Long, Long> = realDoses
                 .groupingBy { it.medicationId!! }
                 .fold(0L) { acc, dose -> if (dose.takenAt > acc) dose.takenAt else acc }
+            // Carry the latest dose entity itself (not just its timestamp)
+            // so the long-press edit sheet can retime / remove the exact
+            // row that's surfacing in the UI.
+            val latestDoseByMed: Map<Long, MedicationDoseEntity> = realDoses
+                .groupBy { it.medicationId!! }
+                .mapValues { (_, doses) -> doses.maxBy { it.takenAt } }
             val computed = MedicationTierComputer.computeAchievedTier(
                 medsForSlot = linkedMeds.associate { it.id to MedicationTier.fromStorage(it.tier) },
                 markedTaken = takenIds
@@ -207,7 +228,8 @@ constructor(
                 isUserSet = userRow != null,
                 intendedTime = anySlotRow?.intendedTime,
                 loggedAt = anySlotRow?.loggedAt,
-                takenAtByMedicationId = takenAtByMed
+                takenAtByMedicationId = takenAtByMed,
+                latestDoseByMedicationId = latestDoseByMed
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyList())
@@ -232,14 +254,14 @@ constructor(
         meds.mapNotNull { med ->
             val linkedSlotIds = slotRepository.getSlotIdsForMedicationOnce(med.id)
             if (linkedSlotIds.isNotEmpty()) return@mapNotNull null
-            val latestDose = doses
-                .asSequence()
+            val medDoses = doses
                 .filter { it.medicationId == med.id && !it.isSyntheticSkip }
-                .maxByOrNull { it.takenAt }
+            val latestDose = medDoses.maxByOrNull { it.takenAt }
             UnslottedMedicationState(
                 medication = med,
                 takenToday = latestDose != null,
-                takenAt = latestDose?.takenAt
+                takenAt = latestDose?.takenAt,
+                dosesToday = medDoses
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyList())
@@ -347,6 +369,66 @@ constructor(
                     intendedTime = takenAt
                 )
             }
+        }
+    }
+
+    /**
+     * Retime an existing dose row to [newTakenAt]. Recomputes
+     * `taken_date_local` from the SoD-anchored boundary so a retime that
+     * crosses a logical-day edge re-files the row under the correct day.
+     * Slot-anchored doses also trigger a tier-state refresh — retiming
+     * doesn't change which meds are taken, but the call is cheap and
+     * keeps the contract symmetric with toggleDose.
+     */
+    fun retimeDose(dose: MedicationDoseEntity, newTakenAt: Long) {
+        viewModelScope.launch {
+            val dayStartHour = taskBehaviorPreferences.getDayStartHour().first()
+            val dateLocal = com.averycorp.prismtask.util.DayBoundary
+                .currentLocalDateString(dayStartHour, newTakenAt)
+            medicationRepository.updateDose(
+                dose.copy(takenAt = newTakenAt, takenDateLocal = dateLocal)
+            )
+            dose.slotKey.toLongOrNull()?.let { refreshTierState(it) }
+        }
+    }
+
+    /**
+     * Delete a dose row entirely. Used by the long-press time-edit sheet
+     * to recover from accidental taps without forcing the user into the
+     * Medication Log screen. Tier-state refresh covers slot-anchored
+     * doses; anytime/custom doses (numeric-slot-key parse fails) skip
+     * the refresh.
+     */
+    fun removeDose(dose: MedicationDoseEntity) {
+        viewModelScope.launch {
+            medicationRepository.unlogDose(dose)
+            dose.slotKey.toLongOrNull()?.let { refreshTierState(it) }
+        }
+    }
+
+    /**
+     * Log a fresh dose at a specific past wall-clock. Mirrors
+     * [toggleDose] / [recordUnslottedDose] but takes a caller-supplied
+     * [takenAt] so the long-press "log at past time" path can stamp a
+     * backdated row without first toggling at `now` and then retiming.
+     * Slot-linked logs trigger the tier-state refresh; unslotted
+     * (`slot == null`) use the `anytime` slot key and skip the refresh.
+     */
+    fun logDoseAtTime(
+        medication: MedicationEntity,
+        slot: MedicationSlotEntity?,
+        takenAt: Long,
+        doseAmount: String? = null
+    ) {
+        viewModelScope.launch {
+            val slotKey = slot?.id?.toString() ?: ANYTIME_SLOT_KEY
+            medicationRepository.logDose(
+                medicationId = medication.id,
+                slotKey = slotKey,
+                takenAt = takenAt,
+                doseAmount = doseAmount
+            )
+            if (slot != null) refreshTierState(slot.id)
         }
     }
 

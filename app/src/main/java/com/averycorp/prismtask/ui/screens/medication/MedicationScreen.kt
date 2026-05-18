@@ -113,11 +113,18 @@ fun MedicationScreen(
     // `tier`, so long-pressing any tier (not just the active one) is a
     // single explicit action: "I achieved this tier at time T".
     var timeEditingTarget by remember { mutableStateOf<TierTimeEditTarget?>(null) }
+    // Long-press → per-dose time-edit sheet. Target captures the
+    // (medication, slot, existing-dose-if-any) tuple so the sheet can
+    // either retime / remove an existing row or backdate a new one.
+    var doseTimeEditTarget by remember { mutableStateOf<DoseTimeEditTarget?>(null) }
+    // Unscheduled meds with >1 dose today route through a picker so the
+    // user can pin which row to retime before the time sheet opens.
+    var dosePickerTarget by remember { mutableStateOf<DosePickerTarget?>(null) }
     // Open the medication editor for a given med. Loads slot selections
     // first so the dialog enters composition with its final
-    // `initialSelections` (see [EditingMedicationState] doc). Shared by
-    // the All-Medications edit row AND the long-press tier-edit
-    // affordance on per-med dose rows + unslotted cards.
+    // `initialSelections` (see [EditingMedicationState] doc). Used by the
+    // All-Medications edit row. Per-med long-press now opens the dose
+    // time-edit sheet; editor access lives in edit mode.
     val openEditor: (MedicationEntity) -> Unit = { med ->
         coroutineScope.launch {
             val sels = viewModel.selectionsForMedication(med.id)
@@ -231,7 +238,13 @@ fun MedicationScreen(
                             onLongPressTier = { tier ->
                                 timeEditingTarget = TierTimeEditTarget(state, tier)
                             },
-                            onEditMedication = openEditor
+                            onLongPressMedication = { med ->
+                                doseTimeEditTarget = DoseTimeEditTarget(
+                                    medication = med,
+                                    slot = state.slot,
+                                    existingDose = state.latestDoseByMedicationId[med.id]
+                                )
+                            }
                         )
                     }
                     if (unslottedStates.isNotEmpty()) {
@@ -256,7 +269,24 @@ fun MedicationScreen(
                                         viewModel.recordUnslottedDose(state.medication)
                                     }
                                 },
-                                onEditMedication = { openEditor(state.medication) }
+                                onLongPress = {
+                                    when (state.dosesToday.size) {
+                                        0 -> doseTimeEditTarget = DoseTimeEditTarget(
+                                            medication = state.medication,
+                                            slot = null,
+                                            existingDose = null
+                                        )
+                                        1 -> doseTimeEditTarget = DoseTimeEditTarget(
+                                            medication = state.medication,
+                                            slot = null,
+                                            existingDose = state.dosesToday.single()
+                                        )
+                                        else -> dosePickerTarget = DosePickerTarget(
+                                            medication = state.medication,
+                                            doses = state.dosesToday
+                                        )
+                                    }
+                                }
                             )
                         }
                     }
@@ -350,6 +380,54 @@ fun MedicationScreen(
         )
     }
 
+    dosePickerTarget?.let { target ->
+        com.averycorp.prismtask.ui.screens.medication.components.DosePickerSheet(
+            medicationName = target.medication.name,
+            doses = target.doses,
+            onDismiss = { dosePickerTarget = null },
+            onSelect = { dose ->
+                doseTimeEditTarget = DoseTimeEditTarget(
+                    medication = target.medication,
+                    slot = null,
+                    existingDose = dose
+                )
+                dosePickerTarget = null
+            }
+        )
+    }
+
+    doseTimeEditTarget?.let { target ->
+        val logicalDay = remember(todayDateIso) {
+            runCatching { java.time.LocalDate.parse(todayDateIso) }
+                .getOrDefault(java.time.LocalDate.now())
+        }
+        com.averycorp.prismtask.ui.screens.medication.components.DoseTimeEditSheet(
+            medicationName = target.medication.name,
+            initialTakenAt = target.existingDose?.takenAt,
+            logicalDay = logicalDay,
+            onDismiss = { doseTimeEditTarget = null },
+            onSave = { takenAt ->
+                val existing = target.existingDose
+                if (existing != null) {
+                    viewModel.retimeDose(existing, takenAt)
+                } else {
+                    viewModel.logDoseAtTime(
+                        medication = target.medication,
+                        slot = target.slot,
+                        takenAt = takenAt
+                    )
+                }
+                doseTimeEditTarget = null
+            },
+            onRemove = target.existingDose?.let { dose ->
+                {
+                    viewModel.removeDose(dose)
+                    doseTimeEditTarget = null
+                }
+            }
+        )
+    }
+
     timeEditingTarget?.let { target ->
         // The sheet anchors the user-picked HH:mm to the slot card's logical
         // day (not wall-clock). When the SoD-boundary window is open
@@ -416,7 +494,7 @@ private fun SlotTodayCard(
     onToggleDose: (MedicationEntity) -> Unit,
     onSelectTier: (AchievedTier) -> Unit,
     onLongPressTier: (AchievedTier) -> Unit,
-    onEditMedication: (MedicationEntity) -> Unit
+    onLongPressMedication: (MedicationEntity) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -463,7 +541,7 @@ private fun SlotTodayCard(
                     takenAt = state.takenAtByMedicationId[med.id],
                     enabled = !editMode,
                     onToggle = { onToggleDose(med) },
-                    onLongPress = { onEditMedication(med) }
+                    onLongPress = { onLongPressMedication(med) }
                 )
             }
         }
@@ -602,14 +680,15 @@ private fun MedicationDoseRow(
                 shape = RoundedCornerShape(10.dp)
             )
             // Long-press is always available (even in edit mode) so users
-            // can change a med's tier / name / slots without first tapping
-            // the All Medications list. Tap stays gated by `enabled` to
-            // preserve the existing edit-mode no-toggle behavior.
+            // can correct the logged time without first leaving edit
+            // mode. Tap stays gated by `enabled` to preserve the existing
+            // edit-mode no-toggle behavior. Editor access for med
+            // metadata lives in edit mode → All Medications.
             .combinedClickable(
                 enabled = true,
                 onClick = { if (enabled) onToggle() },
                 onLongClick = onLongPress,
-                onLongClickLabel = "Edit medication"
+                onLongClickLabel = "Edit logged time"
             )
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -721,7 +800,7 @@ private fun MedicationEditRow(
 private fun UnslottedMedicationCard(
     state: UnslottedMedicationState,
     onRecordTaken: () -> Unit,
-    onEditMedication: () -> Unit
+    onLongPress: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -730,12 +809,13 @@ private fun UnslottedMedicationCard(
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            // Long-press whole-row → editor. Tap stays a no-op so the
+            // Long-press whole-row → time-edit / dose-picker (depending on
+            // how many doses landed today). Tap stays a no-op so the
             // explicit Record Taken button remains the only logging path.
             .combinedClickable(
                 onClick = {},
-                onLongClick = onEditMedication,
-                onLongClickLabel = "Edit medication"
+                onLongClick = onLongPress,
+                onLongClickLabel = "Edit logged time"
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -790,6 +870,28 @@ private data class DoseDialogTarget(
 private data class TierTimeEditTarget(
     val state: MedicationSlotTodayState,
     val tier: AchievedTier
+)
+
+/**
+ * Long-press → dose-time-edit target. [existingDose] is non-null when the
+ * sheet should retime / remove an already-logged row; null means the
+ * sheet logs a fresh dose at the chosen wall-clock (backdated). [slot]
+ * is null for unscheduled-section meds; non-null for slot-card rows.
+ */
+private data class DoseTimeEditTarget(
+    val medication: MedicationEntity,
+    val slot: com.averycorp.prismtask.data.local.entity.MedicationSlotEntity?,
+    val existingDose: com.averycorp.prismtask.data.local.entity.MedicationDoseEntity?
+)
+
+/**
+ * Long-press picker target for unscheduled meds with >1 dose today.
+ * Selecting a dose transitions to [DoseTimeEditTarget] with the chosen
+ * row as [DoseTimeEditTarget.existingDose].
+ */
+private data class DosePickerTarget(
+    val medication: MedicationEntity,
+    val doses: List<com.averycorp.prismtask.data.local.entity.MedicationDoseEntity>
 )
 
 /**

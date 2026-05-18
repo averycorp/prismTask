@@ -811,6 +811,57 @@ function PrivacyCard({ k, v }) {
   );
 }
 
+// ── Gamemaster Helper teaser ──────────────────────────────────────────
+function GamemasterTeaser() {
+  return (
+    <section style={{ padding: '120px 0', background: '#F4F1FF' }}>
+      <div style={{ maxWidth: 820, margin: '0 auto', padding: '0 32px' }}>
+        <Reveal>
+          <div style={{
+            position: 'relative',
+            padding: '44px 40px',
+            borderRadius: 22,
+            background: '#fff',
+            border: '1px solid rgba(91,71,224,0.18)',
+            boxShadow: '0 20px 50px rgba(91,71,224,0.10)',
+          }}>
+            <div style={{
+              position: 'absolute', top: -12, right: 32,
+              padding: '5px 12px', borderRadius: 999,
+              background: '#5B47E0', color: '#fff',
+              fontFamily: 'Space Grotesk, sans-serif', fontSize: 11, fontWeight: 600,
+              letterSpacing: 0.8, textTransform: 'uppercase',
+            }}>Coming Soon</div>
+            <div style={{
+              fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, fontWeight: 600,
+              color: '#5B47E0', letterSpacing: 1.4, textTransform: 'uppercase',
+              marginBottom: 14,
+            }}>Also coming from Avery Corp</div>
+            <h3 style={{
+              fontFamily: 'Fraunces, serif',
+              fontSize: 'clamp(32px, 4vw, 44px)', fontWeight: 500,
+              letterSpacing: -1.2, lineHeight: 1.05,
+              color: '#0F0F12', margin: 0,
+            }}>
+              Gamemaster <em style={{ fontStyle: 'italic', color: '#5B47E0' }}>Helper.</em>
+            </h3>
+            <p style={{
+              marginTop: 18, fontFamily: 'Space Grotesk, sans-serif',
+              fontSize: 16.5, lineHeight: 1.55, color: '#3D3D45',
+              maxWidth: 620, margin: '18px 0 0',
+            }}>
+              A companion app for tabletop RPG gamemasters — encounter planning,
+              NPC and loot generators, initiative tracking, and session notes that
+              keep up with the table. Same forgiveness-first design philosophy,
+              built for game night.
+            </p>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 // ── FAQ ────────────────────────────────────────────────────────────────
 function FAQ() {
   const items = [
@@ -1050,6 +1101,7 @@ function App() {
       <Wellness/>
       <Pricing/>
       <Privacy/>
+      <GamemasterTeaser/>
       <FAQ/>
       <FinalCTA/>
       <Footer/>
