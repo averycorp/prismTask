@@ -14,8 +14,15 @@ import {
 import { toast } from 'sonner';
 import { useSelfCareStore } from '@/stores/selfCareStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
 import { startOfLogicalDayMs } from '@/utils/dayBoundary';
 import { parseCompletedStepsForDisplay } from '@/api/firestore/selfCare';
+import {
+  getTierOrder,
+  resolveSelectedTier,
+  tierIncludes,
+} from '@/utils/selfCareTiers';
+import type { SelfCareTierDefaults } from '@/api/firestore/advancedTuningPreferences';
 import {
   getDailyEssentialsPreferences,
   subscribeToDailyEssentialsPreferences,
@@ -62,6 +69,8 @@ export function DailyEssentialsCards() {
   const selfCareSteps = useSelfCareStore((s) => s.steps);
   const toggleSelfCareStep = useSelfCareStore((s) => s.toggleStep);
 
+  const tierDefaults = useAdvancedTuningStore((s) => s.prefs.selfCareTierDefaults);
+
   const [prefs, setPrefs] = useState<DailyEssentialsSnapshot>(
     DEFAULT_DAILY_ESSENTIALS,
   );
@@ -104,16 +113,19 @@ export function DailyEssentialsCards() {
   );
 
   const morningCard = useMemo(
-    () => buildRoutineCard('morning', selfCareSteps, selfCareLogs, todayMs),
-    [selfCareSteps, selfCareLogs, todayMs],
+    () =>
+      buildRoutineCard('morning', selfCareSteps, selfCareLogs, todayMs, tierDefaults),
+    [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
   );
   const bedtimeCard = useMemo(
-    () => buildRoutineCard('bedtime', selfCareSteps, selfCareLogs, todayMs),
-    [selfCareSteps, selfCareLogs, todayMs],
+    () =>
+      buildRoutineCard('bedtime', selfCareSteps, selfCareLogs, todayMs, tierDefaults),
+    [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
   );
   const houseworkRoutineCard = useMemo(
-    () => buildRoutineCard('housework', selfCareSteps, selfCareLogs, todayMs),
-    [selfCareSteps, selfCareLogs, todayMs],
+    () =>
+      buildRoutineCard('housework', selfCareSteps, selfCareLogs, todayMs, tierDefaults),
+    [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
   );
 
   const visibleCards: VisibleCard[] = useMemo(() => {
@@ -234,6 +246,7 @@ export function buildRoutineCard(
   steps: SelfCareStep[],
   logs: SelfCareLog[],
   todayMs: number,
+  tierDefaults: SelfCareTierDefaults,
 ): RoutineCardState | null {
   const routineSteps = steps
     .filter((s) => s.routine_type === routineType)
@@ -242,6 +255,17 @@ export function buildRoutineCard(
   const log =
     logs.find((l) => l.routine_type === routineType && l.date === todayMs) ??
     null;
+  const tierOrder = getTierOrder(routineType);
+  const selectedTier = resolveSelectedTier(
+    log?.selected_tier,
+    tierOrder,
+    tierDefaults[routineType],
+  );
+  if (!selectedTier) return null;
+  const visibleSteps = routineSteps.filter((s) =>
+    tierIncludes(tierOrder, selectedTier, s.tier),
+  );
+  if (visibleSteps.length === 0) return null;
   const completedIds = new Set(
     log ? parseCompletedStepsForDisplay(log.completed_steps) : [],
   );
@@ -254,7 +278,7 @@ export function buildRoutineCard(
   return {
     routineType,
     displayName,
-    steps: routineSteps.map((s) => ({
+    steps: visibleSteps.map((s) => ({
       stepId: s.step_id,
       label: s.label,
       completed: completedIds.has(s.step_id),
