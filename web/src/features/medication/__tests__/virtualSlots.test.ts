@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  deriveVirtualSlots,
-  mergeVirtualWithMaterialized,
-} from '@/features/medication/virtualSlots';
+import { deriveVirtualSlots } from '@/features/medication/virtualSlots';
 import type { MedicationDoc } from '@/api/firestore/medications';
-import type { MedicationSlot } from '@/types/dailyEssentials';
 
 function med(overrides: Partial<MedicationDoc>): MedicationDoc {
   return {
@@ -121,28 +117,3 @@ describe('deriveVirtualSlots', () => {
   });
 });
 
-describe('mergeVirtualWithMaterialized', () => {
-  function slot(slotKey: string, takenAt: string | null): MedicationSlot {
-    return {
-      slotKey,
-      displayTime: slotKey,
-      medLabels: [],
-      medIds: [],
-      takenAt,
-    };
-  }
-
-  it('lets materialized rows win on (slotKey) collision', () => {
-    const materialized = [slot('morning', '2026-05-13T08:00:00Z')];
-    const virtual = [slot('morning', null), slot('evening', null)];
-    const merged = mergeVirtualWithMaterialized(materialized, virtual);
-    expect(merged).toHaveLength(2);
-    const morning = merged.find((s) => s.slotKey === 'morning')!;
-    expect(morning.takenAt).toBe('2026-05-13T08:00:00Z');
-  });
-
-  it('returns materialized-only when virtual is empty', () => {
-    const materialized = [slot('morning', null)];
-    expect(mergeVirtualWithMaterialized(materialized, [])).toEqual(materialized);
-  });
-});

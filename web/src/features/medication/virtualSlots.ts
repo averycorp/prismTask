@@ -2,28 +2,26 @@ import type { MedicationDoc } from '@/api/firestore/medications';
 import type { MedicationSlot } from '@/types/dailyEssentials';
 
 /**
- * Derive virtual medication slots from the per-medication schedule
- * fields (`scheduleMode`, `timesOfDay`, `specificTimes`) when no
- * materialized backend slot exists for the day yet. Mirrors Android's
- * "derive slots from medications until the user toggles" behavior so
- * web users who set up medications cross-device immediately see the
- * expected slot rows instead of an empty state.
+ * Derive medication slots from the per-medication schedule fields
+ * (`scheduleMode`, `timesOfDay`, `specificTimes`). This is the only
+ * source of slot scaffolding on web; taken-state is filled in by the
+ * caller from Firestore `medication_doses` so Android writes surface
+ * here automatically.
  *
  * Bucketing rules (must match the Android slot-key vocabulary used by
- * `daily_essential_slot_completions.slot_key`):
+ * `MedicationDoseEntity.slotKey` on Firestore):
  *   - `TIMES_OF_DAY`: one slot per `morning|afternoon|evening|night`
  *     entry in `times_of_day`.
  *   - `SPECIFIC_TIMES`: one slot per `HH:mm` entry in `specific_times`.
  *   - `INTERVAL`: a single `anytime` slot (true interval scheduling
  *     is Android-only — web shows the bucket so the user can still
- *     mark a dose, then Android materialises when it next syncs).
+ *     mark a dose).
  *   - `AS_NEEDED`: a single `anytime` slot (PRN).
  *   - Archived or empty-name medications are skipped entirely.
  *
- * The returned slots have `takenAt = null` (web's representation of an
- * unmaterialized row). Once the user toggles via the slot card, the
- * backend write turns the virtual row into a real
- * `MedicationSlotCompletion`.
+ * The returned slots have `takenAt = null`; the caller flips it to a
+ * real timestamp once every linked med has a Firestore dose for the
+ * day.
  */
 export function deriveVirtualSlots(
   medications: readonly MedicationDoc[],
@@ -98,22 +96,4 @@ function compareSlotKeys(a: MedicationSlot, b: MedicationSlot): number {
   if (a.slotKey === 'anytime') return 1;
   if (b.slotKey === 'anytime') return -1;
   return a.slotKey.localeCompare(b.slotKey);
-}
-
-/**
- * Merge derived virtual slots with materialised backend slots. The
- * materialised list wins on `(slotKey)` collisions because the backend
- * holds the canonical taken-state. Virtual slots fill in the gaps so
- * the user sees their full schedule even before any toggles land.
- */
-export function mergeVirtualWithMaterialized(
-  materialized: readonly MedicationSlot[],
-  virtual: readonly MedicationSlot[],
-): MedicationSlot[] {
-  const seen = new Set(materialized.map((s) => s.slotKey));
-  const merged = [...materialized];
-  for (const v of virtual) {
-    if (!seen.has(v.slotKey)) merged.push(v);
-  }
-  return merged.sort(compareSlotKeys);
 }

@@ -18,7 +18,6 @@ import {
   Undo2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { dailyEssentialsApi } from '@/api/dailyEssentials';
 import {
   clearTierState,
   getTierStatesForDate,
@@ -41,10 +40,7 @@ import {
   medicationDoseId,
   type MedicationDoseDoc,
 } from '@/api/firestore/medicationDoses';
-import {
-  deriveVirtualSlots,
-  mergeVirtualWithMaterialized,
-} from '@/features/medication/virtualSlots';
+import { deriveVirtualSlots } from '@/features/medication/virtualSlots';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -56,42 +52,29 @@ import { MedicationTimeEditModal } from '@/features/medication/MedicationTimeEdi
 import { isBacklogged } from '@/features/medication/backloggedHelpers';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
-import type {
-  MedicationSlot,
-  MedicationSlotCompletion,
-} from '@/types/dailyEssentials';
+import type { MedicationSlot } from '@/types/dailyEssentials';
 
 const ANYTIME_KEY = 'anytime';
+const MED_PREFIX = 'med:';
 
-function displayTimeFor(slotKey: string): string {
-  if (slotKey === ANYTIME_KEY) return 'Anytime';
-  return slotKey;
-}
-
-function prettifyMedId(key: string): string {
-  const idx = key.indexOf(':');
-  const raw = idx >= 0 ? key.slice(idx + 1) : key;
-  return raw
-    .split(/[_\s]+/)
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(' ');
-}
-
-function rowToSlot(row: MedicationSlotCompletion): MedicationSlot {
-  return {
-    slotKey: row.slot_key,
-    displayTime: displayTimeFor(row.slot_key),
-    medLabels: row.med_ids.map(prettifyMedId),
-    medIds: row.med_ids,
-    takenAt: row.taken_at,
-  };
+/**
+ * Strip the `med:` prefix off a slot medId. Returns null for legacy
+ * non-`med:` entries (e.g. `self_care_step:lipitor`) which the old
+ * backend slot snapshot used; the Firestore-direct path only mints
+ * `med:` keys so this is a forward-compat guard, not a hot code path.
+ */
+function medCloudIdOf(raw: string): string | null {
+  return raw.startsWith(MED_PREFIX) ? raw.slice(MED_PREFIX.length) : null;
 }
 
 /**
- * Dedicated Medication screen. Scoped to the same slot-toggle data path
- * the Today MedicationSlotList already uses — no tier picker, no slot
- * CRUD (both require backend work on top of the current
- * `/daily-essentials/slots` surface).
+ * Dedicated Medication screen. Reads slot scaffolding from the user's
+ * medication library (Firestore `users/{uid}/medications`) and renders
+ * taken-state from per-medication doses (`medication_doses`) and tier
+ * states (`medication_tier_states`) — both Firestore-direct. The legacy
+ * backend `daily_essential_slot_completions` table is no longer consulted
+ * by web; it was a one-directional source-of-truth that never received
+ * Android's writes, so Android-logged doses never surfaced here.
  *
  * What this screen adds over the Today row:
  *   - Per-day navigation (prev / today / next)
@@ -105,7 +88,6 @@ export function MedicationScreen() {
   const todayIso = useLogicalToday(startOfDayHour);
 
   const [dateIso, setDateIso] = useState(todayIso);
-  const [rows, setRows] = useState<MedicationSlotCompletion[]>([]);
   const [tierStates, setTierStates] = useState<
     Record<string, MedicationTierState>
   >({});
@@ -149,53 +131,37 @@ export function MedicationScreen() {
   }, [reloadMedications]);
 
   const load = useCallback(
-    async (iso: string) => {
+    async (iso: string, meds: readonly MedicationDoc[]) => {
       setLoading(true);
       try {
-        const fetched = await dailyEssentialsApi.listSlots(iso);
-        setRows(fetched);
-        // Tier states live in Firestore, independent of backend slots.
-        try {
-          const uid = getFirebaseUid();
-          const states = await getTierStatesForDate(uid, iso);
-          const byKey: Record<string, MedicationTierState> = {};
-          for (const s of states) byKey[s.slot_key] = s;
-          setTierStates(byKey);
-        } catch {
-          setTierStates({});
-        }
-        // Per-medication doses for the day (PR-2). One read per (med, slot)
-        // pair is wasteful; instead we union the medication cloud-ids from
-        // the slot rows and pull each medication's doses for the day. The
-        // result is keyed by the deterministic doc id so the toggle UI can
-        // look up state in O(1).
-        try {
-          const uid = getFirebaseUid();
-          const medCloudIds = new Set<string>();
-          for (const row of fetched) {
-            for (const raw of row.med_ids) {
-              if (raw.startsWith('med:')) {
-                medCloudIds.add(raw.slice('med:'.length));
-              }
-            }
-          }
-          const allDoses = await Promise.all(
-            [...medCloudIds].map((medId) =>
+        const uid = getFirebaseUid();
+        const medCloudIds = meds
+          .filter((m) => !m.is_archived && m.name.length > 0)
+          .map((m) => m.id);
+        // Fetch tier states + per-medication doses in parallel. Both
+        // live in Firestore; both follow the same `users/{uid}/...`
+        // shape Android writes to, so what the user logs on phone
+        // shows up here on the next snapshot.
+        const [states, allDoses] = await Promise.all([
+          getTierStatesForDate(uid, iso).catch(() => []),
+          Promise.all(
+            medCloudIds.map((medId) =>
               getDosesForDay(uid, medId, iso).catch(() => []),
             ),
-          );
-          const byDoseKey: Record<string, MedicationDoseDoc> = {};
-          for (const list of allDoses) {
-            for (const dose of list) {
-              byDoseKey[dose.id] = dose;
-            }
+          ),
+        ]);
+        const byTierKey: Record<string, MedicationTierState> = {};
+        for (const s of states) byTierKey[s.slot_key] = s;
+        setTierStates(byTierKey);
+        // Dose map keyed by deterministic doc id so per-(med, slot, day)
+        // lookups are O(1) in the row renderer below.
+        const byDoseKey: Record<string, MedicationDoseDoc> = {};
+        for (const list of allDoses) {
+          for (const dose of list) {
+            byDoseKey[dose.id] = dose;
           }
-          setDosesByKey(byDoseKey);
-        } catch {
-          setDosesByKey({});
         }
-      } catch (e) {
-        toast.error((e as Error).message || 'Failed to load slots');
+        setDosesByKey(byDoseKey);
       } finally {
         setLoading(false);
       }
@@ -237,32 +203,88 @@ export function MedicationScreen() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: load slots on mount and when date changes
-    load(dateIso);
-  }, [dateIso, load]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: load tier states + doses on mount and when date / medication library changes
+    load(dateIso, medications);
+  }, [dateIso, medications, load]);
 
-  const slots = useMemo(() => {
-    const materialized = rows.map(rowToSlot);
+  // Slot scaffold derived purely from the medication library. A slot's
+  // `takenAt` is the latest dose `taken_at` if every `med:`-prefixed
+  // entry in the slot has a dose for this (slotKey, dateIso); null
+  // otherwise. Slots whose medIds are all non-`med:` (legacy / external)
+  // fall back to null since web has no source-of-truth for them anymore.
+  const slots = useMemo<MedicationSlot[]>(() => {
     const virtual = deriveVirtualSlots(medications);
-    return mergeVirtualWithMaterialized(materialized, virtual);
-  }, [rows, medications]);
+    return virtual.map((slot) => {
+      const medCloudIds = slot.medIds
+        .map(medCloudIdOf)
+        .filter((id): id is string => id !== null);
+      if (medCloudIds.length === 0) return slot;
+      const doses = medCloudIds.map(
+        (id) => dosesByKey[medicationDoseId(id, slot.slotKey, dateIso)],
+      );
+      const allTaken = doses.every((d) => d !== undefined);
+      if (!allTaken) return { ...slot, takenAt: null };
+      let latest = 0;
+      for (const d of doses) {
+        if (d !== undefined && d.taken_at > latest) latest = d.taken_at;
+      }
+      return { ...slot, takenAt: latest === 0 ? null : latest };
+    });
+  }, [medications, dosesByKey, dateIso]);
   const takenCount = slots.filter((s) => s.takenAt !== null).length;
 
   const handleToggle = async (slot: MedicationSlot, taken: boolean) => {
     try {
-      const updated = await dailyEssentialsApi.toggleSlot({
-        date: dateIso,
-        slot_key: slot.slotKey,
-        med_ids: slot.medIds,
-        taken,
-      });
-      setRows((prev) => {
-        const next = prev.filter((r) => r.slot_key !== updated.slot_key);
-        return [...next, updated];
-      });
+      const uid = getFirebaseUid();
+      const medCloudIds = slot.medIds
+        .map(medCloudIdOf)
+        .filter((id): id is string => id !== null);
+      if (medCloudIds.length === 0) {
+        setOpenSlot(null);
+        return;
+      }
+      if (taken) {
+        // Log a dose for every linked med that doesn't already have one.
+        // Run sequentially so a partial failure stops at the first error
+        // (rather than fan-failing N writes and double-toasting).
+        const newDoses: MedicationDoseDoc[] = [];
+        for (const medCloudId of medCloudIds) {
+          const id = medicationDoseId(medCloudId, slot.slotKey, dateIso);
+          if (dosesByKey[id] !== undefined) continue;
+          const dose = await logDose(uid, {
+            medicationCloudId: medCloudId,
+            slotKey: slot.slotKey,
+            dateIso,
+          });
+          newDoses.push(dose);
+        }
+        if (newDoses.length > 0) {
+          setDosesByKey((prev) => {
+            const next = { ...prev };
+            for (const d of newDoses) next[d.id] = d;
+            return next;
+          });
+        }
+      } else {
+        const removedIds: string[] = [];
+        for (const medCloudId of medCloudIds) {
+          const id = medicationDoseId(medCloudId, slot.slotKey, dateIso);
+          const existing = dosesByKey[id];
+          if (existing === undefined) continue;
+          await deleteDose(uid, existing.id);
+          removedIds.push(id);
+        }
+        if (removedIds.length > 0) {
+          setDosesByKey((prev) => {
+            const next = { ...prev };
+            for (const id of removedIds) delete next[id];
+            return next;
+          });
+        }
+      }
       setOpenSlot(null);
-    } catch {
-      toast.error('Failed to update slot');
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to update slot');
     }
   };
 
