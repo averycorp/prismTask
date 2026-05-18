@@ -7,6 +7,86 @@
         {"fieldPath": "isCompleted", "order": "ASCENDING"},
         {"fieldPath": "completedAt", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isCompleted", "order": "ASCENDING"},
+        {"fieldPath": "dueDate", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "projectId", "order": "ASCENDING"},
+        {"fieldPath": "sortOrder", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "parentTaskId", "order": "ASCENDING"},
+        {"fieldPath": "sortOrder", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "saved_filters",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "sortOrder", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "mood_energy_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "dateIso", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "external_anchors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "projectCloudId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "habit_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "habitCloudId", "order": "ASCENDING"},
+        {"fieldPath": "date", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "project_phases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "projectCloudId", "order": "ASCENDING"},
+        {"fieldPath": "orderIndex", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "project_risks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "projectCloudId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "medication_doses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "medicationCloudId", "order": "ASCENDING"},
+        {"fieldPath": "takenDateLocal", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []
