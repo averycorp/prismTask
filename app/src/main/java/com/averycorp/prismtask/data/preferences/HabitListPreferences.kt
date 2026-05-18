@@ -55,6 +55,8 @@ constructor(
         PreferenceAccessor(ds, TODAY_SKIP_AFTER_COMPLETE_DAYS, default = DEFAULT_TODAY_SKIP_AFTER_COMPLETE_DAYS)
     private val todaySkipBeforeScheduleDaysAccessor =
         PreferenceAccessor(ds, TODAY_SKIP_BEFORE_SCHEDULE_DAYS, default = DEFAULT_TODAY_SKIP_BEFORE_SCHEDULE_DAYS)
+    private val skipCapPerWeekAccessor =
+        PreferenceAccessor(ds, SKIP_CAP_PER_WEEK, default = DEFAULT_SKIP_CAP_PER_WEEK)
 
     fun getAutoHabitSortOrders(): Flow<Triple<Int, Int, Int>> = ds.data.map { prefs ->
         Triple(
@@ -153,6 +155,18 @@ constructor(
         todaySkipBeforeScheduleDaysAccessor.set(days.coerceIn(0, MAX_TODAY_SKIP_DAYS))
     }
 
+    /**
+     * Max long-press "skip today" actions allowed per habit in a rolling 7-day
+     * window. Once the cap is reached, the gesture is rejected (the ViewModel
+     * surfaces a snackbar). 0 disables the cap entirely. Applies to every habit
+     * — there is no per-habit override.
+     */
+    fun getSkipCapPerWeek(): Flow<Int> = skipCapPerWeekAccessor.flow
+
+    suspend fun setSkipCapPerWeek(cap: Int) {
+        skipCapPerWeekAccessor.set(cap.coerceIn(MIN_SKIP_CAP_PER_WEEK, MAX_SKIP_CAP_PER_WEEK))
+    }
+
     suspend fun clearAll() {
         ds.edit { it.clear() }
     }
@@ -174,6 +188,7 @@ constructor(
             intPreferencesKey("today_skip_after_complete_days")
         private val TODAY_SKIP_BEFORE_SCHEDULE_DAYS =
             intPreferencesKey("today_skip_before_schedule_days")
+        private val SKIP_CAP_PER_WEEK = intPreferencesKey("habit_skip_cap_per_week")
         const val DEFAULT_MORNING_ORDER = -6
         const val DEFAULT_BEDTIME_ORDER = -5
         const val DEFAULT_MEDICATION_ORDER = -4
@@ -191,5 +206,13 @@ constructor(
         const val DEFAULT_TODAY_SKIP_BEFORE_SCHEDULE_DAYS = 0
 
         const val MAX_TODAY_SKIP_DAYS = 30
+
+        /** Default per-habit skip-day allowance in a rolling 7-day window. */
+        const val DEFAULT_SKIP_CAP_PER_WEEK = 2
+        const val MIN_SKIP_CAP_PER_WEEK = 0
+        const val MAX_SKIP_CAP_PER_WEEK = 7
+
+        /** Rolling-window length for the skip cap. */
+        const val SKIP_CAP_WINDOW_DAYS = 7
     }
 }

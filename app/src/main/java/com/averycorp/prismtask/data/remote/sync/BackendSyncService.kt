@@ -782,7 +782,8 @@ constructor(
                 completedDate = completedDate,
                 completedAt = data.optLong("completed_at") ?: fallbackTimestamp,
                 notes = data.optString("notes"),
-                completedDateLocal = completedDateLocal
+                completedDateLocal = completedDateLocal,
+                isSkipped = data.optBool("is_skipped") ?: false
             )
             habitCompletionDao.insert(completion)
             applied++

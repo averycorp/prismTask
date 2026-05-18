@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +50,7 @@ import com.averycorp.prismtask.ui.theme.prismCardBackground
 internal fun TodayHabitCheckItem(
     habitWithStatus: HabitWithStatus,
     onToggle: () -> Unit,
+    onSkipToggle: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -55,7 +58,9 @@ internal fun TodayHabitCheckItem(
     val colors = LocalPrismColors.current
     val attrs = LocalPrismAttrs.current
     val fonts = LocalPrismFonts.current.body
-    val isComplete = habitWithStatus.isCompletedToday
+    val haptics = LocalHapticFeedback.current
+    val isSkipped = habitWithStatus.isSkippedToday
+    val isComplete = habitWithStatus.isCompletedToday && !isSkipped
 
     val habitColor = remember(habit.color, colors.primary) {
         try {
@@ -90,7 +95,14 @@ internal fun TodayHabitCheckItem(
         ) {
             CircularCheckbox(
                 checked = isComplete,
-                onCheckedChange = { onToggle() },
+                skipped = isSkipped,
+                onCheckedChange = {
+                    if (isSkipped) onSkipToggle() else onToggle()
+                },
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onSkipToggle()
+                },
                 checkedColor = habitColor
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -110,7 +122,7 @@ internal fun TodayHabitCheckItem(
                     style = MaterialTheme.typography.bodyLarge,
                     fontFamily = fonts,
                     fontWeight = FontWeight.Medium,
-                    color = if (isComplete) colors.muted else colors.onBackground,
+                    color = if (isComplete || isSkipped) colors.muted else colors.onBackground,
                     textDecoration = if (isComplete) TextDecoration.LineThrough else TextDecoration.None,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

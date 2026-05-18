@@ -922,6 +922,18 @@ constructor(
         viewModelScope.launch { habitListPreferences.setTodaySkipBeforeScheduleDays(days) }
     }
 
+    val skipCapPerWeek: StateFlow<Int> = habitListPreferences
+        .getSkipCapPerWeek()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            HabitListPreferences.DEFAULT_SKIP_CAP_PER_WEEK
+        )
+
+    fun setSkipCapPerWeek(cap: Int) {
+        viewModelScope.launch { habitListPreferences.setSkipCapPerWeek(cap) }
+    }
+
     // --- Modes ---
     val selfCareEnabled: StateFlow<Boolean> = habitListPreferences
         .isSelfCareEnabled()

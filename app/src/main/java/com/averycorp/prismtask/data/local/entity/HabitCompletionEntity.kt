@@ -39,5 +39,10 @@ data class HabitCompletionEntity(
     // time. Timezone-neutral successor to [completedDate]; nullable only for
     // legacy rows prior to migration 49→50.
     @ColumnInfo(name = "completed_date_local")
-    val completedDateLocal: String? = null
+    val completedDateLocal: String? = null,
+    // When true the row is a "skip marker" — the user long-pressed the habit
+    // circle to declare the day off. Skip markers don't count toward the daily
+    // completion target; the forgiveness streak treats their dates as kept.
+    @ColumnInfo(name = "is_skipped", defaultValue = "0")
+    val isSkipped: Boolean = false
 )

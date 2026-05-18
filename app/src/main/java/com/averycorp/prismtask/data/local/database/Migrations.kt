@@ -2649,7 +2649,22 @@ val MIGRATION_82_83 = object : Migration(82, 83) {
     }
 }
 
-const val CURRENT_DB_VERSION = 83
+/**
+ * Adds `is_skipped` to `habit_completions` so a long-press on the habit
+ * circle can mark today as a "skip" without breaking the streak. Default 0
+ * keeps every legacy row as a normal completion; the forgiveness streak
+ * folds rows with `is_skipped = 1` into the same bucket as user-marked
+ * rest days (kept by definition, no grace burned).
+ */
+val MIGRATION_83_84 = object : Migration(83, 84) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE habit_completions ADD COLUMN is_skipped INTEGER NOT NULL DEFAULT 0"
+        )
+    }
+}
+
+const val CURRENT_DB_VERSION = 84
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2733,5 +2748,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_79_80,
     MIGRATION_80_81,
     MIGRATION_81_82,
-    MIGRATION_82_83
+    MIGRATION_82_83,
+    MIGRATION_83_84
 )

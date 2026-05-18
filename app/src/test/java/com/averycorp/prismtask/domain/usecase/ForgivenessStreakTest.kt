@@ -261,6 +261,36 @@ class ForgivenessStreakTest {
     }
 
     @Test
+    fun `long press skip on a midweek day extends streak without using grace`() {
+        // Long-press skip on day -3. The repository routes that skip into the
+        // streak walk's restDays bucket, so the run reads as 8 consecutive
+        // kept days with zero grace burned — the user-visible promise of
+        // "skip doesn't break my streak".
+        val completions = listOf(
+            completion(today.minusDays(7)),
+            completion(today.minusDays(6)),
+            completion(today.minusDays(5)),
+            completion(today.minusDays(4)),
+            // day -3 is skipped, not missed
+            completion(today.minusDays(2)),
+            completion(today.minusDays(1)),
+            completion(today)
+        )
+        val skippedDates = setOf(today.minusDays(3))
+        val result = StreakCalculator.calculateResilientDailyStreak(
+            completions,
+            dailyHabit(),
+            today,
+            ForgivenessConfig.DEFAULT,
+            skippedDates
+        )
+        assertEquals(8, result.resilientStreak)
+        assertEquals(0, result.missesInWindow)
+        assertEquals(1, result.gracePeriodRemaining)
+        assertTrue(result.forgivenDates.isEmpty())
+    }
+
+    @Test
     fun `rest day on today and yesterday avoids hard reset`() {
         // Without rest-day support: today + yesterday both unlogged →
         // resilient hard-reset to 0. With rest-day on yesterday only,

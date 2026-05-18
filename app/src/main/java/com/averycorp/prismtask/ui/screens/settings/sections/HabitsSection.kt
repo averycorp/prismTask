@@ -31,11 +31,14 @@ fun HabitsSection(
     todaySkipAfterCompleteDays: Int,
     onTodaySkipAfterCompleteDaysChange: (Int) -> Unit,
     todaySkipBeforeScheduleDays: Int,
-    onTodaySkipBeforeScheduleDaysChange: (Int) -> Unit
+    onTodaySkipBeforeScheduleDaysChange: (Int) -> Unit,
+    skipCapPerWeek: Int,
+    onSkipCapPerWeekChange: (Int) -> Unit
 ) {
     var showStreakDialog by remember { mutableStateOf(false) }
     var showSkipAfterDialog by remember { mutableStateOf(false) }
     var showSkipBeforeDialog by remember { mutableStateOf(false) }
+    var showSkipCapDialog by remember { mutableStateOf(false) }
 
     if (showStreakDialog) {
         StreakMaxMissedDaysDialog(
@@ -78,6 +81,17 @@ fun HabitsSection(
         )
     }
 
+    if (showSkipCapDialog) {
+        SkipCapDialog(
+            current = skipCapPerWeek,
+            onConfirm = {
+                onSkipCapPerWeekChange(it)
+                showSkipCapDialog = false
+            },
+            onDismiss = { showSkipCapDialog = false }
+        )
+    }
+
     SectionHeader("Habits")
 
     SettingsRowWithSubtitle(
@@ -101,7 +115,19 @@ fun HabitsSection(
         onClick = { showSkipBeforeDialog = true }
     )
 
+    SettingsRowWithSubtitle(
+        title = "Skip Cap",
+        subtitle = subtitleForSkipCap(skipCapPerWeek),
+        onClick = { showSkipCapDialog = true }
+    )
+
     HorizontalDivider()
+}
+
+private fun subtitleForSkipCap(cap: Int): String = when (cap) {
+    0 -> "Unlimited long-press skips per habit"
+    1 -> "1 long-press skip per habit per 7 days"
+    else -> "$cap long-press skips per habit per 7 days"
 }
 
 private fun subtitleForMissedDays(days: Int): String = when (days) {
@@ -163,6 +189,70 @@ private fun TodaySkipDaysDialog(
                 }
                 Text(
                     text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun SkipCapDialog(
+    current: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val min = HabitListPreferences.MIN_SKIP_CAP_PER_WEEK
+    val max = HabitListPreferences.MAX_SKIP_CAP_PER_WEEK
+    var value by remember(current) { mutableIntStateOf(current.coerceIn(min, max)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Skip Cap") },
+        text = {
+            Column {
+                Text(
+                    text = subtitleForSkipCap(value),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+                Slider(
+                    value = value.toFloat(),
+                    onValueChange = { value = it.toInt().coerceIn(min, max) },
+                    valueRange = min.toFloat()..max.toFloat(),
+                    steps = (max - min) - 1
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Off",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "$max / 7 days",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = "Long-press a habit's circle to mark today as a skip without " +
+                        "breaking the streak. This cap is per habit and applies to a " +
+                        "rolling 7-day window. Set to 0 to allow unlimited skips.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp)

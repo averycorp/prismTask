@@ -86,6 +86,13 @@ fun HabitListScreen(
         }
     }
 
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    androidx.compose.runtime.LaunchedEffect(viewModel) {
+        viewModel.userMessages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     val baseTitle = "Habits"
     val prismColors = LocalPrismColors.current
     val displayFont = LocalPrismFonts.current.display
@@ -101,6 +108,7 @@ fun HabitListScreen(
 
     Scaffold(
         containerColor = prismColors.background,
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -256,6 +264,10 @@ fun HabitListScreen(
                                                 if (hws.completionsToday > 0 && hws.dailyTarget > 1) {
                                                     viewModel.onDecrementCompletion(hws.habit.id)
                                                 }
+                                            },
+                                            onSkipToggle = {
+                                                val hws = listItem.habitWithStatus
+                                                viewModel.onToggleSkip(hws.habit.id, hws.isSkippedToday)
                                             },
                                             onClick = {
                                                 if (listItem.habitWithStatus.habit.hasLogging) {
