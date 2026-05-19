@@ -12,6 +12,7 @@ import {
 import type { MoodEnergyLog } from '@/api/firestore/moodEnergyLogs';
 import { useTaskStore } from '@/stores/taskStore';
 import { useHabitStore } from '@/stores/habitStore';
+import { isMetaBuiltInHabit } from '@/utils/metaBuiltInHabit';
 import type { Task } from '@/types/task';
 
 /**
@@ -160,7 +161,12 @@ function computeDailyStats(
     if (t.life_category === 'WORK') work++;
     if (t.life_category === 'SELF_CARE') selfCare++;
   }
-  const activeHabits = habits.filter((h) => h.is_active);
+  // Exclude the six built-in meta-habits so the correlation rate
+  // matches what the user sees as "their habits" (Habits screen +
+  // Today habit section).
+  const activeHabits = habits.filter(
+    (h) => h.is_active && !isMetaBuiltInHabit(h),
+  );
   let habitDone = 0;
   for (const h of activeHabits) {
     const list = completions[h.id] ?? [];
