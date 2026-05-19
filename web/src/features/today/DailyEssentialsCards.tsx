@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import { useSelfCareStore } from '@/stores/selfCareStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
+import { useCourseStore } from '@/stores/courseStore';
+import { useAssignmentStore } from '@/stores/assignmentStore';
+import { SchoolworkTodayCard } from '@/features/today/SchoolworkTodayCard';
 import { startOfLogicalDayMs } from '@/utils/dayBoundary';
 import { parseCompletedStepsForDisplay } from '@/api/firestore/selfCare';
 import {
@@ -32,16 +35,18 @@ import {
 } from '@/api/firestore/dailyEssentialsPreferences';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
+import type { Assignment, Course } from '@/types/schoolwork';
 
 /**
  * Daily Essentials section — web port of Android's
  * `DailyEssentialsSection.kt` and `DailyEssentialsUseCase.kt` (parity
  * unit 6 of 23, Today screen A).
  *
- * Card order:
+ * Card order (matches Android's `DailyEssentialsSection.kt`):
  *   1. Morning routine (self-care steps)
  *   2. Housework routine (self-care steps)
- *   3. Bedtime routine (self-care steps)
+ *   3. Schoolwork (active courses + assignments due today)
+ *   4. Bedtime routine (self-care steps)
  *
  * Cards hide individually when empty. The whole section collapses to a
  * single "Set Up Your Daily Essentials" hint when nothing is configured
@@ -54,11 +59,9 @@ import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
  * Firestore fields remain readable for Android parity but are unused
  * on web.
  *
- * Schoolwork is intentionally NOT included here — it already renders
- * inline above the dashboard sections via the standalone
- * `SchoolworkTodayCard`, which mirrors Android's `SchoolworkTodayCard`
- * shape with assignments-due grouping. Duplicating it would split the
- * source of truth.
+ * Schoolwork has no per-section show/hide flag — it gates purely on
+ * "has content" (active course or due-today assignment) the same way
+ * Android's `SchoolworkCardState.hasContent` does.
  *
  * Title Capitalization per CLAUDE.md user-facing strings convention.
  */
@@ -70,6 +73,14 @@ export function DailyEssentialsCards() {
   const toggleSelfCareStep = useSelfCareStore((s) => s.toggleStep);
 
   const tierDefaults = useAdvancedTuningStore((s) => s.prefs.selfCareTierDefaults);
+
+  // Schoolwork slot — Android's `SchoolworkCardState.hasContent` rule:
+  // surface the card if there's any active course OR any not-yet-completed
+  // assignment due today. The `SchoolworkTodayCard` already does its own
+  // bucketing; we precompute `hasSchoolworkContent` here so the slot
+  // counts toward `visibleCards.length` (header chip + empty-state gating).
+  const courses = useCourseStore((s) => s.courses);
+  const assignments = useAssignmentStore((s) => s.assignments);
 
   const [prefs, setPrefs] = useState<DailyEssentialsSnapshot>(
     DEFAULT_DAILY_ESSENTIALS,
@@ -128,6 +139,20 @@ export function DailyEssentialsCards() {
     [selfCareSteps, selfCareLogs, todayMs, tierDefaults],
   );
 
+  // `SchoolworkTodayCard` buckets due-today assignments by calendar
+  // midnight (not logical-day midnight) — mirror that here so the
+  // visibility predicate matches what the card actually renders.
+  const todayMidnightMs = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  const hasSchoolworkContent = useMemo(
+    () => schoolworkHasContent(courses, assignments, todayMidnightMs),
+    [courses, assignments, todayMidnightMs],
+  );
+
   const visibleCards: VisibleCard[] = useMemo(() => {
     const cards: VisibleCard[] = [];
     if (prefs.showMorningRoutine && morningCard) {
@@ -135,6 +160,9 @@ export function DailyEssentialsCards() {
     }
     if (prefs.showHouseworkRoutine && houseworkRoutineCard) {
       cards.push({ kind: 'housework_routine', card: houseworkRoutineCard });
+    }
+    if (hasSchoolworkContent) {
+      cards.push({ kind: 'schoolwork' });
     }
     if (prefs.showBedtimeRoutine && bedtimeCard) {
       cards.push({ kind: 'bedtime', card: bedtimeCard });
@@ -147,6 +175,7 @@ export function DailyEssentialsCards() {
     morningCard,
     houseworkRoutineCard,
     bedtimeCard,
+    hasSchoolworkContent,
   ]);
 
   const isEmpty = visibleCards.length === 0;
@@ -199,15 +228,20 @@ export function DailyEssentialsCards() {
               onSetUp={() => navigate('/settings')}
             />
           ) : (
-            visibleCards.map((entry, idx) => (
-              <RoutineCardView
-                key={`${entry.kind}-${idx}`}
-                card={entry.card}
-                onToggleStep={(stepId) =>
-                  handleToggleStep(entry.card.routineType, stepId)
-                }
-              />
-            ))
+            visibleCards.map((entry, idx) => {
+              if (entry.kind === 'schoolwork') {
+                return <SchoolworkTodayCard key={`schoolwork-${idx}`} />;
+              }
+              return (
+                <RoutineCardView
+                  key={`${entry.kind}-${idx}`}
+                  card={entry.card}
+                  onToggleStep={(stepId) =>
+                    handleToggleStep(entry.card.routineType, stepId)
+                  }
+                />
+              );
+            })
           )}
         </div>
       )}
@@ -226,7 +260,8 @@ export function DailyEssentialsCards() {
 type VisibleCard =
   | { kind: 'morning'; card: RoutineCardState }
   | { kind: 'bedtime'; card: RoutineCardState }
-  | { kind: 'housework_routine'; card: RoutineCardState };
+  | { kind: 'housework_routine'; card: RoutineCardState }
+  | { kind: 'schoolwork' };
 
 interface StepState {
   stepId: string;
@@ -284,6 +319,30 @@ export function buildRoutineCard(
       completed: completedIds.has(s.step_id),
     })),
   };
+}
+
+/**
+ * Schoolwork visibility predicate. Mirrors Android's
+ * `SchoolworkCardState.hasContent`: true when there's at least one
+ * active course, OR at least one not-yet-completed assignment due
+ * within the current calendar day (matches `SchoolworkTodayCard`'s
+ * own bucketing).
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper for unit testing
+export function schoolworkHasContent(
+  courses: Course[],
+  assignments: Assignment[],
+  todayMidnightMs: number,
+): boolean {
+  if (courses.some((c) => c.active)) return true;
+  const tomorrowMidnight = todayMidnightMs + 24 * 60 * 60 * 1000;
+  return assignments.some(
+    (a) =>
+      !a.completed &&
+      a.dueDate != null &&
+      a.dueDate >= todayMidnightMs &&
+      a.dueDate < tomorrowMidnight,
+  );
 }
 
 function RoutineCardView({

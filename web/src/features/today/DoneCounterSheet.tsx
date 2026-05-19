@@ -6,7 +6,7 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
+import { isMetaBuiltInHabit } from '@/utils/metaBuiltInHabit';
 import type { Task } from '@/types/task';
 
 /**
@@ -69,10 +69,12 @@ export function DoneCounterSheet({ isOpen, onClose }: DoneCounterSheetProps) {
     }> = [];
     for (const habit of habits) {
       if (!habit.is_active) continue;
-      // Medication is its own top-level destination (parity with
-      // Android's `HabitListViewModel`); don't surface it here as a
-      // completed habit row.
-      if (isMedicationBuiltInHabit(habit)) continue;
+      // Skip the six built-in meta-habits (Morning/Bedtime Self-Care,
+      // Medication, Housework, School, Leisure). Each has its own
+      // surface (dedicated Today card or top-level Medication
+      // destination), so listing them as completed habit rows would
+      // double-count work the user already sees elsewhere.
+      if (isMetaBuiltInHabit(habit)) continue;
       const list = completions[habit.id] || [];
       const todayCompletion = list.find((c) => c.date === todayIso);
       const count = todayCompletion?.count ?? 0;

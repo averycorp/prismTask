@@ -81,7 +81,15 @@ export function HabitsSection() {
 
   const [collapsed, setCollapsed] = useState<boolean>(loadCollapsed);
 
-  const activeHabits = habits.filter((h) => h.is_active);
+  // Hide the six built-in meta-habits (Morning/Bedtime Self-Care,
+  // Medication, Housework, School, Leisure). They surface on Today via
+  // dedicated cards (DailyEssentialsCards, SchoolworkTodayCard,
+  // LeisureBudgetCard) and as top-level destinations — listing them
+  // here as plain habit rows is duplicative. Matches Android's
+  // `HabitListViewModel.kt:213-221` filter and the Habits screen.
+  const activeHabits = habits.filter(
+    (h) => h.is_active && !isMetaBuiltInHabit(h),
+  );
   if (activeHabits.length === 0) return null;
 
   const dailyHabits = activeHabits.filter((h) => h.frequency === 'daily');

@@ -30,27 +30,11 @@ import {
 } from '@/utils/builtInHabitReconciler';
 import { HabitBookingDialog } from './HabitBookingDialog';
 import { HabitLogDialog } from '@/components/HabitLogDialog';
-import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
+import { isMetaBuiltInHabit } from '@/utils/metaBuiltInHabit';
 import { isRecurringFrequency, type Habit } from '@/types/habit';
 import { periodLabel } from '@/utils/habitPeriod';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-// Names of the six "meta-habit" rows that Android keeps in Room but
-// excludes from the regular Habits list (rendered as Self-Care /
-// Built-In / top-level cards elsewhere). Mirrors the literal constants
-// in `SelfCareRepository.kt`, `SchoolworkRepository.kt`, and
-// `LeisureBudgetRepository.kt`; the Android filter sits in
-// `HabitListViewModel.kt:213-252`. Keep this list in sync with those
-// constants when they change.
-const META_HABIT_NAMES = new Set<string>([
-  'Morning Self-Care',
-  'Bedtime Self-Care',
-  'Medication',
-  'Housework',
-  'School',
-  'Leisure',
-]);
 
 function parseActiveDays(json: string | null): number[] | null {
   if (!json) return null;
@@ -116,13 +100,7 @@ export function HabitListScreen() {
   // `HabitListViewModel.kt:213-252`. Without this, cloud-synced rows
   // leak into web's list and make it longer than mobile's.
   const activeHabits = useMemo(
-    () =>
-      habits.filter(
-        (h) =>
-          h.is_active &&
-          !META_HABIT_NAMES.has(h.name) &&
-          !isMedicationBuiltInHabit(h),
-      ),
+    () => habits.filter((h) => h.is_active && !isMetaBuiltInHabit(h)),
     [habits],
   );
 
