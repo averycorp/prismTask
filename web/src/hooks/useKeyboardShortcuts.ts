@@ -52,26 +52,6 @@ export function useKeyboardShortcuts({ onSearch, onNewTask, onShowShortcuts }: S
           e.preventDefault();
           onShowShortcuts?.();
           break;
-        case '1':
-          e.preventDefault();
-          navigate('/');
-          break;
-        case '2':
-          e.preventDefault();
-          navigate('/tasks');
-          break;
-        case '3':
-          e.preventDefault();
-          navigate('/projects');
-          break;
-        case '4':
-          e.preventDefault();
-          navigate('/habits');
-          break;
-        case '5':
-          e.preventDefault();
-          navigate('/calendar/week');
-          break;
         case 'Escape':
           // Close any open modals — handled by individual components
           break;
