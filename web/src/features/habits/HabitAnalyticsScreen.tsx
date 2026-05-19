@@ -166,14 +166,21 @@ export function HabitAnalyticsScreen() {
         <StatCards streakData={streakData} habitColor={habitColor} />
       )}
 
-      {/* Contribution Grid */}
+      {/* Contribution Grid.
+          `maxCount` is the per-cell ceiling used for color intensity.
+          For daily habits this is `target_count` (a day with target=3 needs
+          3 completions to "fully fill"). For non-daily habits the per-day
+          target is implicitly 1 — `target_count` then describes the *period*
+          total, so passing it through would mark every legitimate "done it
+          today" cell as partial. Mirror Android's per-day-1 semantics by
+          clamping to 1 when the habit isn't daily. */}
       <ContributionGrid
         completions={habitCompletions.map((c) => ({
           date: c.date,
           count: c.count,
         }))}
         habitColor={habitColor}
-        maxCount={habit.target_count}
+        maxCount={habit.frequency === 'daily' ? habit.target_count : 1}
         weeks={12}
         title="Contributions"
       />
@@ -198,12 +205,19 @@ export function HabitAnalyticsScreen() {
         />
       </div>
 
-      {/* Completion Calendar */}
+      {/* Completion Calendar. `targetCount` is the per-day completion
+          threshold the mini-calendar uses to mark a cell "done" or
+          "missed". For non-daily habits the per-day target is implicitly
+          1 — passing `target_count` (the per-period total) marks every
+          day as missed except when the user happens to complete the
+          habit `target_count` times in one day, which is exactly the bug
+          recurring habits had on the web. Clamp to 1 for non-daily. */}
       <CompletionCalendar
         completions={habitCompletions}
         habitColor={habitColor}
         activeDaysJson={habit.active_days_json}
-        targetCount={habit.target_count}
+        targetCount={habit.frequency === 'daily' ? habit.target_count : 1}
+        frequency={habit.frequency}
       />
 
       {/* Edit Modal */}
@@ -594,11 +608,18 @@ function CompletionCalendar({
   habitColor,
   activeDaysJson,
   targetCount,
+  frequency,
 }: {
   completions: HabitCompletion[];
   habitColor: string;
   activeDaysJson: string | null;
   targetCount: number;
+  /**
+   * Habit frequency. Used to suppress the per-day "missed" red dot on
+   * non-daily habits — a monthly habit isn't *expected* to be completed
+   * on every active day, so marking days red is misleading.
+   */
+  frequency: Habit['frequency'];
 }) {
   const today = new Date();
 
@@ -651,6 +672,7 @@ function CompletionCalendar({
             habitColor={habitColor}
             isActiveDay={isActiveDay}
             targetCount={targetCount}
+            markMissed={frequency === 'daily'}
           />
         ))}
       </div>
@@ -665,6 +687,7 @@ function MiniCalendar({
   habitColor,
   isActiveDay,
   targetCount,
+  markMissed,
 }: {
   month: Date;
   today: Date;
@@ -672,6 +695,13 @@ function MiniCalendar({
   habitColor: string;
   isActiveDay: (date: Date) => boolean;
   targetCount: number;
+  /**
+   * When true (daily habits), draw a red dot under active days that
+   * went unmet. Non-daily habits set this to false — a fortnightly
+   * habit shouldn't paint Tuesday red just because the user wasn't
+   * "due" to do it that day.
+   */
+  markMissed: boolean;
 }) {
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
@@ -708,7 +738,7 @@ function MiniCalendar({
           const active = isActiveDay(day);
           const isFuture = day > today;
           const isToday = isSameDay(day, today);
-          const missed = !isFuture && active && !completed;
+          const missed = markMissed && !isFuture && active && !completed;
 
           return (
             <div
