@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { Habit, HabitCompletion, HabitFrequency } from '@/types/habit';
+import type { Habit, HabitFrequency } from '@/types/habit';
 import { isRecurringFrequency } from '@/types/habit';
 
 /**
@@ -46,50 +46,35 @@ function saveCollapsed(collapsed: boolean) {
   }
 }
 
-function completionsThisWeek(
-  list: readonly HabitCompletion[] | undefined,
-  todayIso: string,
-): number {
-  if (!list || list.length === 0) return 0;
-  const todayDate = new Date(todayIso + 'T12:00:00');
-  const startOfWeek = new Date(todayDate);
-  startOfWeek.setDate(todayDate.getDate() - ((todayDate.getDay() + 6) % 7));
-  startOfWeek.setHours(0, 0, 0, 0);
-  return list.reduce((sum, c) => {
-    const d = new Date(c.date + 'T00:00:00');
-    return d >= startOfWeek && d <= todayDate ? sum + c.count : sum;
-  }, 0);
-}
-
 function frequencyLabel(
   frequency: HabitFrequency,
   target: number,
   todayCount: number,
-  weekCount: number,
+  periodCount: number,
 ): string {
   switch (frequency) {
     case 'daily':
       return target > 1 ? `${todayCount}/${target} today` : 'Daily';
     case 'weekly':
-      return `${weekCount}/${target} this week`;
+      return `${periodCount}/${target} this week`;
     case 'fortnightly':
-      return `${weekCount}/${target} this fortnight`;
+      return `${periodCount}/${target} this fortnight`;
     case 'monthly':
-      return `${weekCount}/${target} this month`;
+      return `${periodCount}/${target} this month`;
     case 'bimonthly':
-      return `${weekCount}/${target} this period`;
+      return `${periodCount}/${target} this period`;
     case 'quarterly':
-      return `${weekCount}/${target} this quarter`;
+      return `${periodCount}/${target} this quarter`;
   }
 }
 
 export function HabitsSection() {
   const navigate = useNavigate();
   const habits = useHabitStore((s) => s.habits);
-  const completions = useHabitStore((s) => s.completions);
   const toggleCompletion = useHabitStore((s) => s.toggleCompletion);
   const isTodayCompleted = useHabitStore((s) => s.isTodayCompleted);
   const getTodayCount = useHabitStore((s) => s.getTodayCount);
+  const getPeriodCompletions = useHabitStore((s) => s.getPeriodCompletions);
   const getStreakData = useHabitStore((s) => s.getStreakData);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const todayIso = useLogicalToday(startOfDayHour);
@@ -119,7 +104,7 @@ export function HabitsSection() {
       habit={habit}
       completed={isTodayCompleted(habit.id)}
       currentCount={getTodayCount(habit.id)}
-      weekCount={completionsThisWeek(completions[habit.id], todayIso)}
+      periodCount={getPeriodCompletions(habit.id)}
       streak={getStreakData(habit.id)?.currentStreak ?? 0}
       onToggle={async () => {
         try {
@@ -192,7 +177,13 @@ interface HabitRowProps {
   habit: Habit;
   completed: boolean;
   currentCount: number;
-  weekCount: number;
+  /**
+   * Completion count inside the habit's active period (week / fortnight
+   * / month / 2 months / quarter) — pulled from `getPeriodCompletions`
+   * so the row label matches whatever the habit's actual cadence is.
+   * For daily habits this matches `currentCount`.
+   */
+  periodCount: number;
   streak: number;
   onToggle: () => void;
   onClick: () => void;
@@ -202,7 +193,7 @@ function HabitRow({
   habit,
   completed,
   currentCount,
-  weekCount,
+  periodCount,
   streak,
   onToggle,
   onClick,
@@ -213,7 +204,7 @@ function HabitRow({
   // `HabitEntity.showStreak`; until that lands on web, the >0 check
   // matches the user-visible default (streak hidden when 0).
   const showStreak = streak > 0;
-  const label = frequencyLabel(habit.frequency, habit.target_count, currentCount, weekCount);
+  const label = frequencyLabel(habit.frequency, habit.target_count, currentCount, periodCount);
   return (
     <li className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-[var(--color-bg-secondary)]">
       <button

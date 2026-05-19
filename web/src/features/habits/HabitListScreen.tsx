@@ -32,6 +32,7 @@ import { HabitBookingDialog } from './HabitBookingDialog';
 import { HabitLogDialog } from '@/components/HabitLogDialog';
 import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
 import { isRecurringFrequency, type Habit } from '@/types/habit';
+import { periodLabel } from '@/utils/habitPeriod';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -72,6 +73,7 @@ export function HabitListScreen() {
     getStreakData,
     isTodayCompleted,
     getTodayCount,
+    getPeriodCompletions,
     getTodayProgress,
     getWeekCompletions,
   } = useHabitStore();
@@ -350,6 +352,7 @@ export function HabitListScreen() {
             streakData={getStreakData(habit.id)}
             todayCompleted={isTodayCompleted(habit.id)}
             todayCount={getTodayCount(habit.id)}
+            periodCount={getPeriodCompletions(habit.id)}
             weekCompletions={getWeekCompletions(habit.id)}
             onToggle={() => handleToggle(habit.id)}
             onEdit={() => handleEdit(habit)}
@@ -414,6 +417,7 @@ function HabitCard({
   streakData,
   todayCompleted,
   todayCount,
+  periodCount,
   weekCompletions,
   onToggle,
   onEdit,
@@ -431,6 +435,12 @@ function HabitCard({
     : never;
   todayCompleted: boolean;
   todayCount: number;
+  /**
+   * Completion count inside the habit's *period* (week / fortnight /
+   * month / 2 months / quarter). For daily habits this equals
+   * `todayCount` and isn't used for rendering.
+   */
+  periodCount: number;
   weekCompletions: boolean[];
   onToggle: () => void;
   onEdit: () => void;
@@ -445,6 +455,16 @@ function HabitCard({
   const currentStreak = streakData?.currentStreak ?? 0;
   const activeDays = parseActiveDays(habit.active_days_json);
   const habitColor = habit.color || 'var(--color-accent)';
+  const isRecurring = habit.frequency !== 'daily';
+  // Render at most 7 dots so a quarterly habit with `target_count = 30`
+  // doesn't overflow the card; mirrors Android `HabitCard.kt`'s
+  // `targetFrequency.coerceAtMost(7)` cap.
+  const dotsTarget = isRecurring
+    ? Math.max(1, Math.min(7, habit.target_count))
+    : 7;
+  const filledDots = isRecurring
+    ? Math.min(periodCount, dotsTarget)
+    : weekCompletions.filter(Boolean).length;
 
   return (
     <div
@@ -478,41 +498,101 @@ function HabitCard({
           )}
         </div>
 
-        {/* Weekly progress dots */}
+        {/* Period subtext — non-daily habits get an "X done this {period}"
+            line that mirrors Android's `HabitCard.kt:189-220`. The label
+            uses the habit's frequency noun ("week", "month", "quarter") so
+            a monthly habit doesn't claim weekly progress. */}
+        {isRecurring && (
+          <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+            {periodCount} of {habit.target_count} done {periodLabel(habit.frequency)}
+          </p>
+        )}
+
+        {/* Progress dots. Daily habits show a 7-slot M–S grid of which
+            calendar weekdays are completed. Non-daily habits show
+            `target_count` dots (capped at 7) filled by `periodCount` —
+            progress toward the period target, parity with Android
+            `HabitCard.kt`'s `WeeklyDots(dotsTarget = …)`. */}
         <div className="mt-1.5 flex items-center gap-1">
-          {DAY_LABELS.map((label, idx) => {
-            const isoDay = idx === 6 ? 7 : idx + 1;
-            const isActive =
-              !activeDays || activeDays.length === 0 || activeDays.includes(isoDay);
-            const completed = weekCompletions[idx];
-            return (
-              <Tooltip key={idx} content={`${label}${completed ? ' - Done' : isActive ? '' : ' - Not Active'}`} delay={200}>
-                <div
-                  className={`h-2.5 w-2.5 rounded-full transition-colors ${
-                    !isActive
-                      ? 'bg-[var(--color-bg-secondary)]'
-                      : completed
-                        ? ''
-                        : 'border border-[var(--color-border)]'
-                  }`}
-                  style={
-                    isActive && completed
-                      ? { backgroundColor: habitColor }
-                      : undefined
-                  }
-                />
-              </Tooltip>
-            );
-          })}
+          {isRecurring
+            ? Array.from({ length: dotsTarget }).map((_, idx) => {
+                const completed = idx < filledDots;
+                return (
+                  <Tooltip
+                    key={idx}
+                    content={
+                      completed
+                        ? `${idx + 1} of ${habit.target_count}`
+                        : `Not yet ${periodLabel(habit.frequency)}`
+                    }
+                    delay={200}
+                  >
+                    <div
+                      className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                        completed ? '' : 'border border-[var(--color-border)]'
+                      }`}
+                      style={completed ? { backgroundColor: habitColor } : undefined}
+                    />
+                  </Tooltip>
+                );
+              })
+            : DAY_LABELS.map((label, idx) => {
+                const isoDay = idx === 6 ? 7 : idx + 1;
+                const isActive =
+                  !activeDays ||
+                  activeDays.length === 0 ||
+                  activeDays.includes(isoDay);
+                const completed = weekCompletions[idx];
+                return (
+                  <Tooltip
+                    key={idx}
+                    content={`${label}${completed ? ' - Done' : isActive ? '' : ' - Not Active'}`}
+                    delay={200}
+                  >
+                    <div
+                      className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                        !isActive
+                          ? 'bg-[var(--color-bg-secondary)]'
+                          : completed
+                            ? ''
+                            : 'border border-[var(--color-border)]'
+                      }`}
+                      style={
+                        isActive && completed
+                          ? { backgroundColor: habitColor }
+                          : undefined
+                      }
+                    />
+                  </Tooltip>
+                );
+              })}
         </div>
       </div>
 
-      {/* Completion Toggle */}
+      {/* Completion Toggle.
+          - Daily, target > 1: shows today's `X/target` count.
+          - Daily, target == 1: plain check circle.
+          - Non-daily: shows `periodCount/target` so progress toward the
+            period target is visible. Tapping logs / unlogs today (period
+            target met → filled, otherwise outlined). */}
       <div
         className="shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {habit.target_count > 1 ? (
+        {isRecurring ? (
+          <button
+            onClick={onToggle}
+            className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-200 ${
+              todayCompleted
+                ? 'border-transparent text-white'
+                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]'
+            }`}
+            style={todayCompleted ? { backgroundColor: habitColor } : undefined}
+            aria-label={`${periodCount} of ${habit.target_count} ${periodLabel(habit.frequency)}`}
+          >
+            {periodCount}/{habit.target_count}
+          </button>
+        ) : habit.target_count > 1 ? (
           <button
             onClick={onToggle}
             className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-xs font-bold transition-all duration-200 ${

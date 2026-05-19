@@ -11,6 +11,7 @@ import * as firestoreHabits from '@/api/firestore/habits';
 import { calculateStreaks, type StreakData } from '@/utils/streaks';
 import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
 import { logicalToday } from '@/utils/dayBoundary';
+import { getPeriodBounds } from '@/utils/habitPeriod';
 import { useSettingsStore } from '@/stores/settingsStore';
 import {
   selectForgivenessConfig,
@@ -48,6 +49,14 @@ interface HabitState {
   getStreakData: (habitId: string) => StreakData | null;
   isTodayCompleted: (habitId: string) => boolean;
   getTodayCount: (habitId: string) => number;
+  /**
+   * Completion count inside the habit's current period. For `daily`
+   * habits this is today's count (period = day); for non-daily habits
+   * it is the sum of completions inside the matching weekly /
+   * fortnightly / monthly / bimonthly / quarterly window — the same
+   * `periodCompletions` Android surfaces on the habit card.
+   */
+  getPeriodCompletions: (habitId: string) => number;
   getTodayProgress: () => { completed: number; total: number };
   getWeekCompletions: (habitId: string) => boolean[];
 }
@@ -66,6 +75,24 @@ function parseActiveDays(json: string | null): number[] | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Sum a non-daily habit's completion counts inside the period containing
+ * `todayIso`. Caller is responsible for branching on `habit.frequency` —
+ * passing a daily habit throws (see `getPeriodBounds`).
+ */
+function countPeriodCompletions(
+  habit: Habit,
+  completions: HabitCompletion[],
+  todayIso: string,
+): number {
+  const { startIso, endIso } = getPeriodBounds(habit.frequency, todayIso);
+  let total = 0;
+  for (const c of completions) {
+    if (c.date >= startIso && c.date <= endIso) total += c.count;
+  }
+  return total;
 }
 
 /**
@@ -327,11 +354,20 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   isTodayCompleted: (habitId) => {
     const state = get();
     const habit = state.habits.find((h) => h.id === habitId);
+    if (!habit) return false;
     const completions = state.completions[habitId] || [];
     const today = todayStr();
-    const todayCompletion = completions.find((c) => c.date === today);
-    const count = todayCompletion?.count || 0;
-    return count >= (habit?.target_count || 1);
+    if (habit.frequency === 'daily') {
+      const todayCompletion = completions.find((c) => c.date === today);
+      const count = todayCompletion?.count || 0;
+      return count >= (habit.target_count || 1);
+    }
+    // Non-daily: "completed today" means the period's target is met —
+    // mirrors Android's `HabitRepository.getHabitsWithFullStatus` branch
+    // (`periodCompletions >= habit.targetFrequency`). target_count on a
+    // non-daily habit is the per-period total, not a per-day target.
+    const periodCount = countPeriodCompletions(habit, completions, today);
+    return periodCount >= (habit.target_count || 1);
   },
 
   getTodayCount: (habitId) => {
@@ -339,6 +375,19 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const today = todayStr();
     const todayCompletion = completions.find((c) => c.date === today);
     return todayCompletion?.count || 0;
+  },
+
+  getPeriodCompletions: (habitId) => {
+    const state = get();
+    const habit = state.habits.find((h) => h.id === habitId);
+    if (!habit) return 0;
+    const completions = state.completions[habitId] || [];
+    const today = todayStr();
+    if (habit.frequency === 'daily') {
+      const todayCompletion = completions.find((c) => c.date === today);
+      return todayCompletion?.count || 0;
+    }
+    return countPeriodCompletions(habit, completions, today);
   },
 
   getTodayProgress: () => {
@@ -351,10 +400,10 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     );
     const today = todayStr();
     // Use the logical-day Date (parsed from `today`) so the active-day
-    // weekday filter and weekly-window math align with Android's
-    // `DayBoundary`-driven semantics. A user with SoD = 4 doing their
-    // habit at 02:00 should still see Monday-only habits as "today" if
-    // the logical day is Monday.
+    // weekday filter aligns with Android's `DayBoundary`-driven
+    // semantics. A user with SoD = 4 doing their habit at 02:00 should
+    // still see Monday-only habits as "today" if the logical day is
+    // Monday.
     const todayDate = new Date(today + 'T12:00:00');
     let total = 0;
     let completed = 0;
@@ -366,29 +415,17 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         const isoDay = jsDay === 0 ? 7 : jsDay;
         if (!activeDays.includes(isoDay)) continue;
       }
+      total++;
       if (habit.frequency !== 'daily') {
-        // Weekly / fortnightly / monthly / bimonthly / quarterly all
-        // share the same Today-screen "is the target met in the current
-        // week?" check. Period-aware windows are a follow-up — for now
-        // they at minimum surface progress without being silently
-        // dropped into the daily branch.
-        total++;
-        const weekCompletions = (state.completions[habit.id] || []).reduce(
-          (sum, c) => {
-            const d = new Date(c.date + 'T00:00:00');
-            const startOfCurrentWeek = new Date(todayDate);
-            startOfCurrentWeek.setDate(
-              todayDate.getDate() - ((todayDate.getDay() + 6) % 7),
-            );
-            startOfCurrentWeek.setHours(0, 0, 0, 0);
-            if (d >= startOfCurrentWeek && d <= todayDate) return sum + c.count;
-            return sum;
-          },
-          0,
+        // Period-aware (week / fortnight / month / 2 months / quarter)
+        // — mirrors Android `HabitRepository.getHabitsWithFullStatus`.
+        const periodCount = countPeriodCompletions(
+          habit,
+          state.completions[habit.id] || [],
+          today,
         );
-        if (weekCompletions >= habit.target_count) completed++;
+        if (periodCount >= habit.target_count) completed++;
       } else {
-        total++;
         const todayCompletion = (state.completions[habit.id] || []).find(
           (c) => c.date === today,
         );
