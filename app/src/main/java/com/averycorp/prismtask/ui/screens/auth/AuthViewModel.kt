@@ -9,6 +9,7 @@ import com.averycorp.prismtask.data.remote.GenericPreferenceSyncService
 import com.averycorp.prismtask.data.remote.SortPreferencesSyncService
 import com.averycorp.prismtask.data.remote.SyncService
 import com.averycorp.prismtask.data.remote.ThemePreferencesSyncService
+import com.averycorp.prismtask.data.remote.sync.BackendSyncService
 import com.averycorp.prismtask.testing.EmulatorAuthHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,7 @@ class AuthViewModel
 constructor(
     private val authManager: AuthManager,
     private val syncService: SyncService,
+    private val backendSyncService: BackendSyncService,
     private val sortPreferencesSyncService: SortPreferencesSyncService,
     private val themePreferencesSyncService: ThemePreferencesSyncService,
     private val genericPreferenceSyncService: GenericPreferenceSyncService,
@@ -251,6 +253,14 @@ constructor(
     private suspend fun runPostSignInSync() {
         try {
             syncService.fullSync(trigger = "signIn")
+        } catch (_: Exception) {
+            // Error already logged by fullSync/markSyncCompleted.
+        }
+        // Pull/push the entities that ride the FastAPI backend (chat
+        // history, leisure activities + sessions, etc.) so a returning
+        // user sees their cross-device data without tapping manual Sync.
+        try {
+            backendSyncService.fullSync(trigger = "signIn")
         } catch (_: Exception) {
             // Error already logged by fullSync/markSyncCompleted.
         }

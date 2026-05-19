@@ -8,6 +8,7 @@ import com.averycorp.prismtask.data.local.dao.MedicationDao
 import com.averycorp.prismtask.data.local.dao.MedicationSlotDao
 import com.averycorp.prismtask.data.local.dao.MedicationTierStateDao
 import com.averycorp.prismtask.data.local.dao.ProjectDao
+import com.averycorp.prismtask.data.local.dao.SyncMetadataDao
 import com.averycorp.prismtask.data.local.dao.TagDao
 import com.averycorp.prismtask.data.local.dao.TaskDao
 import com.averycorp.prismtask.data.local.dao.TaskTemplateDao
@@ -25,6 +26,11 @@ import com.averycorp.prismtask.data.preferences.TemplatePreferences
 import com.averycorp.prismtask.data.remote.AuthManager
 import com.averycorp.prismtask.data.remote.api.FirebaseTokenRequest
 import com.averycorp.prismtask.data.remote.api.PrismTaskApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -64,9 +70,15 @@ constructor(
     private val authManager: AuthManager,
     private val logger: PrismSyncLogger,
     private val syncStateRepository: SyncStateRepository,
+    private val syncMetadataDao: SyncMetadataDao,
     private val leisureSyncService: LeisureSyncService,
     private val leisureSessionSyncService: LeisureSessionSyncService
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    private var isSyncing: Boolean = false
+
     /**
      * True when the user has backend JWTs stored (i.e. they've logged into or
      * registered with the FastAPI backend at least once).
@@ -79,6 +91,17 @@ constructor(
      * the server timestamp from the pull response on success.
      */
     suspend fun fullSync(trigger: String = "manual"): Result<SyncSummary> {
+        if (isSyncing) {
+            // Auto-triggers fan in from sign-in, reactive pending, online
+            // transitions, and the periodic backstop; without this guard the
+            // overlapping coroutines would double-push the same pending rows.
+            logger.debug(
+                operation = "sync.skipped",
+                detail = "trigger=$trigger reason=already_syncing"
+            )
+            return Result.failure(IllegalStateException("backend sync already in progress"))
+        }
+        isSyncing = true
         val start = System.currentTimeMillis()
         syncStateRepository.markSyncStarted(source = SOURCE_BACKEND, trigger = trigger)
         var pushed = 0
@@ -146,7 +169,65 @@ constructor(
                 throwable = e
             )
             Result.failure(e)
+        } finally {
+            isSyncing = false
         }
+    }
+
+    /**
+     * Wire the same auto-trigger surface [com.averycorp.prismtask.data.remote.SyncService.startAutoSync]
+     * has, so data routed through the FastAPI backend (chat history,
+     * leisure activities + sessions, the generic /sync entities) moves
+     * across devices without the user tapping the manual Sync button.
+     *
+     * Three coroutines run on the service's own [scope]:
+     *  1. Immediate `fullSync(trigger = "startAutoSync")` so a freshly-launched
+     *     app pulls anything written by another device while it was closed.
+     *  2. Reactive — observe `syncMetadataDao.observePending()` and trigger a
+     *     `fullSync(trigger = "reactive")` when local writes accumulate.
+     *     Debounce 500ms so a multi-row edit (e.g. bulk import) bundles
+     *     into a single push cycle.
+     *  3. [ReactiveSyncDriver] — fires on `isOnline` false→true transitions
+     *     plus a periodic backstop, bounding worst-case staleness.
+     *
+     * Every trigger is gated by [isSyncing] inside [fullSync] so the
+     * fans-in never overlap. Failures swallow into the existing
+     * `markSyncCompleted` telemetry path — auto-triggered runs never
+     * surface to the UI on their own.
+     *
+     * Safe to call repeatedly; later calls re-add coroutines to the same
+     * scope. (`startAutoSync` is currently invoked from
+     * [com.averycorp.prismtask.MainActivity.onCreate] and from
+     * [com.averycorp.prismtask.ui.screens.onboarding.OnboardingViewModel]
+     * once per app launch, mirroring the Firestore service.)
+     */
+    fun startAutoSync() {
+        if (authManager.userId == null) return
+        scope.launch {
+            runCatching { fullSync(trigger = "startAutoSync") }
+        }
+        scope.launch {
+            syncMetadataDao.observePending()
+                .debounce(REACTIVE_DEBOUNCE_MS)
+                .collect { entries ->
+                    if (entries.isEmpty()) return@collect
+                    if (isSyncing) return@collect
+                    if (!syncStateRepository.isOnline.value) return@collect
+                    if (authManager.userId == null) return@collect
+                    if (!isConnected()) return@collect
+                    runCatching { fullSync(trigger = "reactive") }
+                }
+        }
+        ReactiveSyncDriver(
+            isOnline = syncStateRepository.isOnline,
+            isSignedIn = { authManager.userId != null },
+            periodMs = PERIODIC_BACKEND_SYNC_INTERVAL_MS,
+            onTrigger = { trigger ->
+                if (isConnected()) {
+                    runCatching { fullSync(trigger = trigger) }
+                }
+            }
+        ).start(scope)
     }
 
     /**
@@ -853,6 +934,15 @@ constructor(
 
     companion object {
         const val SOURCE_BACKEND: String = "backend"
+
+        // Longer than the Firestore service's 30s floor — backend hits are
+        // server round-trips, not lightweight Firestore writes, and the
+        // operations covered here (chat, leisure, settings) tolerate the
+        // extra latency. The reactive observePending listener catches edits
+        // sooner; this only bounds idle staleness.
+        private const val PERIODIC_BACKEND_SYNC_INTERVAL_MS: Long = 60_000L
+
+        private const val REACTIVE_DEBOUNCE_MS: Long = 500L
     }
 }
 
