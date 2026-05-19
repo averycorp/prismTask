@@ -68,9 +68,14 @@ test.describe('PrismTheme variant picker', () => {
   test('flipping themes via localStorage updates --color-accent across navigations', async ({
     page,
   }) => {
-    // Land on Cyberpunk first.
+    // Land on Cyberpunk first. Playwright re-runs init scripts on every
+    // navigation (including `page.reload()`), so seed conditionally —
+    // otherwise the SYNTHWAVE flip below gets clobbered back to
+    // CYBERPUNK on reload before the app reads it.
     await page.addInitScript(() => {
-      localStorage.setItem('prismtask_theme_key', 'CYBERPUNK');
+      if (!localStorage.getItem('prismtask_theme_key')) {
+        localStorage.setItem('prismtask_theme_key', 'CYBERPUNK');
+      }
     });
     await page.goto('/login');
     // PrismThemeProvider applies the theme in a `useEffect`, so the CSS
