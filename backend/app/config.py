@@ -49,7 +49,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "https://web-prismtask-production.up.railway.app",
         "https://app.prismtask.app",
-        "https://prism.averycorp.org",
+        "https://prism.averykarlin.org",
     ]
     # Emails auto-promoted to admin (is_admin=True) on register / sign-in.
     # Matched case-insensitively. Operators can override via the
@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     _REQUIRED_PRODUCTION_ORIGINS: list[str] = [
         "https://app.prismtask.app",
         "https://web-prismtask-production.up.railway.app",
-        "https://prism.averycorp.org",
+        "https://prism.averykarlin.org",
     ]
 
     @property
