@@ -117,25 +117,32 @@ describe('HabitListScreen — meta-habit filtering', () => {
     localStorage.clear();
   });
 
-  // Mirror of Android's `HabitListViewModel.kt:213-252` filter. Android
+  // Mirror of Android's `HabitListViewModel.kt:213-221` filter. Android
   // keeps these rows in Room (cloud-synced through Firestore) but never
   // renders them inside the regular habit list — they appear as
   // Self-Care / Built-In / top-level cards. Web has to apply the same
   // filter or the cloud-synced rows leak in and make the web list
-  // longer than the phone's.
-  const META_NAMES = [
-    'Morning Self-Care',
-    'Bedtime Self-Care',
-    'Medication',
-    'Housework',
-    'School',
-    'Leisure',
+  // longer than the phone's. Identity is keyed on `template_key` (the
+  // canonical built-in marker written by both Android and the web
+  // reconciler), with `is_built_in + name` as a legacy fallback — see
+  // `web/src/utils/metaBuiltInHabit.ts`.
+  const META_HABITS: Array<{ name: string; template_key: string }> = [
+    { name: 'Morning Self-Care', template_key: 'builtin_morning_selfcare' },
+    { name: 'Bedtime Self-Care', template_key: 'builtin_bedtime_selfcare' },
+    { name: 'Medication', template_key: 'builtin_medication' },
+    { name: 'Housework', template_key: 'builtin_housework' },
+    { name: 'School', template_key: 'builtin_school' },
+    { name: 'Leisure', template_key: 'builtin_leisure' },
   ];
 
-  it('excludes the six meta-habit names but keeps regular user habits', () => {
+  it('excludes the six meta-habits but keeps regular user habits', () => {
     const userHabit = habit('user-1', { name: 'Workout' });
-    const metaHabits = META_NAMES.map((name, idx) =>
-      habit(`meta-${idx}`, { name }),
+    const metaHabits = META_HABITS.map((meta, idx) =>
+      habit(`meta-${idx}`, {
+        name: meta.name,
+        template_key: meta.template_key,
+        is_built_in: true,
+      }),
     );
     useHabitStore.setState({
       habits: [...metaHabits, userHabit],
@@ -145,9 +152,25 @@ describe('HabitListScreen — meta-habit filtering', () => {
     renderScreen();
 
     expect(screen.getByText('Workout')).toBeInTheDocument();
-    for (const name of META_NAMES) {
-      expect(screen.queryByText(name)).not.toBeInTheDocument();
+    for (const meta of META_HABITS) {
+      expect(screen.queryByText(meta.name)).not.toBeInTheDocument();
     }
+  });
+
+  it('keeps user habits that happen to share a meta name when they lack the built-in flag', () => {
+    // A user-created habit literally named "Leisure" without
+    // `is_built_in` / `template_key` is the user's own habit, not the
+    // system built-in — leave it alone.
+    useHabitStore.setState({
+      habits: [
+        habit('user-leisure', { name: 'Leisure', is_built_in: false }),
+      ],
+      completions: {},
+    });
+
+    renderScreen();
+
+    expect(screen.getByText('Leisure')).toBeInTheDocument();
   });
 
   it('still hides is_active=false habits (regression guard for the prior fix)', () => {
@@ -170,7 +193,13 @@ describe('HabitListScreen — meta-habit filtering', () => {
     // seeded the six meta-habits but no user habits should see the
     // empty-state CTA, not a list of six rows.
     useHabitStore.setState({
-      habits: META_NAMES.map((name, idx) => habit(`meta-${idx}`, { name })),
+      habits: META_HABITS.map((meta, idx) =>
+        habit(`meta-${idx}`, {
+          name: meta.name,
+          template_key: meta.template_key,
+          is_built_in: true,
+        }),
+      ),
       completions: {},
     });
 

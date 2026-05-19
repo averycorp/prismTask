@@ -9,7 +9,7 @@ import type {
 } from '@/types/habit';
 import * as firestoreHabits from '@/api/firestore/habits';
 import { calculateStreaks, type StreakData } from '@/utils/streaks';
-import { isMedicationBuiltInHabit } from '@/utils/medicationBuiltInHabit';
+import { isMetaBuiltInHabit } from '@/utils/metaBuiltInHabit';
 import { logicalToday } from '@/utils/dayBoundary';
 import { useSettingsStore } from '@/stores/settingsStore';
 import {
@@ -343,11 +343,14 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   getTodayProgress: () => {
     const state = get();
-    // Medication is its own top-level destination (parity with Android's
-    // `HabitListViewModel`); exclude it so the Today progress count
-    // matches the Today habit section + done-counter sheet.
+    // Exclude the six built-in meta-habits (Morning/Bedtime Self-Care,
+    // Medication, Housework, School, Leisure). Each surfaces elsewhere
+    // (dedicated Today cards or top-level Medication destination) — see
+    // Android's `HabitListViewModel.kt:213-221`. Keeps the Today progress
+    // count consistent with the Today habit section, done-counter sheet,
+    // and Habits screen.
     const activeHabits = state.habits.filter(
-      (h) => h.is_active && !isMedicationBuiltInHabit(h),
+      (h) => h.is_active && !isMetaBuiltInHabit(h),
     );
     const today = todayStr();
     // Use the logical-day Date (parsed from `today`) so the active-day

@@ -39,6 +39,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import { Sparkles as SparklesIcon } from 'lucide-react';
 import { useLogicalToday } from '@/utils/useLogicalToday';
+import { isMetaBuiltInHabit } from '@/utils/metaBuiltInHabit';
 
 const COLLAPSE_KEY = 'prismtask_today_collapse';
 
@@ -654,6 +655,10 @@ function WeeklyHabitSummary() {
 
   for (const habit of habits) {
     if (!habit.is_active) continue;
+    // Skip the six built-in meta-habits — they're surfaced via dedicated
+    // Today cards, not as habit check-ins. Keeps the weekly summary
+    // count consistent with the Today habit section and Habits screen.
+    if (isMetaBuiltInHabit(habit)) continue;
     const habitCompletions = completions[habit.id] || [];
 
     if (habit.frequency !== 'daily') {
