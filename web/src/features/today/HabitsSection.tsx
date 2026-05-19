@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useHabitStore } from '@/stores/habitStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { isMetaBuiltInHabit } from '@/utils/metaBuiltInHabit';
 import type { Habit, HabitFrequency } from '@/types/habit';
 import { isRecurringFrequency } from '@/types/habit';
 
