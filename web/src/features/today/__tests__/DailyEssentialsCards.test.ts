@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildRoutineCard } from '@/features/today/DailyEssentialsCards';
+import {
+  buildRoutineCard,
+  schoolworkHasContent,
+} from '@/features/today/DailyEssentialsCards';
 import type { SelfCareLog, SelfCareStep } from '@/api/firestore/selfCare';
 import type { SelfCareTierDefaults } from '@/api/firestore/advancedTuningPreferences';
+import type { Assignment, Course } from '@/types/schoolwork';
 
 /**
  * Pure-function tests for the Daily Essentials section card builders.
@@ -158,5 +162,101 @@ describe('buildRoutineCard (parity unit 6)', () => {
       { ...TIER_DEFAULTS, housework: 'quick' },
     );
     expect(card!.steps.map((s) => s.stepId)).toEqual(['hQuick', 'hReg', 'hDeep']);
+  });
+});
+
+function course(over: Partial<Course> & { id: string }): Course {
+  return {
+    id: over.id,
+    name: over.name ?? 'Course',
+    code: over.code ?? '',
+    color: over.color ?? 0,
+    icon: over.icon ?? '',
+    active: over.active ?? true,
+    sortOrder: over.sortOrder ?? 0,
+    createdAt: over.createdAt ?? 0,
+    updatedAt: over.updatedAt ?? 0,
+    createDailyTask: over.createDailyTask ?? false,
+  };
+}
+
+function assignment(over: Partial<Assignment> & { id: string }): Assignment {
+  return {
+    id: over.id,
+    courseId: over.courseId ?? 'c1',
+    title: over.title ?? 'Assignment',
+    dueDate: over.dueDate ?? null,
+    completed: over.completed ?? false,
+    completedAt: over.completedAt ?? null,
+    notes: over.notes ?? null,
+    createdAt: over.createdAt ?? 0,
+    updatedAt: over.updatedAt ?? 0,
+  };
+}
+
+describe('schoolworkHasContent', () => {
+  const TODAY_MIDNIGHT = 1_700_000_000_000;
+  const TOMORROW_MIDNIGHT = TODAY_MIDNIGHT + 24 * 60 * 60 * 1000;
+
+  it('is true when an active course exists', () => {
+    expect(
+      schoolworkHasContent([course({ id: 'c1', active: true })], [], TODAY_MIDNIGHT),
+    ).toBe(true);
+  });
+
+  it('is false when only archived courses exist and no assignments', () => {
+    expect(
+      schoolworkHasContent([course({ id: 'c1', active: false })], [], TODAY_MIDNIGHT),
+    ).toBe(false);
+  });
+
+  it('is true when an assignment is due today and not completed', () => {
+    expect(
+      schoolworkHasContent(
+        [course({ id: 'c1', active: false })],
+        [assignment({ id: 'a1', dueDate: TODAY_MIDNIGHT + 3600_000 })],
+        TODAY_MIDNIGHT,
+      ),
+    ).toBe(true);
+  });
+
+  it('ignores completed assignments due today', () => {
+    expect(
+      schoolworkHasContent(
+        [],
+        [
+          assignment({
+            id: 'a1',
+            dueDate: TODAY_MIDNIGHT + 3600_000,
+            completed: true,
+          }),
+        ],
+        TODAY_MIDNIGHT,
+      ),
+    ).toBe(false);
+  });
+
+  it('ignores assignments due tomorrow', () => {
+    expect(
+      schoolworkHasContent(
+        [],
+        [assignment({ id: 'a1', dueDate: TOMORROW_MIDNIGHT })],
+        TODAY_MIDNIGHT,
+      ),
+    ).toBe(false);
+  });
+
+  it('ignores assignments without a due date', () => {
+    expect(
+      schoolworkHasContent(
+        [],
+        [assignment({ id: 'a1', dueDate: null })],
+        TODAY_MIDNIGHT,
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false when nothing matches', () => {
+    expect(schoolworkHasContent([], [], TODAY_MIDNIGHT)).toBe(false);
   });
 });
