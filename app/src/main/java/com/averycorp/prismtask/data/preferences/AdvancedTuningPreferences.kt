@@ -112,9 +112,13 @@ data class SmartDefaultsConfig(
     val durationGranularityMinutes: Int = 15
 )
 
-/** Hard cutoff hour (0..23) for the morning check-in prompt. */
+/**
+ * Length of the morning check-in availability window, in hours after the
+ * user's Start-of-Day. The banner and card hide once this many hours have
+ * elapsed since SoD. Range 1..24; default 12.
+ */
 data class MorningCheckInPromptCutoff(
-    val latestHour: Int = 11
+    val windowHours: Int = 12
 )
 
 /** Per-category extra keywords (CSV) appended to the built-in classifier list. */
@@ -333,8 +337,8 @@ constructor(
         private val SD_MIN_HISTORY = intPreferencesKey("smart_defaults_min_history")
         private val SD_GRANULARITY = intPreferencesKey("smart_defaults_granularity")
 
-        // B14 — morning check-in cutoff
-        private val MORNING_LATEST = intPreferencesKey("morning_checkin_latest_hour")
+        // B14 — morning check-in availability window (hours after SoD)
+        private val MORNING_WINDOW_HOURS = intPreferencesKey("morning_checkin_window_hours")
 
         // B15 — custom keywords
         private val CK_WORK = stringPreferencesKey("custom_keywords_work")
@@ -505,7 +509,7 @@ constructor(
 
     fun getMorningCheckInPromptCutoff(): Flow<MorningCheckInPromptCutoff> = context.advancedTuningDataStore.data.map {
         MorningCheckInPromptCutoff(
-            latestHour = (it[MORNING_LATEST] ?: 11).coerceIn(0, 23)
+            windowHours = (it[MORNING_WINDOW_HOURS] ?: 12).coerceIn(1, 24)
         )
     }
 
@@ -639,7 +643,7 @@ constructor(
 
     suspend fun setMorningCheckInPromptCutoff(c: MorningCheckInPromptCutoff) {
         context.advancedTuningDataStore.edit {
-            it[MORNING_LATEST] = c.latestHour
+            it[MORNING_WINDOW_HOURS] = c.windowHours.coerceIn(1, 24)
         }
     }
 

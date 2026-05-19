@@ -6,10 +6,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import { startOfLogicalDayMs } from '@/utils/dayBoundary';
-import {
-  shouldShowMorningCheckInBanner,
-  DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR,
-} from '@/lib/morningCheckInBanner';
+import { shouldShowMorningCheckInBanner } from '@/lib/morningCheckInBanner';
 import { useCheckInLogsStore } from '@/stores/checkInLogsStore';
 import { MorningCheckInStepper } from '@/features/checkin/MorningCheckInStepper';
 
@@ -54,13 +51,11 @@ function writeDismissedIso(iso: string): void {
 export function MorningCheckInBanner() {
   const featureEnabled = useSettingsStore((s) => s.showMorningCheckIn);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
-  // Read the cutoff hour from Advanced Tuning prefs (synced cross-device
-  // with Android via Firestore). Falls back to the
-  // `DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR` constant (11) when the store
-  // hasn't loaded yet — matches Android's
-  // `MorningCheckInPromptCutoff(latestHour = 11)` default.
-  const cutoffHour = useAdvancedTuningStore(
-    (s) => s.prefs.morningCheckInCutoffHour,
+  // Read the availability window (hours after SoD) from Advanced Tuning
+  // prefs, synced cross-device with Android via Firestore. Mirrors
+  // `MorningCheckInPromptCutoff(windowHours = 12)`.
+  const windowHours = useAdvancedTuningStore(
+    (s) => s.prefs.morningCheckInWindowHours,
   );
   const todayIso = useLogicalToday(startOfDayHour);
 
@@ -99,9 +94,7 @@ export function MorningCheckInBanner() {
   const visible = shouldShowMorningCheckInBanner({
     now,
     todayStart,
-    sodHour: startOfDayHour,
-    sodMinute: 0,
-    cutoffHour: cutoffHour ?? DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR,
+    windowHours,
     featureEnabled,
     alreadyCheckedInToday,
     dismissedToday,

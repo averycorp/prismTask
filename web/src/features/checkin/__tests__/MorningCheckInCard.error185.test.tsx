@@ -15,6 +15,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useAdvancedTuningStore } from '@/stores/advancedTuningStore';
+import { DEFAULT_ADVANCED_TUNING_PREFERENCES } from '@/api/firestore/advancedTuningPreferences';
 
 vi.mock('@/api/firestore/checkInLogs', () => ({
   getCheckIn: vi.fn().mockResolvedValue(null),
@@ -28,6 +30,14 @@ vi.mock('@/stores/firebaseUid', () => ({
 describe('MorningCheckInCard — no infinite render loop (React #185)', () => {
   beforeEach(() => {
     useSettingsStore.setState({ showMorningCheckIn: true, startOfDayHour: 4 });
+    // 24h window keeps the card visible at any wall-clock time after SoD,
+    // so the render-loop check doesn't depend on when the suite runs.
+    useAdvancedTuningStore.setState({
+      prefs: {
+        ...DEFAULT_ADVANCED_TUNING_PREFERENCES,
+        morningCheckInWindowHours: 24,
+      },
+    });
   });
 
   it('renders without re-rendering forever', async () => {
