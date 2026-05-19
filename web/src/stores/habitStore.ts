@@ -18,6 +18,7 @@ import {
   useAdvancedTuningStore,
 } from '@/stores/advancedTuningStore';
 import { useRestDayStore } from '@/stores/restDayStore';
+import { useHabitLogStore } from '@/stores/habitLogStore';
 import type { Unsubscribe } from 'firebase/firestore';
 
 interface HabitState {
@@ -93,6 +94,35 @@ function countPeriodCompletions(
     if (c.date >= startIso && c.date <= endIso) total += c.count;
   }
   return total;
+}
+
+/**
+ * Count bookable-habit logs (from `habitLogStore`) whose logical day falls
+ * in `[startIso, endIso]`. Bookings made via `HabitBookingDialog` write to
+ * `habit_logs` only, never to `habit_completions`; without folding them
+ * back in here the "have I done this within the period" check would
+ * answer No for any bookable habit the user has only booked. Mirrors the
+ * `lastLogDate` recency signal Android uses in
+ * `HabitRepository.kt:491` + `TodayViewModel.kt:853-872`.
+ *
+ * Non-bookable habits short-circuit to `0` so the legacy completion-only
+ * counts stay exact for them.
+ */
+function countLogsInRange(
+  habit: Habit,
+  startIso: string,
+  endIso: string,
+  sodHour: number,
+): number {
+  if (!habit.is_bookable) return 0;
+  const logs = useHabitLogStore.getState().getLogsFor(habit.id);
+  if (logs.length === 0) return 0;
+  let count = 0;
+  for (const log of logs) {
+    const iso = logicalToday(log.date, sodHour);
+    if (iso >= startIso && iso <= endIso) count++;
+  }
+  return count;
 }
 
 /**
@@ -357,24 +387,38 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     if (!habit) return false;
     const completions = state.completions[habitId] || [];
     const today = todayStr();
+    const sodHour = useSettingsStore.getState().startOfDayHour;
+    const target = habit.target_count || 1;
     if (habit.frequency === 'daily') {
       const todayCompletion = completions.find((c) => c.date === today);
-      const count = todayCompletion?.count || 0;
-      return count >= (habit.target_count || 1);
+      const count =
+        (todayCompletion?.count || 0) +
+        countLogsInRange(habit, today, today, sodHour);
+      return count >= target;
     }
     // Non-daily: "completed today" means the period's target is met —
     // mirrors Android's `HabitRepository.getHabitsWithFullStatus` branch
     // (`periodCompletions >= habit.targetFrequency`). target_count on a
     // non-daily habit is the per-period total, not a per-day target.
-    const periodCount = countPeriodCompletions(habit, completions, today);
-    return periodCount >= (habit.target_count || 1);
+    const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
+    const periodCount =
+      countPeriodCompletions(habit, completions, today) +
+      countLogsInRange(habit, startIso, endIso, sodHour);
+    return periodCount >= target;
   },
 
   getTodayCount: (habitId) => {
-    const completions = get().completions[habitId] || [];
+    const state = get();
+    const habit = state.habits.find((h) => h.id === habitId);
+    if (!habit) return 0;
+    const completions = state.completions[habitId] || [];
     const today = todayStr();
+    const sodHour = useSettingsStore.getState().startOfDayHour;
     const todayCompletion = completions.find((c) => c.date === today);
-    return todayCompletion?.count || 0;
+    return (
+      (todayCompletion?.count || 0) +
+      countLogsInRange(habit, today, today, sodHour)
+    );
   },
 
   getPeriodCompletions: (habitId) => {
@@ -383,11 +427,19 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     if (!habit) return 0;
     const completions = state.completions[habitId] || [];
     const today = todayStr();
+    const sodHour = useSettingsStore.getState().startOfDayHour;
     if (habit.frequency === 'daily') {
       const todayCompletion = completions.find((c) => c.date === today);
-      return todayCompletion?.count || 0;
+      return (
+        (todayCompletion?.count || 0) +
+        countLogsInRange(habit, today, today, sodHour)
+      );
     }
-    return countPeriodCompletions(habit, completions, today);
+    const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
+    return (
+      countPeriodCompletions(habit, completions, today) +
+      countLogsInRange(habit, startIso, endIso, sodHour)
+    );
   },
 
   getTodayProgress: () => {
@@ -408,6 +460,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     // still see Monday-only habits as "today" if the logical day is
     // Monday.
     const todayDate = new Date(today + 'T12:00:00');
+    const sodHour = useSettingsStore.getState().startOfDayHour;
     let total = 0;
     let completed = 0;
 
@@ -422,17 +475,25 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       if (habit.frequency !== 'daily') {
         // Period-aware (week / fortnight / month / 2 months / quarter)
         // — mirrors Android `HabitRepository.getHabitsWithFullStatus`.
-        const periodCount = countPeriodCompletions(
-          habit,
-          state.completions[habit.id] || [],
-          today,
-        );
+        // Bookable habits fold `habit_logs` into the period count so
+        // bookings made via `HabitBookingDialog` register as "done"
+        // alongside checkbox-driven completions.
+        const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
+        const periodCount =
+          countPeriodCompletions(
+            habit,
+            state.completions[habit.id] || [],
+            today,
+          ) + countLogsInRange(habit, startIso, endIso, sodHour);
         if (periodCount >= habit.target_count) completed++;
       } else {
         const todayCompletion = (state.completions[habit.id] || []).find(
           (c) => c.date === today,
         );
-        if ((todayCompletion?.count || 0) >= habit.target_count) completed++;
+        const dailyCount =
+          (todayCompletion?.count || 0) +
+          countLogsInRange(habit, today, today, sodHour);
+        if (dailyCount >= habit.target_count) completed++;
       }
     }
 
@@ -440,7 +501,21 @@ export const useHabitStore = create<HabitState>((set, get) => ({
   },
 
   getWeekCompletions: (habitId) => {
-    const completions = get().completions[habitId] || [];
+    const state = get();
+    const habit = state.habits.find((h) => h.id === habitId);
+    const completions = state.completions[habitId] || [];
+    const sodHour = useSettingsStore.getState().startOfDayHour;
+    // Bookable habits fold `habit_logs` into the per-day dots so a
+    // booked day lights up even with no checkbox completion. Logs carry
+    // wall-clock epoch ms — re-key to a logical-day ISO so the SoD-aware
+    // semantics match `getTodayCount` / `isTodayCompleted`.
+    const logIsoSet = new Set<string>();
+    if (habit?.is_bookable) {
+      const logs = useHabitLogStore.getState().getLogsFor(habitId);
+      for (const log of logs) {
+        logIsoSet.add(logicalToday(log.date, sodHour));
+      }
+    }
     const today = new Date();
     const dayOffset = (today.getDay() + 6) % 7;
     const result: boolean[] = [];
@@ -448,7 +523,10 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const d = new Date(today);
       d.setDate(today.getDate() - dayOffset + i);
       const dateStr = format(d, 'yyyy-MM-dd');
-      result.push(completions.some((c) => c.date === dateStr && c.count > 0));
+      const fromCompletions = completions.some(
+        (c) => c.date === dateStr && c.count > 0,
+      );
+      result.push(fromCompletions || logIsoSet.has(dateStr));
     }
     return result;
   },
