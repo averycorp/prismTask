@@ -13,23 +13,17 @@ class MorningCheckInBannerDeciderTest {
     private fun millis(year: Int, month: Int, day: Int, hour: Int, minute: Int = 0): Long =
         LocalDateTime.of(year, month, day, hour, minute).atZone(zone).toInstant().toEpochMilli()
 
-    /**
-     * The structural repro: SoD = 7, wall-clock = 02:00, banner must
-     * stay hidden because the user's logical day hasn't started yet.
-     * The pre-fix `hour < 11` predicate returned true here (user-visible bug).
-     */
     @Test
-    fun `pre-SoD wall-clock window keeps banner hidden`() {
-        // logicalDate is yesterday; todayStart anchors yesterday at 7am.
-        val todayStart = millis(2026, 5, 6, 7)
-        val now = millis(2026, 5, 7, 2) // 02:00 the next wall-clock morning, still pre-SoD
+    fun `pre-SoD now keeps banner hidden`() {
+        // logicalDate is today; todayStart anchors today at 7am.
+        // now is one hour before SoD — the user's day hasn't started.
+        val todayStart = millis(2026, 5, 7, 7)
+        val now = millis(2026, 5, 7, 6)
         assertFalse(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -38,16 +32,14 @@ class MorningCheckInBannerDeciderTest {
     }
 
     @Test
-    fun `inside SoD-cutoff window banner shown`() {
+    fun `inside window banner shown`() {
         val todayStart = millis(2026, 5, 7, 7)
         val now = millis(2026, 5, 7, 8)
         assertTrue(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -63,9 +55,7 @@ class MorningCheckInBannerDeciderTest {
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -74,16 +64,15 @@ class MorningCheckInBannerDeciderTest {
     }
 
     @Test
-    fun `past cutoff banner hidden`() {
+    fun `past window banner hidden`() {
+        // SoD=7, 12h window → cutoff at 19:00; 20:00 is past.
         val todayStart = millis(2026, 5, 7, 7)
-        val now = millis(2026, 5, 7, 12)
+        val now = millis(2026, 5, 7, 20)
         assertFalse(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -94,14 +83,12 @@ class MorningCheckInBannerDeciderTest {
     @Test
     fun `at exact cutoff banner hidden`() {
         val todayStart = millis(2026, 5, 7, 7)
-        val now = millis(2026, 5, 7, 11)
+        val now = millis(2026, 5, 7, 19) // SoD + 12h
         assertFalse(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -110,17 +97,16 @@ class MorningCheckInBannerDeciderTest {
     }
 
     @Test
-    fun `cutoff respects user pref - cutoff equals 9 hides banner at 10`() {
+    fun `tightened window respects user pref`() {
+        // User cut the window from 12h to 2h via Advanced Tuning.
+        // SoD=7, +2h → cutoff at 09:00; now=10 is past.
         val todayStart = millis(2026, 5, 7, 7)
         val now = millis(2026, 5, 7, 10)
         assertFalse(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                // user tightened the cutoff via Advanced Tuning slider
-                cutoffHour = 9,
+                windowHours = 2,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -136,9 +122,7 @@ class MorningCheckInBannerDeciderTest {
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = false,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -154,9 +138,7 @@ class MorningCheckInBannerDeciderTest {
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = true,
                 dismissedToday = false
@@ -172,9 +154,7 @@ class MorningCheckInBannerDeciderTest {
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 0,
-                cutoffHour = 11,
+                windowHours = 12,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = true
@@ -183,22 +163,20 @@ class MorningCheckInBannerDeciderTest {
     }
 
     /**
-     * SoD that wraps past midnight (e.g. night-owl user with SoD = 22).
-     * Cutoff = 2 means "morning window is 22:00 to 02:00." Banner
-     * should stay visible at 23:00 (just after SoD) and at 01:00
-     * (still inside the wrapped window), and disappear at 03:00.
+     * Night-owl SoD (22:00). With a 4-hour window the banner stays
+     * visible at 23:00 and at 01:00 the next wall-clock day, and
+     * disappears at 03:00. The cutoff is computed from `todayStart`
+     * directly, so wall-clock midnight is irrelevant.
      */
     @Test
-    fun `SoD wrap-around - in-window after midnight shows banner`() {
+    fun `late SoD - in-window after midnight shows banner`() {
         val todayStart = millis(2026, 5, 7, 22)
-        val now = millis(2026, 5, 8, 1) // 01:00 the next wall-clock day
+        val now = millis(2026, 5, 8, 1)
         assertTrue(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 22,
-                sodMinute = 0,
-                cutoffHour = 2,
+                windowHours = 4,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -207,16 +185,14 @@ class MorningCheckInBannerDeciderTest {
     }
 
     @Test
-    fun `SoD wrap-around - past wrapped cutoff hides banner`() {
+    fun `late SoD - past window hides banner`() {
         val todayStart = millis(2026, 5, 7, 22)
         val now = millis(2026, 5, 8, 3)
         assertFalse(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 22,
-                sodMinute = 0,
-                cutoffHour = 2,
+                windowHours = 4,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false
@@ -225,16 +201,15 @@ class MorningCheckInBannerDeciderTest {
     }
 
     @Test
-    fun `SoD with minute precision keeps window aligned`() {
-        val todayStart = millis(2026, 5, 7, 7, 30)
-        val now = millis(2026, 5, 7, 7, 45)
+    fun `out-of-range windowHours coerced to valid range`() {
+        // windowHours=0 must coerce to 1 (still a 1-hour window after SoD).
+        val todayStart = millis(2026, 5, 7, 7)
+        val now = millis(2026, 5, 7, 7, 30)
         assertTrue(
             MorningCheckInBannerDecider.shouldShow(
                 now = now,
                 todayStart = todayStart,
-                sodHour = 7,
-                sodMinute = 30,
-                cutoffHour = 11,
+                windowHours = 0,
                 featureEnabled = true,
                 alreadyCheckedInToday = false,
                 dismissedToday = false

@@ -12,11 +12,13 @@ import { getFirebaseUid } from '@/stores/firebaseUid';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useRestDayStore } from '@/stores/restDayStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
+import { startOfLogicalDayMs } from '@/utils/dayBoundary';
 import { computeCheckInStreak } from '@/utils/checkInStreak';
 import {
   selectForgivenessConfig,
   useAdvancedTuningStore,
 } from '@/stores/advancedTuningStore';
+import { shouldShowMorningCheckInBanner } from '@/lib/morningCheckInBanner';
 import { MorningCheckInStepper } from './MorningCheckInStepper';
 
 /**
@@ -29,6 +31,9 @@ export function MorningCheckInCard() {
   const show = useSettingsStore((s) => s.showMorningCheckIn);
   const setSetting = useSettingsStore((s) => s.setSetting);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  const windowHours = useAdvancedTuningStore(
+    (s) => s.prefs.morningCheckInWindowHours,
+  );
   const todayIso = useLogicalToday(startOfDayHour);
   // Subscribe to the rest-day set so a fresh mark/unmark re-renders the
   // streak count without remount. The set is folded into
@@ -41,6 +46,30 @@ export function MorningCheckInCard() {
   const [recent, setRecent] = useState<CheckInLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Re-tick once a minute so the card self-hides when the user's
+  // configured window past Start-of-Day elapses without a reload. Only
+  // arms when the feature is enabled — nothing to update otherwise.
+  useEffect(() => {
+    if (!show) return;
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, [show]);
+
+  const todayStart = useMemo(
+    () => startOfLogicalDayMs(new Date(now), startOfDayHour),
+    [now, startOfDayHour],
+  );
+
+  const inWindow = shouldShowMorningCheckInBanner({
+    now,
+    todayStart,
+    windowHours,
+    featureEnabled: show,
+    alreadyCheckedInToday: false,
+    dismissedToday: false,
+  });
 
   const load = useCallback(async () => {
     try {
@@ -73,7 +102,11 @@ export function MorningCheckInCard() {
   const prefs = useAdvancedTuningStore((s) => s.prefs);
   const forgiveness = useMemo(() => selectForgivenessConfig(prefs), [prefs]);
 
+  // Hide the card outside the morning availability window unless the
+  // user has already logged today — past the window we still want to
+  // surface the streak chip and let them update the existing log.
   if (!show) return null;
+  if (!inWindow && !log) return null;
 
   const streak = computeCheckInStreak(recent, todayIso, forgiveness, restDays);
 

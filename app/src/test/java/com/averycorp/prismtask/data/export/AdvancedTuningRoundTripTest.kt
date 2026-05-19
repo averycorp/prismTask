@@ -131,7 +131,7 @@ class AdvancedTuningRoundTripTest {
 
     @Test
     fun morningCheckInCutoff_roundTrip() {
-        val v = MorningCheckInPromptCutoff(latestHour = 10)
+        val v = MorningCheckInPromptCutoff(windowHours = 8)
         assertEquals(v, roundTrip(v))
     }
 

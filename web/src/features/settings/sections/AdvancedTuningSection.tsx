@@ -211,25 +211,24 @@ export function AdvancedTuningSection() {
 
       <Divider />
 
-      {/* Morning check-in prompt cutoff. Mirrors Android's
-          `MorningCheckInGroup` slider in `AdvancedTuningScreen.kt`. The
-          web `MorningCheckInBanner` reads this value to bound the
-          visible window `[SoD, cutoff)` so the banner self-hides past
-          the user's chosen morning. */}
+      {/* Morning check-in availability window. Mirrors Android's
+          `MorningCheckInGroup` slider in `AdvancedTuningScreen.kt`. Both
+          the `MorningCheckInBanner` and `MorningCheckInCard` read this
+          value to bound the visible window `[SoD, SoD + windowHours)`. */}
       <div className="flex flex-col gap-3">
         <SubHeader label="Morning Check-In Prompt" />
         <p className="text-[11px] text-[var(--color-text-secondary)]">
-          Latest hour the morning check-in banner will stay visible. The
-          banner only shows between Start-of-Day and this cutoff. Default
-          is 11:00.
+          Hours after Start-of-Day the morning check-in stays available.
+          Once this many hours have elapsed, the prompt hides until the
+          next morning. Default is 12 hours.
         </p>
         <SliderRow
-          label="Latest hour"
-          value={prefs.morningCheckInCutoffHour}
-          min={0}
-          max={23}
-          valueFormatter={(v) => `${v}:00`}
-          onChange={(v) => patch({ morningCheckInCutoffHour: v })}
+          label="Window"
+          value={prefs.morningCheckInWindowHours}
+          min={1}
+          max={24}
+          valueFormatter={(v) => `${v} h`}
+          onChange={(v) => patch({ morningCheckInWindowHours: v })}
         />
       </div>
 

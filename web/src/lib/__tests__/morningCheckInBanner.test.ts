@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   shouldShowMorningCheckInBanner,
-  DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR,
+  DEFAULT_MORNING_CHECKIN_WINDOW_HOURS,
 } from '@/lib/morningCheckInBanner';
 
 // Helper: build a millis timestamp for an absolute wall-clock time. We
@@ -17,9 +17,7 @@ describe('shouldShowMorningCheckInBanner', () => {
 
   const baseInput = {
     todayStart,
-    sodHour: 6,
-    sodMinute: 0,
-    cutoffHour: 10, // 4-hour window 6:00 → 10:00
+    windowHours: 4, // 4-hour window 6:00 → 10:00
     featureEnabled: true,
     alreadyCheckedInToday: false,
     dismissedToday: false,
@@ -43,7 +41,7 @@ describe('shouldShowMorningCheckInBanner', () => {
     ).toBe(true);
   });
 
-  it('hides the banner once the cutoff hour passes', () => {
+  it('hides the banner once the window elapses', () => {
     expect(
       shouldShowMorningCheckInBanner({
         ...baseInput,
@@ -91,65 +89,54 @@ describe('shouldShowMorningCheckInBanner', () => {
     ).toBe(false);
   });
 
-  it('handles late SoD wrapping into the next calendar day', () => {
-    // SoD = 22:00, cutoff = 02:00 → 4-hour window 22:00 → 02:00 next day.
+  it('handles late SoD that wraps into the next calendar day', () => {
+    // SoD = 22:00, 4h window → 22:00 → 02:00 next day. The decider
+    // computes the cutoff from `todayStart` directly, so wall-clock
+    // midnight is irrelevant.
     const lateSodTodayStart = ts(2026, 5, 15, 22, 0);
-    // Inside window: 23:00 same day.
     expect(
       shouldShowMorningCheckInBanner({
         todayStart: lateSodTodayStart,
-        sodHour: 22,
-        sodMinute: 0,
-        cutoffHour: 2,
+        windowHours: 4,
         featureEnabled: true,
         alreadyCheckedInToday: false,
         dismissedToday: false,
-        now: ts(2026, 5, 15, 23, 0),
+        now: ts(2026, 5, 15, 23, 0), // 23:00 same day
       }),
     ).toBe(true);
-    // Inside window: 01:30 next day.
     expect(
       shouldShowMorningCheckInBanner({
         todayStart: lateSodTodayStart,
-        sodHour: 22,
-        sodMinute: 0,
-        cutoffHour: 2,
+        windowHours: 4,
         featureEnabled: true,
         alreadyCheckedInToday: false,
         dismissedToday: false,
-        now: ts(2026, 5, 16, 1, 30),
+        now: ts(2026, 5, 16, 1, 30), // 01:30 next day
       }),
     ).toBe(true);
-    // Outside window: 03:00 next day.
     expect(
       shouldShowMorningCheckInBanner({
         todayStart: lateSodTodayStart,
-        sodHour: 22,
-        sodMinute: 0,
-        cutoffHour: 2,
+        windowHours: 4,
         featureEnabled: true,
         alreadyCheckedInToday: false,
         dismissedToday: false,
-        now: ts(2026, 5, 16, 3, 0),
+        now: ts(2026, 5, 16, 3, 0), // past the 4h window
       }),
     ).toBe(false);
   });
 
-  it('uses sane defaults when sodMinute is omitted', () => {
+  it('coerces out-of-range windowHours to the valid 1..24 range', () => {
     expect(
       shouldShowMorningCheckInBanner({
-        todayStart,
-        sodHour: 6,
-        cutoffHour: 10,
-        featureEnabled: true,
-        alreadyCheckedInToday: false,
-        dismissedToday: false,
-        now: ts(2026, 5, 15, 9, 0),
+        ...baseInput,
+        windowHours: 0,
+        now: ts(2026, 5, 15, 6, 30), // 30m into the coerced 1h window
       }),
     ).toBe(true);
   });
 
-  it('exports a sane default cutoff matching Android (11)', () => {
-    expect(DEFAULT_MORNING_CHECKIN_CUTOFF_HOUR).toBe(11);
+  it('exports the default window matching Android (12 hours)', () => {
+    expect(DEFAULT_MORNING_CHECKIN_WINDOW_HOURS).toBe(12);
   });
 });

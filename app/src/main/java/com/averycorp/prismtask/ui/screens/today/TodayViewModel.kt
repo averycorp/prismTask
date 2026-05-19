@@ -319,9 +319,7 @@ constructor(
                     MorningCheckInBannerDecider.shouldShow(
                         now = System.currentTimeMillis(),
                         todayStart = todayStart,
-                        sodHour = sod.hour,
-                        sodMinute = sod.minute,
-                        cutoffHour = cutoff.latestHour,
+                        windowHours = cutoff.windowHours,
                         featureEnabled = enabled,
                         alreadyCheckedInToday = alreadyCheckedInToday,
                         dismissedToday = dismissedToday

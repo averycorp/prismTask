@@ -202,27 +202,27 @@ describe('AdvancedTuningSection', () => {
     expect(relaxMisses.value).toBe('2');
   });
 
-  it('renders the morning check-in cutoff slider with the default hour', () => {
+  it('renders the morning check-in window slider with the default window', () => {
     render(<AdvancedTuningSection />);
-    const slider = screen.getByLabelText('Latest hour') as HTMLInputElement;
-    expect(slider.value).toBe('11');
-    expect(slider.min).toBe('0');
-    expect(slider.max).toBe('23');
+    const slider = screen.getByLabelText('Window') as HTMLInputElement;
+    expect(slider.value).toBe('12');
+    expect(slider.min).toBe('1');
+    expect(slider.max).toBe('24');
   });
 
-  it('persists the morning check-in cutoff slider through the debounce', () => {
+  it('persists the morning check-in window slider through the debounce', () => {
     render(<AdvancedTuningSection />);
-    const slider = screen.getByLabelText('Latest hour') as HTMLInputElement;
-    fireEvent.change(slider, { target: { value: '9' } });
+    const slider = screen.getByLabelText('Window') as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: '6' } });
     expect(patchMock).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(patchMock).toHaveBeenCalledWith('uid-123', {
-      morningCheckInCutoffHour: 9,
+      morningCheckInWindowHours: 6,
     });
-    expect(useAdvancedTuningStore.getState().prefs.morningCheckInCutoffHour).toBe(
-      9,
+    expect(useAdvancedTuningStore.getState().prefs.morningCheckInWindowHours).toBe(
+      6,
     );
   });
 

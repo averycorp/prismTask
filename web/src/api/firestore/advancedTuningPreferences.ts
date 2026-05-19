@@ -85,13 +85,12 @@ const FIELD_LOAD_CK_EASY = 'load_custom_keywords_easy';
 const FIELD_LOAD_CK_MEDIUM = 'load_custom_keywords_medium';
 const FIELD_LOAD_CK_HARD = 'load_custom_keywords_hard';
 
-// Morning check-in prompt cutoff hour (0..23). Mirrors
-// `AdvancedTuningPreferences.kt:337` `MORNING_LATEST`. Latest wall-clock
-// hour after Start-of-Day that the morning check-in banner stays
-// visible — read by `MorningCheckInBanner` to bound the visible window
-// `[SoD, cutoff)`. Default `11` matches Android's
-// `MorningCheckInPromptCutoff(latestHour = 11)`.
-const FIELD_MORNING_CHECKIN_LATEST_HOUR = 'morning_checkin_latest_hour';
+// Morning check-in availability window length (1..24 hours after SoD).
+// Mirrors Android's `MORNING_WINDOW_HOURS` DataStore key. Read by
+// `MorningCheckInBanner` and `MorningCheckInCard` to bound the visible
+// window `[SoD, SoD + windowHours)`. Default `12` matches Android's
+// `MorningCheckInPromptCutoff(windowHours = 12)`.
+const FIELD_MORNING_CHECKIN_WINDOW_HOURS = 'morning_checkin_window_hours';
 
 // Self-care first-display tier per routine. Mirrors
 // `AdvancedTuningPreferences.kt:407-410`. Android owns the writes; web
@@ -171,12 +170,12 @@ export interface AdvancedTuningPreferences {
   /** Custom keyword CSVs per Cognitive Load tier. Default empty strings. */
   cognitiveLoadKeywords: CognitiveLoadCustomKeywords;
   /**
-   * Latest wall-clock hour (0..23) the morning check-in banner stays
-   * visible after Start-of-Day. Mirrors Android's
-   * `MorningCheckInPromptCutoff(latestHour)` slider on
-   * `AdvancedTuningScreen.MorningCheckInGroup`. Default `11`.
+   * Length of the morning check-in availability window, in hours after
+   * the user's Start-of-Day. Range 1..24, default 12. Mirrors Android's
+   * `MorningCheckInPromptCutoff(windowHours)` slider on
+   * `AdvancedTuningScreen.MorningCheckInGroup`.
    */
-  morningCheckInCutoffHour: number;
+  morningCheckInWindowHours: number;
   /**
    * Per-routine default tier applied when today's `SelfCareLog` has no
    * `selectedTier` set. Read-only on web; the Settings UI lives on Android
@@ -202,7 +201,7 @@ export interface AdvancedTuningPatch {
   };
   taskModeKeywords?: Partial<TaskModeCustomKeywords>;
   cognitiveLoadKeywords?: Partial<CognitiveLoadCustomKeywords>;
-  morningCheckInCutoffHour?: number;
+  morningCheckInWindowHours?: number;
 }
 
 /**
@@ -227,7 +226,7 @@ export const DEFAULT_ADVANCED_TUNING_PREFERENCES: AdvancedTuningPreferences = {
   },
   taskModeKeywords: { work: '', play: '', relax: '' },
   cognitiveLoadKeywords: { easy: '', medium: '', hard: '' },
-  morningCheckInCutoffHour: 11,
+  morningCheckInWindowHours: 12,
   selfCareTierDefaults: {
     morning: 'solid',
     bedtime: 'solid',
@@ -328,11 +327,11 @@ function read(data: DocumentData | undefined): AdvancedTuningPreferences {
       medium: readString(data[FIELD_LOAD_CK_MEDIUM], ''),
       hard: readString(data[FIELD_LOAD_CK_HARD], ''),
     },
-    morningCheckInCutoffHour: clampInt(
-      data[FIELD_MORNING_CHECKIN_LATEST_HOUR],
-      0,
-      23,
-      defaults.morningCheckInCutoffHour,
+    morningCheckInWindowHours: clampInt(
+      data[FIELD_MORNING_CHECKIN_WINDOW_HOURS],
+      1,
+      24,
+      defaults.morningCheckInWindowHours,
     ),
     selfCareTierDefaults: {
       morning: readString(
@@ -505,14 +504,14 @@ export async function patchAdvancedTuningPreferences(
     }
   }
 
-  if (patch.morningCheckInCutoffHour !== undefined) {
-    payload[FIELD_MORNING_CHECKIN_LATEST_HOUR] = clampInt(
-      patch.morningCheckInCutoffHour,
-      0,
-      23,
-      DEFAULT_ADVANCED_TUNING_PREFERENCES.morningCheckInCutoffHour,
+  if (patch.morningCheckInWindowHours !== undefined) {
+    payload[FIELD_MORNING_CHECKIN_WINDOW_HOURS] = clampInt(
+      patch.morningCheckInWindowHours,
+      1,
+      24,
+      DEFAULT_ADVANCED_TUNING_PREFERENCES.morningCheckInWindowHours,
     );
-    typeTags[FIELD_MORNING_CHECKIN_LATEST_HOUR] = 'int';
+    typeTags[FIELD_MORNING_CHECKIN_WINDOW_HOURS] = 'int';
   }
 
   if (Object.keys(payload).length === 0) return;

@@ -158,7 +158,7 @@ class TodayViewModelTest {
         coEvery { morningCheckInPreferences.featureEnabled() } returns flowOf(true)
         coEvery { morningCheckInPreferences.bannerDismissedDate() } returns flowOf("")
         coEvery { advancedTuningPreferences.getMorningCheckInPromptCutoff() } returns
-            flowOf(MorningCheckInPromptCutoff(latestHour = 11))
+            flowOf(MorningCheckInPromptCutoff(windowHours = 12))
     }
 
     @After
