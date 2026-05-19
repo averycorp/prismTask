@@ -16,6 +16,7 @@ import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.remote.AuthManager
 import com.averycorp.prismtask.data.remote.CanonicalOnboardingSync
 import com.averycorp.prismtask.data.remote.SyncService
+import com.averycorp.prismtask.data.remote.sync.BackendSyncService
 import com.averycorp.prismtask.data.remote.sync.PrismSyncLogger
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
@@ -42,6 +43,7 @@ constructor(
     private val ndPreferencesDataStore: NdPreferencesDataStore,
     private val authManager: AuthManager,
     private val syncService: SyncService,
+    private val backendSyncService: BackendSyncService,
     private val taskRepository: TaskRepository,
     private val selfCareRepository: SelfCareRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
@@ -236,6 +238,7 @@ constructor(
                     onSuccess = { user ->
                         _signInState.value = SignInState.SignedIn(user.email ?: "")
                         syncService.startAutoSync()
+                        backendSyncService.startAutoSync()
                         checkExistingUserAndMaybeSkip()
                     },
                     onFailure = {
@@ -257,6 +260,7 @@ constructor(
                     onSuccess = { user ->
                         _signInState.value = SignInState.SignedIn(user.email ?: email)
                         syncService.startAutoSync()
+                        backendSyncService.startAutoSync()
                         checkExistingUserAndMaybeSkip()
                     },
                     onFailure = {
@@ -278,6 +282,7 @@ constructor(
                     onSuccess = { user ->
                         _signInState.value = SignInState.SignedIn(user.email ?: email)
                         syncService.startAutoSync()
+                        backendSyncService.startAutoSync()
                         checkExistingUserAndMaybeSkip()
                     },
                     onFailure = {

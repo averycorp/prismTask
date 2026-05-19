@@ -181,6 +181,11 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Auto-sync failed to start", e)
         }
         try {
+            backendSyncService.startAutoSync()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Backend auto-sync failed to start", e)
+        }
+        try {
             sortPreferencesSyncService.startPushObserver()
         } catch (e: Exception) {
             Log.e("MainActivity", "Sort prefs push observer failed to start", e)
