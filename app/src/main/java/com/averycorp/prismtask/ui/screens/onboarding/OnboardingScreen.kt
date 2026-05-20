@@ -335,6 +335,41 @@ private fun WelcomePage(viewModel: OnboardingViewModel) {
                     )
                 }
             }
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(450, delayMillis = 200))
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "⚠️", fontSize = 22.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Open Beta",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "PrismTask is currently in open beta. You may run into bugs or " +
+                                "rough edges between updates — please back up important data " +
+                                "and report any issues you find.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
             // "Already have an account?" sign-in link — lets returning users on a
             // new device skip the walkthrough by detecting existing Firestore data.
             AnimatedVisibility(
