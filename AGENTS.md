@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Guidance for the **Jules async coding agent** (Google) working in the PrismTask
-repo. Jules runs async, well-scoped tasks — this file captures the project
+Guidance for AI coding agents (such as Google's **Antigravity** and **Jules**) working in the PrismTask
+repo. These agents run async, well-scoped tasks — this file captures the project
 shape, the rails, and the off-limits areas so a single hand-off prompt is
 enough to land a clean PR. For the broader, interactive-session conventions
 used by Claude Code, see [`CLAUDE.md`](CLAUDE.md).
@@ -138,7 +138,7 @@ pytest              # Full suite
 pytest tests/test_<module>.py::test_<name>  # Single test
 ```
 
-## Working Style For Jules
+## Working Style For AI Agents (Antigravity, Jules)
 
 - **One concern per PR.** Async tasks land cleanest when the diff is
   narrowly scoped. If a request implies two unrelated changes, split them.
