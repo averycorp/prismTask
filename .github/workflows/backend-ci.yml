@@ -15,6 +15,7 @@ concurrency:
 
 permissions:
   contents: write        # capture job pushes to ci-logs branch
+  pull-requests: read    # dorny/paths-filter calls listFiles on the PR
   checks: read
   actions: read          # capture-failure-log fetches job logs via API
 
