@@ -13,7 +13,6 @@ falls back to a narrow tool.
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Awaitable, Callable
 
 from app.routers.ai.tools._base import (
     ToolError,

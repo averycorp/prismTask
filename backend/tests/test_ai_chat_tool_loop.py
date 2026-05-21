@@ -9,9 +9,8 @@ returned the final reply with a tool_calls summary attached.
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 
 
 def _block_text(text: str):
