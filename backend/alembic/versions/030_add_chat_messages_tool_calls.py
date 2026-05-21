@@ -5,8 +5,8 @@ rows whenever the Phase 1 read-tool loop fires. Nullable so existing rows
 and write-only / no-tool turns remain valid. Per
 ``docs/superpowers/specs/2026-05-18-ai-personal-assistant-design.md``.
 
-Revision ID: 029
-Revises: 028
+Revision ID: 030
+Revises: 029
 Create Date: 2026-05-18
 """
 
@@ -14,8 +14,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "029"
-down_revision = "028"
+revision = "030"
+down_revision = "029"
 branch_labels = None
 depends_on = None
 

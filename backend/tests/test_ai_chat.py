@@ -294,7 +294,7 @@ class TestChatSodAnchor:
         assert _resolve_logical_today(anchored) == date(2026, 5, 14)
 
     def test_router_falls_back_to_utc_when_no_user_context(self):
-        from datetime import date, datetime, timezone
+        from datetime import datetime, timezone
 
         from app.routers.ai.chat import _resolve_logical_today
 

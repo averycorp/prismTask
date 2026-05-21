@@ -30,7 +30,6 @@ from app.models import (
     HabitCompletion,
     LeisureSession,
     Medication,
-    MedicationSlot,
     Project,
     Task,
     User as UserModel,

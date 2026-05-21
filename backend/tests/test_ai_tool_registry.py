@@ -9,7 +9,7 @@ from app.routers.ai.tool_registry import (
     ToolRegistry,
     build_tool_error_result,
 )
-from app.routers.ai.tools._base import ToolError, ToolHandler, ToolResult
+from app.routers.ai.tools._base import ToolError, ToolResult
 
 
 class _FakeHandler:
