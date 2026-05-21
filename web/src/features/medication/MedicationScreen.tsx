@@ -167,12 +167,23 @@ export function MedicationScreen() {
     return (dosesByMed[medCloudId]?.length ?? 0) > 0;
   };
 
-  const takenAtForMed = (medCloudId: string): number | null => {
+  // Per-slot taken time. Returns the dose's `taken_at` only when the
+  // dose's own `slot_key` matches `slotKey` exactly — otherwise the
+  // time would bleed across every slot the same med appears in (a med
+  // scheduled `morning,evening` would show the morning dose's time on
+  // the evening card too). Android-logged doses use opaque local-id
+  // slot keys that web can't reverse-map, so they intentionally render
+  // as taken-without-time rather than guessing the wrong slot.
+  const takenAtForMedInSlot = (
+    slotKey: string,
+    medCloudId: string,
+  ): number | null => {
     const doses = dosesByMed[medCloudId];
     if (doses === undefined || doses.length === 0) return null;
-    let latest = doses[0].taken_at;
-    for (let i = 1; i < doses.length; i++) {
-      if (doses[i].taken_at > latest) latest = doses[i].taken_at;
+    let latest: number | null = null;
+    for (const d of doses) {
+      if (d.slot_key !== slotKey) continue;
+      if (latest === null || d.taken_at > latest) latest = d.taken_at;
     }
     return latest;
   };
@@ -578,7 +589,9 @@ export function MedicationScreen() {
                         const checked =
                           medCloudId !== null && isMedTakenToday(medCloudId);
                         const takenAt =
-                          medCloudId !== null ? takenAtForMed(medCloudId) : null;
+                          medCloudId !== null
+                            ? takenAtForMedInSlot(slot.slotKey, medCloudId)
+                            : null;
                         return (
                           <li
                             key={raw}
