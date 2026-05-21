@@ -177,6 +177,14 @@ export function MedicationScreen() {
     return dosesByKey[id] !== undefined;
   };
 
+  const takenAtForMed = (
+    slotKey: string,
+    medCloudId: string,
+  ): number | null => {
+    const id = medicationDoseId(medCloudId, slotKey, dateIso);
+    return dosesByKey[id]?.taken_at ?? null;
+  };
+
   const handleDoseToggle = async (slotKey: string, medCloudId: string) => {
     try {
       const uid = getFirebaseUid();
@@ -567,6 +575,10 @@ export function MedicationScreen() {
                         const checked =
                           medCloudId !== null &&
                           isMedTakenInSlot(slot.slotKey, medCloudId);
+                        const takenAt =
+                          medCloudId !== null
+                            ? takenAtForMed(slot.slotKey, medCloudId)
+                            : null;
                         return (
                           <li
                             key={raw}
@@ -582,6 +594,11 @@ export function MedicationScreen() {
                             >
                               {label}
                             </span>
+                            {takenAt !== null && (
+                              <span className="text-[10px] font-medium text-[var(--color-accent)]">
+                                {format(new Date(takenAt), 'h:mm a')}
+                              </span>
+                            )}
                             {medCloudId !== null ? (
                               <button
                                 type="button"
