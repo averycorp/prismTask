@@ -38,6 +38,10 @@ import {
   logDose,
   type MedicationDoseDoc,
 } from '@/api/firestore/medicationDoses';
+import {
+  assignmentKey,
+  buildDoseAssignment,
+} from '@/features/medication/doseAssignment';
 import { deriveVirtualSlots } from '@/features/medication/virtualSlots';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { Button } from '@/components/ui/Button';
@@ -167,27 +171,6 @@ export function MedicationScreen() {
     return (dosesByMed[medCloudId]?.length ?? 0) > 0;
   };
 
-  // Per-slot taken time. Returns the dose's `taken_at` only when the
-  // dose's own `slot_key` matches `slotKey` exactly — otherwise the
-  // time would bleed across every slot the same med appears in (a med
-  // scheduled `morning,evening` would show the morning dose's time on
-  // the evening card too). Android-logged doses use opaque local-id
-  // slot keys that web can't reverse-map, so they intentionally render
-  // as taken-without-time rather than guessing the wrong slot.
-  const takenAtForMedInSlot = (
-    slotKey: string,
-    medCloudId: string,
-  ): number | null => {
-    const doses = dosesByMed[medCloudId];
-    if (doses === undefined || doses.length === 0) return null;
-    let latest: number | null = null;
-    for (const d of doses) {
-      if (d.slot_key !== slotKey) continue;
-      if (latest === null || d.taken_at > latest) latest = d.taken_at;
-    }
-    return latest;
-  };
-
   const handleDoseToggle = async (slotKey: string, medCloudId: string) => {
     try {
       const uid = getFirebaseUid();
@@ -223,32 +206,37 @@ export function MedicationScreen() {
     load(dateIso, medications);
   }, [dateIso, medications, load]);
 
-  // Slot scaffold derived purely from the medication library. A slot's
-  // `takenAt` is the latest dose `taken_at` across its `med:`-prefixed
-  // entries when every one of them has at least one dose today (any
-  // slot, any device); null otherwise. Slots whose medIds are all
-  // non-`med:` (legacy / external) fall back to null since web has no
-  // source-of-truth for them anymore.
+  // Slot scaffold derived purely from the medication library plus a
+  // per-render dose-to-slot assignment (see `doseAssignment.ts`). The
+  // assignment first tries exact `slot_key` matches (web-logged doses)
+  // and falls back to time-of-day proximity for opaque local-id slot
+  // keys (Android-logged doses), so the per-med time chips and slot-
+  // pending pills stay precise regardless of which platform recorded
+  // the dose. Slots whose medIds are all non-`med:` (legacy / external)
+  // fall back to null since web has no source-of-truth for them.
+  const virtualSlots = useMemo(
+    () => deriveVirtualSlots(medications),
+    [medications],
+  );
+  const doseAssignment = useMemo(
+    () => buildDoseAssignment(virtualSlots, dosesByMed),
+    [virtualSlots, dosesByMed],
+  );
   const slots = useMemo<MedicationSlot[]>(() => {
-    const virtual = deriveVirtualSlots(medications);
-    return virtual.map((slot) => {
+    return virtualSlots.map((slot) => {
       const medCloudIds = slot.medIds
         .map(medCloudIdOf)
         .filter((id): id is string => id !== null);
       if (medCloudIds.length === 0) return slot;
       let latest = 0;
       for (const medId of medCloudIds) {
-        const doses = dosesByMed[medId];
-        if (doses === undefined || doses.length === 0) {
-          return { ...slot, takenAt: null };
-        }
-        for (const d of doses) {
-          if (d.taken_at > latest) latest = d.taken_at;
-        }
+        const dose = doseAssignment.get(assignmentKey(slot.slotKey, medId));
+        if (dose === undefined) return { ...slot, takenAt: null };
+        if (dose.taken_at > latest) latest = dose.taken_at;
       }
       return { ...slot, takenAt: latest === 0 ? null : latest };
     });
-  }, [medications, dosesByMed]);
+  }, [virtualSlots, doseAssignment]);
   const takenCount = slots.filter((s) => s.takenAt !== null).length;
 
   const handleToggle = async (slot: MedicationSlot, taken: boolean) => {
@@ -590,7 +578,9 @@ export function MedicationScreen() {
                           medCloudId !== null && isMedTakenToday(medCloudId);
                         const takenAt =
                           medCloudId !== null
-                            ? takenAtForMedInSlot(slot.slotKey, medCloudId)
+                            ? (doseAssignment.get(
+                                assignmentKey(slot.slotKey, medCloudId),
+                              )?.taken_at ?? null)
                             : null;
                         return (
                           <li
