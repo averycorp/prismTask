@@ -11,6 +11,7 @@ from app.routers.ai.tools.projects import GetProjectsHandler
 
 class _FakeUser:
     id = 11
+    firebase_uid = "fb-11"
 
 
 class _FakeDb:
@@ -64,7 +65,9 @@ async def test_get_projects_active_returns_loader_data():
             args={"status": "active"},
             logical_today=date(2026, 5, 18),
         )
-    mock_load.assert_awaited_once_with(fake_db, 11, date(2026, 5, 18))
+    mock_load.assert_awaited_once_with(
+        fake_db, 11, date(2026, 5, 18), firebase_uid="fb-11"
+    )
     assert result.data["status"] == "active"
     assert result.data["active_count"] == 2
     assert len(result.data["projects"]) == 2

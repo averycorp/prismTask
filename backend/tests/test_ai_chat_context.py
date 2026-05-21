@@ -473,7 +473,41 @@ class TestChatEndpointWiresCurrentState:
             ))
             await session.commit()
 
-        with patch("app.services.ai_productivity.generate_chat_response") as mock_gen:
+        # The test user carries a ``firebase_uid``, so the bundle loader's
+        # task / habit / project / medication sections would normally route
+        # through Firestore. Force them to the Postgres path here so the
+        # seeded "Demo task" reaches the assertion — Firestore is not
+        # available in CI and the wiring this test cares about (loader →
+        # handler → service) is the same on either backend.
+        from app.routers.ai import context as _ctx
+
+        async def _pg_tasks(db, user_id, today, *, firebase_uid=None):
+            return await _ctx._load_open_tasks_postgres(db, user_id, today)
+
+        async def _pg_habits(db, user_id, today, *, firebase_uid=None):
+            return await _ctx._load_habits_with_history_postgres(
+                db, user_id, today
+            )
+
+        async def _pg_projects(db, user_id, today, *, firebase_uid=None):
+            return await _ctx._load_active_projects_postgres(
+                db, user_id, today
+            )
+
+        async def _pg_meds(db, user_id, today, *, firebase_uid=None):
+            return await _ctx._load_medications_postgres(db, user_id, today)
+
+        with patch(
+            "app.routers.ai.context._load_open_tasks", new=_pg_tasks,
+        ), patch(
+            "app.routers.ai.context._load_habits_with_history", new=_pg_habits,
+        ), patch(
+            "app.routers.ai.context._load_active_projects", new=_pg_projects,
+        ), patch(
+            "app.routers.ai.context._load_medications", new=_pg_meds,
+        ), patch(
+            "app.services.ai_productivity.generate_chat_response"
+        ) as mock_gen:
             mock_gen.return_value = {
                 "message": "ok",
                 "actions": [],

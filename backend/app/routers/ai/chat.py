@@ -116,7 +116,10 @@ async def chat(
     current_state: dict | None
     try:
         current_state = await load_user_context_bundle(
-            db, current_user.id, today
+            db,
+            current_user.id,
+            today,
+            firebase_uid=getattr(current_user, "firebase_uid", None),
         )
     except Exception:
         logger.exception(

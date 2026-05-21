@@ -23,10 +23,14 @@ _WINDOWS = {"today"}  # Phase 1: today only; last_7d/last_30d in follow-up
 _CATEGORIES = {"work", "personal", "self_care", "health", "uncategorized"}
 
 
-async def _load_habits_today(db, user_id: int, today: date) -> dict:
+async def _load_habits_today(
+    db, user_id: int, today: date, *, firebase_uid: str | None = None
+) -> dict:
     """Indirection so tests can patch a single symbol."""
     from app.routers.ai.context import load_habits_today
-    return await load_habits_today(db, user_id, today)
+    return await load_habits_today(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
 
 
 class GetHabitsHandler:
@@ -59,7 +63,12 @@ class GetHabitsHandler:
         if category is not None:
             validate_one_of(category, _CATEGORIES, field="category")
 
-        raw = await _load_habits_today(db, user_id, logical_today)
+        raw = await _load_habits_today(
+            db,
+            user_id,
+            logical_today,
+            firebase_uid=getattr(user, "firebase_uid", None),
+        )
         today_list = list(raw.get("today") or [])
         if category is not None:
             today_list = [h for h in today_list if h.get("category") == category]

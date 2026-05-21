@@ -21,9 +21,13 @@ from app.routers.ai.tools._base import (
 _WINDOWS = {"today", "last_7d"}
 
 
-async def _load_medications(db, user_id: int, today: date) -> dict:
+async def _load_medications(
+    db, user_id: int, today: date, *, firebase_uid: str | None = None
+) -> dict:
     from app.routers.ai.context import load_medications
-    return await load_medications(db, user_id, today)
+    return await load_medications(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
 
 
 class GetMedicationsHandler:
@@ -52,7 +56,12 @@ class GetMedicationsHandler:
         if user_id is None:
             raise ToolError("missing user id", field="user")
         window = validate_one_of(args.get("window"), _WINDOWS, field="window")
-        bundle = await _load_medications(db, user_id, logical_today)
+        bundle = await _load_medications(
+            db,
+            user_id,
+            logical_today,
+            firebase_uid=getattr(user, "firebase_uid", None),
+        )
         if window == "today":
             adherence = dict(bundle.get("today") or {})
         else:

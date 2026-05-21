@@ -11,6 +11,7 @@ from app.routers.ai.tools.medications import GetMedicationsHandler
 
 class _FakeUser:
     id = 13
+    firebase_uid = "fb-13"
 
 
 class _FakeDb:
@@ -65,7 +66,9 @@ async def test_today_returns_today_adherence_block():
             args={"window": "today"},
             logical_today=date(2026, 5, 18),
         )
-    mock_load.assert_awaited_once_with(fake_db, 13, date(2026, 5, 18))
+    mock_load.assert_awaited_once_with(
+        fake_db, 13, date(2026, 5, 18), firebase_uid="fb-13"
+    )
     assert result.data["window"] == "today"
     assert result.data["adherence"] == {"slots_logged": 3, "slots_taken": 2}
     assert result.data["active_count"] == 2

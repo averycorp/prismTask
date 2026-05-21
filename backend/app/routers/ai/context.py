@@ -7,10 +7,15 @@ today + upcoming + backlog), recently completed work, every active
 habit and its streak, every active project and its progress, the last
 week of leisure totals, and the last week of medication adherence.
 
-Server-side data only. Mood, check-ins, boundary rules, and the live
-Pomodoro/timer state live in Android Room and are NOT persisted to the
-FastAPI backend; passing them in is a follow-up that requires extending
-``ChatRequest``.
+Source-of-truth split: tasks, habits, projects, medications, and the
+``daily_essential_slot_completions`` collection live in Firestore — the
+web client writes them there directly and does NOT mirror to Postgres,
+so loaders take the user's ``firebase_uid`` and route through
+``services/firestore_tasks.py`` + ``services/firestore_state.py``. Goals
+and leisure sessions live in Postgres (the web client writes them via
+``/goals`` + ``/leisure`` REST), so those loaders still use ``db``.
+Legacy callers that omit ``firebase_uid`` fall through to a Postgres
+read so the seeded-Postgres test suite keeps working.
 
 The output dict is rendered by ``_format_current_state_block`` in
 ``ai_productivity`` and appended after the preferences block. Per-bucket
@@ -88,12 +93,37 @@ def _completed_task_brief(task: Task) -> dict[str, Any]:
     return brief
 
 
-async def _load_open_tasks(
+def _firestore_task_brief(task, today: date) -> dict[str, Any]:
+    """Brief shape for a Firestore ``TaskDTO`` (mirrors `_task_brief`)."""
+    brief: dict[str, Any] = {
+        "id": task.task_id,
+        "title": task.title,
+        "priority": int(task.priority or 0),
+    }
+    due = task.due_date_obj
+    if due is not None and due < today:
+        brief["days_overdue"] = (today - due).days
+    elif due is not None and due > today:
+        brief["days_until_due"] = (due - today).days
+        brief["due_date"] = due.isoformat()
+    return brief
+
+
+def _firestore_completed_task_brief(task) -> dict[str, Any]:
+    """Recently-completed brief for a Firestore ``TaskDTO``."""
+    brief: dict[str, Any] = {"id": task.task_id, "title": task.title}
+    if task.completed_at:
+        # ``completed_at`` is an ISO datetime string on the DTO; truncate.
+        brief["completed_on"] = task.completed_at.split("T", 1)[0]
+    return brief
+
+
+async def _load_open_tasks_postgres(
     db: AsyncSession,
     user_id: int,
     today: date,
 ) -> dict[str, Any]:
-    """Bucket open tasks into overdue / due-today / planned-today / upcoming / backlog.
+    """Postgres-backed loader (legacy + test fallback).
 
     Single SELECT for every open task the user has — bucketing then
     happens in Python. In practice users have tens, not thousands, of
@@ -193,6 +223,134 @@ async def _load_open_tasks(
     }
 
 
+async def _load_open_tasks_firestore(
+    firebase_uid: str, today: date
+) -> dict[str, Any]:
+    """Firestore-backed loader. Mirrors the Postgres bucketing exactly.
+
+    Pulls every incomplete task with a single stream, then buckets in
+    Python — same shape as the Postgres path so callers see identical
+    payloads regardless of source.
+    """
+    from datetime import datetime, timezone as _tz
+
+    from app.services.firestore_tasks import (
+        fetch_incomplete_tasks,
+        fetch_recently_completed_tasks,
+    )
+
+    incomplete = await fetch_incomplete_tasks(firebase_uid)
+
+    upcoming_cutoff = today + timedelta(days=_UPCOMING_WINDOW_DAYS)
+
+    overdue: list[dict[str, Any]] = []
+    due_today: list[dict[str, Any]] = []
+    planned_today: list[dict[str, Any]] = []
+    upcoming: list[dict[str, Any]] = []
+    backlog: list[dict[str, Any]] = []
+    overdue_count = 0
+    due_today_count = 0
+    planned_today_count = 0
+    upcoming_count = 0
+    backlog_count = 0
+
+    # Keep parity with the Postgres ordering: due_date asc nulls last, then
+    # priority desc. ``TaskDTO.due_date_obj`` is None for backlog rows.
+    incomplete_sorted = sorted(
+        incomplete,
+        key=lambda t: (
+            t.due_date_obj is None,
+            t.due_date_obj or date.max,
+            -(t.priority or 0),
+        ),
+    )
+    for task in incomplete_sorted:
+        due = task.due_date_obj
+        planned = task.planned_date_obj
+        if due is not None and due < today:
+            overdue_count += 1
+            if len(overdue) < _TASKS_OVERDUE_LIMIT:
+                overdue.append(_firestore_task_brief(task, today))
+        elif due == today:
+            due_today_count += 1
+            if len(due_today) < _TASKS_DUE_TODAY_LIMIT:
+                due_today.append(_firestore_task_brief(task, today))
+        elif planned == today:
+            planned_today_count += 1
+            if len(planned_today) < _TASKS_PLANNED_TODAY_LIMIT:
+                planned_today.append(_firestore_task_brief(task, today))
+        elif due is not None and today < due <= upcoming_cutoff:
+            upcoming_count += 1
+            if len(upcoming) < _TASKS_UPCOMING_LIMIT:
+                upcoming.append(_firestore_task_brief(task, today))
+        elif due is None and planned is None:
+            backlog_count += 1
+            if len(backlog) < _TASKS_BACKLOG_LIMIT:
+                backlog.append(_firestore_task_brief(task, today))
+
+    # Recent completions: re-use the existing helper that filters on
+    # ``completedAt >= since``, then narrow to today / last-7-days in
+    # Python so we can produce both counts off one Firestore read.
+    recent_window_start = today - timedelta(days=_RECENT_COMPLETED_WINDOW_DAYS - 1)
+    since_dt = datetime(
+        recent_window_start.year,
+        recent_window_start.month,
+        recent_window_start.day,
+        tzinfo=_tz.utc,
+    )
+    recent_rows = await fetch_recently_completed_tasks(firebase_uid, since_dt)
+    today_iso = today.isoformat()
+    completed_today_count = sum(
+        1
+        for t in recent_rows
+        if (t.completed_at or "").startswith(today_iso)
+    )
+    # Sort newest-first to match the Postgres ``ORDER BY completed_at DESC``.
+    recent_sorted = sorted(
+        recent_rows,
+        key=lambda t: (t.completed_at or ""),
+        reverse=True,
+    )
+    recently_completed = [
+        _firestore_completed_task_brief(t)
+        for t in recent_sorted[:_TASKS_RECENT_COMPLETED_LIMIT]
+    ]
+
+    return {
+        "due_today_count": due_today_count,
+        "due_today": due_today,
+        "overdue_count": overdue_count,
+        "overdue": overdue,
+        "planned_today_count": planned_today_count,
+        "planned_today": planned_today,
+        "upcoming_count": upcoming_count,
+        "upcoming": upcoming,
+        "backlog_count": backlog_count,
+        "backlog": backlog,
+        "completed_today_count": completed_today_count,
+        "recently_completed_count": len(recent_rows),
+        "recently_completed": recently_completed,
+    }
+
+
+async def _load_open_tasks(
+    db: AsyncSession,
+    user_id: int,
+    today: date,
+    *,
+    firebase_uid: str | None = None,
+) -> dict[str, Any]:
+    """Route to Firestore when ``firebase_uid`` is known, else Postgres.
+
+    Production callers (chat handler, tool handlers) always have a
+    Firebase-linked user; legacy / test users with no Firestore mirror
+    fall back to the Postgres path so the seeded test suite keeps
+    working without rewriting every fixture."""
+    if firebase_uid:
+        return await _load_open_tasks_firestore(firebase_uid, today)
+    return await _load_open_tasks_postgres(db, user_id, today)
+
+
 def _streak_from_dates(completion_dates: set[date], today: date) -> int:
     """Walk back from ``today`` counting consecutive days with a completion.
 
@@ -208,12 +366,12 @@ def _streak_from_dates(completion_dates: set[date], today: date) -> int:
     return streak
 
 
-async def _load_habits_with_history(
+async def _load_habits_with_history_postgres(
     db: AsyncSession,
     user_id: int,
     today: date,
 ) -> dict[str, Any]:
-    """Return active habits + today's count + streak + last-7-day count.
+    """Postgres path (legacy + test fallback).
 
     Pulls active habits and the last ``_HABIT_STREAK_WINDOW_DAYS`` days
     of completion rows in two queries, then assembles streak + 7d count
@@ -288,12 +446,88 @@ async def _load_habits_with_history(
     }
 
 
-async def _load_active_projects(
+async def _load_habits_with_history_firestore(
+    firebase_uid: str, today: date
+) -> dict[str, Any]:
+    """Firestore-backed habits + 60d completion history.
+
+    Sums per-doc completions (each habit_completion doc represents +1
+    on its logical day) so the streak walk and last-7d count mirror
+    the Postgres ``HabitCompletion.count`` semantics.
+    """
+    from app.services.firestore_state import (
+        fetch_active_habits,
+        fetch_habit_completions_since,
+    )
+
+    habits = await fetch_active_habits(firebase_uid)
+    if not habits:
+        return {
+            "active_count": 0,
+            "completed_today_count": 0,
+            "today": [],
+        }
+
+    window_start = today - timedelta(days=_HABIT_STREAK_WINDOW_DAYS - 1)
+    last7_start = today - timedelta(days=6)
+    completions = await fetch_habit_completions_since(firebase_uid, window_start)
+
+    by_habit: dict[str, list[date]] = {}
+    for c in completions:
+        by_habit.setdefault(c.habit_id, []).append(c.completed_date)
+
+    completed_today_count = 0
+    today_list: list[dict[str, Any]] = []
+    for habit in habits:
+        dates_for_habit = by_habit.get(habit.habit_id, [])
+        completion_dates: set[date] = set()
+        today_count = 0
+        last7_count = 0
+        for d in dates_for_habit:
+            completion_dates.add(d)
+            if d == today:
+                today_count += 1
+            if last7_start <= d <= today:
+                last7_count += 1
+        if today_count > 0:
+            completed_today_count += 1
+        if len(today_list) < _HABITS_LIMIT:
+            today_list.append(
+                {
+                    "name": habit.name,
+                    "count": today_count,
+                    "target": int(habit.target_count or 1),
+                    "category": habit.category or None,
+                    "streak": _streak_from_dates(completion_dates, today),
+                    "last7_count": last7_count,
+                }
+            )
+
+    return {
+        "active_count": len(habits),
+        "completed_today_count": completed_today_count,
+        "today": today_list,
+    }
+
+
+async def _load_habits_with_history(
+    db: AsyncSession,
+    user_id: int,
+    today: date,
+    *,
+    firebase_uid: str | None = None,
+) -> dict[str, Any]:
+    if firebase_uid:
+        return await _load_habits_with_history_firestore(firebase_uid, today)
+    return await _load_habits_with_history_postgres(db, user_id, today)
+
+
+async def _load_active_projects_postgres(
     db: AsyncSession,
     user_id: int,
     today: date,
 ) -> dict[str, Any]:
-    """Return active projects + per-project task counts + due/progress.
+    """Postgres path (legacy + test fallback).
 
     Adds a single GROUP BY on ``tasks.project_id`` to count open vs
     completed tasks per project, then renders progress % as
@@ -349,6 +583,54 @@ async def _load_active_projects(
     return {"active_count": len(projects), "active": active}
 
 
+async def _load_active_projects_firestore(
+    firebase_uid: str, today: date
+) -> dict[str, Any]:
+    """Firestore-backed active projects + per-project task counts."""
+    from app.services.firestore_state import (
+        count_project_task_buckets,
+        fetch_active_projects,
+    )
+
+    projects = await fetch_active_projects(firebase_uid)
+    if not projects:
+        return {"active_count": 0, "active": []}
+
+    project_ids = [p.project_id for p in projects[:_PROJECTS_LIMIT]]
+    by_project = await count_project_task_buckets(firebase_uid, project_ids)
+
+    active: list[dict[str, Any]] = []
+    for p in projects[:_PROJECTS_LIMIT]:
+        done, open_count, total = by_project.get(p.project_id, (0, 0, 0))
+        entry: dict[str, Any] = {
+            "id": p.project_id,
+            "title": p.title,
+            "open_tasks": open_count,
+            "done_tasks": done,
+            "total_tasks": total,
+        }
+        if total > 0:
+            entry["progress_pct"] = int(round(100 * done / total))
+        if p.due_date is not None:
+            entry["due_date"] = p.due_date.isoformat()
+            entry["days_until_due"] = (p.due_date - today).days
+        active.append(entry)
+
+    return {"active_count": len(projects), "active": active}
+
+
+async def _load_active_projects(
+    db: AsyncSession,
+    user_id: int,
+    today: date,
+    *,
+    firebase_uid: str | None = None,
+) -> dict[str, Any]:
+    if firebase_uid:
+        return await _load_active_projects_firestore(firebase_uid, today)
+    return await _load_active_projects_postgres(db, user_id, today)
+
+
 async def _load_active_goals(
     db: AsyncSession,
     user_id: int,
@@ -358,6 +640,9 @@ async def _load_active_goals(
 
     Goals are the top of the ladder above projects; surfacing them gives
     the AI orientation on what the active projects ladder up to.
+
+    Postgres-only: the web client writes goals via the ``/goals`` REST
+    API, not Firestore, so this loader has no Firestore counterpart.
     """
     stmt = (
         select(Goal)
@@ -381,6 +666,9 @@ async def _load_leisure(
     today: date,
 ) -> dict[str, Any]:
     """Return today's and last-7-day leisure minutes by category.
+
+    Postgres-only: the web client writes leisure sessions via the
+    ``/leisure`` REST API, not Firestore.
 
     Two GROUP BY queries against ``leisure_sessions`` over today and the
     7-day window — both portable across SQLite (tests) and Postgres
@@ -436,12 +724,12 @@ async def _load_leisure(
     }
 
 
-async def _load_medications(
+async def _load_medications_postgres(
     db: AsyncSession,
     user_id: int,
     today: date,
 ) -> dict[str, Any]:
-    """Return medication adherence today + last 7 days + active medication list.
+    """Postgres path (legacy + test fallback).
 
     ``slots_logged`` counts materialized slot rows; ``slots_taken``
     counts those with a non-null ``taken_at``. The 7-day rate divides
@@ -500,10 +788,78 @@ async def _load_medications(
     return bundle
 
 
+async def _load_medications_firestore(
+    firebase_uid: str, today: date
+) -> dict[str, Any]:
+    """Firestore-backed medications + slot-completion adherence.
+
+    Slot completions live at ``users/{uid}/daily_essential_slot_completions``;
+    each doc carries ``date`` (epoch ms) and ``takenAt`` (epoch ms or
+    null). We aggregate counts directly here rather than threading a
+    medication-name join (the AI doesn't need per-med adherence).
+    """
+    from app.services.firestore_state import (
+        fetch_active_medications,
+        fetch_slot_completions_between,
+    )
+
+    meds = await fetch_active_medications(firebase_uid)
+    recent_start = today - timedelta(days=_MEDICATION_RECENT_WINDOW_DAYS - 1)
+    completions = await fetch_slot_completions_between(
+        firebase_uid, recent_start, today
+    )
+
+    today_rows = [c for c in completions if c.date == today]
+    today_slots_taken = sum(1 for c in today_rows if c.taken)
+    recent_logged = len(completions)
+    recent_taken = sum(1 for c in completions if c.taken)
+
+    active_meds = [
+        {
+            "id": m.medication_id,
+            "name": m.name,
+            "dosage": m.display_label,
+        }
+        for m in meds[:_MEDICATIONS_LIMIT]
+    ]
+
+    bundle: dict[str, Any] = {
+        "today": {
+            "slots_logged": len(today_rows),
+            "slots_taken": today_slots_taken,
+        },
+        "last_7_days": {
+            "slots_logged": recent_logged,
+            "slots_taken": recent_taken,
+        },
+        "active_count": len(meds),
+        "active": active_meds,
+    }
+    if recent_logged > 0:
+        bundle["last_7_days"]["adherence_pct"] = int(
+            round(100 * recent_taken / recent_logged)
+        )
+    return bundle
+
+
+async def _load_medications(
+    db: AsyncSession,
+    user_id: int,
+    today: date,
+    *,
+    firebase_uid: str | None = None,
+) -> dict[str, Any]:
+    if firebase_uid:
+        return await _load_medications_firestore(firebase_uid, today)
+    return await _load_medications_postgres(db, user_id, today)
+
+
 async def load_user_context_bundle(
     db: AsyncSession,
     user_id: int,
     today: date,
+    *,
+    firebase_uid: str | None = None,
 ) -> dict[str, Any]:
     """Aggregate everything the chat handler injects as current state.
 
@@ -512,6 +868,11 @@ async def load_user_context_bundle(
     the client-forwarded SoD anchor via ``user_context.today`` (PR
     #1446) so the bundle's notion of "today" matches the rest of the
     app.
+
+    ``firebase_uid`` selects the data source for the four Firestore-
+    backed sections (tasks, habits, projects, medications). Production
+    callers always have it set; tests that haven't migrated to the
+    Firestore-mock pattern omit it and stay on the Postgres path.
 
     Each sub-loader is independent and failures bubble up; the chat
     handler catches and skips the context block on error so a transient
@@ -532,12 +893,20 @@ async def load_user_context_bundle(
     compat aliases pointing at the today-only sub-dicts so prior callers
     + the PR #1442 test suite keep working unchanged.
     """
-    tasks = await _load_open_tasks(db, user_id, today)
-    habits = await _load_habits_with_history(db, user_id, today)
-    projects = await _load_active_projects(db, user_id, today)
+    tasks = await _load_open_tasks(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
+    habits = await _load_habits_with_history(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
+    projects = await _load_active_projects(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
     goals = await _load_active_goals(db, user_id, today)
     leisure = await _load_leisure(db, user_id, today)
-    medications = await _load_medications(db, user_id, today)
+    medications = await _load_medications(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
     return {
         "today_iso": today.isoformat(),
         "tasks": tasks,
@@ -560,27 +929,40 @@ async def load_user_context_bundle(
 # private builder. Logic lives in the private implementations above; the
 # public surface is intentionally thin.
 
-async def load_habits_today(db, user_id: int, today: date) -> dict:
+async def load_habits_today(
+    db, user_id: int, today: date, *, firebase_uid: str | None = None
+) -> dict:
     """Public wrapper around ``_load_habits_with_history`` for the
     ``get_habits`` tool handler. Same shape, same data."""
-    return await _load_habits_with_history(db, user_id, today)
+    return await _load_habits_with_history(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
 
 
-async def load_active_projects(db, user_id: int, today: date) -> dict:
+async def load_active_projects(
+    db, user_id: int, today: date, *, firebase_uid: str | None = None
+) -> dict:
     """Public wrapper around ``_load_active_projects`` for the
     ``get_projects`` tool handler. Same shape, same data."""
-    return await _load_active_projects(db, user_id, today)
+    return await _load_active_projects(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
 
 
-async def load_medications(db, user_id: int, today: date) -> dict:
+async def load_medications(
+    db, user_id: int, today: date, *, firebase_uid: str | None = None
+) -> dict:
     """Public wrapper around ``_load_medications`` for the ``get_medications``
     tool handler. Same shape: today + last_7_days + active list."""
-    return await _load_medications(db, user_id, today)
+    return await _load_medications(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
 
 
 async def load_leisure(db, user_id: int, today: date) -> dict:
     """Public wrapper around ``_load_leisure`` for the ``get_leisure_logs``
-    tool handler. Returns today + last_7_days aggregates by category."""
+    tool handler. Returns today + last_7_days aggregates by category.
+    Postgres-only; the web client writes leisure sessions via REST."""
     return await _load_leisure(db, user_id, today)
 
 
