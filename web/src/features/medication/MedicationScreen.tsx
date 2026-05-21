@@ -29,7 +29,6 @@ import {
 } from '@/api/firestore/medicationSlots';
 import {
   archiveMedication,
-  getAllMedications,
   unarchiveMedication,
   type MedicationDoc,
 } from '@/api/firestore/medications';
@@ -50,6 +49,7 @@ import { MedicationEditorDialog } from '@/features/medication/MedicationEditorDi
 import { MedicationTierPicker } from '@/features/medication/MedicationTierPicker';
 import { MedicationTimeEditModal } from '@/features/medication/MedicationTimeEditModal';
 import { isBacklogged } from '@/features/medication/backloggedHelpers';
+import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useLogicalToday } from '@/utils/useLogicalToday';
 import type { MedicationSlot } from '@/types/dailyEssentials';
@@ -105,30 +105,15 @@ export function MedicationScreen() {
     Record<string, MedicationDoseDoc>
   >({});
   // Medication library (parity Batch 5 PR-1): full add / edit / archive
-  // surface backed by `users/{uid}/medications` Firestore writes.
-  const [medications, setMedications] = useState<MedicationDoc[]>([]);
-  const [medsLoading, setMedsLoading] = useState(false);
+  // surface backed by `users/{uid}/medications` Firestore writes. Read
+  // from the live store wired by `useFirestoreSync.subscribeToMedications`
+  // so Android-side adds / edits / archives surface here without a manual
+  // refetch — a one-shot `getAllMedications` would race the Firestore
+  // listener and leave the screen blank on first paint.
+  const medications = useMedicationsStore((s) => s.medications);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingMed, setEditingMed] = useState<MedicationDoc | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-
-  const reloadMedications = useCallback(async () => {
-    setMedsLoading(true);
-    try {
-      const uid = getFirebaseUid();
-      const list = await getAllMedications(uid);
-      setMedications(list);
-    } catch (e) {
-      toast.error((e as Error).message || 'Failed to load medications');
-    } finally {
-      setMedsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only data fetch
-    reloadMedications();
-  }, [reloadMedications]);
 
   const load = useCallback(
     async (iso: string, meds: readonly MedicationDoc[]) => {
@@ -407,14 +392,15 @@ export function MedicationScreen() {
         await archiveMedication(uid, med.id);
         toast.success(`Archived ${med.name}`);
       }
-      await reloadMedications();
     } catch (e) {
       toast.error((e as Error).message || 'Failed to update medication');
     }
   };
 
   const handleEditorSaved = async () => {
-    await reloadMedications();
+    // No-op — the live Firestore listener on `useMedicationsStore` picks
+    // up the new / edited doc on its next snapshot, so a manual refetch
+    // here would just duplicate work and risk a flicker.
   };
 
   const visibleMedications = useMemo(
@@ -755,11 +741,7 @@ export function MedicationScreen() {
             </Button>
           </div>
         </div>
-        {medsLoading && medications.length === 0 ? (
-          <p className="py-6 text-center text-sm text-[var(--color-text-secondary)]">
-            Loading medications…
-          </p>
-        ) : visibleMedications.length === 0 ? (
+        {visibleMedications.length === 0 ? (
           <EmptyState
             icon={<Pill className="h-8 w-8" />}
             title="No medications yet"
