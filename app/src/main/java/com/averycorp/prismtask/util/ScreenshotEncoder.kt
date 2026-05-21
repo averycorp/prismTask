@@ -80,9 +80,13 @@ object ScreenshotEncoder {
         // First pass: bounds-only decode so we can compute the inSampleSize
         // without decoding the full bitmap into RAM.
         val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(sourceUri)?.use { input ->
-            BitmapFactory.decodeStream(input, null, boundsOptions)
-        } ?: return null
+        try {
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, boundsOptions)
+            } ?: return null
+        } catch (e: Exception) {
+            return null
+        }
 
         if (boundsOptions.outWidth <= 0 || boundsOptions.outHeight <= 0) return null
 
@@ -96,8 +100,12 @@ object ScreenshotEncoder {
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        return context.contentResolver.openInputStream(sourceUri)?.use { input ->
-            BitmapFactory.decodeStream(input, null, decodeOptions)
+        return try {
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, decodeOptions)
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 }

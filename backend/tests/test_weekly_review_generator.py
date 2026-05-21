@@ -240,7 +240,8 @@ def test_write_review_preserves_ai_insights_and_created_at_on_reruns() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_start_scheduler_registers_cron_job_then_stop_clears_it() -> None:
+@pytest.mark.asyncio
+async def test_start_scheduler_registers_cron_job_then_stop_clears_it() -> None:
     if gen.AsyncIOScheduler is None:
         pytest.skip("apscheduler not installed")
     gen.stop_scheduler()  # idempotent guard
@@ -253,6 +254,7 @@ def test_start_scheduler_registers_cron_job_then_stop_clears_it() -> None:
     finally:
         gen.stop_scheduler()
     assert gen._scheduler is None
+
 
 
 # ---------------------------------------------------------------------------

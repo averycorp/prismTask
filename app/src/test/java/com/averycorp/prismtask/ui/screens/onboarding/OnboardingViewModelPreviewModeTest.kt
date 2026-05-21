@@ -13,6 +13,7 @@ import com.averycorp.prismtask.data.preferences.VoicePreferences
 import com.averycorp.prismtask.data.remote.AuthManager
 import com.averycorp.prismtask.data.remote.CanonicalOnboardingSync
 import com.averycorp.prismtask.data.remote.SyncService
+import com.averycorp.prismtask.data.remote.sync.BackendSyncService
 import com.averycorp.prismtask.data.remote.sync.PrismSyncLogger
 import com.averycorp.prismtask.data.repository.SelfCareRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
@@ -55,6 +56,7 @@ class OnboardingViewModelPreviewModeTest {
     private lateinit var ndPreferencesDataStore: NdPreferencesDataStore
     private lateinit var authManager: AuthManager
     private lateinit var syncService: SyncService
+    private lateinit var backendSyncService: BackendSyncService
     private lateinit var taskRepository: TaskRepository
     private lateinit var selfCareRepository: SelfCareRepository
     private lateinit var userPreferencesDataStore: UserPreferencesDataStore
@@ -75,6 +77,7 @@ class OnboardingViewModelPreviewModeTest {
         ndPreferencesDataStore = mockk(relaxed = true)
         authManager = mockk(relaxed = true)
         syncService = mockk(relaxed = true)
+        backendSyncService = mockk(relaxed = true)
         taskRepository = mockk(relaxed = true)
         selfCareRepository = mockk(relaxed = true)
         userPreferencesDataStore = mockk(relaxed = true)
@@ -103,6 +106,7 @@ class OnboardingViewModelPreviewModeTest {
         ndPreferencesDataStore = ndPreferencesDataStore,
         authManager = authManager,
         syncService = syncService,
+        backendSyncService = backendSyncService,
         taskRepository = taskRepository,
         selfCareRepository = selfCareRepository,
         userPreferencesDataStore = userPreferencesDataStore,

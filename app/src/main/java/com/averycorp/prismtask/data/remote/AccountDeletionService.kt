@@ -329,7 +329,10 @@ constructor(
             "advanced_tuning_prefs",
             "productive_streak_prefs",
             "tour_card_prefs",
-            "rating_prompt_prefs"
+            "rating_prompt_prefs",
+            "custom_brain_modes",
+            "end_of_day_reflection_prefs",
+            "rest_day_ui_prefs"
         )
     }
 }

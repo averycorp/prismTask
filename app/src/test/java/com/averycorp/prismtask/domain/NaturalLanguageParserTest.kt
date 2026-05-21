@@ -297,6 +297,28 @@ class NaturalLanguageParserTest {
             activityId: String
         ): retrofit2.Response<Unit> =
             error("not used in offline parser tests")
+
+        override suspend fun listLeisureSessions(
+            since: String?,
+            limit: Int?
+        ): List<com.averycorp.prismtask.data.remote.api.LeisureSessionRemoteResponse> =
+            error("not used in offline parser tests")
+
+        override suspend fun createLeisureSession(
+            body: com.averycorp.prismtask.data.remote.api.LeisureSessionCreateRequest
+        ): com.averycorp.prismtask.data.remote.api.LeisureSessionRemoteResponse =
+            error("not used in offline parser tests")
+
+        override suspend fun updateLeisureSession(
+            sessionId: String,
+            body: com.averycorp.prismtask.data.remote.api.LeisureSessionUpdateRequest
+        ): com.averycorp.prismtask.data.remote.api.LeisureSessionRemoteResponse =
+            error("not used in offline parser tests")
+
+        override suspend fun deleteLeisureSession(
+            sessionId: String
+        ): retrofit2.Response<Unit> =
+            error("not used in offline parser tests")
     }
 
     private fun dateMillis(date: LocalDate): Long =

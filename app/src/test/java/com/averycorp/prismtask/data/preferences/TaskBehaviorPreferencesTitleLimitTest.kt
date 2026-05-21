@@ -23,8 +23,9 @@ class TaskBehaviorPreferencesTitleLimitTest {
     private lateinit var prefs: TaskBehaviorPreferences
 
     @Before
-    fun setUp() {
+    fun setUp() = runTest {
         prefs = TaskBehaviorPreferences(ApplicationProvider.getApplicationContext())
+        prefs.resetToDefaults()
     }
 
     @Test

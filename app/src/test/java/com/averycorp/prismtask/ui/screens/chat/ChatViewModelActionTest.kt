@@ -79,7 +79,10 @@ class ChatViewModelActionTest {
             every { userTier } returns MutableStateFlow(UserTier.PRO)
             every { hasAccess(any()) } returns true
         }
-        taskBehaviorPreferences = mockk(relaxed = true)
+        taskBehaviorPreferences = mockk(relaxed = true) {
+            every { getStartOfDay() } returns flowOf(com.averycorp.prismtask.data.preferences.StartOfDay())
+            every { getFirstDayOfWeek() } returns flowOf(java.time.DayOfWeek.MONDAY)
+        }
         userPreferencesDataStore = mockk(relaxed = true) {
             coEvery { aiChatDisclosureShownFlow } returns flowOf(true)
             coEvery { aiChatDisclosureShownV2Flow } returns flowOf(true)
@@ -478,6 +481,7 @@ class ChatViewModelActionTest {
         viewModel.requestClearConversation()
         advanceUntilIdle()
         viewModel.clearConversation()
+        advanceUntilIdle()
         assertEquals(false, viewModel.showClearConfirm.value)
         coVerify(exactly = 1) { chatRepository.clearConversation() }
     }
