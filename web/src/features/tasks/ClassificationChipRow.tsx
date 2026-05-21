@@ -1,4 +1,5 @@
-import { Loader2, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Sparkles, HelpCircle } from 'lucide-react';
 
 /**
  * Shared three-chip picker used by Organize-tab classification dimensions
@@ -18,6 +19,13 @@ export interface ChipOption<T extends string> {
   value: T;
   /** Human-readable label shown on the chip. */
   label: string;
+}
+
+export interface HelpItem {
+  /** Title of the classification value (e.g. "Work-Mode"). */
+  title: string;
+  /** Explanatory description of what this value represents. */
+  description: string;
 }
 
 export interface ClassificationChipRowProps<T extends string> {
@@ -41,6 +49,8 @@ export interface ClassificationChipRowProps<T extends string> {
   autoAriaLabel?: string;
   /** Helper text rendered below the chip row. */
   helperText?: string;
+  /** Optional array of educational descriptions for each choice. */
+  helpItems?: HelpItem[];
 }
 
 export function ClassificationChipRow<T extends string>({
@@ -54,13 +64,31 @@ export function ClassificationChipRow<T extends string>({
   autoTooltip,
   autoAriaLabel,
   helperText,
+  helpItems,
 }: ClassificationChipRowProps<T>) {
+  const [showHelp, setShowHelp] = useState(false);
+
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
-          {label}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="block text-xs font-medium text-[var(--color-text-secondary)]">
+            {label}
+          </span>
+          {helpItems && helpItems.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowHelp(!showHelp)}
+              aria-label={`Learn more about ${label}`}
+              title={`Learn more about ${label}`}
+              className={`rounded-full p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-accent)] transition-colors cursor-pointer ${
+                showHelp ? 'text-[var(--color-accent)] bg-[var(--color-bg-secondary)]' : ''
+              }`}
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         {onAutoClick && (
           <button
             type="button"
@@ -93,7 +121,7 @@ export function ClassificationChipRow<T extends string>({
               role="radio"
               aria-checked={selected}
               onClick={() => onChange(selected ? '' : opt.value)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors prism-interactive cursor-pointer ${
                 selected
                   ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
                   : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]'
@@ -108,6 +136,20 @@ export function ClassificationChipRow<T extends string>({
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           {helperText}
         </p>
+      )}
+      {helpItems && showHelp && (
+        <div className="mt-2 rounded-lg border border-[var(--color-accent)]/20 bg-[var(--color-accent)]/5 p-3 text-xs flex flex-col gap-2 animate-slide-up">
+          {helpItems.map((item, idx) => (
+            <div key={idx} className="flex flex-col gap-0.5">
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {item.title}
+              </span>
+              <span className="text-[var(--color-text-secondary)] font-normal leading-normal">
+                {item.description}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

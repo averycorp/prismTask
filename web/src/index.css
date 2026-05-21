@@ -337,6 +337,35 @@ samp {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
+/* Custom keyframes & interactive utilities */
+@keyframes party-pop {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.15) rotate(-6deg);
+  }
+  75% {
+    transform: scale(1.15) rotate(6deg);
+  }
+}
+
+.prism-pop-hover:hover {
+  animation: party-pop 0.6s ease-in-out infinite;
+}
+
+.prism-interactive {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.prism-interactive:hover {
+  transform: scale(1.03) translateY(-1px);
+}
+
+.prism-interactive:active {
+  transform: scale(0.97) translateY(0);
+}
+
 /* Reduced motion — disable all animations for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -351,7 +380,8 @@ samp {
   .animate-slide-up,
   .animate-loading-bar,
   .animate-pulse-slow,
-  .animate-pulse {
+  .animate-pulse,
+  .prism-pop-hover:hover {
     animation: none !important;
   }
 }

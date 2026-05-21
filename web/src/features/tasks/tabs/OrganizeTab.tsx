@@ -60,6 +60,18 @@ const TASK_MODE_OPTIONS: { value: TaskMode; label: string }[] = [
   { value: 'RELAX', label: 'Relax-Mode' },
 ];
 
+const TASK_MODE_HELP = [
+  { title: 'Work-Mode (Produces Output)', description: 'Tasks focused on concrete outcomes, deliverables, chores, or deadlines.' },
+  { title: 'Play-Mode (Produces Enjoyment)', description: 'Recreational activities, creative practice, hobbies, and social interactions.' },
+  { title: 'Relax-Mode (Restores Energy)', description: 'Restorative acts to recover physical or cognitive energy (stretching, napping, walking).' }
+];
+
+const COGNITIVE_LOAD_HELP = [
+  { title: 'Easy-Load (Low Start-Friction)', description: 'Trivial starting effort. You can begin instantly without a deliberate decision.' },
+  { title: 'Medium-Load (Moderate Start-Friction)', description: 'Requires a brief beat of attention or active preparation before beginning.' },
+  { title: 'Hard-Load (High Start-Friction)', description: 'High mental dread or emotional inertia. Starting is the hardest part of the work.' }
+];
+
 interface FocusReleaseOverrideRowProps {
   title: string;
   enabledLabel: string;
@@ -420,6 +432,7 @@ export function OrganizeTab(props: OrganizeTabProps) {
         }
         autoAriaLabel="Auto-Classify Task Mode"
         helperText="What kind of output does this produce? Orthogonal to Life Category and Cognitive Load. Tap Auto to classify from the Title + Description."
+        helpItems={TASK_MODE_HELP}
       />
 
       {/* Cognitive Load — chips + on-device Auto */}
@@ -438,6 +451,7 @@ export function OrganizeTab(props: OrganizeTabProps) {
         }
         autoAriaLabel="Auto-Classify Cognitive Load"
         helperText="How hard is it to start? Independent of duration, importance, and reward type. Tap Auto to classify from the Title + Description."
+        helpItems={COGNITIVE_LOAD_HELP}
       />
 
       {/* Focus-Release per-task overrides */}

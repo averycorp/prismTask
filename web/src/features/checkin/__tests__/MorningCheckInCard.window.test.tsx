@@ -36,7 +36,7 @@ function setStores(windowHours: number) {
 
 describe('MorningCheckInCard — availability window', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
   });
 
   afterEach(() => {

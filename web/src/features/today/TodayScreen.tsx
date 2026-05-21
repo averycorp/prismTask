@@ -6,10 +6,12 @@ import {
   PartyPopper,
   BarChart3,
   Pin,
+  Timer,
+  MessageSquare,
 } from 'lucide-react';
 import { format, parseISO, startOfWeek, subDays, isMonday, isSunday } from 'date-fns';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useHabitStore } from '@/stores/habitStore';
@@ -549,14 +551,38 @@ export function TodayScreen() {
           own copy and an extra "All Caught Up" card would muddy the
           message. */}
       {!isRestingToday && isEmpty && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 text-center">
-          <PartyPopper className="mb-4 h-16 w-16 text-[var(--color-accent)]" />
+        <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] py-16 px-6 text-center">
+          <PartyPopper className="mb-4 h-16 w-16 text-[var(--color-accent)] transition-transform duration-300 prism-pop-hover cursor-pointer" />
           <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">
             All Caught Up!
           </h3>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            You have no pending tasks. Enjoy your day!
+          <p className="mt-2 mb-6 text-sm text-[var(--color-text-secondary)] max-w-sm">
+            You have no pending tasks. Take a moment to restore your energy or explore these activities:
           </p>
+          
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/pomodoro"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-xs font-semibold text-[var(--color-text-primary)] shadow-sm prism-interactive transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            >
+              <Timer className="h-4 w-4 text-[var(--color-accent)]" />
+              Focus Session
+            </Link>
+            <Link
+              to="/chat"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-xs font-semibold text-[var(--color-text-primary)] shadow-sm prism-interactive transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            >
+              <MessageSquare className="h-4 w-4 text-[var(--color-accent)]" />
+              AI Assistant
+            </Link>
+            <Link
+              to="/balance/weekly-report"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-xs font-semibold text-[var(--color-text-primary)] shadow-sm prism-interactive transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+            >
+              <BarChart3 className="h-4 w-4 text-[var(--color-accent)]" />
+              Weekly Balance
+            </Link>
+          </div>
         </div>
       )}
 
