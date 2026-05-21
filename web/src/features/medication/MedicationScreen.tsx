@@ -36,7 +36,6 @@ import {
   deleteDose,
   getDosesForDay,
   logDose,
-  medicationDoseId,
   type MedicationDoseDoc,
 } from '@/api/firestore/medicationDoses';
 import { deriveVirtualSlots } from '@/features/medication/virtualSlots';
@@ -98,11 +97,16 @@ export function MedicationScreen() {
     null,
   );
   const [bulkMarkOpen, setBulkMarkOpen] = useState(false);
-  // Per-medication dose toggles (parity Batch 5 PR-2). Keyed by Firestore
-  // dose docId so a re-tap toggles the same doc rather than racing two
-  // writes for the same (med, slot, day) triple.
-  const [dosesByKey, setDosesByKey] = useState<
-    Record<string, MedicationDoseDoc>
+  // Per-medication doses for `dateIso`, keyed by medication cloud id.
+  // Keyed by med (not by `(med, slot, day)` doc id) because Android's
+  // UI dose-write path stores `slotKey = slot.id.toString()` — a local
+  // Room id that's meaningless on web — while web mints bucket-style
+  // slot keys (`morning` / `08:00` / `anytime`). A slot-key-aware
+  // lookup never matched Android-logged doses; everything showed
+  // Pending. Per-med-per-day is the lowest common denominator that
+  // surfaces taken-state regardless of which platform recorded it.
+  const [dosesByMed, setDosesByMed] = useState<
+    Record<string, MedicationDoseDoc[]>
   >({});
   // Medication library (parity Batch 5 PR-1): full add / edit / archive
   // surface backed by `users/{uid}/medications` Firestore writes. Read
@@ -138,15 +142,20 @@ export function MedicationScreen() {
         const byTierKey: Record<string, MedicationTierState> = {};
         for (const s of states) byTierKey[s.slot_key] = s;
         setTierStates(byTierKey);
-        // Dose map keyed by deterministic doc id so per-(med, slot, day)
-        // lookups are O(1) in the row renderer below.
-        const byDoseKey: Record<string, MedicationDoseDoc> = {};
+        // Bucket every today's dose under its medication cloud id —
+        // ignoring `slot_key` because Android's UI dose-write path uses
+        // a local-Room-id-as-string that web can't reverse-map. The
+        // resulting "any dose for this med today" predicate is what
+        // the per-med row and slot-pending pill consult below.
+        const byMed: Record<string, MedicationDoseDoc[]> = {};
         for (const list of allDoses) {
           for (const dose of list) {
-            byDoseKey[dose.id] = dose;
+            const medId = dose.medication_cloud_id;
+            if (medId === null) continue;
+            (byMed[medId] ??= []).push(dose);
           }
         }
-        setDosesByKey(byDoseKey);
+        setDosesByMed(byMed);
       } finally {
         setLoading(false);
       }
@@ -154,32 +163,35 @@ export function MedicationScreen() {
     [],
   );
 
-  const isMedTakenInSlot = (
-    slotKey: string,
-    medCloudId: string,
-  ): boolean => {
-    const id = medicationDoseId(medCloudId, slotKey, dateIso);
-    return dosesByKey[id] !== undefined;
+  const isMedTakenToday = (medCloudId: string): boolean => {
+    return (dosesByMed[medCloudId]?.length ?? 0) > 0;
   };
 
-  const takenAtForMed = (
-    slotKey: string,
-    medCloudId: string,
-  ): number | null => {
-    const id = medicationDoseId(medCloudId, slotKey, dateIso);
-    return dosesByKey[id]?.taken_at ?? null;
+  const takenAtForMed = (medCloudId: string): number | null => {
+    const doses = dosesByMed[medCloudId];
+    if (doses === undefined || doses.length === 0) return null;
+    let latest = doses[0].taken_at;
+    for (let i = 1; i < doses.length; i++) {
+      if (doses[i].taken_at > latest) latest = doses[i].taken_at;
+    }
+    return latest;
   };
 
   const handleDoseToggle = async (slotKey: string, medCloudId: string) => {
     try {
       const uid = getFirebaseUid();
-      const id = medicationDoseId(medCloudId, slotKey, dateIso);
-      const existing = dosesByKey[id];
-      if (existing !== undefined) {
-        await deleteDose(uid, existing.id);
-        setDosesByKey((prev) => {
+      const existing = dosesByMed[medCloudId] ?? [];
+      if (existing.length > 0) {
+        // Already taken today (on any slot, any device). Toggle off by
+        // removing every dose row for this med on this day — keeps the
+        // per-med checkbox truthy when at least one dose remains and
+        // false when the user has explicitly un-taken every one of them.
+        for (const dose of existing) {
+          await deleteDose(uid, dose.id);
+        }
+        setDosesByMed((prev) => {
           const next = { ...prev };
-          delete next[id];
+          delete next[medCloudId];
           return next;
         });
       } else {
@@ -188,7 +200,7 @@ export function MedicationScreen() {
           slotKey,
           dateIso,
         });
-        setDosesByKey((prev) => ({ ...prev, [dose.id]: dose }));
+        setDosesByMed((prev) => ({ ...prev, [medCloudId]: [dose] }));
       }
     } catch (e) {
       toast.error((e as Error).message || 'Failed to toggle dose');
@@ -201,10 +213,11 @@ export function MedicationScreen() {
   }, [dateIso, medications, load]);
 
   // Slot scaffold derived purely from the medication library. A slot's
-  // `takenAt` is the latest dose `taken_at` if every `med:`-prefixed
-  // entry in the slot has a dose for this (slotKey, dateIso); null
-  // otherwise. Slots whose medIds are all non-`med:` (legacy / external)
-  // fall back to null since web has no source-of-truth for them anymore.
+  // `takenAt` is the latest dose `taken_at` across its `med:`-prefixed
+  // entries when every one of them has at least one dose today (any
+  // slot, any device); null otherwise. Slots whose medIds are all
+  // non-`med:` (legacy / external) fall back to null since web has no
+  // source-of-truth for them anymore.
   const slots = useMemo<MedicationSlot[]>(() => {
     const virtual = deriveVirtualSlots(medications);
     return virtual.map((slot) => {
@@ -212,18 +225,19 @@ export function MedicationScreen() {
         .map(medCloudIdOf)
         .filter((id): id is string => id !== null);
       if (medCloudIds.length === 0) return slot;
-      const doses = medCloudIds.map(
-        (id) => dosesByKey[medicationDoseId(id, slot.slotKey, dateIso)],
-      );
-      const allTaken = doses.every((d) => d !== undefined);
-      if (!allTaken) return { ...slot, takenAt: null };
       let latest = 0;
-      for (const d of doses) {
-        if (d !== undefined && d.taken_at > latest) latest = d.taken_at;
+      for (const medId of medCloudIds) {
+        const doses = dosesByMed[medId];
+        if (doses === undefined || doses.length === 0) {
+          return { ...slot, takenAt: null };
+        }
+        for (const d of doses) {
+          if (d.taken_at > latest) latest = d.taken_at;
+        }
       }
       return { ...slot, takenAt: latest === 0 ? null : latest };
     });
-  }, [medications, dosesByKey, dateIso]);
+  }, [medications, dosesByMed]);
   const takenCount = slots.filter((s) => s.takenAt !== null).length;
 
   const handleToggle = async (slot: MedicationSlot, taken: boolean) => {
@@ -237,40 +251,43 @@ export function MedicationScreen() {
         return;
       }
       if (taken) {
-        // Log a dose for every linked med that doesn't already have one.
-        // Run sequentially so a partial failure stops at the first error
-        // (rather than fan-failing N writes and double-toasting).
-        const newDoses: MedicationDoseDoc[] = [];
+        // Log a dose for every linked med that doesn't already have one
+        // today (any slot, any device). Run sequentially so a partial
+        // failure stops at the first error rather than fan-failing N
+        // writes and double-toasting.
+        const newDoses: { medId: string; dose: MedicationDoseDoc }[] = [];
         for (const medCloudId of medCloudIds) {
-          const id = medicationDoseId(medCloudId, slot.slotKey, dateIso);
-          if (dosesByKey[id] !== undefined) continue;
+          if ((dosesByMed[medCloudId]?.length ?? 0) > 0) continue;
           const dose = await logDose(uid, {
             medicationCloudId: medCloudId,
             slotKey: slot.slotKey,
             dateIso,
           });
-          newDoses.push(dose);
+          newDoses.push({ medId: medCloudId, dose });
         }
         if (newDoses.length > 0) {
-          setDosesByKey((prev) => {
+          setDosesByMed((prev) => {
             const next = { ...prev };
-            for (const d of newDoses) next[d.id] = d;
+            for (const { medId, dose } of newDoses) {
+              next[medId] = [...(next[medId] ?? []), dose];
+            }
             return next;
           });
         }
       } else {
-        const removedIds: string[] = [];
+        const removedMedIds: string[] = [];
         for (const medCloudId of medCloudIds) {
-          const id = medicationDoseId(medCloudId, slot.slotKey, dateIso);
-          const existing = dosesByKey[id];
-          if (existing === undefined) continue;
-          await deleteDose(uid, existing.id);
-          removedIds.push(id);
+          const existing = dosesByMed[medCloudId] ?? [];
+          if (existing.length === 0) continue;
+          for (const dose of existing) {
+            await deleteDose(uid, dose.id);
+          }
+          removedMedIds.push(medCloudId);
         }
-        if (removedIds.length > 0) {
-          setDosesByKey((prev) => {
+        if (removedMedIds.length > 0) {
+          setDosesByMed((prev) => {
             const next = { ...prev };
-            for (const id of removedIds) delete next[id];
+            for (const medId of removedMedIds) delete next[medId];
             return next;
           });
         }
@@ -559,12 +576,9 @@ export function MedicationScreen() {
                           : null;
                         const label = slot.medLabels[idx] ?? raw;
                         const checked =
-                          medCloudId !== null &&
-                          isMedTakenInSlot(slot.slotKey, medCloudId);
+                          medCloudId !== null && isMedTakenToday(medCloudId);
                         const takenAt =
-                          medCloudId !== null
-                            ? takenAtForMed(slot.slotKey, medCloudId)
-                            : null;
+                          medCloudId !== null ? takenAtForMed(medCloudId) : null;
                         return (
                           <li
                             key={raw}
