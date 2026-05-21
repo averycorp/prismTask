@@ -65,7 +65,9 @@ async def test_get_habits_today_returns_per_habit_progress():
             args={"window": "today"},
             logical_today=date(2026, 5, 18),
         )
-    mock_load.assert_awaited_once_with(fake_db, 9, date(2026, 5, 18))
+    mock_load.assert_awaited_once_with(
+        fake_db, 9, date(2026, 5, 18), firebase_uid="fb-9"
+    )
     assert result.data["window"] == "today"
     assert result.data["active_count"] == 2
     assert result.data["completed_today_count"] == 1

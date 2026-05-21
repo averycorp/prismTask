@@ -23,9 +23,13 @@ _STATUSES = {"active"}  # Phase 1: active only
 _MAX_LIMIT = 50
 
 
-async def _load_active_projects(db, user_id: int, today: date) -> dict:
+async def _load_active_projects(
+    db, user_id: int, today: date, *, firebase_uid: str | None = None
+) -> dict:
     from app.routers.ai.context import load_active_projects
-    return await load_active_projects(db, user_id, today)
+    return await load_active_projects(
+        db, user_id, today, firebase_uid=firebase_uid
+    )
 
 
 class GetProjectsHandler:
@@ -61,7 +65,12 @@ class GetProjectsHandler:
         limit = validate_positive_int(
             args.get("limit", 20), max_value=_MAX_LIMIT, field="limit",
         )
-        raw = await _load_active_projects(db, user_id, logical_today)
+        raw = await _load_active_projects(
+            db,
+            user_id,
+            logical_today,
+            firebase_uid=getattr(user, "firebase_uid", None),
+        )
         projects = list(raw.get("active") or [])[:limit]
         return ToolResult(
             data={
