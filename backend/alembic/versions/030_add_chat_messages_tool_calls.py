@@ -21,11 +21,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "chat_messages",
-        sa.Column("tool_calls", sa.JSON, nullable=True),
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col["name"] for col in inspector.get_columns("chat_messages")]
+    if "tool_calls" not in columns:
+        op.add_column(
+            "chat_messages",
+            sa.Column("tool_calls", sa.JSON, nullable=True),
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("chat_messages", "tool_calls")
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col["name"] for col in inspector.get_columns("chat_messages")]
+    if "tool_calls" in columns:
+        op.drop_column("chat_messages", "tool_calls")
+
