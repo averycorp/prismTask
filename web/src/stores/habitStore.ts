@@ -58,8 +58,23 @@ interface HabitState {
    * `periodCompletions` Android surfaces on the habit card.
    */
   getPeriodCompletions: (habitId: string) => number;
+  /**
+   * Count of strictly *future* bookings (logs) inside the habit's current
+   * period — sessions the user has scheduled via `HabitBookingDialog` but
+   * has not yet completed. Always `0` for non-bookable habits, and `0`
+   * for daily habits (their "period" is a single day, so no future slots
+   * exist inside it).
+   */
+  getPeriodBookings: (habitId: string) => number;
   getTodayProgress: () => { completed: number; total: number };
   getWeekCompletions: (habitId: string) => boolean[];
+  /**
+   * Per-weekday booleans (Mon..Sun) marking days with a future booking
+   * but no completion. Lets the week-dot UI render booked-but-pending
+   * days distinctly from past completions. Always all-false for
+   * non-bookable habits.
+   */
+  getWeekBookings: (habitId: string) => boolean[];
 }
 
 import { getFirebaseUid } from '@/stores/firebaseUid';
@@ -98,12 +113,18 @@ function countPeriodCompletions(
 
 /**
  * Count bookable-habit logs (from `habitLogStore`) whose logical day falls
- * in `[startIso, endIso]`. Bookings made via `HabitBookingDialog` write to
- * `habit_logs` only, never to `habit_completions`; without folding them
- * back in here the "have I done this within the period" check would
- * answer No for any bookable habit the user has only booked. Mirrors the
- * `lastLogDate` recency signal Android uses in
- * `HabitRepository.kt:491` + `TodayViewModel.kt:853-872`.
+ * in `[startIso, endIso]` AND is on or before `todayIso`. Bookings made via
+ * `HabitBookingDialog` write to `habit_logs` only, never to
+ * `habit_completions`; without folding past/today logs in here the "have I
+ * done this within the period" check would answer No for any bookable
+ * habit the user has only booked. Mirrors the `lastLogDate` recency signal
+ * Android uses in `HabitRepository.kt:491` + `TodayViewModel.kt:853-872`.
+ *
+ * Future-dated logs (e.g. a therapy session booked for next Friday) are
+ * intentionally excluded — a booking that hasn't happened yet is not a
+ * completion. They're surfaced separately via `countFutureLogsInRange`
+ * so the UI can render them with a distinct affordance instead of
+ * conflating them with completed sessions.
  *
  * Non-bookable habits short-circuit to `0` so the legacy completion-only
  * counts stay exact for them.
@@ -112,6 +133,7 @@ function countLogsInRange(
   habit: Habit,
   startIso: string,
   endIso: string,
+  todayIso: string,
   sodHour: number,
 ): number {
   if (!habit.is_bookable) return 0;
@@ -120,7 +142,32 @@ function countLogsInRange(
   let count = 0;
   for (const log of logs) {
     const iso = logicalToday(log.date, sodHour);
-    if (iso >= startIso && iso <= endIso) count++;
+    if (iso >= startIso && iso <= endIso && iso <= todayIso) count++;
+  }
+  return count;
+}
+
+/**
+ * Companion to {@link countLogsInRange} that counts strictly *future*
+ * bookings in the period — logs whose logical day is after `todayIso` but
+ * still within `[startIso, endIso]`. Powers the "X booked" affordance on
+ * recurring habit cards so users can tell at a glance how many sessions
+ * they've actually completed vs. how many are scheduled but pending.
+ */
+function countFutureLogsInRange(
+  habit: Habit,
+  startIso: string,
+  endIso: string,
+  todayIso: string,
+  sodHour: number,
+): number {
+  if (!habit.is_bookable) return 0;
+  const logs = useHabitLogStore.getState().getLogsFor(habit.id);
+  if (logs.length === 0) return 0;
+  let count = 0;
+  for (const log of logs) {
+    const iso = logicalToday(log.date, sodHour);
+    if (iso > todayIso && iso >= startIso && iso <= endIso) count++;
   }
   return count;
 }
@@ -393,17 +440,20 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const todayCompletion = completions.find((c) => c.date === today);
       const count =
         (todayCompletion?.count || 0) +
-        countLogsInRange(habit, today, today, sodHour);
+        countLogsInRange(habit, today, today, today, sodHour);
       return count >= target;
     }
     // Non-daily: "completed today" means the period's target is met —
     // mirrors Android's `HabitRepository.getHabitsWithFullStatus` branch
     // (`periodCompletions >= habit.targetFrequency`). target_count on a
     // non-daily habit is the per-period total, not a per-day target.
+    // Future bookings inside the period intentionally don't count — a
+    // session you've scheduled for next Friday isn't a session you've
+    // already done. See `countLogsInRange` for the rationale.
     const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
     const periodCount =
       countPeriodCompletions(habit, completions, today) +
-      countLogsInRange(habit, startIso, endIso, sodHour);
+      countLogsInRange(habit, startIso, endIso, today, sodHour);
     return periodCount >= target;
   },
 
@@ -417,7 +467,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const todayCompletion = completions.find((c) => c.date === today);
     return (
       (todayCompletion?.count || 0) +
-      countLogsInRange(habit, today, today, sodHour)
+      countLogsInRange(habit, today, today, today, sodHour)
     );
   },
 
@@ -432,14 +482,28 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const todayCompletion = completions.find((c) => c.date === today);
       return (
         (todayCompletion?.count || 0) +
-        countLogsInRange(habit, today, today, sodHour)
+        countLogsInRange(habit, today, today, today, sodHour)
       );
     }
     const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
     return (
       countPeriodCompletions(habit, completions, today) +
-      countLogsInRange(habit, startIso, endIso, sodHour)
+      countLogsInRange(habit, startIso, endIso, today, sodHour)
     );
+  },
+
+  getPeriodBookings: (habitId) => {
+    const state = get();
+    const habit = state.habits.find((h) => h.id === habitId);
+    if (!habit) return 0;
+    // Daily habits have a single-day "period" — there's no future inside
+    // it that's also still inside the period. Short-circuit so callers
+    // don't have to special-case it.
+    if (habit.frequency === 'daily') return 0;
+    const today = todayStr();
+    const sodHour = useSettingsStore.getState().startOfDayHour;
+    const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
+    return countFutureLogsInRange(habit, startIso, endIso, today, sodHour);
   },
 
   getTodayProgress: () => {
@@ -475,16 +539,18 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       if (habit.frequency !== 'daily') {
         // Period-aware (week / fortnight / month / 2 months / quarter)
         // — mirrors Android `HabitRepository.getHabitsWithFullStatus`.
-        // Bookable habits fold `habit_logs` into the period count so
-        // bookings made via `HabitBookingDialog` register as "done"
-        // alongside checkbox-driven completions.
+        // Bookable habits fold past/today `habit_logs` into the period
+        // count so bookings made via `HabitBookingDialog` register as
+        // "done" alongside checkbox-driven completions. Future bookings
+        // are excluded — a session scheduled for next Friday isn't a
+        // session you've already completed today.
         const { startIso, endIso } = getPeriodBounds(habit.frequency, today);
         const periodCount =
           countPeriodCompletions(
             habit,
             state.completions[habit.id] || [],
             today,
-          ) + countLogsInRange(habit, startIso, endIso, sodHour);
+          ) + countLogsInRange(habit, startIso, endIso, today, sodHour);
         if (periodCount >= habit.target_count) completed++;
       } else {
         const todayCompletion = (state.completions[habit.id] || []).find(
@@ -492,7 +558,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         );
         const dailyCount =
           (todayCompletion?.count || 0) +
-          countLogsInRange(habit, today, today, sodHour);
+          countLogsInRange(habit, today, today, today, sodHour);
         if (dailyCount >= habit.target_count) completed++;
       }
     }
@@ -505,15 +571,20 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     const habit = state.habits.find((h) => h.id === habitId);
     const completions = state.completions[habitId] || [];
     const sodHour = useSettingsStore.getState().startOfDayHour;
-    // Bookable habits fold `habit_logs` into the per-day dots so a
-    // booked day lights up even with no checkbox completion. Logs carry
-    // wall-clock epoch ms — re-key to a logical-day ISO so the SoD-aware
-    // semantics match `getTodayCount` / `isTodayCompleted`.
+    const todayIso = todayStr();
+    // Bookable habits fold past/today `habit_logs` into the per-day
+    // dots so a booked day lights up even with no checkbox completion.
+    // Future-dated logs are intentionally excluded — they're surfaced
+    // separately by `getWeekBookings` so the UI can render them with a
+    // distinct affordance. Logs carry wall-clock epoch ms — re-key to a
+    // logical-day ISO so the SoD-aware semantics match
+    // `getTodayCount` / `isTodayCompleted`.
     const logIsoSet = new Set<string>();
     if (habit?.is_bookable) {
       const logs = useHabitLogStore.getState().getLogsFor(habitId);
       for (const log of logs) {
-        logIsoSet.add(logicalToday(log.date, sodHour));
+        const iso = logicalToday(log.date, sodHour);
+        if (iso <= todayIso) logIsoSet.add(iso);
       }
     }
     const today = new Date();
@@ -527,6 +598,36 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         (c) => c.date === dateStr && c.count > 0,
       );
       result.push(fromCompletions || logIsoSet.has(dateStr));
+    }
+    return result;
+  },
+
+  getWeekBookings: (habitId) => {
+    const state = get();
+    const habit = state.habits.find((h) => h.id === habitId);
+    const sodHour = useSettingsStore.getState().startOfDayHour;
+    const todayIso = todayStr();
+    const result: boolean[] = Array(7).fill(false);
+    if (!habit?.is_bookable) return result;
+    const completions = state.completions[habitId] || [];
+    const futureBookingDays = new Set<string>();
+    const logs = useHabitLogStore.getState().getLogsFor(habitId);
+    for (const log of logs) {
+      const iso = logicalToday(log.date, sodHour);
+      if (iso > todayIso) futureBookingDays.add(iso);
+    }
+    const today = new Date();
+    const dayOffset = (today.getDay() + 6) % 7;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - dayOffset + i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      // A day with a completion outranks a same-day booking — if you
+      // somehow have both, render it as completed not booked.
+      const hasCompletion = completions.some(
+        (c) => c.date === dateStr && c.count > 0,
+      );
+      result[i] = !hasCompletion && futureBookingDays.has(dateStr);
     }
     return result;
   },
