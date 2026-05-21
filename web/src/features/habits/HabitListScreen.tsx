@@ -58,8 +58,10 @@ export function HabitListScreen() {
     isTodayCompleted,
     getTodayCount,
     getPeriodCompletions,
+    getPeriodBookings,
     getTodayProgress,
     getWeekCompletions,
+    getWeekBookings,
   } = useHabitStore();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -331,7 +333,9 @@ export function HabitListScreen() {
             todayCompleted={isTodayCompleted(habit.id)}
             todayCount={getTodayCount(habit.id)}
             periodCount={getPeriodCompletions(habit.id)}
+            periodBookings={getPeriodBookings(habit.id)}
             weekCompletions={getWeekCompletions(habit.id)}
+            weekBookings={getWeekBookings(habit.id)}
             onToggle={() => handleToggle(habit.id)}
             onEdit={() => handleEdit(habit)}
             onDelete={() => setDeleteConfirm(habit)}
@@ -396,7 +400,9 @@ function HabitCard({
   todayCompleted,
   todayCount,
   periodCount,
+  periodBookings,
   weekCompletions,
+  weekBookings,
   onToggle,
   onEdit,
   onDelete,
@@ -419,7 +425,20 @@ function HabitCard({
    * `todayCount` and isn't used for rendering.
    */
   periodCount: number;
+  /**
+   * Strictly-future bookings inside the same period. Rendered as
+   * outlined-with-color dots after the filled completion dots so users
+   * can tell at a glance how many sessions are scheduled but not yet
+   * completed. Always `0` for daily habits and non-bookable habits.
+   */
+  periodBookings: number;
   weekCompletions: boolean[];
+  /**
+   * Per-weekday booleans (Mon..Sun) marking days with a future booking
+   * but no completion — surfaces booked days in the daily-habit
+   * week-dot grid without coloring them as if they were completed.
+   */
+  weekBookings: boolean[];
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -443,6 +462,12 @@ function HabitCard({
   const filledDots = isRecurring
     ? Math.min(periodCount, dotsTarget)
     : weekCompletions.filter(Boolean).length;
+  // Booked-but-not-done dots are drawn *after* the filled completion
+  // dots, sharing the same `dotsTarget` budget. Cap so the two never
+  // overflow the dot row — completions always win.
+  const bookedDots = isRecurring
+    ? Math.max(0, Math.min(periodBookings, dotsTarget - filledDots))
+    : 0;
 
   return (
     <div
@@ -479,10 +504,18 @@ function HabitCard({
         {/* Period subtext — non-daily habits get an "X done this {period}"
             line that mirrors Android's `HabitCard.kt:189-220`. The label
             uses the habit's frequency noun ("week", "month", "quarter") so
-            a monthly habit doesn't claim weekly progress. */}
+            a monthly habit doesn't claim weekly progress. When future
+            bookings exist inside the period, a trailing "+N booked"
+            tells the user how many scheduled sessions haven't happened
+            yet — keeps the count honest about what's *done* vs *planned*. */}
         {isRecurring && (
           <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
             {periodCount} of {habit.target_count} done {periodLabel(habit.frequency)}
+            {periodBookings > 0 && (
+              <span className="ml-1 italic">
+                · {periodBookings} booked
+              </span>
+            )}
           </p>
         )}
 
@@ -490,26 +523,40 @@ function HabitCard({
             calendar weekdays are completed. Non-daily habits show
             `target_count` dots (capped at 7) filled by `periodCount` —
             progress toward the period target, parity with Android
-            `HabitCard.kt`'s `WeeklyDots(dotsTarget = …)`. */}
+            `HabitCard.kt`'s `WeeklyDots(dotsTarget = …)`. Booked-but-
+            not-done sessions render as outlined-with-color dots after
+            the solid completion dots so future bookings are visually
+            distinct from completions. */}
         <div className="mt-1.5 flex items-center gap-1">
           {isRecurring
             ? Array.from({ length: dotsTarget }).map((_, idx) => {
                 const completed = idx < filledDots;
+                const booked = !completed && idx < filledDots + bookedDots;
+                let tooltip: string;
+                if (completed) {
+                  tooltip = `${idx + 1} of ${habit.target_count}`;
+                } else if (booked) {
+                  tooltip = `Booked — not yet done`;
+                } else {
+                  tooltip = `Not yet ${periodLabel(habit.frequency)}`;
+                }
                 return (
-                  <Tooltip
-                    key={idx}
-                    content={
-                      completed
-                        ? `${idx + 1} of ${habit.target_count}`
-                        : `Not yet ${periodLabel(habit.frequency)}`
-                    }
-                    delay={200}
-                  >
+                  <Tooltip key={idx} content={tooltip} delay={200}>
                     <div
                       className={`h-2.5 w-2.5 rounded-full transition-colors ${
-                        completed ? '' : 'border border-[var(--color-border)]'
+                        completed
+                          ? ''
+                          : booked
+                            ? 'border-2'
+                            : 'border border-[var(--color-border)]'
                       }`}
-                      style={completed ? { backgroundColor: habitColor } : undefined}
+                      style={
+                        completed
+                          ? { backgroundColor: habitColor }
+                          : booked
+                            ? { borderColor: habitColor }
+                            : undefined
+                      }
                     />
                   </Tooltip>
                 );
@@ -521,24 +568,33 @@ function HabitCard({
                   activeDays.length === 0 ||
                   activeDays.includes(isoDay);
                 const completed = weekCompletions[idx];
+                const booked = !completed && weekBookings[idx];
+                let suffix = '';
+                if (completed) suffix = ' - Done';
+                else if (booked) suffix = ' - Booked';
+                else if (!isActive) suffix = ' - Not Active';
                 return (
                   <Tooltip
                     key={idx}
-                    content={`${label}${completed ? ' - Done' : isActive ? '' : ' - Not Active'}`}
+                    content={`${label}${suffix}`}
                     delay={200}
                   >
                     <div
                       className={`h-2.5 w-2.5 rounded-full transition-colors ${
-                        !isActive
+                        !isActive && !booked
                           ? 'bg-[var(--color-bg-secondary)]'
                           : completed
                             ? ''
-                            : 'border border-[var(--color-border)]'
+                            : booked
+                              ? 'border-2'
+                              : 'border border-[var(--color-border)]'
                       }`}
                       style={
-                        isActive && completed
+                        completed
                           ? { backgroundColor: habitColor }
-                          : undefined
+                          : booked
+                            ? { borderColor: habitColor }
+                            : undefined
                       }
                     />
                   </Tooltip>

@@ -323,4 +323,140 @@ describe('habitStore — bookable habit recency', () => {
     // No other days lit (no completions, no other logs).
     expect(week.filter((b) => b).length).toBe(1);
   });
+
+  /**
+   * Regression: the web app used to fold *future-dated* bookings into the
+   * "done this period" count, so booking a therapy session for next
+   * Friday made a weekly habit look completed today. Bookings that
+   * haven't happened yet are not completions — they should surface
+   * separately via `getPeriodBookings` / `getWeekBookings`.
+   */
+  describe('future bookings are distinct from completions', () => {
+    it('weekly bookable: a future booking inside this week does NOT mark done', () => {
+      // Monday 2026-05-18 noon — Friday 2026-05-22 is still in this week.
+      vi.setSystemTime(new Date(2026, 4, 18, 12, 0, 0));
+      useHabitStore.setState({
+        habits: [makeHabit({ frequency: 'weekly', target_count: 1 })],
+      });
+      seedLogs('habit-1', [
+        makeLog({ date: new Date(2026, 4, 22, 14, 0, 0).getTime() }),
+      ]);
+      expect(useHabitStore.getState().isTodayCompleted('habit-1')).toBe(false);
+      expect(useHabitStore.getState().getPeriodCompletions('habit-1')).toBe(0);
+      expect(useHabitStore.getState().getPeriodBookings('habit-1')).toBe(1);
+    });
+
+    it('monthly bookable target=2: one past log + one future booking → 1 done, 1 booked', () => {
+      vi.setSystemTime(new Date(2026, 4, 20, 10, 0, 0));
+      useHabitStore.setState({
+        habits: [makeHabit({ frequency: 'monthly', target_count: 2 })],
+      });
+      seedLogs('habit-1', [
+        makeLog({
+          id: 'log-past',
+          date: new Date(2026, 4, 6, 9, 0, 0).getTime(),
+        }),
+        makeLog({
+          id: 'log-future',
+          date: new Date(2026, 4, 28, 9, 0, 0).getTime(),
+        }),
+      ]);
+      expect(useHabitStore.getState().getPeriodCompletions('habit-1')).toBe(1);
+      expect(useHabitStore.getState().getPeriodBookings('habit-1')).toBe(1);
+      expect(useHabitStore.getState().isTodayCompleted('habit-1')).toBe(false);
+    });
+
+    it('getTodayProgress excludes future bookings from the completed tally', () => {
+      vi.setSystemTime(new Date(2026, 4, 18, 12, 0, 0));
+      useHabitStore.setState({
+        habits: [makeHabit({ frequency: 'weekly', target_count: 1 })],
+      });
+      seedLogs('habit-1', [
+        makeLog({ date: new Date(2026, 4, 22, 14, 0, 0).getTime() }),
+      ]);
+      expect(useHabitStore.getState().getTodayProgress()).toEqual({
+        completed: 0,
+        total: 1,
+      });
+    });
+
+    it('getWeekCompletions does NOT light up the day of a future booking', () => {
+      // Monday 2026-05-18 — booking for Friday 2026-05-22.
+      vi.setSystemTime(new Date(2026, 4, 18, 12, 0, 0));
+      useHabitStore.setState({
+        habits: [makeHabit({ frequency: 'weekly', target_count: 1 })],
+      });
+      seedLogs('habit-1', [
+        makeLog({ date: new Date(2026, 4, 22, 14, 0, 0).getTime() }),
+      ]);
+      const week = useHabitStore.getState().getWeekCompletions('habit-1');
+      expect(week.filter((b) => b).length).toBe(0);
+      const bookings = useHabitStore.getState().getWeekBookings('habit-1');
+      // Friday is index 4 (Mon=0..Sun=6).
+      expect(bookings[4]).toBe(true);
+      expect(bookings.filter((b) => b).length).toBe(1);
+    });
+
+    it('getWeekBookings is all-false for non-bookable habits', () => {
+      vi.setSystemTime(new Date(2026, 4, 18, 12, 0, 0));
+      useHabitStore.setState({
+        habits: [
+          makeHabit({
+            frequency: 'weekly',
+            target_count: 1,
+            is_bookable: false,
+          }),
+        ],
+      });
+      seedLogs('habit-1', [
+        makeLog({ date: new Date(2026, 4, 22, 14, 0, 0).getTime() }),
+      ]);
+      const bookings = useHabitStore.getState().getWeekBookings('habit-1');
+      expect(bookings.every((b) => !b)).toBe(true);
+    });
+
+    it('getPeriodBookings is 0 for daily habits (no future inside a 1-day period)', () => {
+      vi.setSystemTime(new Date(2026, 4, 20, 10, 0, 0));
+      useHabitStore.setState({
+        habits: [makeHabit({ frequency: 'daily', target_count: 1 })],
+      });
+      // Even with a log scheduled for tomorrow, daily habits short-circuit
+      // because their period is exactly today.
+      seedLogs('habit-1', [
+        makeLog({ date: new Date(2026, 4, 21, 9, 0, 0).getTime() }),
+      ]);
+      expect(useHabitStore.getState().getPeriodBookings('habit-1')).toBe(0);
+    });
+
+    it('completion on a day with a same-day booking wins over the booking marker', () => {
+      // Tuesday 2026-05-19. Completion logged for today; an extra log
+      // dated "tomorrow" should not mark Tuesday as booked.
+      vi.setSystemTime(new Date(2026, 4, 19, 12, 0, 0));
+      useHabitStore.setState({
+        habits: [makeHabit({ frequency: 'weekly', target_count: 2 })],
+        completions: {
+          'habit-1': [
+            {
+              id: 'c-1',
+              habit_id: 'habit-1',
+              date: '2026-05-19',
+              count: 1,
+              created_at: '2026-05-19T12:00:00Z',
+            },
+          ],
+        },
+      });
+      seedLogs('habit-1', [
+        makeLog({ date: new Date(2026, 4, 22, 9, 0, 0).getTime() }),
+      ]);
+      const week = useHabitStore.getState().getWeekCompletions('habit-1');
+      const bookings = useHabitStore.getState().getWeekBookings('habit-1');
+      // Tuesday (idx 1): completed (true), not booked.
+      expect(week[1]).toBe(true);
+      expect(bookings[1]).toBe(false);
+      // Friday (idx 4): not completed, but booked.
+      expect(week[4]).toBe(false);
+      expect(bookings[4]).toBe(true);
+    });
+  });
 });

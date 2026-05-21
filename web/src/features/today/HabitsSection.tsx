@@ -52,20 +52,25 @@ function frequencyLabel(
   target: number,
   todayCount: number,
   periodCount: number,
+  periodBookings: number,
 ): string {
+  // Trailing "(+N booked)" surfaces future-dated bookings without
+  // letting them silently inflate the progress count. Mirrors the
+  // recurring habit card on the Habits list.
+  const bookedSuffix = periodBookings > 0 ? ` (+${periodBookings} booked)` : '';
   switch (frequency) {
     case 'daily':
       return target > 1 ? `${todayCount}/${target} today` : 'Daily';
     case 'weekly':
-      return `${periodCount}/${target} this week`;
+      return `${periodCount}/${target} this week${bookedSuffix}`;
     case 'fortnightly':
-      return `${periodCount}/${target} this fortnight`;
+      return `${periodCount}/${target} this fortnight${bookedSuffix}`;
     case 'monthly':
-      return `${periodCount}/${target} this month`;
+      return `${periodCount}/${target} this month${bookedSuffix}`;
     case 'bimonthly':
-      return `${periodCount}/${target} this period`;
+      return `${periodCount}/${target} this period${bookedSuffix}`;
     case 'quarterly':
-      return `${periodCount}/${target} this quarter`;
+      return `${periodCount}/${target} this quarter${bookedSuffix}`;
   }
 }
 
@@ -76,6 +81,7 @@ export function HabitsSection() {
   const isTodayCompleted = useHabitStore((s) => s.isTodayCompleted);
   const getTodayCount = useHabitStore((s) => s.getTodayCount);
   const getPeriodCompletions = useHabitStore((s) => s.getPeriodCompletions);
+  const getPeriodBookings = useHabitStore((s) => s.getPeriodBookings);
   const getStreakData = useHabitStore((s) => s.getStreakData);
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
   const todayIso = useLogicalToday(startOfDayHour);
@@ -114,6 +120,7 @@ export function HabitsSection() {
       completed={isTodayCompleted(habit.id)}
       currentCount={getTodayCount(habit.id)}
       periodCount={getPeriodCompletions(habit.id)}
+      periodBookings={getPeriodBookings(habit.id)}
       streak={getStreakData(habit.id)?.currentStreak ?? 0}
       onToggle={async () => {
         try {
@@ -193,6 +200,12 @@ interface HabitRowProps {
    * For daily habits this matches `currentCount`.
    */
   periodCount: number;
+  /**
+   * Strictly-future bookings in the same period. Surfaced inline as
+   * "(+N booked)" so users can see scheduled-but-pending sessions
+   * without them inflating the done count.
+   */
+  periodBookings: number;
   streak: number;
   onToggle: () => void;
   onClick: () => void;
@@ -203,6 +216,7 @@ function HabitRow({
   completed,
   currentCount,
   periodCount,
+  periodBookings,
   streak,
   onToggle,
   onClick,
@@ -213,7 +227,13 @@ function HabitRow({
   // `HabitEntity.showStreak`; until that lands on web, the >0 check
   // matches the user-visible default (streak hidden when 0).
   const showStreak = streak > 0;
-  const label = frequencyLabel(habit.frequency, habit.target_count, currentCount, periodCount);
+  const label = frequencyLabel(
+    habit.frequency,
+    habit.target_count,
+    currentCount,
+    periodCount,
+    periodBookings,
+  );
   return (
     <li className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-[var(--color-bg-secondary)]">
       <button
