@@ -10,7 +10,7 @@ import {
 } from '../notifications';
 
 // Mock Notification API
-const MockNotification = vi.fn() as unknown as { requestPermission: import('vitest').Mock; permission: string; mockClear: () => void; } & typeof vi.fn;
+const MockNotification = vi.fn();
 MockNotification.requestPermission = vi.fn().mockResolvedValue('granted');
 Object.defineProperty(MockNotification, 'permission', {
   value: 'default',
