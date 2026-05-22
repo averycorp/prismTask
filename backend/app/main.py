@@ -66,6 +66,13 @@ Instrumentator(
 ).instrument(app)
 
 
+def _client_ip(request: Request) -> str:
+    # Do not trust X-Forwarded-For for security boundaries, as it is trivially spoofed.
+    # Uvicorn with ProxyHeadersMiddleware properly sets request.client.host when
+    # behind a trusted proxy. Otherwise, it falls back to the direct peer IP.
+    return request.client.host if request.client else "unknown"
+
+
 def _require_scrape_token(request: Request) -> None:
     """Bearer-token gate for /metrics. Empty token → 503 (endpoint inert).
 
@@ -78,6 +85,11 @@ def _require_scrape_token(request: Request) -> None:
     auth = request.headers.get("authorization", "")
     if auth != f"Bearer {settings.METRICS_SCRAPE_TOKEN}":
         raise HTTPException(status_code=401, detail="invalid scrape token")
+
+    if "*" not in settings.METRICS_ALLOWED_IPS:
+        client_ip = _client_ip(request)
+        if client_ip not in settings.METRICS_ALLOWED_IPS:
+            raise HTTPException(status_code=403, detail="ip not allowed")
 
 
 @app.get("/metrics")

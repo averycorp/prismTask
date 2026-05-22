@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # /metrics. Empty default keeps the endpoint inert in dev — the route
     # is registered unconditionally but returns 503 until a token is set.
     METRICS_SCRAPE_TOKEN: str = ""
+    # Allowlist for /metrics IPs. The wildcard is included by default for
+    # dev environments and operators not needing restriction.
+    METRICS_ALLOWED_IPS: list[str] = ["*"]
     ENVIRONMENT: str = "dev"
     # Default to an explicit allowlist. The wildcard is NOT included by
     # default — operators must opt in by setting CORS_ORIGINS="*" in dev.
@@ -52,9 +55,9 @@ class Settings(BaseSettings):
     # pre-loop behavior. Default off so prod can flip the loop on per env.
     AI_ASSISTANT_TOOL_USE_ENABLED: bool = False
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", "METRICS_ALLOWED_IPS", mode="before")
     @classmethod
-    def _parse_cors_origins(cls, v: object) -> object:
+    def _parse_list_from_string(cls, v: object) -> object:
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
