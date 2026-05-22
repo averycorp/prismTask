@@ -59,6 +59,7 @@ import javax.inject.Inject
  * ([SettingsViewModelExportImport]) to keep this file focused on
  * state exposure and simple setters.
  */
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class SettingsViewModel
 @Inject

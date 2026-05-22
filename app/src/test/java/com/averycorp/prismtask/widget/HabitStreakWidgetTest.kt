@@ -36,7 +36,8 @@ class HabitStreakWidgetTest {
             HabitWidgetItem(3L, "Meditate", "🧘", 10, true)
         )
         val config = WidgetConfigDataStore.HabitStreakConfig(
-            selectedHabitIds = listOf(3L, 1L) // user-picked order
+            // user-picked order
+            selectedHabitIds = listOf(3L, 1L)
         )
         val result = applyConfig(data, config)
         assertEquals(2, result.habits.size)

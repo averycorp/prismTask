@@ -56,7 +56,8 @@ fun DurationPickerDialog(
                     steps = ((maxMinutes - minMinutes) / step) - 1
                 )
                 Text(
-                    text = "Used as fallback length when a task has no estimate. Powers the Today balance bar and cognitive-load weighting.",
+                    text = "Used as fallback length when a task has no estimate. " +
+                        "Powers the Today balance bar and cognitive-load weighting.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
