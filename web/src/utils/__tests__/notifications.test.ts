@@ -10,7 +10,8 @@ import {
 } from '../notifications';
 
 // Mock Notification API
-const MockNotification = vi.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const MockNotification: any = vi.fn();
 MockNotification.requestPermission = vi.fn().mockResolvedValue('granted');
 Object.defineProperty(MockNotification, 'permission', {
   value: 'default',
