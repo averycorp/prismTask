@@ -7,7 +7,7 @@ import { useBatchStore } from '@/stores/batchStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { applyA11yToDocument, useA11yStore } from '@/stores/a11yStore';
 import { useFirestoreSync } from '@/hooks/useFirestoreSync';
-import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { ErrorBoundary, ErrorBoundaryFallback } from '@/components/shared/ErrorBoundary';
 import { OfflineBanner } from '@/components/shared/OfflineBanner';
 import { PrismThemeProvider } from '@/theme/PrismThemeProvider';
 
@@ -81,7 +81,7 @@ export default function App() {
   }, []);
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary FallbackComponent={ErrorBoundaryFallback}>
       <PrismThemeProvider>
         <OfflineBanner />
         <RouterProvider router={router} />
