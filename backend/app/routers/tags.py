@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -98,23 +98,24 @@ async def set_task_tags(
         raise HTTPException(status_code=404, detail="Task not found")
 
     # Remove existing task-tag associations
-    existing = await db.execute(
-        select(TaskTag).where(TaskTag.task_id == task_id)
-    )
-    for tt in existing.scalars().all():
-        await db.delete(tt)
+    await db.execute(delete(TaskTag).where(TaskTag.task_id == task_id))
 
     # Add new associations
-    tags = []
-    for tid in tag_ids:
+    if tag_ids:
         tag_result = await db.execute(
-            select(Tag).where(Tag.id == tid, Tag.user_id == current_user.id)
+            select(Tag).where(Tag.id.in_(tag_ids), Tag.user_id == current_user.id)
         )
-        tag = tag_result.scalar_one_or_none()
-        if not tag:
-            raise HTTPException(status_code=404, detail=f"Tag {tid} not found")
-        db.add(TaskTag(task_id=task_id, tag_id=tid))
-        tags.append(tag)
+        tags = list(tag_result.scalars().all())
+
+        if len(tags) != len(set(tag_ids)):
+            found_ids = {t.id for t in tags}
+            missing_ids = set(tag_ids) - found_ids
+            first_missing = next(tid for tid in tag_ids if tid in missing_ids)
+            raise HTTPException(status_code=404, detail=f"Tag {first_missing} not found")
+
+        db.add_all([TaskTag(task_id=task_id, tag_id=t.id) for t in tags])
+    else:
+        tags = []
 
     await db.flush()
     return [_tag_response(t) for t in tags]
