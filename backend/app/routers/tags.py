@@ -106,15 +106,24 @@ async def set_task_tags(
 
     # Add new associations
     tags = []
-    for tid in tag_ids:
+    if tag_ids:
         tag_result = await db.execute(
-            select(Tag).where(Tag.id == tid, Tag.user_id == current_user.id)
+            select(Tag).where(Tag.id.in_(tag_ids), Tag.user_id == current_user.id)
         )
-        tag = tag_result.scalar_one_or_none()
-        if not tag:
-            raise HTTPException(status_code=404, detail=f"Tag {tid} not found")
-        db.add(TaskTag(task_id=task_id, tag_id=tid))
-        tags.append(tag)
+        tags = tag_result.scalars().all()
+
+        # Verify all provided tag IDs were found
+        found_tag_ids = {t.id for t in tags}
+        for tid in tag_ids:
+            if tid not in found_tag_ids:
+                raise HTTPException(status_code=404, detail=f"Tag {tid} not found")
+
+        # Reorder tags to match the input order
+        tag_dict = {t.id: t for t in tags}
+        tags = [tag_dict[tid] for tid in tag_ids]
+
+        for t in tags:
+            db.add(TaskTag(task_id=task_id, tag_id=t.id))
 
     await db.flush()
     return [_tag_response(t) for t in tags]
