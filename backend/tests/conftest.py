@@ -1,6 +1,8 @@
 import os
 import time
 
+os.environ["JWT_SECRET_KEY"] = "testsecret"
+
 # Force process timezone to UTC to align local date.today() with UTC datetime.now()
 # during tests, preventing timezone boundary failures.
 os.environ["TZ"] = "UTC"
