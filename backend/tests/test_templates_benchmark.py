@@ -11,7 +11,7 @@ async def my_goal_and_project(client: AsyncClient, auth_headers: dict):
     goal_id = goal_resp.json()["id"]
     project_resp = await client.post(
         f"/api/v1/goals/{goal_id}/projects",
-        json={"name": "Template Project"},
+        json={"title": "Template Project"},
         headers=auth_headers,
     )
     return goal_id, project_resp.json()["id"]

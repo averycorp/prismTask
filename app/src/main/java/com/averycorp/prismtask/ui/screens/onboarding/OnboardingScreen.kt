@@ -80,6 +80,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.layout.FoldingFeature
 import com.averycorp.prismtask.BuildConfig
 import com.averycorp.prismtask.ui.a11y.asHeading
@@ -1993,9 +1994,11 @@ private fun NotificationsPage(viewModel: OnboardingViewModel) {
 
 @Composable
 private fun DaySetupPage(viewModel: OnboardingViewModel) {
+    val initialHour by collectAsLocalState(viewModel.startOfDayHour, initial = 4)
+    val initialMinute by collectAsLocalState(viewModel.startOfDayMinute, initial = 0)
     val clockState = rememberAnalogClockState(
-        initialHour = viewModel.startOfDayHour.value,
-        initialMinute = viewModel.startOfDayMinute.value,
+        initialHour = initialHour,
+        initialMinute = initialMinute,
         is24Hour = false
     )
 
@@ -2158,7 +2161,8 @@ private val OnboardingThemeEntries = listOf(
 @Composable
 private fun ThemePickerPage(viewModel: OnboardingViewModel) {
     val themeViewModel: ThemeViewModel = hiltViewModel()
-    var selectedTheme by remember { mutableStateOf(themeViewModel.currentTheme.value) }
+    val activeTheme by themeViewModel.currentTheme.collectAsStateWithLifecycle()
+    var selectedTheme by remember(activeTheme) { mutableStateOf(activeTheme) }
     val widgetFollowsApp by collectAsLocalState(viewModel.widgetThemeFollowsApp, initial = true)
 
     Box(
