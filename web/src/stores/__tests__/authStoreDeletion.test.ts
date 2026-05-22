@@ -11,6 +11,8 @@ const {
   clearIndexedDbPersistenceMock,
   setFirebaseUidMock,
   authApiMock,
+  docMock,
+  getDocMock,
   getAiFeaturesEnabledMock,
   setAiFeaturesEnabledMock,
 } = vi.hoisted(() => ({
@@ -22,6 +24,8 @@ const {
   googleProviderMock: {},
   terminateMock: vi.fn().mockResolvedValue(undefined),
   clearIndexedDbPersistenceMock: vi.fn().mockResolvedValue(undefined),
+  getDocMock: vi.fn().mockResolvedValue({ exists: () => true, data: () => ({}) }),
+  docMock: vi.fn(),
   setFirebaseUidMock: vi.fn(),
   getAiFeaturesEnabledMock: vi.fn(),
   setAiFeaturesEnabledMock: vi.fn(),
@@ -47,6 +51,8 @@ vi.mock('firebase/auth', () => ({
 vi.mock('firebase/firestore', () => ({
   terminate: terminateMock,
   clearIndexedDbPersistence: clearIndexedDbPersistenceMock,
+  getDoc: getDocMock,
+  doc: docMock,
 }));
 
 vi.mock('@/lib/firebase', () => ({
