@@ -17,7 +17,7 @@ import javax.inject.Singleton
 
 internal val Context.themePrefsDataStore: DataStore<Preferences> by preferencesDataStore(name = "theme_prefs")
 
-// TODO: Any new key added here that belongs in the sync payload must also be added to
+// Note: Any new key added here that belongs in the sync payload must also be added to
 //  ThemePreferencesSyncService.pushNow() (push) and applyRemoteSnapshot() (pull).
 //  Full per-user DataStore scoping + unified AppearanceSettingsSyncService deferred to Option C.
 @Singleton
