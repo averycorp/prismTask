@@ -44,19 +44,12 @@ steps:
   args: ['run', 'build']
   waitFor: ['web-install']
 
-- id: 'web-e2e-deps'
-  name: 'mcr.microsoft.com/playwright:v1.44.0-jammy'
-  dir: 'web'
-  entrypoint: 'npm'
-  args: ['ci']
-  waitFor: ['-']
-
 - id: 'web-e2e'
-  name: 'mcr.microsoft.com/playwright:v1.44.0-jammy'
+  name: 'mcr.microsoft.com/playwright:v1.60.0-jammy'
   dir: 'web'
   entrypoint: 'npx'
   args: ['playwright', 'test']
-  waitFor: ['web-e2e-deps', 'web-build']
+  waitFor: ['web-build']
 
 
 # ==========================================
@@ -95,13 +88,6 @@ steps:
     exit 1
   waitFor: ['start-postgres']
 
-- id: 'backend-install'
-  name: 'python:3.11'
-  dir: 'backend'
-  entrypoint: 'pip'
-  args: ['install', '-r', 'requirements.txt']
-  waitFor: ['-']
-
 - id: 'backend-lint'
   name: 'python:3.11'
   dir: 'backend'
@@ -119,36 +105,19 @@ steps:
     - 'ENVIRONMENT=dev'
     - 'ANTHROPIC_API_KEY=test-key'
   script: |
+    pip install -r requirements.txt
     alembic upgrade head
     pytest tests/ -x --tb=short -q --junitxml=junit.xml
-  waitFor: ['wait-for-postgres', 'backend-install']
+  waitFor: ['wait-for-postgres']
 
 
 # ==========================================
 # ANDROID CI
 # ==========================================
-- id: 'android-ktlint'
+- id: 'android-checks'
   name: 'ghcr.io/cirruslabs/android-sdk:34'
   entrypoint: './gradlew'
-  args: ['ktlintCheck', '--continue']
-  waitFor: ['-']
-
-- id: 'android-detekt'
-  name: 'ghcr.io/cirruslabs/android-sdk:34'
-  entrypoint: './gradlew'
-  args: ['detekt', '--continue']
-  waitFor: ['-']
-
-- id: 'android-lint'
-  name: 'ghcr.io/cirruslabs/android-sdk:34'
-  entrypoint: './gradlew'
-  args: ['lint', '--continue']
-  waitFor: ['-']
-
-- id: 'android-unit-test'
-  name: 'ghcr.io/cirruslabs/android-sdk:34'
-  entrypoint: './gradlew'
-  args: ['testDebugUnitTest', '--continue']
+  args: ['ktlintCheck', 'detekt', 'lint', 'testDebugUnitTest', '--continue', '--no-daemon']
   waitFor: ['-']
 
 # ==========================================
@@ -179,8 +148,9 @@ steps:
     
     # Run the tests
     ./gradlew connectedDebugAndroidTest --no-daemon --continue
-  waitFor: ['-']
+  waitFor: ['android-checks']
 
 timeout: '3600s'
 options:
   machineType: 'E2_HIGHCPU_8'
+  logging: 'CLOUD_LOGGING_ONLY'

@@ -8,6 +8,7 @@ import {
   Pin,
   Timer,
   MessageSquare,
+  Zap,
 } from 'lucide-react';
 import { format, parseISO, startOfWeek, subDays, isMonday, isSunday } from 'date-fns';
 import { toast } from 'sonner';
@@ -93,6 +94,10 @@ export function TodayScreen() {
   // sections, plan-more affordance, and "Show Blocked Tasks" toggle —
   // i.e. everything that nags about uncompleted work — drop out.
   const isRestingToday = useRestDayStore((s) => s.isRestDayToday());
+  const lowEnergyModeEnabled = useRestDayStore((s) => s.lowEnergyModeEnabled);
+  const setLowEnergyModeEnabled = useRestDayStore(
+    (s) => s.setLowEnergyModeEnabled,
+  );
 
   const settingsShowBriefing = useSettingsStore((s) => s.showBriefingCard);
   const settingsStartOfDayHour = useSettingsStore((s) => s.startOfDayHour);
@@ -270,10 +275,20 @@ export function TodayScreen() {
     showBlocked || unmetBlockerCount(t.id) === 0;
 
   const activeOverdue = filterPending(
-    overdueTasks.filter((t) => t.status !== 'done' && blockedAwareFilter(t)),
+    overdueTasks.filter(
+      (t) =>
+        t.status !== 'done' &&
+        blockedAwareFilter(t) &&
+        (!lowEnergyModeEnabled || t.cognitive_load === 'EASY'),
+    ),
   );
   const activeToday = filterPending(
-    todayTasks.filter((t) => t.status !== 'done' && blockedAwareFilter(t)),
+    todayTasks.filter(
+      (t) =>
+        t.status !== 'done' &&
+        blockedAwareFilter(t) &&
+        (!lowEnergyModeEnabled || t.cognitive_load === 'EASY'),
+    ),
   );
   const activeUpcoming = filterPending(
     upcomingTasks.filter(
@@ -358,6 +373,32 @@ export function TodayScreen() {
           </button>
         )}
       </div>
+
+      {/* Quick-actions chip row — parity with Android
+          `TodayScreen.kt:521–700`. Horizontally scrollable so it scales
+          on small screens. Hidden on rest days. */}
+      {!isRestingToday && (
+        <div
+          className="mb-4 flex items-center gap-2 overflow-x-auto pb-1"
+          role="toolbar"
+          aria-label="Quick Actions"
+        >
+          <button
+            type="button"
+            onClick={() => setLowEnergyModeEnabled(!lowEnergyModeEnabled)}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 ${
+              lowEnergyModeEnabled
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                : 'border-[var(--color-border)] text-[var(--color-text-primary)] hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-bg-secondary)]'
+            }`}
+            aria-pressed={lowEnergyModeEnabled}
+            data-testid="low-energy-chip"
+          >
+            <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+            {lowEnergyModeEnabled ? 'Low Energy On' : 'Low Energy'}
+          </button>
+        </div>
+      )}
 
       <MorningCheckInBanner />
       <BoundaryTodayBanner />

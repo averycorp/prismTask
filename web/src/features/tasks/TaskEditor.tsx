@@ -7,7 +7,9 @@ import {
   Loader2,
   Check,
   Save,
+  MessageSquare,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Drawer } from '@/components/ui/Drawer';
 import { Tabs } from '@/components/ui/Tabs';
@@ -17,6 +19,7 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useChatStore } from '@/stores/chatStore';
 import { aiLifeCategoryClassifyText } from '@/api/ai/chat';
 import { formatRelative } from '@/utils/dates';
 import { classifyTaskMode } from '@/utils/taskModeClassifier';
@@ -91,6 +94,7 @@ export default function TaskEditor({
   const { tags, fetchTags, createTag } = useTagStore();
 
   const [activeTab, setActiveTab] = useState('details');
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -884,6 +888,20 @@ export default function TaskEditor({
                     <Copy className="h-4 w-4" />
                     Duplicate
                   </Button>
+                  {task && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        useChatStore.getState().setContextTask(task);
+                        navigate('/chat');
+                        onClose();
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Chat About This Task
+                    </Button>
+                  )}
                   {onSaveAsTemplate && (
                     <Button
                       variant="ghost"

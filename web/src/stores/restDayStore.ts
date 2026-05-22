@@ -41,6 +41,15 @@ interface RestDayState {
   /** ISO `yyyy-MM-dd` dates the user has marked as rest days. */
   restDates: Set<string>;
 
+  /**
+   * Low Energy Mode filter — device-local toggle. When `true`, the Today
+   * screen only shows tasks with `cognitive_load === 'EASY'`. Mirrors
+   * Android's `RestDayPreferences.lowEnergyFilterEnabled` DataStore key.
+   * Not synced cross-device (same as Android — it's a per-device
+   * ephemeral mood toggle, not a user-level preference).
+   */
+  lowEnergyModeEnabled: boolean;
+
   /** Wire Firestore real-time listener. Returns a cleanup function. */
   subscribeToRestDays: (uid: string) => Unsubscribe;
 
@@ -55,6 +64,9 @@ interface RestDayState {
 
   /** Look up an arbitrary ISO date. */
   isRestDay: (isoDate: string) => boolean;
+
+  /** Toggle Low Energy Mode on or off. Persisted to localStorage. */
+  setLowEnergyModeEnabled: (enabled: boolean) => void;
 
   /**
    * Mark today (logical, SoD-aware) as a rest day. Optimistically
@@ -72,15 +84,29 @@ interface RestDayState {
   unmarkToday: () => Promise<void>;
 }
 
+const LOW_ENERGY_KEY = 'prismtask_low_energy_mode';
+
+function readLowEnergyMode(): boolean {
+  try {
+    return localStorage.getItem(LOW_ENERGY_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export const useRestDayStore = create<RestDayState>((set, get) => ({
   restDates: new Set<string>(),
+  lowEnergyModeEnabled: readLowEnergyMode(),
 
   subscribeToRestDays: (uid) =>
     subscribeToRestDays(uid, (dates) => {
       set({ restDates: dates });
     }),
 
-  reset: () => set({ restDates: new Set<string>() }),
+  reset: () => {
+    try { localStorage.removeItem(LOW_ENERGY_KEY); } catch { /* swallow */ }
+    set({ restDates: new Set<string>(), lowEnergyModeEnabled: false });
+  },
 
   todayIso: () => {
     const hour = useSettingsStore.getState().startOfDayHour;
@@ -90,6 +116,17 @@ export const useRestDayStore = create<RestDayState>((set, get) => ({
   isRestDayToday: () => get().restDates.has(get().todayIso()),
 
   isRestDay: (isoDate) => get().restDates.has(isoDate),
+
+  setLowEnergyModeEnabled: (enabled) => {
+    try {
+      if (enabled) {
+        localStorage.setItem(LOW_ENERGY_KEY, 'true');
+      } else {
+        localStorage.removeItem(LOW_ENERGY_KEY);
+      }
+    } catch { /* swallow */ }
+    set({ lowEnergyModeEnabled: enabled });
+  },
 
   markToday: async () => {
     const iso = get().todayIso();

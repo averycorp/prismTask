@@ -15,7 +15,9 @@ test.describe('Accessibility', () => {
 
   test('interactive elements are keyboard focusable', async ({ page }) => {
     await page.goto('/login');
-    // Tab to first interactive element
+    // Wait for the page to render
+    await expect(page.locator('h1')).toBeVisible();
+    // Tab to next interactive element (email input is auto-focused on mount)
     await page.keyboard.press('Tab');
     const focused = await page.evaluate(() => document.activeElement?.tagName);
     expect(focused).toBeTruthy();
