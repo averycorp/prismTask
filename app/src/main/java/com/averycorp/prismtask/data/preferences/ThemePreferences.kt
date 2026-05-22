@@ -294,6 +294,7 @@ constructor(
             put("priority_color_high", prefs[PRIORITY_COLOR_HIGH_KEY] ?: "")
             put("priority_color_urgent", prefs[PRIORITY_COLOR_URGENT_KEY] ?: "")
             put("recent_custom_colors", prefs[RECENT_CUSTOM_COLORS_KEY] ?: "")
+            put("widget_theme_override", prefs[WIDGET_THEME_OVERRIDE_KEY] ?: "")
         }
     }
 
@@ -317,6 +318,7 @@ constructor(
             (remote["priority_color_high"] as? String)?.let { prefs[PRIORITY_COLOR_HIGH_KEY] = it }
             (remote["priority_color_urgent"] as? String)?.let { prefs[PRIORITY_COLOR_URGENT_KEY] = it }
             (remote["recent_custom_colors"] as? String)?.let { prefs[RECENT_CUSTOM_COLORS_KEY] = it }
+            (remote["widget_theme_override"] as? String)?.let { prefs[WIDGET_THEME_OVERRIDE_KEY] = it }
             // Do NOT touch THEME_UPDATED_AT_KEY here. That key is the local "user last changed
             // something" timestamp and is only written by ThemePreferences setters. Writing it
             // from the pull path would overwrite a device's local clock with a remote device's
