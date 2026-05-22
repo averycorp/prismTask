@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { lazy, Suspense, type ComponentType } from 'react';
 import {
   createBrowserRouter,
