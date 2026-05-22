@@ -97,7 +97,7 @@ class ConversationTaskExtractor(
 
     private fun clean(raw: String): String? {
         var s = raw.trim().trimEnd('.', '!', '?', ',', ';', ':')
-        if (s.isEmpty() || s.length > config.maxTitleChars) return null
+        if (s.length < 3 || s.length > config.maxTitleChars) return null
         // Title-case the first letter, leave the rest alone.
         s = s[0].uppercaseChar() + s.substring(1)
         return s
