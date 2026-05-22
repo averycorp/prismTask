@@ -114,28 +114,10 @@ steps:
 # ==========================================
 # ANDROID CI
 # ==========================================
-- id: 'android-ktlint'
+- id: 'android-checks'
   name: 'ghcr.io/cirruslabs/android-sdk:34'
   entrypoint: './gradlew'
-  args: ['ktlintCheck', '--continue']
-  waitFor: ['-']
-
-- id: 'android-detekt'
-  name: 'ghcr.io/cirruslabs/android-sdk:34'
-  entrypoint: './gradlew'
-  args: ['detekt', '--continue']
-  waitFor: ['-']
-
-- id: 'android-lint'
-  name: 'ghcr.io/cirruslabs/android-sdk:34'
-  entrypoint: './gradlew'
-  args: ['lint', '--continue']
-  waitFor: ['-']
-
-- id: 'android-unit-test'
-  name: 'ghcr.io/cirruslabs/android-sdk:34'
-  entrypoint: './gradlew'
-  args: ['testDebugUnitTest', '--continue']
+  args: ['ktlintCheck', 'detekt', 'lint', 'testDebugUnitTest', '--continue', '--no-daemon']
   waitFor: ['-']
 
 # ==========================================
@@ -166,7 +148,7 @@ steps:
     
     # Run the tests
     ./gradlew connectedDebugAndroidTest --no-daemon --continue
-  waitFor: ['-']
+  waitFor: ['android-checks']
 
 timeout: '3600s'
 options:
