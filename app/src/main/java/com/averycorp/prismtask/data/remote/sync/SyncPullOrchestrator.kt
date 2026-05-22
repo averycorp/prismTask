@@ -1262,10 +1262,10 @@ constructor(
                 automationRuleDao.update(SyncMapper.mapToAutomationRule(data, localId, cloudId))
             },
             // Same-template-imported-on-two-devices dedup: when a peer's
-            // import of template X arrives, adopt the existing local row
-            // whose template_key already matches instead of creating a
-            // second row. Skipped when templateKey is null (user-authored
-            // rules carry no template identity and must not collapse).
+            // template import arrives, adopt the existing local row whose
+            // template_key already matches instead of creating a second
+            // row. Skipped when templateKey is null (user-authored rules
+            // carry no template identity and must not collapse).
             naturalKeyLookup = { data ->
                 (data["templateKey"] as? String)?.let { key ->
                     automationRuleDao.getByTemplateKeyOnce(key)?.id
