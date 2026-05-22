@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 from datetime import date as date_cls, datetime, timezone
 from typing import Any
@@ -181,10 +182,11 @@ def _filter_writable(entity_type: str, data: dict) -> dict:
 
 
 async def _validate_foreign_keys(
-    entity_type: str, data: dict, user: User, db: AsyncSession
+    entity_type: str, data: dict, user: User, db: AsyncSession, valid_fks: dict[type, set[int]]
 ) -> str | None:
-    """Ensure any user-scoped FK in ``data`` points to a row owned by ``user``.
-
+    """Ensure any user-scoped FK in ``data`` points to a row owned by the user.
+    Uses a pre-fetched `valid_fks` cache for speed, but falls back to DB query
+    for intra-batch entity dependencies.
     Returns an error string on failure, None on success.
     """
     fks = USER_SCOPED_FKS.get(entity_type)
@@ -194,12 +196,21 @@ async def _validate_foreign_keys(
         value = data.get(column)
         if value is None:
             continue
+
+        if model in valid_fks and value in valid_fks[model]:
+            continue
+
+        # Fallback to query for items created within this batch
         query = select(model.id).where(model.id == value)
         if hasattr(model, "user_id"):
             query = query.where(model.user_id == user.id)
         result = await db.execute(query)
         if result.scalar_one_or_none() is None:
             return f"Invalid {column} on {entity_type}: {value} not found"
+
+        # Update cache for future lookups
+        valid_fks[model].add(value)
+
     return None
 
 
@@ -325,7 +336,7 @@ async def _emit_audit_events(db: AsyncSession, records: list[dict[str, Any]]) ->
 
 
 async def _process_operation(
-    op: SyncOperation, user: User, db: AsyncSession
+    op: SyncOperation, user: User, db: AsyncSession, valid_fks: dict[type, set[int]]
 ) -> str | None:
     model = ENTITY_MAP.get(op.entity_type)
     if not model:
@@ -335,7 +346,7 @@ async def _process_operation(
         if not op.data:
             return "Create operation requires data"
         data = _filter_writable(op.entity_type, dict(op.data))
-        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db)
+        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db, valid_fks)
         if fk_error:
             return fk_error
         cloud_fk_error = await _resolve_cloud_fk_for_medication(
@@ -376,7 +387,7 @@ async def _process_operation(
         if not entity:
             return f"{op.entity_type} {op.entity_id} not found"
         data = _filter_writable(op.entity_type, dict(op.data))
-        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db)
+        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db, valid_fks)
         if fk_error:
             return fk_error
         cloud_fk_error = await _resolve_cloud_fk_for_medication(
@@ -423,8 +434,29 @@ async def sync_push(
     processed = 0
     audit_records: list[dict[str, Any]] = []
 
+    # Bulk pre-fetch for user-scoped FKs
+    fks_to_validate = defaultdict(set)
     for op in data.operations:
-        error = await _process_operation(op, current_user, db)
+        fks = USER_SCOPED_FKS.get(op.entity_type)
+        if not fks or not op.data:
+            continue
+        for column, model in fks.items():
+            value = op.data.get(column)
+            if value is not None:
+                fks_to_validate[model].add(value)
+
+    valid_fks: dict[type, set[int]] = defaultdict(set)
+    for model, ids in fks_to_validate.items():
+        if not ids:
+            continue
+        query = select(model.id).where(model.id.in_(ids))
+        if hasattr(model, "user_id"):
+            query = query.where(model.user_id == current_user.id)
+        result = await db.execute(query)
+        valid_fks[model].update(result.scalars().all())
+
+    for op in data.operations:
+        error = await _process_operation(op, current_user, db, valid_fks)
         if error:
             errors.append(error)
             continue
