@@ -1,0 +1,198 @@
+steps:
+  # ==========================================
+  # VERSION BUMP & TAG (Runs on 'main' branch push)
+  # ==========================================
+  - id: 'version-bump-and-tag'
+    name: 'ghcr.io/cirruslabs/android-sdk:34'
+    entrypoint: 'bash'
+    secretEnv: ['GITHUB_TOKEN']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+
+        # If a tag triggered the build, skip the bump step.
+        if [ -n "${TAG_NAME:-}" ]; then
+          echo "Triggered by tag ($TAG_NAME). Skipping version bump."
+          exit 0
+        fi
+
+        # Check if the commit is already a bump commit to prevent infinite loops
+        COMMIT_MSG=$$(git log -1 --pretty=%B)
+        if echo "$$COMMIT_MSG" | grep -q "^chore: bump to v"; then
+          echo "This is already a bump commit. Skipping."
+          exit 0
+        fi
+
+        echo "Triggered by branch push to main. Bumping version..."
+        
+        # Configure Git
+        git config --global user.email "cloudbuild@averycorp.com"
+        git config --global user.name "Cloud Build"
+        
+        # Authenticate git push using GITHUB_TOKEN from Secret Manager
+        git remote set-url origin "https://x-access-token:$$GITHUB_TOKEN@github.com/akarlin3/prismTask.git"
+        
+        # Ensure we are on the tip of main
+        git fetch origin main
+        git checkout main
+        git reset --hard origin/main
+
+        # Extract and bump versionCode
+        CURRENT_CODE=$$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)
+        NEW_CODE=$$(( CURRENT_CODE + 1 ))
+        sed -i "s/versionCode = [0-9]*/versionCode = $$NEW_CODE/" app/build.gradle.kts
+
+        # Extract and bump versionName (patch only)
+        CURRENT_NAME=$$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
+        MAJOR=$$(echo "$$CURRENT_NAME" | cut -d. -f1)
+        MINOR=$$(echo "$$CURRENT_NAME" | cut -d. -f2)
+        PATCH=$$(echo "$$CURRENT_NAME" | cut -d. -f3)
+        NEW_PATCH=$$(( PATCH + 1 ))
+        NEW_NAME="$${MAJOR}.$${MINOR}.$${NEW_PATCH}"
+        sed -i "s/versionName = \"$${CURRENT_NAME}\"/versionName = \"$${NEW_NAME}\"/" app/build.gradle.kts
+
+        echo "Bumping to v$$NEW_NAME (build $$NEW_CODE)"
+
+        git add app/build.gradle.kts
+        git commit -m "chore: bump to v$$NEW_NAME (build $$NEW_CODE)"
+        
+        # Rebase and push commit (with retry)
+        for attempt in 1 2 3 4 5; do
+          if git push origin main; then
+            echo "Successfully pushed version bump."
+            break
+          fi
+          echo "Push rejected, attempt $$attempt. Rebasing..."
+          git fetch origin main
+          git rebase origin/main
+          sleep 2
+        done
+
+        # Create and push the new release tag
+        TAG="v$$NEW_NAME"
+        git tag -a "$$TAG" -m "PrismTask v$$NEW_NAME (build $$NEW_CODE)"
+        git push origin "$$TAG"
+
+  # ==========================================
+  # ANDROID RELEASE BUILD (Runs on tag push)
+  # ==========================================
+  - id: 'android-build'
+    name: 'ghcr.io/cirruslabs/android-sdk:34'
+    entrypoint: 'bash'
+    secretEnv: ['KEYSTORE_BASE64', 'KEYSTORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        if [ -z "${TAG_NAME:-}" ]; then
+          echo "Not triggered by a tag push. Skipping Android build."
+          exit 0
+        fi
+        
+        echo "Building Android release for tag $$TAG_NAME..."
+        
+        # Decode the keystore
+        if [ -z "$$KEYSTORE_BASE64" ]; then
+          echo "ERROR: KEYSTORE_BASE64 secret is missing. Cannot build release."
+          exit 1
+        fi
+        printf '%s' "$$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > app/release.keystore
+        
+        export KEYSTORE_PATH="release.keystore"
+        
+        # Build Release APK & AAB
+        ./gradlew assembleRelease bundleRelease --no-configuration-cache --parallel -x lint -x lintVitalRelease
+
+  # ==========================================
+  # WEB BUILD (Runs on tag push)
+  # ==========================================
+  - id: 'web-build'
+    name: 'node:20'
+    dir: 'web'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        if [ -z "${TAG_NAME:-}" ]; then
+          echo "Not triggered by a tag push. Skipping Web build."
+          exit 0
+        fi
+        
+        echo "Building Web Application..."
+        npm install
+        npm run build
+        # Expand logic here if deploying to Firebase Hosting or Vercel natively
+
+  # ==========================================
+  # BACKEND & GITHUB RELEASE UPLOAD (Runs on tag push)
+  # ==========================================
+  - id: 'github-and-backend-release'
+    name: 'ghcr.io/cirruslabs/android-sdk:34'
+    entrypoint: 'bash'
+    secretEnv: ['GITHUB_TOKEN', 'API_BASE_URL', 'DEPLOY_API_KEY']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        if [ -z "${TAG_NAME:-}" ]; then
+          echo "Not triggered by a tag push. Skipping Release creation."
+          exit 0
+        fi
+
+        VERSION_CODE=$$(grep 'versionCode\s*=' app/build.gradle.kts | grep -o '[0-9]*')
+        VERSION_NAME=$$(grep 'versionName' app/build.gradle.kts | head -1 | grep -oP '"\K[^"]+')
+        NOTES=$$(git log -5 --pretty=format:"- %s" | head -c 500)
+        
+        # Install GitHub CLI
+        echo "Installing GitHub CLI..."
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        apt-get update && apt-get install gh -y
+        
+        export GH_TOKEN="$$GITHUB_TOKEN"
+        
+        echo "Creating GitHub Release $$TAG_NAME..."
+        gh release create "$$TAG_NAME" \
+          app/build/outputs/bundle/release/app-release.aab \
+          app/build/outputs/apk/release/app-release.apk \
+          --title "PrismTask $$TAG_NAME" \
+          --notes "$$NOTES"
+
+        # Upload APK to Backend
+        APK_PATH=$$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+        if [ -n "$${API_BASE_URL:-}" ] && [ -n "$${DEPLOY_API_KEY:-}" ]; then
+          echo "Uploading APK to backend..."
+          curl -f -X POST "$${API_BASE_URL}/api/v1/app/releases" \
+            -H "Authorization: Bearer $${DEPLOY_API_KEY}" \
+            -F "version_code=$${VERSION_CODE}" \
+            -F "version_name=$${VERSION_NAME}" \
+            -F "release_notes=$${NOTES}" \
+            -F "apk=@$${APK_PATH}" || echo "Backend upload failed, continuing..."
+        else
+          echo "Warning: Missing API_BASE_URL or DEPLOY_API_KEY. Skipping backend upload."
+        fi
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/GITHUB_TOKEN/versions/latest
+    env: 'GITHUB_TOKEN'
+  - versionName: projects/$PROJECT_ID/secrets/KEYSTORE_BASE64/versions/latest
+    env: 'KEYSTORE_BASE64'
+  - versionName: projects/$PROJECT_ID/secrets/KEYSTORE_PASSWORD/versions/latest
+    env: 'KEYSTORE_PASSWORD'
+  - versionName: projects/$PROJECT_ID/secrets/KEY_ALIAS/versions/latest
+    env: 'KEY_ALIAS'
+  - versionName: projects/$PROJECT_ID/secrets/KEY_PASSWORD/versions/latest
+    env: 'KEY_PASSWORD'
+  - versionName: projects/$PROJECT_ID/secrets/API_BASE_URL/versions/latest
+    env: 'API_BASE_URL'
+  - versionName: projects/$PROJECT_ID/secrets/DEPLOY_API_KEY/versions/latest
+    env: 'DEPLOY_API_KEY'
+
+timeout: '3600s'
+options:
+  machineType: 'E2_HIGHCPU_32'
+  logging: 'CLOUD_LOGGING_ONLY'

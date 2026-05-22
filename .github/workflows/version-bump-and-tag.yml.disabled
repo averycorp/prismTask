@@ -1,0 +1,424 @@
+name: Version Bump & Tag
+
+# Post-merge job that bumps versionCode + versionName on main and
+# pushes a `vX.Y.Z` tag so release.yml fires the canonical signed
+# APK + AAB build and creates the GitHub Release.
+#
+# History: this workflow used to also build a signed APK and upload
+# it to Firebase App Distribution. Firebase distribution was retired
+# in favor of GitHub Releases (release.yml) — so the signing /
+# Gradle / Firebase steps were removed. Per-merge contract is now:
+# bump → commit → tag → release.yml builds + publishes the Release.
+#
+# Trigger choice: workflow_run on auto-merge.yml's completion. This
+# is the documented exception to the GITHUB_TOKEN-recursion rule —
+# workflow_run events DO fire even when the source workflow used
+# GITHUB_TOKEN internally, as long as the source workflow itself
+# was triggered by a non-bot event (auto-merge.yml is — pull_request
+# from a real user). A `push` trigger on main would NOT fire because
+# the squash merge push is performed via GITHUB_TOKEN.
+#
+# Caveat: workflow_run fires when auto-merge.yml COMPLETES, not when
+# the actual merge happens. gh pr merge --auto queues the merge to
+# run when required checks pass, so this workflow still polls for
+# the PR to flip to MERGED before bumping.
+#
+# Caveat: this file must exist on the default branch (main) for the
+# workflow_run trigger to fire. The PR that adds it can NOT use the
+# new path for itself — its own version bump runs the inline job
+# from the prior auto-merge.yml shape. First post-merge cycle is
+# unaffected.
+#
+# IMPORTANT: do NOT add a `branches:` filter here. For workflow_run,
+# the `branches:` filter matches the SOURCE workflow's HEAD branch.
+# Auto-merge & Release runs on `pull_request` events, so its HEAD
+# branch is always the PR's feature branch — never `main`. PR #771
+# originally shipped with `branches: [main]` here and the workflow
+# never fired once until PR #794 removed the filter, silently
+# breaking the post-merge bump path for every merge in between.
+
+on:
+  workflow_run:
+    workflows: ["Auto-merge & Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to retag (leave empty to walk most-recent merged PR)'
+        required: false
+        default: ''
+
+# Serialize all post-merge bump work against main so concurrent
+# PRs produce sequential versionCode bumps without racing each other.
+concurrency:
+  group: version-bump-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+  # actions: write needed for the "Dispatch release.yml on the new tag"
+  # step to call /repos/{owner}/{repo}/actions/workflows/{id}/dispatches.
+  # workflow_dispatch is one of the two documented exceptions to GitHub's
+  # GITHUB_TOKEN anti-recursion rule, so the dispatched run will fire.
+  actions: write
+
+jobs:
+  version-bump-and-tag:
+    name: Version Bump & Tag
+    # Cross-workflow lock so the tag-push critical section is owned by
+    # exactly one path at a time — android-ci.yml's `tag-and-release`
+    # shares this group. The pre-existing per-job `git ls-remote --tags`
+    # idempotency guards still close the loop on any race that slips
+    # through (e.g. a hand-pushed annotated tag), but this group makes
+    # the common case observably serialized rather than relying purely
+    # on the can't-clobber check. See CI_AUDIT_2026-04-30 F7.
+    concurrency:
+      group: tag-push-main
+      cancel-in-progress: false
+    # Skip when the source auto-merge run failed or was cancelled —
+    # nothing to bump. workflow_dispatch always runs.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          # workflow_run.pull_requests is populated for same-repo PRs ONLY
+          # when the source workflow's HEAD branch lives in the default
+          # branch's repo AND GitHub's branch index for that ref still
+          # points at the PR. In practice it lands EMPTY surprisingly
+          # often even for vanilla same-repo PRs (observed across
+          # PRs #798, #800-#802) — most likely because the auto-merge
+          # workflow uses a generated GITHUB_TOKEN whose branch context
+          # GitHub doesn't link back to the PR. We try this field first
+          # so the fast path stays free, but always fall back to a
+          # `commits/{sha}/pulls` lookup keyed on the workflow_run
+          # `head_sha` so we never silently drop a bump on the floor.
+          PR_JSON: ${{ toJson(github.event.workflow_run.pull_requests) }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          DISPATCH_PR: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            # Manual dispatch path — use the input if provided, otherwise
+            # walk the latest merged PR on main and target that.
+            if [ -n "$DISPATCH_PR" ]; then
+              echo "pr_number=$DISPATCH_PR" >> "$GITHUB_OUTPUT"
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              echo "Using PR #$DISPATCH_PR from dispatch input."
+              exit 0
+            fi
+            PR_NUMBER=$(gh pr list --repo "$REPO" --state merged --base main \
+              --limit 1 --json number -q '.[0].number // empty')
+            if [ -z "$PR_NUMBER" ]; then
+              echo "::warning::No merged PRs found on main. Cannot resolve PR; skipping."
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Resolved most-recent merged PR #$PR_NUMBER for dispatch run."
+            exit 0
+          fi
+
+          # Path 1 — fast path: pull_requests was populated.
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number // empty')
+          if [ -n "$PR_NUMBER" ]; then
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Resolved PR #$PR_NUMBER from workflow_run payload."
+            exit 0
+          fi
+
+          # Path 2 — fallback: look the PR up by HEAD SHA. Works in both
+          # the pre-merge case (auto-merge.yml fires before the squash
+          # actually happens; the open PR still has this commit at its
+          # head) and the post-merge case (GitHub keeps the commit→PR
+          # mapping after squash, so we still resolve correctly even if
+          # the source branch was deleted). The downstream "Wait for PR
+          # to merge" step handles the timing — we only need the PR
+          # number here, not its merge state.
+          #
+          # Deliberately NOT falling back to "most recent merged PR" —
+          # that race-condition-bumps a previously-merged PR if
+          # workflow_run fires before the queued merge lands.
+          if [ -z "$HEAD_SHA" ]; then
+            echo "::warning::workflow_run.head_sha is empty; cannot resolve PR. Skipping."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Capture the API response separately instead of piping through
+          # `gh api --jq` directly. Under `set -euo pipefail`, an empty or
+          # non-JSON response body crashes the embedded jq with
+          # `unexpected end of JSON input` and aborts the whole script
+          # before the empty-result branch below can fire — observed on
+          # PR #857's post-merge run, which silently dropped the version
+          # bump on the floor. The retry loop covers the indexing-lag
+          # window where `commits/{sha}/pulls` returns `[]` for a few
+          # seconds after the squash-merge push lands.
+          PR_NUMBER=""
+          for attempt in 1 2 3; do
+            RESPONSE=$(gh api \
+              "repos/$REPO/commits/$HEAD_SHA/pulls" \
+              -H "Accept: application/vnd.github+json" 2>/dev/null || echo "[]")
+            PR_NUMBER=$(printf '%s' "$RESPONSE" | jq -r '
+              if type == "array" and length > 0 then
+                (sort_by(.number) | reverse | .[0].number // empty)
+              else empty end
+            ' 2>/dev/null || echo "")
+            [ -n "$PR_NUMBER" ] && break
+            echo "commits/$HEAD_SHA/pulls returned no PR (attempt $attempt/3); sleeping 5s..."
+            sleep 5
+          done
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::No PR found for commit $HEAD_SHA via commits/{sha}/pulls after 3 attempts. Skipping."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "Resolved PR #$PR_NUMBER from commits/$HEAD_SHA/pulls fallback."
+
+      - name: Wait for PR to merge
+        id: wait
+        if: steps.pr.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # gh pr merge --auto may queue the merge until required checks
+          # pass. Poll until MERGED, CLOSED, or timeout.
+          #
+          # Audit PR #876 → CI pathway efficiency: ceiling raised
+          # 60→120 attempts × 10s = 20 min. Real Android PRs (PR #851
+          # took 37 min from open to merge; PR #859 took 14 min) can
+          # exceed the prior 10-min ceiling because auto-merge.yml
+          # queues on slow lane completion. A silently-dropped bump
+          # (memory `feedback_skip_ci_blocks_tag_release.md`) requires a
+          # manual `gh workflow run release.yml --ref vX.Y.Z` re-fire,
+          # which is a real recovery cost. 20 min covers all observed
+          # PR lifecycles in the audit window without expanding
+          # workflow_run resource cost meaningfully (idle polling).
+          for i in $(seq 1 120); do
+            STATE=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state -q '.state')
+            case "$STATE" in
+              MERGED)
+                MERGE_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json mergeCommit -q '.mergeCommit.oid')
+                echo "merged=true" >> "$GITHUB_OUTPUT"
+                echo "merge_sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+                echo "PR merged at $MERGE_SHA"
+                exit 0
+                ;;
+              CLOSED)
+                echo "merged=false" >> "$GITHUB_OUTPUT"
+                echo "PR closed without merging — skipping bump."
+                exit 0
+                ;;
+              *)
+                echo "PR state=$STATE (attempt $i/120); sleeping 10s..."
+                sleep 10
+                ;;
+            esac
+          done
+          echo "merged=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::PR did not reach MERGED within 20 minutes — skipping bump."
+
+      - name: Checkout main at merge commit
+        if: steps.wait.outputs.merged == 'true'
+        uses: actions/checkout@v6
+        with:
+          # Token choice — same rationale as auto-merge.yml's
+          # "Update branch if behind main" step. The bump push later in
+          # this job targets `main`, which is branch-protected and rejects
+          # any push that lacks the 4 required status checks. GITHUB_TOKEN
+          # has no bypass-protection capability, so the bot's bump push is
+          # rejected with `protected branch hook declined`. AUTOFIX_PAT
+          # belongs to a repo admin (per the same secret already in use
+          # by `gh pr update-branch`) and bypasses required-checks for
+          # direct pushes when "Include administrators" is unchecked in
+          # branch protection. Falls back to GITHUB_TOKEN if the secret
+          # isn't seeded — the push will then fail loud at the
+          # "Commit version bump" step rather than silently dropping.
+          #
+          # The token configured here propagates to every subsequent
+          # `git` invocation in this job (because actions/checkout sets
+          # the credential helper in the local repo config), so the
+          # later `git push origin HEAD:main` picks it up automatically.
+          token: ${{ secrets.AUTOFIX_PAT || secrets.GITHUB_TOKEN }}
+          ref: ${{ steps.wait.outputs.merge_sha }}
+          fetch-depth: 0
+
+      # Patch bump only. release.yml owns release (minor/major) versionCode.
+      - name: Bump versionCode and versionName
+        if: steps.wait.outputs.merged == 'true'
+        id: version
+        run: |
+          set -euo pipefail
+          # Switch off the detached merge-sha checkout onto a local branch
+          # tracking main so the later `git push HEAD:main` has somewhere
+          # to go. Fetch the latest main first so we bump from the tip the
+          # push will target — otherwise a concurrent PR's bump from a
+          # queued run ahead of us would get overwritten.
+          git fetch origin main
+          git checkout -B main origin/main
+
+          CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)
+          NEW_CODE=$(( CURRENT_CODE + 1 ))
+          sed -i "s/versionCode = [0-9]*/versionCode = $NEW_CODE/" app/build.gradle.kts
+
+          CURRENT_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
+          MAJOR=$(echo "$CURRENT_NAME" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_NAME" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_NAME" | cut -d. -f3)
+          NEW_PATCH=$(( PATCH + 1 ))
+          NEW_NAME="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          sed -i "s/versionName = \"${CURRENT_NAME}\"/versionName = \"${NEW_NAME}\"/" app/build.gradle.kts
+
+          echo "version_name=$NEW_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$NEW_CODE" >> "$GITHUB_OUTPUT"
+          echo "Bumping to v$NEW_NAME (build $NEW_CODE)"
+
+      - name: Commit version bump
+        if: steps.wait.outputs.merged == 'true'
+        run: |
+          set -euo pipefail
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add app/build.gradle.kts
+          if git diff --cached --quiet; then
+            echo "No version bump to commit"
+            exit 0
+          fi
+          git commit -m "chore: bump to v${{ steps.version.outputs.version_name }} (build ${{ steps.version.outputs.version_code }}) [skip ci]"
+          # Another PR merge can push to main while this job is running,
+          # so a straight `git push` here races and silently loses the
+          # bump commit. Rebase onto the current main tip and retry on rejection.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              echo "Pushed version bump on attempt $attempt"
+              exit 0
+            fi
+            echo "Push rejected on attempt $attempt; rebasing onto origin/main and retrying"
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "::error::Rebase conflict while replaying version bump; aborting."
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "::error::Failed to push version bump after 5 attempts."
+          exit 1
+
+      - name: Push patch tag to fire release.yml
+        # P0 sync audit follow-up to PR #850. Pushes an annotated tag
+        # matching the new versionName so release.yml fires on every PR
+        # merge instead of only on hand-crafted minor/major tags.
+        # release.yml owns the canonical signed APK + AAB build,
+        # GitHub Release creation, and backend upload.
+        #
+        # Tag is created from the post-bump origin/main tip we just
+        # pushed (or whatever main is at if our bump was a no-op).
+        # Skipped if no version_name output (bump didn't land).
+        if: steps.wait.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_NAME: ${{ steps.version.outputs.version_name }}
+          NEW_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEW_NAME:-}" ]; then
+            echo "No version_name output — bump didn't land. Skipping tag push."
+            exit 0
+          fi
+          TAG="v${NEW_NAME}"
+          # Idempotency guard: another concurrent run may have raced us
+          # to push the same tag. Refusing to clobber a pre-existing tag
+          # keeps the release.yml run that fired on the first push as
+          # the canonical artifact source.
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "Tag ${TAG} already exists on origin; another run pushed first. Skipping."
+            exit 0
+          fi
+          # Re-sync to the post-bump main tip so the tag points at the
+          # version-bump commit we just pushed.
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+          git tag -a "${TAG}" -m "PrismTask v${NEW_NAME} (build ${NEW_CODE})"
+          # The tag push *event* would normally fire release.yml via its
+          # `push: tags:` trigger, but that's blocked here: the bump
+          # commit carries `[skip ci]` (to prevent loops on the bump
+          # push to main), and a tag pointing at a `[skip ci]` commit
+          # suppresses the push-tag workflow run. We dispatch
+          # release.yml explicitly in the next step instead — that path
+          # bypasses the suppression cleanly. If the tag push itself
+          # races and loses, the existence check above on the next run
+          # picks it up.
+          for attempt in 1 2 3; do
+            if git push origin "${TAG}"; then
+              echo "Pushed ${TAG} on attempt ${attempt}"
+              exit 0
+            fi
+            echo "Tag push rejected on attempt ${attempt}; retrying"
+            sleep $((attempt * 2))
+          done
+          echo "::error::Failed to push tag ${TAG} after 3 attempts."
+          exit 1
+
+      - name: Dispatch release.yml on the new tag
+        # The `[skip ci]` token in the bump commit message suppresses
+        # workflows that would otherwise fire on the tag push. A
+        # workflow_dispatch call is NOT subject to `[skip ci]`, so we
+        # always end up with a per-merge GitHub Release as long as the
+        # tag push above succeeded. If the tag already existed (raced),
+        # the previous run dispatched release.yml — skip to stay
+        # idempotent and avoid double-publishing the same vX.Y.Z.
+        #
+        # Use GITHUB_TOKEN (not AUTOFIX_PAT) here. The first cut of this
+        # step preferred AUTOFIX_PAT for symmetry with the tag-push step
+        # above, but the PAT lacks `actions: write` scope and the
+        # dispatch fired with HTTP 403 "Resource not accessible by
+        # personal access token" on the v1.7.52 cycle. The job's
+        # workflow-level `permissions: actions: write` grants the right
+        # scope to GITHUB_TOKEN, which CAN trigger workflow_dispatch
+        # (one of the two documented exceptions to the GITHUB_TOKEN
+        # anti-recursion rule — alongside repository_dispatch).
+        if: steps.wait.outputs.merged == 'true' && steps.version.outputs.version_name != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NEW_NAME: ${{ steps.version.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          TAG="v${NEW_NAME}"
+          # Confirm no release.yml run already exists on this tag — a
+          # concurrent run that won the tag-push race may have already
+          # dispatched. release.yml is idempotent on its own GitHub
+          # Release creation step, but skipping the redundant dispatch
+          # keeps Actions history readable.
+          EXISTING=$(gh run list --repo "$REPO" --workflow=release.yml \
+            --limit 20 --json headBranch,databaseId \
+            -q ".[] | select(.headBranch == \"${TAG}\") | .databaseId" | head -1 || true)
+          if [ -n "$EXISTING" ]; then
+            echo "release.yml run ${EXISTING} already exists for ${TAG}; skipping dispatch."
+            exit 0
+          fi
+          gh workflow run release.yml --repo "$REPO" --ref "${TAG}"
+          echo "Dispatched release.yml on ${TAG}"
+
+  capture-failure-log:
+    needs: [version-bump-and-tag]
+    if: ${{ failure() }}
+    uses: ./.github/workflows/capture-failure.yml
+    with:
+      workflow-slug: version-bump-and-tag
