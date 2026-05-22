@@ -8,7 +8,7 @@ describe('burnoutScorer', () => {
     const inputs: BurnoutInputs = {
       breaches: [],
       recent_mood_logs: [
-        { id: '1', mood: 5, energy: 5, timestamp: '2023-01-01T00:00:00Z', user_id: 'user', date: '2023-01-01', notes: '' },
+        { id: '1', mood: 5, energy: 5, date_iso: '2023-01-01', notes: '', time_of_day: 'morning', created_at: 0, updated_at: 0 },
       ] as MoodEnergyLog[],
       active_tasks_today: 0,
       task_soft_cap: 10,

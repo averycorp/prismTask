@@ -10,6 +10,8 @@ import { OnboardingGate } from './OnboardingGate';
 import { RestorePendingGate } from './RestorePendingGate';
 import { TaskListSkeleton, ProjectListSkeleton, HabitListSkeleton, SettingsSkeleton } from '@/components/shared/SkeletonLoader';
 
+/* eslint-disable react-refresh/only-export-components */
+
 // Auth screens (eagerly loaded — first screens users see)
 const LoginScreen = lazy(() => import('@/features/auth/LoginScreen').then(m => ({ default: m.LoginScreen })));
 const RegisterScreen = lazy(() => import('@/features/auth/RegisterScreen').then(m => ({ default: m.RegisterScreen })));
@@ -20,7 +22,6 @@ const TaskListScreen = lazy(() => import('@/features/tasks/TaskListScreen').then
 const ProjectListScreen = lazy(() => import('@/features/projects/ProjectListScreen').then(m => ({ default: m.ProjectListScreen })));
 
 // Lazy-loaded screens (loaded on demand)
-/* eslint-disable react-refresh/only-export-components */
 const TaskDetailScreen = lazy(() => import('@/features/tasks/TaskDetailScreen').then(m => ({ default: m.TaskDetailScreen })));
 const ProjectDetailScreen = lazy(() => import('@/features/projects/ProjectDetailScreen').then(m => ({ default: m.ProjectDetailScreen })));
 const ProjectRoadmapScreen = lazy(() => import('@/features/projects/ProjectRoadmapScreen').then(m => ({ default: m.ProjectRoadmapScreen })));

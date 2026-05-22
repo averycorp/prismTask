@@ -1,16 +1,15 @@
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AiActionChip } from '../AiActionChip';
 import type { ChatActionPayload } from '@/types/chat';
 
 vi.mock('@/features/chat/chatActions', () => ({
-  actionLabel: vi.fn((a: any) => `Mock Label for ${a.type}`),
-  actionSignature: vi.fn((a: any) => a.sig),
+  actionLabel: vi.fn((a: { type: string }) => `Mock Label for ${a.type}`),
+  actionSignature: vi.fn((a: { sig: string }) => a.sig),
 }));
 
 describe('AiActionChip', () => {
-  const mockAction: ChatActionPayload = { type: 'mark_complete', taskId: '123', sig: 'sig123' } as any;
+  const mockAction = { type: 'mark_complete', taskId: '123', sig: 'sig123' } as unknown as ChatActionPayload;
 
   it('renders correctly', () => {
     const disabledSignatures = new Set<string>();

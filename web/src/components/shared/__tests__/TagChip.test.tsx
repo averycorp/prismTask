@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { TagChip } from '../TagChip';
@@ -7,10 +6,12 @@ import type { Tag } from '@/types/tag';
 describe('TagChip', () => {
   const mockTag: Tag = {
     id: 'tag-1',
+    user_id: 'user-1',
     name: 'Work',
     color: '#ff0000',
-    created_at: '',
-    updated_at: ''
+    sort_order: 0,
+    archived: false,
+    created_at: ''
   };
 
   it('renders tag name and color indicator', () => {

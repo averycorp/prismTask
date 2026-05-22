@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DueDateLabel } from '../DueDateLabel';
@@ -32,9 +31,9 @@ describe('DueDateLabel', () => {
   });
 
   it('renders correctly for a normal future date', () => {
-    (isOverdue as any).mockReturnValue(false);
-    (isToday as any).mockReturnValue(false);
-    (isTomorrow as any).mockReturnValue(false);
+    (isOverdue as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isToday as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isTomorrow as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     render(<DueDateLabel date="2023-12-25" />);
 
@@ -44,9 +43,9 @@ describe('DueDateLabel', () => {
   });
 
   it('applies overdue styling', () => {
-    (isOverdue as any).mockReturnValue(true);
-    (isToday as any).mockReturnValue(false);
-    (isTomorrow as any).mockReturnValue(false);
+    (isOverdue as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (isToday as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isTomorrow as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     render(<DueDateLabel date="2023-10-01" />);
 
@@ -55,9 +54,9 @@ describe('DueDateLabel', () => {
   });
 
   it('applies today styling', () => {
-    (isOverdue as any).mockReturnValue(false);
-    (isToday as any).mockReturnValue(true);
-    (isTomorrow as any).mockReturnValue(false);
+    (isOverdue as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isToday as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (isTomorrow as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     render(<DueDateLabel date="2023-10-15" />);
 
@@ -66,9 +65,9 @@ describe('DueDateLabel', () => {
   });
 
   it('applies tomorrow styling', () => {
-    (isOverdue as any).mockReturnValue(false);
-    (isToday as any).mockReturnValue(false);
-    (isTomorrow as any).mockReturnValue(true);
+    (isOverdue as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isToday as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isTomorrow as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
     render(<DueDateLabel date="2023-10-16" />);
 
@@ -77,9 +76,9 @@ describe('DueDateLabel', () => {
   });
 
   it('hides icon when showIcon is false', () => {
-    (isOverdue as any).mockReturnValue(false);
-    (isToday as any).mockReturnValue(false);
-    (isTomorrow as any).mockReturnValue(false);
+    (isOverdue as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isToday as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isTomorrow as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     const { container } = render(<DueDateLabel date="2023-12-25" showIcon={false} />);
 
@@ -87,9 +86,9 @@ describe('DueDateLabel', () => {
   });
 
   it('applies custom className', () => {
-    (isOverdue as any).mockReturnValue(false);
-    (isToday as any).mockReturnValue(false);
-    (isTomorrow as any).mockReturnValue(false);
+    (isOverdue as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isToday as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isTomorrow as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     render(<DueDateLabel date="2023-12-25" className="custom-due-date" />);
 

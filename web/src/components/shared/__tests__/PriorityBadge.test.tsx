@@ -1,8 +1,6 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PriorityBadge } from '../PriorityBadge';
-import { PRIORITY_CONFIG } from '@/utils/priority';
 
 // Mock PRIORITY_CONFIG to ensure tests are stable and isolated
 vi.mock('@/utils/priority', () => ({
@@ -16,7 +14,7 @@ vi.mock('@/utils/priority', () => ({
 
 describe('PriorityBadge', () => {
   it('renders nothing for invalid priority', () => {
-    const { container } = render(<PriorityBadge priority={5 as any} />);
+    const { container } = render(<PriorityBadge priority={5 as unknown as 1} />);
     expect(container.firstChild).toBeNull();
   });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { validateImportFile, parseImportFile, importData } from '../import';
 import { exportApi } from '@/api/export';
 
@@ -146,11 +146,17 @@ describe('import utils', () => {
   });
 
   describe('parseImportFile', () => {
-    let originalFileReader: any;
-    let mockReaderInstance: any;
+    type ReaderEventArg = { target?: { result?: string } };
+    type MockReader = {
+      readAsText: ReturnType<typeof vi.fn>;
+      onload: ((ev?: ReaderEventArg) => void) | null;
+      onerror: ((ev?: ReaderEventArg) => void) | null;
+    };
+    let originalFileReader: typeof FileReader;
+    let mockReaderInstance: MockReader;
 
     beforeEach(() => {
-      originalFileReader = global.FileReader;
+      originalFileReader = globalThis.FileReader;
 
       mockReaderInstance = {
         readAsText: vi.fn(),
@@ -159,19 +165,19 @@ describe('import utils', () => {
       };
 
       class MockFileReader {
-        onload: any = null;
-        onerror: any = null;
-        readAsText = vi.fn().mockImplementation(() => {
+        onload: MockReader['onload'] = null;
+        onerror: MockReader['onerror'] = null;
+        readAsText = vi.fn().mockImplementation(function (this: MockFileReader) {
           mockReaderInstance.onload = this.onload;
           mockReaderInstance.onerror = this.onerror;
         });
       }
 
-      global.FileReader = MockFileReader as any;
+      globalThis.FileReader = MockFileReader as unknown as typeof FileReader;
     });
 
     afterEach(() => {
-      global.FileReader = originalFileReader;
+      globalThis.FileReader = originalFileReader;
     });
 
     it('resolves with parsed data and preview on success', async () => {
@@ -180,7 +186,7 @@ describe('import utils', () => {
 
       // Simulate file load
       const validJson = JSON.stringify({ version: 1, tasks: [{ title: 'Test' }] });
-      mockReaderInstance.onload({ target: { result: validJson } });
+      mockReaderInstance.onload?.({ target: { result: validJson } });
 
       const result = await promise;
       expect(result.data).toEqual({ version: 1, tasks: [{ title: 'Test' }] });
@@ -192,7 +198,7 @@ describe('import utils', () => {
       const mockFile = new File([''], 'test.json');
       const promise = parseImportFile(mockFile);
 
-      mockReaderInstance.onload({ target: { result: 'invalid json' } });
+      mockReaderInstance.onload?.({ target: { result: 'invalid json' } });
 
       await expect(promise).rejects.toThrow('Failed to parse JSON file.');
     });
@@ -201,7 +207,7 @@ describe('import utils', () => {
       const mockFile = new File([''], 'test.json');
       const promise = parseImportFile(mockFile);
 
-      mockReaderInstance.onload({ target: { result: JSON.stringify({ random: 'data' }) } });
+      mockReaderInstance.onload?.({ target: { result: JSON.stringify({ random: 'data' }) } });
 
       await expect(promise).rejects.toThrow('Invalid import file format. Missing "version" field.');
     });
@@ -210,7 +216,7 @@ describe('import utils', () => {
       const mockFile = new File([''], 'test.json');
       const promise = parseImportFile(mockFile);
 
-      mockReaderInstance.onerror();
+      mockReaderInstance.onerror?.();
 
       await expect(promise).rejects.toThrow('Failed to read file.');
     });
