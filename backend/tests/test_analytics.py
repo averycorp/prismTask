@@ -2,6 +2,7 @@ import sys
 import types
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
+from app.services.analytics import determine_trend
 
 import pytest
 from httpx import AsyncClient
@@ -390,7 +391,6 @@ class TestSummary:
         assert "completion_rate_7d" in data["habits"]
         assert "completion_rate_30d" in data["habits"]
 
-from app.services.analytics import determine_trend
 
 def test_determine_trend():
     # Empty list
