@@ -54,10 +54,15 @@ class BatchPreviewSmokeTest {
         val ndPrefs = mockk<NdPreferencesDataStore>().also {
             every { it.ndPreferencesFlow } returns flowOf(NdPreferences())
         }
+        val customBrainPrefs = mockk<com.averycorp.prismtask.data.preferences.CustomBrainModePreferences>().also {
+            every { it.observeActive() } returns flowOf(null)
+            every { it.observe() } returns flowOf(emptyList())
+        }
         return BatchPreviewViewModel(
             repository = repository,
             undoBus = BatchUndoEventBus(),
-            ndPreferencesDataStore = ndPrefs
+            ndPreferencesDataStore = ndPrefs,
+            customBrainModePreferences = customBrainPrefs
         )
     }
 
