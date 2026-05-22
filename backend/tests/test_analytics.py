@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
+from app.services.analytics import determine_trend
+
 
 # --- Helper to set up test data ---
 
@@ -75,6 +77,32 @@ async def _complete_habit(client: AsyncClient, headers: dict, habit_id: int, dat
 
 
 # --- Tests ---
+
+
+def test_determine_trend():
+    """Test determine_trend function."""
+    # List length < 2
+    assert determine_trend([]) == "stable"
+    assert determine_trend([{"score": 10}]) == "stable"
+
+    # Improving trend (second half > first half by > 3)
+    # first half: 10, second half: 14. Diff is 4 (>3).
+    assert determine_trend([{"score": 10}, {"score": 14}]) == "improving"
+    # first half: 10, 10 (avg 10), second half: 14, 14 (avg 14). Diff is 4.
+    assert determine_trend([{"score": 10}, {"score": 10}, {"score": 14}, {"score": 14}]) == "improving"
+
+    # Declining trend (second half < first half by < -3)
+    # first half: 14, second half: 10. Diff is -4 (<-3).
+    assert determine_trend([{"score": 14}, {"score": 10}]) == "declining"
+    assert determine_trend([{"score": 14}, {"score": 14}, {"score": 10}, {"score": 10}]) == "declining"
+
+    # Stable trend (diff between -3 and 3)
+    # first half: 10, second half: 12. Diff is 2.
+    assert determine_trend([{"score": 10}, {"score": 12}]) == "stable"
+    # first half: 10, second half: 7. Diff is -3.
+    assert determine_trend([{"score": 10}, {"score": 7}]) == "stable"
+    # first half: 10, second half: 13. Diff is 3.
+    assert determine_trend([{"score": 10}, {"score": 13}]) == "stable"
 
 
 class TestProductivityScore:
