@@ -80,14 +80,12 @@ class EisenhowerViewModelTest {
     @Test
     fun categorize_proTierCallsApiAndUpdatesTaskQuadrants() = runTest(dispatcher) {
         every { proFeatureGate.hasAccess(ProFeatureGate.AI_EISENHOWER) } returns true
+        coEvery { taskRepository.getIdByCloudId("abc-firestore-id") } returns 1L
+        coEvery { taskRepository.getIdByCloudId("def-firestore-id") } returns 2L
         coEvery { api.categorizeEisenhower(any()) } returns EisenhowerResponse(
             categorizations = listOf(
-                // Numeric string task IDs so the toLongOrNull() path still
-                // writes to the DAO. See the TODO(weekly-followup) in the
-                // ViewModel — alphanumeric Firestore IDs are skipped for
-                // now with a warning.
-                EisenhowerCategorization(taskId = "1", quadrant = "Q1", reason = "Due today"),
-                EisenhowerCategorization(taskId = "2", quadrant = "Q2", reason = "Important")
+                EisenhowerCategorization(taskId = "abc-firestore-id", quadrant = "Q1", reason = "Due today"),
+                EisenhowerCategorization(taskId = "def-firestore-id", quadrant = "Q2", reason = "Important")
             ),
             summary = EisenhowerSummary()
         )

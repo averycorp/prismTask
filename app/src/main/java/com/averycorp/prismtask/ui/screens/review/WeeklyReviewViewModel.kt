@@ -218,11 +218,7 @@ constructor(
             null
         }
         return WeeklyTaskSummary(
-            // TODO(weekly-followup): TaskEntity PK is Long; backend expects
-            // Firestore doc IDs (strings). We stringify the Long here so
-            // the request round-trips until the Long -> String migration
-            // lands on TaskEntity.
-            taskId = id.toString(),
+            taskId = cloudId ?: id.toString(),
             title = title,
             completedAt = completedAtIso,
             priority = priority,
