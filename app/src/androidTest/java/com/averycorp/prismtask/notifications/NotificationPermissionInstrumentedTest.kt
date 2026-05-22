@@ -1,18 +1,18 @@
 package com.averycorp.prismtask.notifications
 
-import android.app.NotificationChannel
 import android.app.Instrumentation
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.FileInputStream
 import org.junit.Assert.assertNotNull
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.FileInputStream
 
 /**
  * Validates that the post-notification code paths do not crash when the
