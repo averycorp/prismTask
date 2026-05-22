@@ -18,6 +18,8 @@ import logging
 import os
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
+
 try:
     from cryptography.fernet import Fernet, InvalidToken
 except ImportError:  # pragma: no cover
@@ -67,13 +69,32 @@ def encrypt_json(data: dict[str, Any]) -> str:
     return token.decode("utf-8")
 
 
+class IntegrationToken(BaseModel):
+    """Schema for securely validating decrypted JSON payloads."""
+
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_uri: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    scopes: list[str] | None = None
+    expiry: str | None = None
+
+    model_config = {"extra": "ignore"}
+
+
 def decrypt_json(encoded: str) -> dict[str, Any]:
     """Reverse of [encrypt_json]. Raises `ValueError` if the payload is
-    tampered with or the key has rotated."""
+    tampered with, the key has rotated, or the payload shape is invalid."""
     if not encoded:
         return {}
     try:
         plain = _fernet().decrypt(encoded.encode("utf-8"))
     except InvalidToken as e:  # pragma: no cover
         raise ValueError("integration config token is invalid or expired") from e
-    return json.loads(plain.decode("utf-8"))
+
+    parsed = json.loads(plain.decode("utf-8"))
+    try:
+        return IntegrationToken.model_validate(parsed).model_dump(exclude_unset=True)
+    except ValidationError as e:
+        raise ValueError("integration config payload fails schema validation") from e
