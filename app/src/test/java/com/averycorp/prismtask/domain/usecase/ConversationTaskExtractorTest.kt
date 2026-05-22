@@ -82,8 +82,16 @@ class ConversationTaskExtractorTest {
     }
 
     @Test
-    fun `very short title is rejected`() {
-        assertTrue(extractor.extract("${TODO_PREFIX}x").isEmpty())
+    fun `very short title is accepted`() {
+        // Threshold is empty-only: 1-2 character TODOs are valid (e.g. "QA", "PR").
+        val result = extractor.extract("${TODO_PREFIX}x")
+        assertEquals(1, result.size)
+        assertEquals("X", result.first().title)
+    }
+
+    @Test
+    fun `empty TODO body is rejected`() {
+        assertTrue(extractor.extract("${TODO_PREFIX}").isEmpty())
     }
 
     @Test
