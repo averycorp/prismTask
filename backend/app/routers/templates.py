@@ -283,18 +283,18 @@ async def use_template(
         except (ValueError, TypeError):
             tag_ids = []
         if isinstance(tag_ids, list):
-            for tag_id in tag_ids:
-                if not isinstance(tag_id, int):
-                    continue
-                # Verify the tag belongs to the user before associating
+            valid_tag_ids = [tid for tid in tag_ids if isinstance(tid, int)]
+            if valid_tag_ids:
+                # Verify all tags belong to the user in a single query
                 tag_result = await db.execute(
-                    select(Tag).where(
-                        Tag.id == tag_id, Tag.user_id == current_user.id
+                    select(Tag.id).where(
+                        Tag.id.in_(valid_tag_ids), Tag.user_id == current_user.id
                     )
                 )
-                if tag_result.scalar_one_or_none() is None:
-                    continue
-                db.add(TaskTag(task_id=new_task.id, tag_id=tag_id))
+                user_tag_ids = set(tag_result.scalars().all())
+                for tag_id in valid_tag_ids:
+                    if tag_id in user_tag_ids:
+                        db.add(TaskTag(task_id=new_task.id, tag_id=tag_id))
 
     # Update usage tracking
     tmpl.usage_count = (tmpl.usage_count or 0) + 1
