@@ -1,5 +1,6 @@
 package com.averycorp.prismtask.data.remote.sync
 
+import android.app.Application
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -30,7 +31,7 @@ import org.robolectric.annotation.Config
 import retrofit2.Response
 
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [33])
+@Config(manifest = Config.NONE, sdk = [33], application = Application::class)
 class LeisureSessionSyncServiceTest {
 
     @get:Rule
