@@ -107,3 +107,4 @@ dedup_*.log
 /secrets
 test-results/
 playwright-report/
+venv/
