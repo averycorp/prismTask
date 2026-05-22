@@ -20,8 +20,10 @@ import { buildUnmetBlockerCountMap } from '@/features/tasks/dependencyHelpers';
 import { dashboardApi } from '@/api/dashboard';
 import { TaskRow } from '@/components/shared/TaskRow';
 import { Spinner } from '@/components/ui/Spinner';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 import type { DashboardSummary } from '@/types/api';
 import { MorningCheckInCard } from '@/features/checkin/MorningCheckInCard';
 import { BoundaryTodayBanner } from '@/features/boundaries/BoundaryTodayBanner';
@@ -633,15 +635,17 @@ export function TodayScreen() {
       )}
 
       {/* Task Editor Drawer */}
-      {editorOpen && (
-        <TaskEditor
-          onClose={() => {
-            setEditorOpen(false);
-            setSelectedTask(null);
-          }}
-          onUpdate={() => loadData()}
-        />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor
+            onClose={() => {
+              setEditorOpen(false);
+              setSelectedTask(null);
+            }}
+            onUpdate={() => loadData()}
+          />
+        )}
+      </Suspense>
 
       {/* Plan For Today Sheet */}
       <PlanForTodaySheet
