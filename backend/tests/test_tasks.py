@@ -168,6 +168,25 @@ async def test_get_task_with_subtasks(client: AsyncClient, auth_headers: dict, g
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("exc_type", [ValueError, RuntimeError])
+async def test_parse_task_validation_error(
+    client: AsyncClient, auth_headers: dict, exc_type
+):
+    from unittest.mock import patch
+    # The router imports the function inline: `from app.services.nlp_parser import parse_task_input`
+    # Therefore, we need to mock the module it's importing from.
+    with patch("app.services.nlp_parser.parse_task_input") as mock_parse:
+        mock_parse.side_effect = exc_type("Simulated parser error")
+        resp = await client.post(
+            "/api/v1/tasks/parse",
+            json={"text": "buy milk", "start_of_day_hour": 4, "start_of_day_minute": 0},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "Simulated parser error"
+
+
+@pytest.mark.asyncio
 async def test_parse_debug_does_not_leak_api_key_length(
     client: AsyncClient, auth_headers: dict
 ):
