@@ -48,17 +48,23 @@ async def store_suggestions(
     (source_id, source_title, suggested_title, etc.).
     Returns the list of newly created SuggestedTask rows.
     """
+    if not suggestions:
+        return []
+
+    # Fetch all existing suggestions for the given user, source, and source_ids in one query
+    source_ids = [s["source_id"] for s in suggestions]
+    existing_result = await db.execute(
+        select(SuggestedTask.source_id).where(
+            SuggestedTask.user_id == user_id,
+            SuggestedTask.source == source,
+            SuggestedTask.source_id.in_(source_ids),
+        )
+    )
+    existing_source_ids = {row[0] for row in existing_result.all()}
+
     created: list[SuggestedTask] = []
     for s in suggestions:
-        # Check for existing suggestion with same source + source_id
-        existing = await db.execute(
-            select(SuggestedTask).where(
-                SuggestedTask.user_id == user_id,
-                SuggestedTask.source == source,
-                SuggestedTask.source_id == s["source_id"],
-            )
-        )
-        if existing.scalar_one_or_none() is not None:
+        if s["source_id"] in existing_source_ids:
             continue
 
         tags_json = json.dumps(s.get("suggested_tags")) if s.get("suggested_tags") else None

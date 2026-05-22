@@ -105,3 +105,4 @@ firestore_audit_v*.md
 firestore_state_check_*.md
 dedup_*.log
 /secrets
+venv/
