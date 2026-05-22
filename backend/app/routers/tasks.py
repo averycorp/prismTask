@@ -280,13 +280,14 @@ async def parse_task(data: ParseRequest, request: Request):
     """
     parse_rate_limiter.check(request)
     try:
-        from app.services.nlp_parser import parse_task_input
+        import app.services.nlp_parser
+        parse_task_input = app.services.nlp_parser.parse_task_input
         today = _logical_today(
             datetime.now(),
             sod_hour=data.start_of_day_hour,
             sod_minute=data.start_of_day_minute,
         )
-        parsed = parse_task_input(data.text, [], today)
+        parsed = app.services.nlp_parser.parse_task_input(data.text, [], today)
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=422, detail=str(e))
 
