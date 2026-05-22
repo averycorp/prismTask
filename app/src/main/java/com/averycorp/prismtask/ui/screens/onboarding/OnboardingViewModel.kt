@@ -262,9 +262,10 @@ constructor(
                             // Ignore failures to send verification email so signup completes
                         }
                         _signInState.value = SignInState.SignedIn(user.email ?: email)
-                        // TODO(email-verification): gate sync until verified once the verification flow lands.
-                        syncService.startAutoSync()
-                        backendSyncService.startAutoSync()
+                        if (user.isEmailVerified) {
+                            syncService.startAutoSync()
+                            backendSyncService.startAutoSync()
+                        }
                         checkExistingUserAndMaybeSkip()
                     },
                     onFailure = {
