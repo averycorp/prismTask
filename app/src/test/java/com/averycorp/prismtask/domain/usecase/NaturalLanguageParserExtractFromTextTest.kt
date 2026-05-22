@@ -32,6 +32,10 @@ import java.time.ZoneId
  */
 class NaturalLanguageParserExtractFromTextTest {
 
+    companion object {
+        private const val TODO_PREFIX = "TODO: "
+    }
+
     private val api: PrismTaskApi = mockk()
     private lateinit var parser: NaturalLanguageParser
 
@@ -85,7 +89,7 @@ class NaturalLanguageParserExtractFromTextTest {
         coEvery { api.extractTasksFromText(any()) } throws IOException("boom")
 
         val results = parser.extractFromText(
-            "TODO: write the docs\nI'll review the PR tomorrow"
+            "${TODO_PREFIX}write the docs\nI'll review the PR tomorrow"
         )
 
         // Regex extractor matches both "TODO: ..." and "I'll ..." patterns.
@@ -105,7 +109,7 @@ class NaturalLanguageParserExtractFromTextTest {
             tasks = emptyList()
         )
 
-        val results = parser.extractFromText("TODO: ship the feature")
+        val results = parser.extractFromText("${TODO_PREFIX}ship the feature")
 
         assertTrue(results.isNotEmpty())
         assertTrue(results[0].title.contains("ship", ignoreCase = true))
@@ -122,7 +126,7 @@ class NaturalLanguageParserExtractFromTextTest {
     @Test
     fun extractFromText_freeTier_skipsApiAndUsesRegex() = runTest {
         val results = parser.extractFromText(
-            input = "TODO: file the report",
+            input = "${TODO_PREFIX}file the report",
             isProEnabled = { false }
         )
 
