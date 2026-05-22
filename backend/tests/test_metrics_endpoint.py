@@ -60,9 +60,12 @@ async def test_metrics_ip_not_allowed_returns_403(client: AsyncClient, scrape_to
 
 @pytest.mark.asyncio
 async def test_metrics_ip_allowed_returns_prometheus_text(client: AsyncClient, scrape_token, monkeypatch):
-    monkeypatch.setattr(settings, "METRICS_ALLOWED_IPS", ["10.0.0.1"])
+    # `_client_ip` uses `request.client.host` (not X-Forwarded-For — see
+    # the security note on the helper). The test client fixture pins the
+    # peer to 127.0.0.1 via `ASGITransport(client=("127.0.0.1", ...))`.
+    monkeypatch.setattr(settings, "METRICS_ALLOWED_IPS", ["127.0.0.1"])
     resp = await client.get(
-        "/metrics", headers={"Authorization": f"Bearer {scrape_token}", "X-Forwarded-For": "10.0.0.1"}
+        "/metrics", headers={"Authorization": f"Bearer {scrape_token}"}
     )
     assert resp.status_code == 200, resp.text
 
