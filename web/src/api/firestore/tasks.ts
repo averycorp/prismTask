@@ -11,6 +11,7 @@ import {
   onSnapshot,
   type Unsubscribe,
   type DocumentData,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
@@ -447,6 +448,60 @@ export async function getAllTasks(uid: string): Promise<Task[]> {
   const q = query(tasksCol(uid), orderBy('sortOrder', 'asc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
+}
+
+/**
+ * Fetches only the tasks that might be relevant for a given weekly review window.
+ * By using three separate ranged queries for completedAt, dueDate, and plannedDate
+ * and unioning the results, we avoid iterating over the user's entire task history.
+ *
+ * We expand the query range by 48 hours on each side to ensure timezone differences
+ * don't cause us to miss tasks at the edges. The local aggregator will filter them exactly.
+ */
+export async function getTasksForWeeklyReview(
+  uid: string,
+  windowMs: { weekStartMs: number; weekEndMs: number }
+): Promise<Task[]> {
+  const paddingMs = 2 * 24 * 60 * 60 * 1000; // 48 hours
+  const start = windowMs.weekStartMs - paddingMs;
+  const end = windowMs.weekEndMs + paddingMs;
+
+  const qCompleted = query(
+    tasksCol(uid),
+    where('completedAt', '>=', start),
+    where('completedAt', '<=', end)
+  );
+
+  const qDue = query(
+    tasksCol(uid),
+    where('dueDate', '>=', start),
+    where('dueDate', '<=', end)
+  );
+
+  const qPlanned = query(
+    tasksCol(uid),
+    where('plannedDate', '>=', start),
+    where('plannedDate', '<=', end)
+  );
+
+  const [snapCompleted, snapDue, snapPlanned] = await Promise.all([
+    getDocs(qCompleted),
+    getDocs(qDue),
+    getDocs(qPlanned)
+  ]);
+
+  const map = new Map<string, Task>();
+  const addDocSnap = (d: QueryDocumentSnapshot<DocumentData>) => {
+    if (!map.has(d.id)) {
+      map.set(d.id, docToTask(d.id, d.data(), uid));
+    }
+  };
+
+  snapCompleted.forEach(addDocSnap);
+  snapDue.forEach(addDocSnap);
+  snapPlanned.forEach(addDocSnap);
+
+  return Array.from(map.values());
 }
 
 export async function getTask(uid: string, taskId: string): Promise<Task | null> {
