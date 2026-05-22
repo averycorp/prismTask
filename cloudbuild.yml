@@ -184,3 +184,4 @@ steps:
 timeout: '3600s'
 options:
   machineType: 'E2_HIGHCPU_8'
+  logging: 'CLOUD_LOGGING_ONLY'
