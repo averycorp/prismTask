@@ -1,0 +1,628 @@
+Starting a Gradle Daemon, 1 busy Daemon could not be reused, use --status for details
+Configuration on demand is an incubating feature.
+
+> Configure project :app
+WARNING: The option setting 'android.builtInKotlin=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.newDsl=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.dependency.excludeLibraryComponentsFromConstraints=true' is deprecated.
+The current default is 'false'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+Following can be set instead to achieve a similar behaviour.
+    android.dependency.useConstraints=false
+w: [33m[1m⚠️ Deprecated 'org.jetbrains.kotlin.android' plugin usage[0m[0m
+The 'org.jetbrains.kotlin.android' plugin in project ':app' is no longer required for Kotlin support since AGP 9.0.
+[32m[1mSolution:[0m[0m
+[32m[3mRemove both `android.builtInKotlin=true` and `android.newDsl=false` from `gradle.properties`, then migrate to built-in Kotlin.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/gradle/agp-built-in-kotlin[0m[36m for more details.[0m
+
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:injectCrashlyticsMappingFileIdDebug UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:packageDebugUnitTestForUnitTest UP-TO-DATE
+> Task :app:processDebugUnitTestManifest UP-TO-DATE
+> Task :app:generateDebugUnitTestConfig UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:compileDebugKotlin
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:127:23 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:457:23 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:505:31 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:627:31 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:675:31 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:1207:31 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/build/generated/ksp/debug/kotlin/com/averycorp/prismtask/data/local/dao/HabitCompletionDao_Impl.kt:1239:31 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/MainActivity.kt:271:50 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/PrismTaskApplication.kt:232:22 'fun setPersistenceEnabled(p0: Boolean): FirebaseFirestoreSettings.Builder' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/billing/BillingManager.kt:60:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:6:8 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:7:8 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:44:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:58:23 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:69:85 'class GoogleSignInClient : GoogleApi<GoogleSignInOptions!>' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:70:19 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:70:47 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:74:16 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:85:28 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:121:24 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:156:23 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/CalendarManager.kt:224:23 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/calendar/DefaultCalendarPushDispatcher.kt:28:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/A11yPreferences.kt:22:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/AdvancedTuningPreferences.kt:267:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/ArchivePreferences.kt:21:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/AuthTokenPreferences.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/BackendSyncPreferences.kt:29:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/BuiltInSyncPreferences.kt:26:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/CoachingPreferences.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/CustomBrainModePreferences.kt:73:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/DailyEssentialsPreferences.kt:28:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/DashboardPreferences.kt:23:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/HabitListPreferences.kt:42:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/LeisureBudgetPreferences.kt:76:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/MedicationMigrationPreferences.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/MedicationPreferences.kt:26:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/MorningCheckInPreferences.kt:32:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/OnboardingPreferences.kt:23:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/ProStatusPreferences.kt:25:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/ProductiveStreakPreferences.kt:46:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/RatingPromptPreferences.kt:37:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/ReflectionPreferences.kt:41:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/RestDayPreferences.kt:51:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/TabPreferences.kt:22:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/TaskBehaviorPreferences.kt:74:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/TemplatePreferences.kt:31:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/ThemePreferences.kt:27:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/TimerPreferences.kt:23:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/TourCardPreferences.kt:47:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/preferences/VoicePreferences.kt:22:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/AccountDeletionService.kt:59:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/AuthManager.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/GenericPreferenceSyncService.kt:70:22 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/GoogleDriveService.kt:4:8 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/GoogleDriveService.kt:23:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/GoogleDriveService.kt:33:23 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/GoogleDriveService.kt:143:34 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/SortPreferencesSyncService.kt:58:18 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/SyncService.kt:2052:18 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/ThemePreferencesSyncService.kt:60:18 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/sync/BackendSyncService.kt:211:18 This declaration is in a preview state and can be changed in a backwards-incompatible manner with a best-effort migration. Its usage should be marked with '@kotlinx.coroutines.FlowPreview' or '@OptIn(kotlinx.coroutines.FlowPreview::class)' if you accept the drawback of relying on preview API
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/remote/sync/SyncDeviceIdProvider.kt:33:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/data/repository/CustomSoundRepository.kt:35:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:31:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:116:58 No cast needed.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:132:55 No cast needed.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:148:59 No cast needed.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:155:57 No cast needed.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:251:40 No cast needed.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:302:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/automation/handlers/SimpleActionHandlers.kt:387:40 No cast needed.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/usecase/NaturalLanguageParser.kt:503:48 Unnecessary safe call on a non-null receiver of type 'LocalDate'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/usecase/TextToSpeechManager.kt:20:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/domain/usecase/VoiceInputManager.kt:35:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/EscalationScheduler.kt:29:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/HabitReminderScheduler.kt:47:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/MedicationClockRescheduler.kt:93:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/MedicationIntervalRescheduler.kt:53:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/MedicationReminderScheduler.kt:47:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/NotificationTester.kt:28:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/NotificationWorkerScheduler.kt:41:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/ProductiveStreakNotifier.kt:24:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/notifications/ReminderScheduler.kt:21:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/components/CircularCheckbox.kt:145:45 'val Icons.Filled.Redo: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Redo.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/components/QuickAddBar.kt:63:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/components/sync/SyncDebugPanel.kt:40:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/components/sync/SyncDebugPanel.kt:139:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/components/sync/SyncDetailsSheet.kt:74:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/components/sync/SyncIndicatorHost.kt:22:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/navigation/NavGraph.kt:645:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/navigation/routes/AuthRoutes.kt:17:44 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/navigation/routes/FeedbackRoutes.kt:51:45 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/rating/PlayReviewLauncher.kt:27:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/rating/RatingPromptSheet.kt:58:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/AddEditTaskScreen.kt:103:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/AddEditTaskSheet.kt:113:43 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/AddEditTaskSheet.kt:114:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/AddEditTaskSheet.kt:138:44 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:144:51 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:152:73 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Long'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:168:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:195:70 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LifeCategory'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:203:79 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Int'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:211:48 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:219:57 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:227:82 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Int'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/FileImportSuggestionSheet.kt:281:44 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/addedittask/tabs/DetailsTab.kt:154:44 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/admin/AdminBugReportsScreen.kt:69:43 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/admin/AdminNotificationLogScreen.kt:46:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/AnalyticsSummaryTiles.kt:202:52 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/AnalyticsSummaryTiles.kt:203:52 'val Icons.Filled.TrendingDown: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingDown.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/AnalyticsSummaryTiles.kt:205:26 'val Icons.Filled.TrendingFlat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingFlat.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/HabitCorrelationsSection.kt:45:45 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/LeisureScoreSection.kt:41:47 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/ProductivityScoreSection.kt:153:60 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/ProductivityScoreSection.kt:154:60 'val Icons.Filled.TrendingDown: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingDown.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/ProductivityScoreSection.kt:156:26 'val Icons.Filled.TrendingFlat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingFlat.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/analytics/TaskAnalyticsScreen.kt:72:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/archive/ArchiveScreen.kt:62:35 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/automation/AutomationLogScreen.kt:42:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/automation/AutomationRuleEditScreen.kt:56:46 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/automation/AutomationRuleListScreen.kt:50:46 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/automation/library/AutomationTemplateLibraryScreen.kt:62:53 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/balance/WeeklyBalanceReportScreen.kt:83:47 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/batch/BatchHistoryScreen.kt:59:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/batch/BatchPreviewScreen.kt:66:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/batch/BatchUndoEventBus.kt:52:17 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/briefing/DailyBriefingScreen.kt:66:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/builtinupdates/BuiltInUpdatesScreen.kt:36:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/builtinupdates/TemplateDiffScreen.kt:41:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/chat/ChatScreen.kt:91:32 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/checkin/MorningCheckInScreen.kt:84:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/eisenhower/EisenhowerScreen.kt:95:38 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/extract/PasteConversationScreen.kt:43:45 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/feedback/BugReportScreen.kt:82:37 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/feedback/BugReportViewModel.kt:51:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/AddEditHabitScreen.kt:116:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitAnalyticsScreen.kt:65:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitDetailScreen.kt:61:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitListScreen.kt:64:37 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitListViewModel.kt:182:32 Unchecked cast of 'Any?' to 'List<SelfCareStepEntity>'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitListViewModel.kt:183:32 Unchecked cast of 'Any?' to 'List<SelfCareStepEntity>'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitListViewModel.kt:184:34 Unchecked cast of 'Any?' to 'List<SelfCareStepEntity>'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/HabitListViewModel.kt:191:34 Unchecked cast of 'Any?' to 'List<SelfCareStepEntity>'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/habits/components/HabitCard.kt:374:39 'val Icons.Filled.Redo: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Redo.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/leisure/LeisurePoolScreen.kt:99:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/leisure/LogPastLeisureSheet.kt:37:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/medication/MedicationLogScreen.kt:62:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/medication/MedicationRefillScreen.kt:58:44 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/medication/MedicationScreen.kt:94:38 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/medication/MedicationScreen.kt:161:47 'val Icons.Filled.PlaylistAddCheck: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.PlaylistAddCheck.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/medication/components/MedicationSlotPicker.kt:189:37 Unnecessary safe call on a non-null receiver of type 'MedicationSlotSelection'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/monthview/MonthViewScreen.kt:90:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/mood/MoodAnalyticsScreen.kt:58:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/multicreate/MultiCreateBottomSheet.kt:50:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationBriefingScreen.kt:32:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationCollaboratorScreen.kt:14:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationEscalationScreen.kt:41:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationLockScreen.kt:22:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationProfilesScreen.kt:33:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationQuietHoursScreen.kt:40:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationSnoozeScreen.kt:27:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationSoundScreen.kt:38:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationStreakScreen.kt:13:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationTesterScreen.kt:34:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationTypesScreen.kt:29:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationVibrationScreen.kt:27:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationVisualScreen.kt:25:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationWatchScreen.kt:16:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/notifications/NotificationsHubScreen.kt:42:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/onboarding/OnboardingScreen.kt:2159:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/planner/WeeklyPlannerScreen.kt:77:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/pomodoro/SmartPomodoroScreen.kt:64:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/pomodoro/SmartPomodoroViewModel.kt:154:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/AddEditProjectScreen.kt:98:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/ProjectDetailScreen.kt:88:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/ProjectImportPreviewScreen.kt:71:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/ProjectImportPreviewViewModel.kt:36:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/ProjectListScreen.kt:75:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/ProjectsPane.kt:65:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/projects/roadmap/ProjectRoadmapScreen.kt:73:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/reflection/ReflectionScreen.kt:61:38 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/review/WeeklyReviewDetailScreen.kt:43:46 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/review/WeeklyReviewScreen.kt:48:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/review/WeeklyReviewsListScreen.kt:42:45 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/schoolwork/AddEditCourseScreen.kt:91:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/schoolwork/SchoolworkScreen.kt:100:38 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/schoolwork/SyllabusReviewScreen.kt:71:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/schoolwork/SyllabusViewModel.kt:30:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/screenshotimport/ScreenshotImportScreen.kt:64:44 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/search/SearchScreen.kt:64:34 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/selfcare/SelfCareScreen.kt:69:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/AccessibilityScreen.kt:32:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/AccountSyncScreen.kt:36:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/AdvancedTuningScreen.kt:54:42 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/AiMemoryScreen.kt:56:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/AppearanceScreen.kt:32:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/BetaCodeRedemptionScreen.kt:35:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/BrainModeScreen.kt:32:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/DataBackupScreen.kt:42:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/FocusTimerScreen.kt:31:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/HabitsStreaksScreen.kt:34:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/LayoutScreen.kt:33:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/LifeModesScreen.kt:35:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/MedicationSlotsScreen.kt:70:43 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/NotificationsScreen.kt:62:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/SettingsScreen.kt:78:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/SettingsViewModel.kt:66:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/SubscriptionScreen.kt:31:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/TaskDefaultsScreen.kt:33:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/WellbeingScreen.kt:42:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/sections/NotificationSettingsViewModel.kt:22:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/sections/PrismThemeSection.kt:58:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/sections/StreakPauseSection.kt:62:46 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LocalDate'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/sections/StreakPauseSection.kt:62:84 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LocalDate'.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/sections/WidgetThemeSection.kt:58:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/settings/sections/medication/MedicationReminderModeSection.kt:38:88 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/tags/TagManagementScreen.kt:77:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/tasklist/TaskListScreen.kt:130:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/tasklist/TaskListScreen.kt:190:57 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/tasklist/TaskListScreen.kt:489:55 'val Icons.Filled.FormatListBulleted: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.FormatListBulleted.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/tasklist/TaskListScreen.kt:765:29 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/tasklist/components/TaskListItemScopes.kt:463:47 'fun Modifier.dragAndDropSource(drawDragDecoration: DrawScope.() -> Unit, block: suspend DragAndDropSourceScope.() -> Unit): Modifier' is deprecated. Replaced by overload with a callback for obtain a transfer data,start detection is performed by Compose itself.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/templates/AddEditTemplateScreen.kt:91:43 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/templates/TemplateBrowserScreen.kt:38:43 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/templates/TemplateListScreen.kt:85:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/templates/TemplatePickerSheet.kt:73:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/templates/TemplatePickerSheet.kt:238:35 'val Icons.Filled.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.OpenInNew.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/timeline/TimelineScreen.kt:87:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/timer/TimerScreen.kt:86:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/timer/TimerViewModel.kt:45:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/TodayScreen.kt:118:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/TodayScreen.kt:119:44 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/TodayScreen.kt:175:98 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/TodayScreen.kt:1136:9 'fun AlertDialog(onDismissRequest: () -> Unit, modifier: Modifier = ..., properties: DialogProperties = ..., content: ComposableFunction0<Unit>): Unit' is deprecated. Use BasicAlertDialog instead.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/ai/TodayAiHubSheet.kt:42:36 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/PauseAllNotificationsControl.kt:119:49 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/PauseAllNotificationsControl.kt:190:49 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/PlanForTodaySheet.kt:230:29 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/ProductivityScoreBadge.kt:38:43 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/TodayProgressHeader.kt:201:68 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/TodayProgressHeader.kt:202:68 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/TodayProgressHeader.kt:203:68 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/TodayProgressHeader.kt:204:68 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/today/components/TodayQuickAddBar.kt:58:40 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/ui/screens/weekview/WeekViewScreen.kt:82:32 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/widget/AdminWidgetGate.kt:28:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/widget/WidgetUpdateManager.kt:27:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/averycorp/prismtask/workers/CalendarSyncScheduler.kt:32:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltSyncDebug
+> Task :app:hiltAggregateDepsDebug
+> Task :app:processDebugJavaRes
+> Task :app:hiltJavaCompileDebug
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:transformDebugClassesWithAsm
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:kspDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestKotlin
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/remote/FileExtractionMappingTest.kt:310:44 Unnecessary non-null assertion (!!) on a non-null receiver of type 'FileExtractionSuggestion.TechnicalMetadata'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/remote/sync/BackendSyncServiceAutoTriggerTest.kt:97:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:549:22 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:565:22 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:572:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:579:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:586:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:593:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/HabitRepositoryTest.kt:602:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/SelfCareRepositorySeedingTest.kt:232:42 The corresponding parameter in the supertype 'SelfCareDao' is named 'steps'. This may cause problems when calling this function with named arguments.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/SelfCareRepositorySeedingTest.kt:250:42 The corresponding parameter in the supertype 'SelfCareDao' is named 'steps'. This may cause problems when calling this function with named arguments.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/data/repository/TaskTimingRepositoryTest.kt:120:30 No cast needed.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/domain/automation/AutomationJsonAdapterTest.kt:110:11 Unchecked cast of 'List<AutomationAction>' to 'List<AutomationAction.MutateTask>'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/domain/automation/handlers/AiActionHandlersTest.kt:109:36 Unnecessary safe call on a non-null receiver of type 'Map<String, Any?>'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/domain/automation/handlers/AiActionHandlersTest.kt:110:36 Unnecessary safe call on a non-null receiver of type 'Map<String, Any?>'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/domain/automation/handlers/AiActionHandlersTest.kt:111:36 Unnecessary safe call on a non-null receiver of type 'Map<String, Any?>'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/domain/automation/handlers/AiActionHandlersTest.kt:225:36 Unnecessary safe call on a non-null receiver of type 'Map<String, Any?>'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/domain/automation/handlers/AiActionHandlersTest.kt:226:36 Unnecessary safe call on a non-null receiver of type 'Map<String, Any?>'.
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:77:21 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:91:21 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:108:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:117:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:128:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:131:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:142:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:144:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:156:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:158:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:160:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:170:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:172:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:187:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:189:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:211:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:213:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:227:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:229:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:239:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:250:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:260:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:270:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:272:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:285:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:287:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:297:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:299:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:301:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:325:13 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:342:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/ui/coachmark/CoachmarkControllerTest.kt:344:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///app/app/src/test/java/com/averycorp/prismtask/widget/GlanceTrampolineGuardTest.kt:80:20 'fun <T : Parcelable!> getParcelableExtra(p0: String!): T?' is deprecated. Deprecated in Java.
+
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:hiltSyncDebugUnitTest
+> Task :app:hiltAggregateDepsDebugUnitTest
+> Task :app:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :app:transformDebugUnitTestClassesWithAsm
+
+> Task :app:testDebugUnitTest
+OpenJDK 64-Bit Server VM warning: Options -Xverify:none and -noverify were deprecated in JDK 13 and will likely be removed in a future release.
+
+[Incubating] Problems report is available at: file:///app/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 6m 34s
+40 actionable tasks: 14 executed, 26 up-to-date

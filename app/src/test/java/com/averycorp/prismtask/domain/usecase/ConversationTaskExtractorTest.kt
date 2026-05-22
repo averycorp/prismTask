@@ -14,13 +14,13 @@ class ConversationTaskExtractorTest {
 
     @Test
     fun `over-sized input returns empty list`() {
-        val huge = "TODO: something\n".repeat(2000)
+        val huge = "${TODO_PREFIX}something\n".repeat(2000)
         assertTrue(extractor.extract(huge).isEmpty())
     }
 
     @Test
     fun `explicit TODO marker is extracted`() {
-        val result = extractor.extract("TODO: fix the login bug")
+        val result = extractor.extract("${TODO_PREFIX}fix the login bug")
         assertEquals(1, result.size)
         assertEquals("Fix the login bug", result.first().title)
         assertTrue(result.first().confidence > 0.9f)
@@ -58,7 +58,7 @@ class ConversationTaskExtractorTest {
     fun `multiple patterns in same input all extracted`() {
         val text =
             """
-            TODO: fix the login bug
+            ${TODO_PREFIX}fix the login bug
             I should call the dentist
             Action item: draft the email
             """.trimIndent()
@@ -72,7 +72,7 @@ class ConversationTaskExtractorTest {
     fun `duplicate action items are deduped by lowercase`() {
         val text =
             """
-            TODO: fix the bug
+            ${TODO_PREFIX}fix the bug
             I should fix the bug
             """.trimIndent()
         val result = extractor.extract(text)
@@ -83,7 +83,7 @@ class ConversationTaskExtractorTest {
 
     @Test
     fun `very short title is rejected`() {
-        assertTrue(extractor.extract("TODO: x").isEmpty())
+        assertTrue(extractor.extract("${TODO_PREFIX}x").isEmpty())
     }
 
     @Test
@@ -94,7 +94,7 @@ class ConversationTaskExtractorTest {
 
     @Test
     fun `source label propagates to results`() {
-        val result = extractor.extract("TODO: ship it", source = "claude")
+        val result = extractor.extract("${TODO_PREFIX}ship it", source = "claude")
         assertEquals("claude", result.first().source)
     }
 
@@ -110,5 +110,9 @@ class ConversationTaskExtractorTest {
         val result = extractor.extract("Can you review the design mocks?")
         assertTrue(result.isNotEmpty())
         assertEquals("Review the design mocks", result.first().title)
+    }
+
+    companion object {
+        private const val TODO_PREFIX = "TODO: "
     }
 }
