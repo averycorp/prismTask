@@ -10,13 +10,7 @@ import {
 } from '../notifications';
 
 // Mock Notification API
-const MockNotification = vi.fn() as unknown as {
-  new (title: string, options?: NotificationOptions): Notification;
-  requestPermission: () => Promise<NotificationPermission>;
-  permission: NotificationPermission;
-  mockClear: () => void;
-};
-
+const MockNotification = vi.fn();
 MockNotification.requestPermission = vi.fn().mockResolvedValue('granted');
 Object.defineProperty(MockNotification, 'permission', {
   value: 'default',
@@ -28,7 +22,7 @@ describe('notifications utility', () => {
     vi.useFakeTimers();
     vi.stubGlobal('Notification', MockNotification);
     MockNotification.mockClear();
-    (MockNotification.requestPermission as unknown as { mockClear: () => void }).mockClear();
+    MockNotification.requestPermission.mockClear();
     MockNotification.permission = 'default';
   });
 
