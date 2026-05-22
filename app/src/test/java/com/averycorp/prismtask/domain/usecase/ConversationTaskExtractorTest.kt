@@ -14,7 +14,7 @@ class ConversationTaskExtractorTest {
 
     @Test
     fun `over-sized input returns empty list`() {
-        val huge = "TODO: something\n".repeat(2000)
+        val huge = "Action item: something\n".repeat(2000)
         assertTrue(extractor.extract(huge).isEmpty())
     }
 
@@ -24,6 +24,20 @@ class ConversationTaskExtractorTest {
         assertEquals(1, result.size)
         assertEquals("Fix the login bug", result.first().title)
         assertTrue(result.first().confidence > 0.9f)
+    }
+
+    @Test
+    fun `TODO marker without colon is extracted`() {
+        val result = extractor.extract("TODO fix the login bug")
+        assertEquals(1, result.size)
+        assertEquals("Fix the login bug", result.first().title)
+    }
+
+    @Test
+    fun `TODO marker with leading spaces is extracted`() {
+        val result = extractor.extract("   TODO: fix the login bug")
+        assertEquals(1, result.size)
+        assertEquals("Fix the login bug", result.first().title)
     }
 
     @Test
