@@ -136,11 +136,16 @@ interface HabitCompletionDao {
     @Query("SELECT * FROM habit_completions WHERE habit_id = :habitId AND completed_date = :date LIMIT 1")
     suspend fun getByHabitAndDate(habitId: Long, date: Long): HabitCompletionEntity?
 
-    @Query("SELECT * FROM habit_completions WHERE habit_id = :habitId AND completed_date_local = :date AND is_skipped = 0 LIMIT 1")
+    @Query(
+        "SELECT * FROM habit_completions " +
+            "WHERE habit_id = :habitId AND completed_date_local = :date AND is_skipped = 0 LIMIT 1"
+    )
     suspend fun getByHabitAndDateLocal(habitId: Long, date: String): HabitCompletionEntity?
 
     @Query(
-        "SELECT * FROM habit_completions WHERE habit_id = :habitId AND completed_date_local = :date AND is_skipped = 0 ORDER BY completed_at DESC LIMIT 1"
+        "SELECT * FROM habit_completions " +
+            "WHERE habit_id = :habitId AND completed_date_local = :date AND is_skipped = 0 " +
+            "ORDER BY completed_at DESC LIMIT 1"
     )
     suspend fun getLatestByHabitAndDateLocal(habitId: Long, date: String): HabitCompletionEntity?
 

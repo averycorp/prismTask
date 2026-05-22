@@ -394,17 +394,17 @@ constructor(
         viewModelScope.launch { ndPreferencesDataStore.setCoolingOffMinutes(m) }
     }
 
-    fun setRevisionCounterEnabled(e: Boolean) {
-        viewModelScope.launch { ndPreferencesDataStore.setRevisionCounterEnabled(e) }
-    }
+//    fun setRevisionCounterEnabled(e: Boolean) {
+//        viewModelScope.launch { ndPreferencesDataStore.setRevisionCounterEnabled(e) }
+    //
 
-    fun setMaxRevisions(m: Int) {
-        viewModelScope.launch { ndPreferencesDataStore.setMaxRevisions(m) }
-    }
+//    fun setMaxRevisions(m: Int) {
+//        viewModelScope.launch { ndPreferencesDataStore.setMaxRevisions(m) }
+    //
 
-    fun setShipItCelebrationsEnabled(e: Boolean) {
-        viewModelScope.launch { ndPreferencesDataStore.setShipItCelebrationsEnabled(e) }
-    }
+//    fun setShipItCelebrationsEnabled(e: Boolean) {
+//        viewModelScope.launch { ndPreferencesDataStore.setShipItCelebrationsEnabled(e) }
+    //
 
     fun setCelebrationIntensity(i: com.averycorp.prismtask.data.preferences.CelebrationIntensity) {
         viewModelScope.launch { ndPreferencesDataStore.setCelebrationIntensity(i) }
@@ -1014,17 +1014,21 @@ constructor(
     val isSignedIn: StateFlow<Boolean> get() = syncSettings.isSignedIn
     val userEmail: String? get() = syncSettings.userEmail
 
+    @Suppress("TopLevelPropertyNaming", "PropertyName")
     internal val _pendingJsonExport = MutableStateFlow<String?>(null)
     val pendingJsonExport: StateFlow<String?> = _pendingJsonExport
 
+    @Suppress("TopLevelPropertyNaming", "PropertyName")
     internal val _pendingCsvExport = MutableStateFlow<String?>(null)
     val pendingCsvExport: StateFlow<String?> = _pendingCsvExport
 
     val isSyncing: StateFlow<Boolean> get() = syncSettings.isSyncing
 
+    @Suppress("TopLevelPropertyNaming", "PropertyName")
     internal val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting
 
+    @Suppress("TopLevelPropertyNaming", "PropertyName")
     internal val _isExporting = MutableStateFlow(false)
     val isExporting: StateFlow<Boolean> = _isExporting
 
