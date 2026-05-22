@@ -66,6 +66,16 @@ Instrumentator(
 ).instrument(app)
 
 
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # Proxies typically append to the header. To prevent trivial spoofing
+        # where an attacker sends "X-Forwarded-For: 127.0.0.1", we take the
+        # rightmost IP added by our reverse proxy rather than the leftmost.
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def _require_scrape_token(request: Request) -> None:
     """Bearer-token gate for /metrics. Empty token → 503 (endpoint inert).
 
@@ -78,6 +88,11 @@ def _require_scrape_token(request: Request) -> None:
     auth = request.headers.get("authorization", "")
     if auth != f"Bearer {settings.METRICS_SCRAPE_TOKEN}":
         raise HTTPException(status_code=401, detail="invalid scrape token")
+
+    if "*" not in settings.METRICS_ALLOWED_IPS:
+        ip = _client_ip(request)
+        if ip not in settings.METRICS_ALLOWED_IPS:
+            raise HTTPException(status_code=403, detail="ip not allowed")
 
 
 @app.get("/metrics")
