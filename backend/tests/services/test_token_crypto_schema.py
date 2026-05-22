@@ -1,6 +1,4 @@
-import pytest
 from app.services.integrations.token_crypto import OAuthTokenPayload
-from pydantic import ValidationError
 
 def test_oauth_token_payload_schema():
     payload = OAuthTokenPayload.model_validate_json('{"access_token": "token", "refresh_token": "refresh", "unknown_field": "val"}')
