@@ -96,11 +96,6 @@ function toIsoDate(d: Date): string {
  * completedAt falls inside the window). When viewing a past week, the
  * current-week completion excludes it from slipped because the
  * completedAt > weekEnd check kicks in.
- *
- * TODO(perf): this iterates over all tasks returned by getAllTasks —
- * fine at current user scale but will feel sluggish for >2000 tasks.
- * Replace with a ranged Firestore query keyed on completedAt / dueDate
- * when that becomes a real problem.
  */
 export function aggregateWeek(
   tasks: Task[],
