@@ -88,7 +88,9 @@ async def create_project(
     return _project_response(project)
 
 
-async def _get_project_for_user(project_id: int, user: User, db: AsyncSession) -> Project:
+async def _get_project_for_user(
+    project_id: int, user: User, db: AsyncSession
+) -> Project:
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.user_id == user.id)
     )
@@ -164,17 +166,35 @@ async def reorder_projects(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    project_orders = {}
     for item in items:
         project_id = item.get("id")
         sort_order = item.get("sort_order")
         if project_id is None or sort_order is None:
-            raise HTTPException(status_code=400, detail="Each item must have 'id' and 'sort_order'")
-        result = await db.execute(
-            select(Project).where(Project.id == project_id, Project.user_id == current_user.id)
+            raise HTTPException(
+                status_code=400, detail="Each item must have 'id' and 'sort_order'"
+            )
+        project_orders[project_id] = sort_order
+
+    if not project_orders:
+        return {"detail": "Projects reordered"}
+
+    result = await db.execute(
+        select(Project).where(
+            Project.id.in_(project_orders.keys()), Project.user_id == current_user.id
         )
-        project = result.scalar_one_or_none()
-        if not project:
-            raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-        project.sort_order = sort_order
+    )
+    projects = result.scalars().all()
+
+    found_projects = {p.id: p for p in projects}
+
+    for item in items:
+        project_id = item["id"]
+        if project_id not in found_projects:
+            raise HTTPException(
+                status_code=404, detail=f"Project {project_id} not found"
+            )
+        found_projects[project_id].sort_order = item["sort_order"]
+
     await db.flush()
     return {"detail": "Projects reordered"}
