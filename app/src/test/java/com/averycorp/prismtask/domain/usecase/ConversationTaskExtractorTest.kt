@@ -27,31 +27,20 @@ class ConversationTaskExtractorTest {
     }
 
     @Test
-    fun `action item marker is extracted`() {
-        val result = extractor.extract("Action item: send the report to Alice")
-        assertEquals(1, result.size)
-        assertEquals("Send the report to Alice", result.first().title)
-    }
-
-    @Test
-    fun `I should pattern is extracted`() {
-        val result = extractor.extract("I should call the dentist tomorrow.")
-        assertEquals(1, result.size)
-        assertEquals("Call the dentist tomorrow", result.first().title)
-    }
-
-    @Test
-    fun `I need to pattern is extracted`() {
-        val result = extractor.extract("I need to prepare slides for Monday.")
-        assertEquals(1, result.size)
-        assertEquals("Prepare slides for Monday", result.first().title)
-    }
-
-    @Test
-    fun `I will pattern is extracted`() {
-        val result = extractor.extract("I will review the PR this afternoon.")
-        assertEquals(1, result.size)
-        assertEquals("Review the PR this afternoon", result.first().title)
+    fun `various task patterns are extracted correctly`() {
+        val cases = listOf(
+            "Action item: send the report to Alice" to "Send the report to Alice",
+            "I should call the dentist tomorrow." to "Call the dentist tomorrow",
+            "I need to prepare slides for Monday." to "Prepare slides for Monday",
+            "I will review the PR this afternoon." to "Review the PR this afternoon",
+            "Let's schedule a follow-up meeting next week." to "Schedule a follow-up meeting next week",
+            "Can you review the design mocks?" to "Review the design mocks"
+        )
+        for ((input, expected) in cases) {
+            val result = extractor.extract(input)
+            assertEquals(1, result.size)
+            assertEquals(expected, result.first().title)
+        }
     }
 
     @Test
@@ -98,17 +87,4 @@ class ConversationTaskExtractorTest {
         assertEquals("claude", result.first().source)
     }
 
-    @Test
-    fun `let's pattern is extracted`() {
-        val result = extractor.extract("Let's schedule a follow-up meeting next week.")
-        assertTrue(result.isNotEmpty())
-        assertEquals("Schedule a follow-up meeting next week", result.first().title)
-    }
-
-    @Test
-    fun `can you request is extracted`() {
-        val result = extractor.extract("Can you review the design mocks?")
-        assertTrue(result.isNotEmpty())
-        assertEquals("Review the design mocks", result.first().title)
-    }
 }
