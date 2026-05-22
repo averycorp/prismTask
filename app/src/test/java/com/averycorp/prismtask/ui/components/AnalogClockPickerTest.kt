@@ -90,7 +90,8 @@ class AnalogClockPickerTest {
     @Test
     fun applyPointerKeepsPmHalfWhenUserWasOnPm() {
         val state = AnalogClockState(
-            initialHour = 21, // 9 PM
+            initialHour = 21,
+// 9 PM
             initialMinute = 0,
             initialSecond = 0,
             is24Hour = false,
@@ -121,7 +122,8 @@ class AnalogClockPickerTest {
     @Test
     fun applyPointerOuterRingPicksAmIn24HourMode() {
         val state = AnalogClockState(
-            initialHour = 15, // 3 PM
+            initialHour = 15,
+// 3 PM
             initialMinute = 0,
             initialSecond = 0,
             is24Hour = true,

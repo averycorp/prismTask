@@ -196,7 +196,8 @@ class HabitForgivenessResolverTest {
     fun `axes resolve independently`() {
         val h = habit(
             forgivenessEnabled = 1,
-            forgivenessAllowedMisses = -1, // inherit
+            forgivenessAllowedMisses = -1,
+// inherit
             forgivenessGracePeriodDays = 10 // override
         )
         val resolved = HabitForgivenessResolver.resolveForgivenessConfig(

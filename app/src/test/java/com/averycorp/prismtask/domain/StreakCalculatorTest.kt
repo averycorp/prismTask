@@ -124,7 +124,8 @@ class StreakCalculatorTest {
         // single-day misses are tolerated and the streak walks back further.
         val today = LocalDate.of(2025, 6, 10)
         val completions = listOf(
-            completion(date = today), // today
+            completion(date = today),
+// today
             completion(date = today.minusDays(1)),
             // miss day -2
             completion(date = today.minusDays(3)),

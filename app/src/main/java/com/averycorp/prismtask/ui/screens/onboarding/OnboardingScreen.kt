@@ -528,7 +528,8 @@ private fun SmartTasksPage() {
     OnboardingPageLayout(
         emoji = "\u2705",
         headline = "Organize Tasks & Projects",
-        body = "Capture tasks with tags, priorities, and subtasks. Group related work into projects with milestones and a forgiveness-friendly streak."
+        body =
+"Capture tasks with tags, priorities, and subtasks. Group related work into projects with milestones and a forgiveness-friendly streak."
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
