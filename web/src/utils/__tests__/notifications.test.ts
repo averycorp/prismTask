@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import {
   isNotificationSupported,
   requestNotificationPermission,
@@ -10,8 +10,16 @@ import {
 } from '../notifications';
 
 // Mock Notification API
-const MockNotification = vi.fn();
-MockNotification.requestPermission = vi.fn().mockResolvedValue('granted');
+type MockNotificationType = Mock & {
+  requestPermission: Mock;
+  permission: string;
+};
+
+const MockNotification = Object.assign(vi.fn(), {
+  requestPermission: vi.fn().mockResolvedValue('granted'),
+  permission: 'default',
+}) as unknown as MockNotificationType;
+
 Object.defineProperty(MockNotification, 'permission', {
   value: 'default',
   writable: true,

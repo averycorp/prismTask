@@ -10,6 +10,7 @@ import { OnboardingGate } from './OnboardingGate';
 import { RestorePendingGate } from './RestorePendingGate';
 import { TaskListSkeleton, ProjectListSkeleton, HabitListSkeleton, SettingsSkeleton } from '@/components/shared/SkeletonLoader';
 
+/* eslint-disable react-refresh/only-export-components */
 // Auth screens (eagerly loaded — first screens users see)
 const LoginScreen = lazy(() => import('@/features/auth/LoginScreen').then(m => ({ default: m.LoginScreen })));
 const RegisterScreen = lazy(() => import('@/features/auth/RegisterScreen').then(m => ({ default: m.RegisterScreen })));
