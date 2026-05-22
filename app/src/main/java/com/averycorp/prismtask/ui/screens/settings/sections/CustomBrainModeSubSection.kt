@@ -238,7 +238,8 @@ private fun BrainModeFormDialog(
                     onValueChange = { if (it.length <= 40) name = it },
                     label = { Text("Name") },
                     singleLine = true,
-                    enabled = !isEdit, // name is the key — editing it would orphan the active pointer
+                    // name is the key — editing it would orphan the active pointer
+                    enabled = !isEdit,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
