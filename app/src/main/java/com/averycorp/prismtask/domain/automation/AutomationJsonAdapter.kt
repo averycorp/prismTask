@@ -262,7 +262,7 @@ object AutomationJsonAdapter {
                         p.asDouble
                     } else {
                         // Narrow to Int when it fits — production callers
-                        // construct Compare values with Int literals (e.g.
+                        // create comparison values with Int literals (e.g.
                         // priority thresholds, weekday ints), and structural
                         // round-trip equality requires we preserve that.
                         // ConditionEvaluator coerces both sides to Double
