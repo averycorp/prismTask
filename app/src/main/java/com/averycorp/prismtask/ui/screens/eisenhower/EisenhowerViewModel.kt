@@ -127,19 +127,11 @@ constructor(
                 }
                 val now = System.currentTimeMillis()
                 for (cat in response.categorizations) {
-                    // TODO(weekly-followup): TaskEntity PK is Long but the
-                    // backend now returns Firestore document IDs (strings).
-                    // Until the Room schema gains a firestoreId column and a
-                    // lookup by that column, try to parse as Long so the
-                    // app continues to work for the Postgres-numeric-ID
-                    // migration window. Alphanumeric IDs are skipped with a
-                    // warning; the user will see the backend's response
-                    // echoed but Room won't update until the follow-up.
-                    val localId = cat.taskId.toLongOrNull()
+                    val localId = cat.taskId.toLongOrNull() ?: taskRepository.getIdByCloudId(cat.taskId)
                     if (localId == null) {
                         Log.w(
                             "EisenhowerVM",
-                            "Skipping quadrant write for non-numeric task id: ${cat.taskId}"
+                            "Skipping quadrant write for unresolvable task id: ${cat.taskId}"
                         )
                         continue
                     }
