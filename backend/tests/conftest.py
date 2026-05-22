@@ -1,3 +1,14 @@
+import os
+import time
+
+# Force process timezone to UTC to align local date.today() with UTC datetime.now()
+# during tests, preventing timezone boundary failures.
+os.environ["TZ"] = "UTC"
+try:
+    time.tzset()
+except AttributeError:
+    pass
+
 from typing import AsyncGenerator
 
 import pytest_asyncio
