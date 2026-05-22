@@ -319,7 +319,6 @@ export function WeeklyReviewScreen() {
             variant="ghost"
             size="sm"
             onClick={() => { void runReview(weekWindow); }}
-            disabled={uiState.kind === 'loading'}
             aria-label="Generate Now"
           >
             <Sparkles className="h-4 w-4" />
