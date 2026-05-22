@@ -24,9 +24,25 @@ except ImportError:  # pragma: no cover
     Fernet = None  # type: ignore
     InvalidToken = Exception  # type: ignore
 
+from pydantic import BaseModel, ConfigDict, ValidationError
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class IntegrationTokenPayload(BaseModel):
+    """Pydantic model to ensure safe deserialization of integration tokens."""
+
+    model_config = ConfigDict(extra="allow")
+
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_uri: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    scopes: list[str] | None = None
+    expiry: str | None = None
 
 
 def _load_key() -> bytes:
@@ -43,9 +59,7 @@ def _load_key() -> bytes:
         digest = hashlib.sha256(key_bytes).digest()
         return base64.urlsafe_b64encode(digest)
     if settings.is_production:
-        raise RuntimeError(
-            "INTEGRATION_ENCRYPTION_KEY must be set in production"
-        )
+        raise RuntimeError("INTEGRATION_ENCRYPTION_KEY must be set in production")
     # Dev fallback — derive from JWT secret so repeated starts on the same
     # machine with the same JWT_SECRET_KEY can decrypt their own writes.
     digest = hashlib.sha256(settings.get_jwt_secret().encode()).digest()
@@ -76,4 +90,9 @@ def decrypt_json(encoded: str) -> dict[str, Any]:
         plain = _fernet().decrypt(encoded.encode("utf-8"))
     except InvalidToken as e:  # pragma: no cover
         raise ValueError("integration config token is invalid or expired") from e
-    return json.loads(plain.decode("utf-8"))
+
+    try:
+        payload = IntegrationTokenPayload.model_validate_json(plain)
+        return payload.model_dump(exclude_unset=True)
+    except ValidationError as e:
+        raise ValueError("integration config token payload is invalid") from e
