@@ -180,7 +180,7 @@ class TestFileExtractionService:
                 "detected_dates": [], "confidence": 0.7,
             })
 
-            jsx = b"export function LoginForm() { return null; }\n"
+            jsx = b"// TODO: extract validation helper\nexport function LoginForm() { return null; }\n"
             result = extract_from_file(
                 file_bytes=jsx,
                 filename="LoginForm.jsx",
