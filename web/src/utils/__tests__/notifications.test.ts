@@ -10,7 +10,13 @@ import {
 } from '../notifications';
 
 // Mock Notification API
-const MockNotification = vi.fn();
+interface MockNotificationCtor {
+  (): void;
+  requestPermission: ReturnType<typeof vi.fn>;
+  permission: NotificationPermission;
+  mockClear: () => void;
+}
+const MockNotification = vi.fn() as unknown as MockNotificationCtor;
 MockNotification.requestPermission = vi.fn().mockResolvedValue('granted');
 Object.defineProperty(MockNotification, 'permission', {
   value: 'default',

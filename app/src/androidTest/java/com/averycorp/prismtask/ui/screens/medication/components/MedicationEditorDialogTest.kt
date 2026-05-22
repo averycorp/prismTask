@@ -165,7 +165,8 @@ class MedicationEditorDialogTest {
                 initialSelections = emptyList(),
                 activeSlots = listOf(morningSlot),
                 initialReminderMode = "INTERVAL",
-                initialReminderIntervalMinutes = 241, // off-preset → custom on open
+                // off-preset → custom on open
+                initialReminderIntervalMinutes = 241,
                 onDismiss = {},
                 onConfirm = { _, _, _, _, _, _, _ -> },
                 onCreateNewSlot = {}

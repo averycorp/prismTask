@@ -294,7 +294,7 @@ class UserPreferencesDataStore(
         // Haiku-determined urgency on the Tasks-screen URGENCY sort
         // (Pro). Same per-feature-opt-in shape as the PR #1214 flags;
         // master AI toggle + Pro tier are the real gates, this just
-        // lets a Pro user fall back to the on-device formula without
+        // allows a Pro user to fall back to the on-device formula without
         // turning the whole AI surface off.
         val KEY_AI_URGENCY_ENABLED = booleanPreferencesKey("ai_urgency_enabled")
 

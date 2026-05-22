@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
+from app.services.analytics import determine_trend
+
 
 # --- Helper to set up test data ---
 
@@ -75,6 +77,32 @@ async def _complete_habit(client: AsyncClient, headers: dict, habit_id: int, dat
 
 
 # --- Tests ---
+
+
+def test_determine_trend():
+    """Test determine_trend function."""
+    # List length < 2
+    assert determine_trend([]) == "stable"
+    assert determine_trend([{"score": 10}]) == "stable"
+
+    # Improving trend (second half > first half by > 3)
+    # first half: 10, second half: 14. Diff is 4 (>3).
+    assert determine_trend([{"score": 10}, {"score": 14}]) == "improving"
+    # first half: 10, 10 (avg 10), second half: 14, 14 (avg 14). Diff is 4.
+    assert determine_trend([{"score": 10}, {"score": 10}, {"score": 14}, {"score": 14}]) == "improving"
+
+    # Declining trend (second half < first half by < -3)
+    # first half: 14, second half: 10. Diff is -4 (<-3).
+    assert determine_trend([{"score": 14}, {"score": 10}]) == "declining"
+    assert determine_trend([{"score": 14}, {"score": 14}, {"score": 10}, {"score": 10}]) == "declining"
+
+    # Stable trend (diff between -3 and 3)
+    # first half: 10, second half: 12. Diff is 2.
+    assert determine_trend([{"score": 10}, {"score": 12}]) == "stable"
+    # first half: 10, second half: 7. Diff is -3.
+    assert determine_trend([{"score": 10}, {"score": 7}]) == "stable"
+    # first half: 10, second half: 13. Diff is 3.
+    assert determine_trend([{"score": 10}, {"score": 13}]) == "stable"
 
 
 class TestProductivityScore:
@@ -389,3 +417,37 @@ class TestSummary:
         assert "habits" in data
         assert "completion_rate_7d" in data["habits"]
         assert "completion_rate_30d" in data["habits"]
+
+# --- Tests for determine_trend ---
+
+def test_determine_trend_less_than_two_elements():
+    assert determine_trend([]) == "stable"
+    assert determine_trend([{"score": 10}]) == "stable"
+
+def test_determine_trend_improving():
+    # first_half avg: (10+10)/2=10, second_half avg: (20+20)/2=20. diff = 10 (>3) -> improving
+    scores = [{"score": 10}, {"score": 10}, {"score": 20}, {"score": 20}]
+    assert determine_trend(scores) == "improving"
+
+def test_determine_trend_declining():
+    # first_half avg: (20+20)/2=20, second_half avg: (10+10)/2=10. diff = -10 (<-3) -> declining
+    scores = [{"score": 20}, {"score": 20}, {"score": 10}, {"score": 10}]
+    assert determine_trend(scores) == "declining"
+
+def test_determine_trend_stable():
+    # first_half avg: (10+10)/2=10, second_half avg: (12+12)/2=12. diff = 2 (<=3 and >=-3) -> stable
+    scores = [{"score": 10}, {"score": 10}, {"score": 12}, {"score": 12}]
+    assert determine_trend(scores) == "stable"
+
+    # diff = -2
+    scores = [{"score": 12}, {"score": 12}, {"score": 10}, {"score": 10}]
+    assert determine_trend(scores) == "stable"
+
+def test_determine_trend_odd_number_of_elements():
+    # len=5, mid=2. first_half: [:2] (10, 10) avg=10. second_half: [2:] (15, 20, 20) avg=(55)/3=18.33. diff = 8.33 > 3 -> improving
+    scores = [{"score": 10}, {"score": 10}, {"score": 15}, {"score": 20}, {"score": 20}]
+    assert determine_trend(scores) == "improving"
+
+    # len=3, mid=1. first_half: [:1] (20) avg=20. second_half: [1:] (10, 10) avg=10. diff = -10 < -3 -> declining
+    scores = [{"score": 20}, {"score": 10}, {"score": 10}]
+    assert determine_trend(scores) == "declining"

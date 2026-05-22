@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useTaskStore } from '@/stores/taskStore';
 import { Spinner } from '@/components/ui/Spinner';
-import TaskEditor from '@/features/tasks/TaskEditor';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 export function TaskDetailScreen() {
   const { id } = useParams<{ id: string }>();
@@ -44,15 +46,17 @@ export function TaskDetailScreen() {
         All Tasks
       </button>
 
-      <TaskEditor
-        onClose={() => {
-          setSelectedTask(null);
-          navigate('/tasks');
-        }}
-        onUpdate={() => {
-          if (id) fetchTask(id);
-        }}
-      />
+      <Suspense fallback={null}>
+        <TaskEditor
+          onClose={() => {
+            setSelectedTask(null);
+            navigate('/tasks');
+          }}
+          onUpdate={() => {
+            if (id) fetchTask(id);
+          }}
+        />
+      </Suspense>
     </div>
   );
 }

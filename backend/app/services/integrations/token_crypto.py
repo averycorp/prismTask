@@ -12,11 +12,15 @@ dev-only trade-off.
 from __future__ import annotations
 
 import base64
+import functools
 import hashlib
 import json
 import logging
 import os
-from typing import Any
+import secrets
+from typing import Any, Optional
+
+from pydantic import BaseModel, ValidationError
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -27,6 +31,24 @@ except ImportError:  # pragma: no cover
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@functools.lru_cache(maxsize=1)
+def _get_dev_encryption_key() -> bytes:
+    """Generate a random 32-byte key for development to avoid reusing JWT_SECRET_KEY."""
+    return base64.urlsafe_b64encode(secrets.token_bytes(32))
+
+
+class OAuthTokenPayload(BaseModel):
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_uri: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    scopes: Optional[list[str]] = None
+    expiry: Optional[str] = None
+
+    model_config = {"extra": "allow"}
 
 
 def _load_key() -> bytes:
@@ -46,10 +68,9 @@ def _load_key() -> bytes:
         raise RuntimeError(
             "INTEGRATION_ENCRYPTION_KEY must be set in production"
         )
-    # Dev fallback — derive from JWT secret so repeated starts on the same
-    # machine with the same JWT_SECRET_KEY can decrypt their own writes.
-    digest = hashlib.sha256(settings.get_jwt_secret().encode()).digest()
-    return base64.urlsafe_b64encode(digest)
+    # Dev fallback — generate a random per-process key so the server starts.
+    # Tokens written will be unreadable after a restart.
+    return _get_dev_encryption_key()
 
 
 def _fernet() -> Fernet:
@@ -76,4 +97,9 @@ def decrypt_json(encoded: str) -> dict[str, Any]:
         plain = _fernet().decrypt(encoded.encode("utf-8"))
     except InvalidToken as e:  # pragma: no cover
         raise ValueError("integration config token is invalid or expired") from e
-    return json.loads(plain.decode("utf-8"))
+
+    try:
+        payload = OAuthTokenPayload.model_validate_json(plain)
+        return payload.model_dump(exclude_unset=True)
+    except ValidationError as e:
+        raise ValueError("integration config token payload has an invalid structure") from e

@@ -33,9 +33,11 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import { computeUrgencyScore } from '@/utils/urgency';
 import type { Task, TaskPriority, TaskStatus } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 type SortKey =
   | 'priority'
@@ -1042,17 +1044,19 @@ export function TaskListScreen() {
       )}
 
       {/* Task Editor */}
-      {editorOpen && (
-        <TaskEditor
-          mode={createMode ? 'create' : 'edit'}
-          onClose={() => {
-            setEditorOpen(false);
-            setSelectedTask(null);
-            setCreateMode(false);
-          }}
-          onUpdate={() => loadData()}
-        />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor
+            mode={createMode ? 'create' : 'edit'}
+            onClose={() => {
+              setEditorOpen(false);
+              setSelectedTask(null);
+              setCreateMode(false);
+            }}
+            onUpdate={() => loadData()}
+          />
+        )}
+      </Suspense>
 
       {/* Bulk Delete Confirmation */}
       <ConfirmDialog

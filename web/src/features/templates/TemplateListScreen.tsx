@@ -23,11 +23,13 @@ import {
   ProjectStarterList,
 } from './StarterTemplatesPanel';
 import { Tabs } from '@/components/ui/Tabs';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import type { TaskTemplate } from '@/types/template';
 import type { TaskPriority } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 export function TemplateListScreen() {
   const { templates, isLoading, fetch, use: applyTemplate, remove } = useTemplateStore();
@@ -349,15 +351,17 @@ export function TemplateListScreen() {
       />
 
       {/* Task Editor (opened after using template) */}
-      {taskEditorOpen && (
-        <TaskEditor
-          onClose={() => {
-            setTaskEditorOpen(false);
-            setSelectedTask(null);
-          }}
-          mode="edit"
-        />
-      )}
+      <Suspense fallback={null}>
+        {taskEditorOpen && (
+          <TaskEditor
+            onClose={() => {
+              setTaskEditorOpen(false);
+              setSelectedTask(null);
+            }}
+            mode="edit"
+          />
+        )}
+      </Suspense>
 
       {/* Delete Confirmation */}
       <ConfirmDialog

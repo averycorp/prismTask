@@ -131,7 +131,7 @@ constructor(
             null
         }
         return com.averycorp.prismtask.data.remote.api.WeeklyTaskSummary(
-            taskId = id.toString(),
+            taskId = cloudId ?: id.toString(),
             title = title,
             completedAt = completedIso,
             priority = priority,

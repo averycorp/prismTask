@@ -1,6 +1,8 @@
 import os
 import time
 
+os.environ["JWT_SECRET_KEY"] = "testsecret"
+
 # Force process timezone to UTC to align local date.today() with UTC datetime.now()
 # during tests, preventing timezone boundary failures.
 os.environ["TZ"] = "UTC"
@@ -69,7 +71,7 @@ app.dependency_overrides[get_db] = override_get_db
 
 @pytest_asyncio.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app, client=("127.0.0.1", 12345))
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 

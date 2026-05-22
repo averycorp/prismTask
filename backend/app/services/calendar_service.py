@@ -15,6 +15,7 @@ module focuses on the Google API surface.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -70,7 +71,9 @@ class PullResult:
 def _build_service(credentials: Any):
     if google_build is None:
         raise RuntimeError("google-api-python-client is not installed")
-    return google_build("calendar", "v3", credentials=credentials, cache_discovery=False)
+    return google_build(
+        "calendar", "v3", credentials=credentials, cache_discovery=False
+    )
 
 
 async def list_calendars(db: AsyncSession, user_id: int) -> list[CalendarInfo]:
@@ -258,8 +261,12 @@ async def list_events(
             kwargs["syncToken"] = token
         else:
             now = datetime.now(timezone.utc)
-            kwargs["timeMin"] = (time_min or now - timedelta(days=DEFAULT_LOOKBACK_DAYS)).isoformat()
-            kwargs["timeMax"] = (time_max or now + timedelta(days=DEFAULT_LOOKAHEAD_DAYS)).isoformat()
+            kwargs["timeMin"] = (
+                time_min or now - timedelta(days=DEFAULT_LOOKBACK_DAYS)
+            ).isoformat()
+            kwargs["timeMax"] = (
+                time_max or now + timedelta(days=DEFAULT_LOOKAHEAD_DAYS)
+            ).isoformat()
         return service.events().list(**kwargs).execute()
 
     try:
@@ -267,7 +274,9 @@ async def list_events(
     except HttpError as e:
         status = getattr(getattr(e, "resp", None), "status", None)
         if status == 410:
-            logger.info("syncToken expired for calendar=%s, doing full pull", calendar_id)
+            logger.info(
+                "syncToken expired for calendar=%s, doing full pull", calendar_id
+            )
             response = _call(None)
         else:
             raise
@@ -346,12 +355,11 @@ def _datetime_to_millis(event_date_time: dict[str, Any]) -> int | None:
         return None
     try:
         if "T" in iso:
-            return int(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000)
+            return int(
+                datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000
+            )
         return int(
-            datetime.fromisoformat(iso)
-            .replace(tzinfo=timezone.utc)
-            .timestamp()
-            * 1000
+            datetime.fromisoformat(iso).replace(tzinfo=timezone.utc).timestamp() * 1000
         )
     except ValueError:
         return None
@@ -368,9 +376,9 @@ async def list_events_in_window(
     creds = await load_credentials(db, user_id)
     if creds is None:
         return []
-    service = _build_service(creds)
-    out: list[dict[str, Any]] = []
-    for calendar_id in calendar_ids:
+
+    def _fetch_calendar_events(calendar_id: str) -> list[dict[str, Any]]:
+        service = _build_service(creds)
         response = (
             service.events()
             .list(
@@ -383,6 +391,7 @@ async def list_events_in_window(
             )
             .execute()
         )
+        events = []
         for event in response.get("items", []):
             extended = event.get("extendedProperties") or {}
             private = extended.get("private") or {}
@@ -394,7 +403,7 @@ async def list_events_in_window(
             end_millis = _datetime_to_millis(end)
             if start_millis is None or end_millis is None:
                 continue
-            out.append(
+            events.append(
                 {
                     "id": event["id"],
                     "calendar_id": calendar_id,
@@ -404,5 +413,14 @@ async def list_events_in_window(
                     "all_day": bool(start.get("date")),
                 }
             )
+        return events
+
+    tasks = [asyncio.to_thread(_fetch_calendar_events, cid) for cid in calendar_ids]
+    results = await asyncio.gather(*tasks)
+
+    out: list[dict[str, Any]] = []
+    for events in results:
+        out.extend(events)
+
     out.sort(key=lambda e: e["start_millis"])
     return out[:limit]
