@@ -456,32 +456,30 @@ async def sync_pull(
             # HabitCompletion doesn't have user_id directly
             continue
 
-        query = select(model)
-        if hasattr(model, "user_id"):
-            query = query.where(model.user_id == current_user.id)
+        table = model.__table__
+        query = select(table)
+        if "user_id" in table.columns:
+            query = query.where(table.c.user_id == current_user.id)
 
-        if since and hasattr(model, "updated_at"):
-            query = query.where(model.updated_at > since)
-        elif since and hasattr(model, "created_at"):
-            query = query.where(model.created_at > since)
+        if since:
+            if "updated_at" in table.columns:
+                query = query.where(table.c.updated_at > since)
+            elif "created_at" in table.columns:
+                query = query.where(table.c.created_at > since)
 
         result = await db.execute(query)
-        for entity in result.scalars().all():
-            data = {}
-            for col in entity.__table__.columns:
-                val = getattr(entity, col.name)
-                if hasattr(val, "value"):
-                    val = val.value
-                if hasattr(val, "isoformat"):
-                    val = val.isoformat()
-                data[col.name] = val
+        for row in result.mappings().all():
+            data = {
+                col: val.value if hasattr(val, "value") else (val.isoformat() if hasattr(val, "isoformat") else val)
+                for col, val in row.items()
+            }
 
-            timestamp = getattr(entity, "updated_at", None) or getattr(entity, "created_at", None)
+            timestamp = row.get("updated_at") or row.get("created_at")
             changes.append(
                 SyncChange(
                     entity_type=entity_type,
                     operation="upsert",
-                    entity_id=entity.id,
+                    entity_id=row["id"],
                     data=data,
                     timestamp=timestamp or datetime.now(timezone.utc),
                 )
@@ -495,25 +493,25 @@ async def sync_pull(
         habit_ids = [r[0] for r in habit_result.all()]
         if habit_ids:
             comp_result = await db.execute(
-                select(HabitCompletion)
+                select(HabitCompletion.__table__)
                 .where(
                     HabitCompletion.habit_id.in_(habit_ids),
                     HabitCompletion.created_at > since,
                 )
             )
-            for c in comp_result.scalars().all():
+            for row in comp_result.mappings().all():
                 changes.append(
                     SyncChange(
                         entity_type="habit_completion",
                         operation="upsert",
-                        entity_id=c.id,
+                        entity_id=row["id"],
                         data={
-                            "id": c.id,
-                            "habit_id": c.habit_id,
-                            "date": c.date.isoformat(),
-                            "count": c.count,
+                            "id": row["id"],
+                            "habit_id": row["habit_id"],
+                            "date": row["date"].isoformat() if hasattr(row["date"], "isoformat") else row["date"],
+                            "count": row["count"],
                         },
-                        timestamp=c.created_at,
+                        timestamp=row["created_at"],
                     )
                 )
 
