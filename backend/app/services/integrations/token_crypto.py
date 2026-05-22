@@ -16,7 +16,9 @@ import hashlib
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Optional
+
+from pydantic import BaseModel, ValidationError
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -27,6 +29,18 @@ except ImportError:  # pragma: no cover
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class OAuthTokenPayload(BaseModel):
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_uri: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    scopes: Optional[list[str]] = None
+    expiry: Optional[str] = None
+
+    model_config = {"extra": "allow"}
 
 
 def _load_key() -> bytes:
@@ -76,4 +90,9 @@ def decrypt_json(encoded: str) -> dict[str, Any]:
         plain = _fernet().decrypt(encoded.encode("utf-8"))
     except InvalidToken as e:  # pragma: no cover
         raise ValueError("integration config token is invalid or expired") from e
-    return json.loads(plain.decode("utf-8"))
+
+    try:
+        payload = OAuthTokenPayload.model_validate_json(plain)
+        return payload.model_dump(exclude_unset=True)
+    except ValidationError as e:
+        raise ValueError("integration config token payload has an invalid structure") from e
