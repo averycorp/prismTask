@@ -164,17 +164,32 @@ async def reorder_projects(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    project_ids = []
+    order_map = {}
+
     for item in items:
         project_id = item.get("id")
         sort_order = item.get("sort_order")
         if project_id is None or sort_order is None:
             raise HTTPException(status_code=400, detail="Each item must have 'id' and 'sort_order'")
-        result = await db.execute(
-            select(Project).where(Project.id == project_id, Project.user_id == current_user.id)
-        )
-        project = result.scalar_one_or_none()
-        if not project:
-            raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-        project.sort_order = sort_order
+        project_ids.append(project_id)
+        order_map[project_id] = sort_order
+
+    if not project_ids:
+        return {"detail": "Projects reordered"}
+
+    result = await db.execute(
+        select(Project).where(Project.id.in_(project_ids), Project.user_id == current_user.id)
+    )
+    projects = result.scalars().all()
+
+    found_ids = {p.id for p in projects}
+    for pid in project_ids:
+        if pid not in found_ids:
+            raise HTTPException(status_code=404, detail=f"Project {pid} not found")
+
+    for project in projects:
+        project.sort_order = order_map[project.id]
+
     await db.flush()
     return {"detail": "Projects reordered"}
