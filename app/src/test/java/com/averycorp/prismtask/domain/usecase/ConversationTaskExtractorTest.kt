@@ -86,5 +86,4 @@ class ConversationTaskExtractorTest {
         val result = extractor.extract("TODO: ship it", source = "claude")
         assertEquals("claude", result.first().source)
     }
-
 }
