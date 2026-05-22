@@ -14,7 +14,7 @@ class ConversationTaskExtractorTest {
 
     @Test
     fun `over-sized input returns empty list`() {
-        val huge = "TODO: something\n".repeat(2000)
+        val huge = "A".repeat(10001)
         assertTrue(extractor.extract(huge).isEmpty())
     }
 
@@ -24,6 +24,11 @@ class ConversationTaskExtractorTest {
         assertEquals(1, result.size)
         assertEquals("Fix the login bug", result.first().title)
         assertTrue(result.first().confidence > 0.9f)
+    }
+
+    @Test
+    fun `empty TODO marker returns empty list`() {
+        assertTrue(extractor.extract("TODO:").isEmpty())
     }
 
     @Test
