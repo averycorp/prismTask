@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -177,3 +178,14 @@ async def test_parse_debug_does_not_leak_api_key_length(
     assert isinstance(body.get("api_key_configured"), bool)
     assert "model" in body
     assert "anthropic_installed" in body
+
+
+@pytest.mark.asyncio
+async def test_parse_debug_anthropic_not_installed(
+    client: AsyncClient, auth_headers: dict
+):
+    with patch.dict("sys.modules", {"anthropic": None}):
+        resp = await client.get("/api/v1/tasks/parse-debug", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body.get("anthropic_installed") is False
