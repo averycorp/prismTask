@@ -88,13 +88,6 @@ steps:
     exit 1
   waitFor: ['start-postgres']
 
-- id: 'backend-install'
-  name: 'python:3.11'
-  dir: 'backend'
-  entrypoint: 'pip'
-  args: ['install', '-r', 'requirements.txt']
-  waitFor: ['-']
-
 - id: 'backend-lint'
   name: 'python:3.11'
   dir: 'backend'
@@ -112,9 +105,10 @@ steps:
     - 'ENVIRONMENT=dev'
     - 'ANTHROPIC_API_KEY=test-key'
   script: |
+    pip install -r requirements.txt
     alembic upgrade head
     pytest tests/ -x --tb=short -q --junitxml=junit.xml
-  waitFor: ['wait-for-postgres', 'backend-install']
+  waitFor: ['wait-for-postgres']
 
 
 # ==========================================
