@@ -97,105 +97,104 @@ export function WeeklyReviewScreen() {
   const [weekWindow, setWeekWindow] = useState<WeeklyWindow>(() =>
     computeWeekWindow(),
   );
-  const [allTasks, setAllTasks] = useState<Task[] | null>(null);
   const [uiState, setUiState] = useState<UiState>({ kind: 'idle' });
   const [errorDismissed, setErrorDismissed] = useState(false);
 
   const weekLabel = useMemo(() => formatWeekLabel(weekWindow), [weekWindow]);
 
-  // Load the user's tasks once; the aggregator re-runs locally when the
-  // week window changes without re-fetching.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const runReview = useCallback(
+    async (targetWindow: WeeklyWindow, signal?: AbortSignal) => {
+      setUiState({ kind: 'loading' });
+      setErrorDismissed(false);
+
+      let tasks: Task[];
       try {
         const uid = getFirebaseUid();
-        const tasks = await firestoreTasks.getAllTasks(uid);
-        if (!cancelled) setAllTasks(tasks);
+        tasks = await firestoreTasks.getTasksForWeeklyReview(uid, targetWindow);
       } catch {
-        if (!cancelled) toast.error('Failed to load tasks');
+        if (signal?.aborted) return;
+        toast.error('Failed to load tasks');
+        setUiState({ kind: 'idle' });
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
-  const runReview = useCallback(async () => {
-    if (!allTasks) return;
+      if (signal?.aborted) return;
 
-    setUiState({ kind: 'loading' });
-    setErrorDismissed(false);
+      // Step 1: local aggregation (fast, deterministic, always succeeds).
+      const local = aggregateWeek(tasks, targetWindow);
 
-    // Step 1: local aggregation (fast, deterministic, always succeeds).
-    const local = aggregateWeek(allTasks, weekWindow);
-
-    // Step 2: Free users stop here with local-only content. If everything
-    // is empty, surface the Empty state so the screen isn't a blank card.
-    if (!isPro) {
-      if (local.completedCount === 0 && local.slippedCount === 0) {
-        setUiState({ kind: 'empty', local });
-      } else {
-        setUiState({ kind: 'success', local, backend: null });
-        // Persist Free-tier reviews too — Android picks them up on next
-        // pull and renders the same metrics breakdown.
-        void persistWeeklyReview(weekWindow, local, null);
+      // Step 2: Free users stop here with local-only content. If everything
+      // is empty, surface the Empty state so the screen isn't a blank card.
+      if (!isPro) {
+        if (local.completedCount === 0 && local.slippedCount === 0) {
+          setUiState({ kind: 'empty', local });
+        } else {
+          setUiState({ kind: 'success', local, backend: null });
+          // Persist Free-tier reviews too — Android picks them up on next
+          // pull and renders the same metrics breakdown.
+          void persistWeeklyReview(targetWindow, local, null);
+        }
+        return;
       }
-      return;
-    }
 
-    // Step 3: Pro users additionally call the backend. On success,
-    // render the richer narrative; on failure, fall back to local.
-    try {
-      const response = await aiApi.weeklyReview({
-        week_start: weekWindow.weekStartIso,
-        week_end: weekWindow.weekEndIso,
-        completed_tasks: local.completedTasks.map((t) =>
-          taskToSummary(t, { completed: true }),
-        ),
-        slipped_tasks: local.slippedTasks.map((t) =>
-          taskToSummary(t, { completed: false }),
-        ),
-        // habit_summary / pomodoro_summary: intentionally omitted. The
-        // web app doesn't have persistent pomodoro stats, and computing
-        // a habit_summary requires iterating completions per habit,
-        // which is scoped for a dedicated follow-up. Backend treats
-        // missing fields as "not provided" — no prompt section for
-        // either.
-        notes: null,
-      });
+      // Step 3: Pro users additionally call the backend. On success,
+      // render the richer narrative; on failure, fall back to local.
+      try {
+        const response = await aiApi.weeklyReview({
+          week_start: targetWindow.weekStartIso,
+          week_end: targetWindow.weekEndIso,
+          completed_tasks: local.completedTasks.map((t) =>
+            taskToSummary(t, { completed: true }),
+          ),
+          slipped_tasks: local.slippedTasks.map((t) =>
+            taskToSummary(t, { completed: false }),
+          ),
+          // habit_summary / pomodoro_summary: intentionally omitted. The
+          // web app doesn't have persistent pomodoro stats, and computing
+          // a habit_summary requires iterating completions per habit,
+          // which is scoped for a dedicated follow-up. Backend treats
+          // missing fields as "not provided" — no prompt section for
+          // either.
+          notes: null,
+        });
 
-      const backendIsEmpty =
-        response.wins.length === 0 &&
-        response.slips.length === 0 &&
-        response.patterns.length === 0 &&
-        response.next_week_focus.length === 0 &&
-        !response.narrative.trim();
+        if (signal?.aborted) return;
 
-      if (
-        backendIsEmpty &&
-        local.completedCount === 0 &&
-        local.slippedCount === 0
-      ) {
-        setUiState({ kind: 'empty', local });
-      } else {
-        setUiState({ kind: 'success', local, backend: response });
-        // Fire-and-forget persistence to Firestore so Android picks up
-        // the review on next pull. Parity audit C.4a.
-        void persistWeeklyReview(weekWindow, local, response);
+        const backendIsEmpty =
+          response.wins.length === 0 &&
+          response.slips.length === 0 &&
+          response.patterns.length === 0 &&
+          response.next_week_focus.length === 0 &&
+          !response.narrative.trim();
+
+        if (
+          backendIsEmpty &&
+          local.completedCount === 0 &&
+          local.slippedCount === 0
+        ) {
+          setUiState({ kind: 'empty', local });
+        } else {
+          setUiState({ kind: 'success', local, backend: response });
+          // Fire-and-forget persistence to Firestore so Android picks up
+          // the review on next pull. Parity audit C.4a.
+          void persistWeeklyReview(targetWindow, local, response);
+        }
+      } catch (err) {
+        if (signal?.aborted) return;
+
+        console.warn('AI weekly review fell back to local summary', err);
+        setUiState({
+          kind: 'error',
+          local,
+          message: 'AI review unavailable — showing local summary.',
+        });
+        // Still persist the local-only review so cross-device users see
+        // the same week breakdown without re-running the aggregator.
+        void persistWeeklyReview(targetWindow, local, null);
       }
-    } catch (err) {
-      console.warn('AI weekly review fell back to local summary', err);
-      setUiState({
-        kind: 'error',
-        local,
-        message: 'AI review unavailable — showing local summary.',
-      });
-      // Still persist the local-only review so cross-device users see
-      // the same week breakdown without re-running the aggregator.
-      void persistWeeklyReview(weekWindow, local, null);
-    }
-  }, [allTasks, weekWindow, isPro]);
+    },
+    [isPro]
+  );
 
   // Auto-run on mount / week change once tasks are loaded. The eslint
   // rule against synchronous setState-in-effect doesn't fit here: we
@@ -204,11 +203,13 @@ export function WeeklyReviewScreen() {
   // pure useMemo + a separate fetch effect wouldn't compose well
   // because the fetch outcome feeds back into the same ui state.
   useEffect(() => {
-    if (allTasks) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      runReview();
-    }
-  }, [allTasks, weekWindow, runReview]);
+    const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void runReview(weekWindow, controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [weekWindow, runReview]);
 
   const onPrevWeek = () => setWeekWindow((w) => shiftWeekWindow(w, -1));
   const onNextWeek = () => setWeekWindow((w) => shiftWeekWindow(w, 1));
@@ -317,8 +318,8 @@ export function WeeklyReviewScreen() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={runReview}
-            disabled={!allTasks}
+            onClick={() => { void runReview(weekWindow); }}
+            disabled={uiState.kind === 'loading'}
             aria-label="Generate Now"
           >
             <Sparkles className="h-4 w-4" />
