@@ -33,6 +33,8 @@ export function Avatar({ src, name, size = 'md', className = '' }: AvatarProps) 
       <img
         src={src}
         alt={name || 'Avatar'}
+        loading="lazy"
+        decoding="async"
         className={`rounded-full object-cover ${styles.container} ${className}`}
       />
     );
