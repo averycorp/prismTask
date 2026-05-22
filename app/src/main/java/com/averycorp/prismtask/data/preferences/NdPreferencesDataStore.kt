@@ -286,7 +286,7 @@ class NdPreferencesDataStore(
             // Legacy key from pre-R6 backups. The underlying field was removed
             // in the mental-health-first audit § R6 (it duplicated the global
             // ForgivenessPrefs.enabled). Accepted as a no-op so old config
-            // imports don't throw IllegalArgumentException.
+            // restores do not crash.
             "forgiveness_streaks" -> { /* no-op: removed in audit § R6 */ }
             "good_enough_timers_enabled" -> bool()?.let { setGoodEnoughTimersEnabled(it) }
             "default_good_enough_minutes" -> int()?.let { setDefaultGoodEnoughMinutes(it) }
