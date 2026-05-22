@@ -6,10 +6,12 @@ import { useThemeStore } from '@/stores/themeStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { nonArchivedProjects } from '@/utils/projectFilters';
-import { NLPInput } from '@/components/shared/NLPInput';
 import { SearchModal } from '@/components/shared/SearchModal';
 import { Avatar } from '@/components/ui/Avatar';
 import { THEME_ORDER, THEMES } from '@/theme/themes';
+import { lazy, Suspense } from 'react';
+
+const NLPInput = lazy(() => import('@/components/shared/NLPInput').then(m => ({ default: m.NLPInput })));
 
 export function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -98,7 +100,9 @@ export function Header() {
         role="banner"
       >
         {/* NLP Quick Add Bar */}
-        <NLPInput onTaskCreate={handleTaskCreate} />
+        <Suspense fallback={<div className="flex-1" />}>
+          <NLPInput onTaskCreate={handleTaskCreate} />
+        </Suspense>
 
         {/* Search Button */}
         <button

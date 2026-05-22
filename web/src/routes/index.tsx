@@ -11,13 +11,13 @@ import { RestorePendingGate } from './RestorePendingGate';
 import { TaskListSkeleton, ProjectListSkeleton, HabitListSkeleton, SettingsSkeleton } from '@/components/shared/SkeletonLoader';
 
 // Auth screens (eagerly loaded — first screens users see)
-import { LoginScreen } from '@/features/auth/LoginScreen';
-import { RegisterScreen } from '@/features/auth/RegisterScreen';
+const LoginScreen = lazy(() => import('@/features/auth/LoginScreen').then(m => ({ default: m.LoginScreen })));
+const RegisterScreen = lazy(() => import('@/features/auth/RegisterScreen').then(m => ({ default: m.RegisterScreen })));
 
 // Core screens (eagerly loaded — most common)
-import { TodayScreen } from '@/features/today/TodayScreen';
-import { TaskListScreen } from '@/features/tasks/TaskListScreen';
-import { ProjectListScreen } from '@/features/projects/ProjectListScreen';
+const TodayScreen = lazy(() => import('@/features/today/TodayScreen').then(m => ({ default: m.TodayScreen })));
+const TaskListScreen = lazy(() => import('@/features/tasks/TaskListScreen').then(m => ({ default: m.TaskListScreen })));
+const ProjectListScreen = lazy(() => import('@/features/projects/ProjectListScreen').then(m => ({ default: m.ProjectListScreen })));
 
 // Lazy-loaded screens (loaded on demand)
 /* eslint-disable react-refresh/only-export-components */
@@ -90,8 +90,8 @@ function LoadingFallback() {
 
 const routes: RouteObject[] = [
   // Public routes
-  { path: '/login', element: <LoginScreen /> },
-  { path: '/register', element: <RegisterScreen /> },
+  { path: '/login', element: <LazyRoute Component={LoginScreen} /> },
+  { path: '/register', element: <LazyRoute Component={RegisterScreen} /> },
 
   // Onboarding is protected (auth required) but sits outside the AppShell
   // so it renders full-screen without the sidebar/header, and must not
@@ -122,10 +122,10 @@ const routes: RouteObject[] = [
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <TodayScreen /> },
-      { path: 'tasks', element: <TaskListScreen /> },
+      { index: true, element: <LazyRoute Component={TodayScreen} /> },
+      { path: 'tasks', element: <LazyRoute Component={TaskListScreen} fallback={<TaskListSkeleton />} /> },
       { path: 'tasks/:id', element: <LazyRoute Component={TaskDetailScreen} fallback={<TaskListSkeleton />} /> },
-      { path: 'projects', element: <ProjectListScreen /> },
+      { path: 'projects', element: <LazyRoute Component={ProjectListScreen} fallback={<ProjectListSkeleton />} /> },
       { path: 'projects/:id', element: <LazyRoute Component={ProjectDetailScreen} fallback={<ProjectListSkeleton />} /> },
       { path: 'projects/:id/roadmap', element: <LazyRoute Component={ProjectRoadmapScreen} fallback={<ProjectListSkeleton />} /> },
       { path: 'habits', element: <LazyRoute Component={HabitListScreen} fallback={<HabitListSkeleton />} /> },
