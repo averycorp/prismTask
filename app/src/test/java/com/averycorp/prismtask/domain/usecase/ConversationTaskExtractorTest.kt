@@ -82,8 +82,15 @@ class ConversationTaskExtractorTest {
     }
 
     @Test
-    fun `very short title is rejected`() {
-        assertTrue(extractor.extract("TODO: x").isEmpty())
+    fun `empty title is rejected`() {
+        assertTrue(extractor.extract("TODO:   ").isEmpty())
+    }
+
+    @Test
+    fun `very short title is extracted`() {
+        val result = extractor.extract("TODO: QA")
+        assertEquals(1, result.size)
+        assertEquals("QA", result.first().title)
     }
 
     @Test
