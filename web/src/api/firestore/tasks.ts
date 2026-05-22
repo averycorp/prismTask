@@ -357,6 +357,49 @@ export async function getTodayTasks(
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
 }
 
+export async function getWeeklyReviewTasks(
+  uid: string,
+  weekStartMs: number,
+  weekEndMs: number,
+): Promise<Task[]> {
+  const completedQ = query(
+    tasksCol(uid),
+    where('completedAt', '>=', weekStartMs),
+    where('completedAt', '<=', weekEndMs)
+  );
+  const dueQ = query(
+    tasksCol(uid),
+    where('dueDate', '>=', weekStartMs),
+    where('dueDate', '<=', weekEndMs)
+  );
+  const plannedQ = query(
+    tasksCol(uid),
+    where('plannedDate', '>=', weekStartMs),
+    where('plannedDate', '<=', weekEndMs)
+  );
+
+  const [completedSnap, dueSnap, plannedSnap] = await Promise.all([
+    getDocs(completedQ),
+    getDocs(dueQ),
+    getDocs(plannedQ),
+  ]);
+
+  const tasksMap = new Map<string, Task>();
+  const addDocs = (snap: import('firebase/firestore').QuerySnapshot<import('firebase/firestore').DocumentData, import('firebase/firestore').DocumentData>) => {
+    snap.docs.forEach((d) => {
+      if (!tasksMap.has(d.id)) {
+        tasksMap.set(d.id, docToTask(d.id, d.data(), uid));
+      }
+    });
+  };
+
+  addDocs(completedSnap);
+  addDocs(dueSnap);
+  addDocs(plannedSnap);
+
+  return Array.from(tasksMap.values());
+}
+
 export async function getOverdueTasks(
   uid: string,
   startOfDayHour: number,

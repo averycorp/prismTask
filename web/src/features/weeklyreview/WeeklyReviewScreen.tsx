@@ -103,14 +103,18 @@ export function WeeklyReviewScreen() {
 
   const weekLabel = useMemo(() => formatWeekLabel(weekWindow), [weekWindow]);
 
-  // Load the user's tasks once; the aggregator re-runs locally when the
-  // week window changes without re-fetching.
+  // Load the subset of tasks relevant to the current week window.
+  // We re-fetch when the week window changes to avoid loading all user tasks.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const uid = getFirebaseUid();
-        const tasks = await firestoreTasks.getAllTasks(uid);
+        const tasks = await firestoreTasks.getWeeklyReviewTasks(
+          uid,
+          weekWindow.weekStartMs,
+          weekWindow.weekEndMs
+        );
         if (!cancelled) setAllTasks(tasks);
       } catch {
         if (!cancelled) toast.error('Failed to load tasks');
@@ -119,7 +123,7 @@ export function WeeklyReviewScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [weekWindow.weekStartMs, weekWindow.weekEndMs]);
 
   const runReview = useCallback(async () => {
     if (!allTasks) return;
