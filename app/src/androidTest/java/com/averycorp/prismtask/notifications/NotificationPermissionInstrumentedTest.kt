@@ -1,5 +1,6 @@
 package com.averycorp.prismtask.notifications
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
@@ -8,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assume.assumeTrue
@@ -57,6 +59,7 @@ class NotificationPermissionInstrumentedTest {
         }
     }
 
+
     @Test
     fun notifyOnInvalidChannel_doesNotCrash_onApi33Plus() {
         assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -105,6 +108,57 @@ class NotificationPermissionInstrumentedTest {
             NotificationManagerCompat.from(context).cancel(30_001)
             NotificationManagerCompat.from(context).cancel(30_002)
             manager.deleteNotificationChannel(validChannelId)
+        }
+    }
+
+    @Test
+    fun notify_doesNotCrash_whenPermissionRevoked_onApi33Plus() {
+        assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val packageName = context.packageName
+        val manager = context.getSystemService(NotificationManager::class.java)
+        assertNotNull("NotificationManager system service must be available", manager)
+
+        // Revoke the POST_NOTIFICATIONS permission
+        val device = UiDevice.getInstance(instrumentation)
+        device.executeShellCommand("pm revoke $packageName ${Manifest.permission.POST_NOTIFICATIONS}")
+
+        val validChannelId = "__strict_permission_test_channel__"
+        val validChannel = NotificationChannel(
+            validChannelId,
+            "strict permission test channel",
+            NotificationManager.IMPORTANCE_LOW
+        )
+        manager.createNotificationChannel(validChannel)
+
+        try {
+            val notification = NotificationCompat.Builder(context, validChannelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("strict perm test")
+                .setContentText("Must not crash when permission strictly revoked")
+                .setAutoCancel(true)
+                .build()
+
+            // NotificationManagerCompat.notify should absorb SecurityException
+            // or silently fail if notifications are disabled.
+            NotificationManagerCompat.from(context).notify(30_003, notification)
+
+            // Also verify the raw NotificationManager behaves as expected (by
+            // either succeeding or throwing SecurityException which we catch)
+            try {
+                manager.notify(30_004, notification)
+            } catch (_: SecurityException) {
+                // Expected behavior when strictly revoked on some OEM builds
+            }
+        } finally {
+            NotificationManagerCompat.from(context).cancel(30_003)
+            NotificationManagerCompat.from(context).cancel(30_004)
+            manager.deleteNotificationChannel(validChannelId)
+
+            // Grant the permission back
+            device.executeShellCommand("pm grant $packageName ${Manifest.permission.POST_NOTIFICATIONS}")
         }
     }
 }

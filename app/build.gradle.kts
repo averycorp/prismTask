@@ -393,6 +393,7 @@ dependencies {
     androidTestImplementation("com.google.dagger:hilt-android-testing:2.59.2")
     androidTestImplementation("io.mockk:mockk-android:1.13.13")
     androidTestImplementation("androidx.work:work-testing:2.9.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     // Required by `testOptions.execution = "ANDROIDX_TEST_ORCHESTRATOR"`.
     // The `androidTestUtil` configuration installs the orchestrator APK
     // alongside the test APK rather than bundling it.
