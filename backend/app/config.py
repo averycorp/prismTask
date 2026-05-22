@@ -1,18 +1,7 @@
-import secrets
 from functools import lru_cache
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-
-
-@lru_cache(maxsize=1)
-def _get_dev_secret() -> str:
-    """Return a process-lifetime random secret for development.
-
-    Production must set JWT_SECRET_KEY explicitly — this helper is only
-    consulted when running in dev without an explicit secret.
-    """
-    return secrets.token_urlsafe(64)
 
 
 class Settings(BaseSettings):
@@ -110,12 +99,9 @@ class Settings(BaseSettings):
         return self.CORS_ORIGINS
 
     def get_jwt_secret(self) -> str:
-        if self.JWT_SECRET_KEY:
-            return self.JWT_SECRET_KEY
-        if self.is_production:
-            raise RuntimeError("JWT_SECRET_KEY must be set in production")
-        # Auto-generate for local dev only (tokens won't persist across restarts)
-        return _get_dev_secret()
+        if not self.JWT_SECRET_KEY:
+            raise RuntimeError("JWT_SECRET_KEY must be set")
+        return self.JWT_SECRET_KEY
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
