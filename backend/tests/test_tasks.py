@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -177,3 +178,26 @@ async def test_parse_debug_does_not_leak_api_key_length(
     assert isinstance(body.get("api_key_configured"), bool)
     assert "model" in body
     assert "anthropic_installed" in body
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exception_type,exception_message", [
+    (ValueError, "Invalid date format"),
+    (RuntimeError, "Failed to connect to NLP service"),
+])
+async def test_parse_task_error_handling(
+    client: AsyncClient,
+    auth_headers: dict,
+    exception_type: type[Exception],
+    exception_message: str,
+):
+    with patch("app.services.nlp_parser.parse_task_input") as mock_parse:
+        mock_parse.side_effect = exception_type(exception_message)
+
+        resp = await client.post(
+            "/api/v1/tasks/parse",
+            json={"text": "Buy groceries tomorrow"},
+            headers=auth_headers,
+        )
+
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == exception_message
