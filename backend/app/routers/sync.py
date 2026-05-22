@@ -1,6 +1,7 @@
 import logging
 from datetime import date as date_cls, datetime, timezone
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Iterable
 
 from fastapi import APIRouter, Depends, Query
 from prometheus_client import Counter
@@ -180,8 +181,74 @@ def _filter_writable(entity_type: str, data: dict) -> dict:
     return filtered
 
 
-async def _validate_foreign_keys(
-    entity_type: str, data: dict, user: User, db: AsyncSession
+
+@dataclass
+class ResolutionCache:
+    # model -> set of valid integer ids owned by the user
+    valid_fks: dict[type, set[int]] = field(default_factory=dict)
+    # model -> dict mapping cloud_id to valid integer id
+    resolved_cloud_fks: dict[type, dict[str, int]] = field(default_factory=dict)
+
+
+async def _prefetch_fks(
+    operations: Iterable[SyncOperation], user: User, db: AsyncSession
+) -> ResolutionCache:
+    """Bulk pre-fetch all foreign keys and cloud IDs referenced in the push payload.
+    This eliminates N+1 queries during validation.
+    """
+    cache = ResolutionCache()
+
+    # model -> set of ids to fetch
+    fk_requests: dict[type, set[int]] = {}
+    # model -> set of cloud_ids to fetch
+    cloud_fk_requests: dict[type, set[str]] = {}
+
+    for op in operations:
+        if op.operation not in ("create", "update") or not op.data:
+            continue
+
+        # Collect local FKs
+        fks = USER_SCOPED_FKS.get(op.entity_type)
+        if fks:
+            for column, model in fks.items():
+                val = op.data.get(column)
+                if val is not None:
+                    fk_requests.setdefault(model, set()).add(val)
+
+        # Collect cloud FKs
+        cloud_fks = _MEDICATION_CLOUD_FK_MAP.get(op.entity_type)
+        if cloud_fks:
+            for cloud_key, (model, _) in cloud_fks.items():
+                val = op.data.get(cloud_key)
+                if val is not None:
+                    cloud_fk_requests.setdefault(model, set()).add(val)
+
+    # Execute batch queries for local FKs
+    for model, ids in fk_requests.items():
+        if not ids:
+            continue
+        query = select(model.id).where(model.id.in_(ids))
+        if hasattr(model, "user_id"):
+            query = query.where(model.user_id == user.id)
+        result = await db.execute(query)
+        cache.valid_fks[model] = set(result.scalars().all())
+
+    # Execute batch queries for cloud FKs
+    for model, cloud_ids in cloud_fk_requests.items():
+        if not cloud_ids:
+            continue
+        query = select(model.cloud_id, model.id).where(model.cloud_id.in_(cloud_ids))
+        if hasattr(model, "user_id"):
+            query = query.where(model.user_id == user.id)
+        result = await db.execute(query)
+        # Result is (cloud_id, id) tuples
+        cache.resolved_cloud_fks[model] = {row[0]: row[1] for row in result.all()}
+
+    return cache
+
+
+def _validate_foreign_keys(
+    entity_type: str, data: dict, cache: ResolutionCache
 ) -> str | None:
     """Ensure any user-scoped FK in ``data`` points to a row owned by ``user``.
 
@@ -194,17 +261,14 @@ async def _validate_foreign_keys(
         value = data.get(column)
         if value is None:
             continue
-        query = select(model.id).where(model.id == value)
-        if hasattr(model, "user_id"):
-            query = query.where(model.user_id == user.id)
-        result = await db.execute(query)
-        if result.scalar_one_or_none() is None:
+        valid_set = cache.valid_fks.get(model, set())
+        if value not in valid_set:
             return f"Invalid {column} on {entity_type}: {value} not found"
     return None
 
 
-async def _resolve_cloud_fk_for_medication(
-    entity_type: str, data: dict, user: User, db: AsyncSession
+def _resolve_cloud_fk_for_medication(
+    entity_type: str, data: dict, cache: ResolutionCache
 ) -> str | None:
     """Resolve every `*_cloud_id` reference in `data` for medication
     tier_state / mark into the corresponding integer FK column.
@@ -221,11 +285,10 @@ async def _resolve_cloud_fk_for_medication(
         cloud_id = data.pop(cloud_key, None)
         if not cloud_id:
             return f"{entity_type}.{cloud_key} is required"
-        query = select(model.id).where(model.cloud_id == cloud_id)
-        if hasattr(model, "user_id"):
-            query = query.where(model.user_id == user.id)
-        result = await db.execute(query)
-        resolved = result.scalar_one_or_none()
+
+        resolved_map = cache.resolved_cloud_fks.get(model, {})
+        resolved = resolved_map.get(cloud_id)
+
         if resolved is None:
             return (
                 f"{entity_type}.{cloud_key}={cloud_id} did not resolve "
@@ -325,7 +388,7 @@ async def _emit_audit_events(db: AsyncSession, records: list[dict[str, Any]]) ->
 
 
 async def _process_operation(
-    op: SyncOperation, user: User, db: AsyncSession
+    op: SyncOperation, user: User, db: AsyncSession, cache: ResolutionCache
 ) -> str | None:
     model = ENTITY_MAP.get(op.entity_type)
     if not model:
@@ -335,11 +398,11 @@ async def _process_operation(
         if not op.data:
             return "Create operation requires data"
         data = _filter_writable(op.entity_type, dict(op.data))
-        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db)
+        fk_error = _validate_foreign_keys(op.entity_type, data, cache)
         if fk_error:
             return fk_error
-        cloud_fk_error = await _resolve_cloud_fk_for_medication(
-            op.entity_type, data, user, db
+        cloud_fk_error = _resolve_cloud_fk_for_medication(
+            op.entity_type, data, cache
         )
         if cloud_fk_error:
             return cloud_fk_error
@@ -362,8 +425,25 @@ async def _process_operation(
                 data[key] = _parse_dt(data[key])
         if "log_date" in data:
             data["log_date"] = _parse_date(data["log_date"])
+
+        # We need to make sure the entity gets an ID assigned, so we can put it in cache.
+        # But `db.add` doesn't populate `id` until flush.
         entity = model(**data)
+
+        # If the user provides an id, we can cache it immediately.
+        if "id" in op.data:
+            entity.id = op.data["id"]
+            cache.valid_fks.setdefault(model, set()).add(entity.id)
+
+        # We need to flush to get the DB-assigned ID if not provided,
+        # otherwise subsequent operations in the same batch won't be able to reference it.
         db.add(entity)
+        await db.flush()
+        cache.valid_fks.setdefault(model, set()).add(entity.id)
+
+        if hasattr(entity, "cloud_id") and entity.cloud_id:
+            cache.resolved_cloud_fks.setdefault(model, {})[entity.cloud_id] = entity.id
+
 
     elif op.operation == "update":
         if not op.entity_id or not op.data:
@@ -376,11 +456,11 @@ async def _process_operation(
         if not entity:
             return f"{op.entity_type} {op.entity_id} not found"
         data = _filter_writable(op.entity_type, dict(op.data))
-        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db)
+        fk_error = _validate_foreign_keys(op.entity_type, data, cache)
         if fk_error:
             return fk_error
-        cloud_fk_error = await _resolve_cloud_fk_for_medication(
-            op.entity_type, data, user, db
+        cloud_fk_error = _resolve_cloud_fk_for_medication(
+            op.entity_type, data, cache
         )
         if cloud_fk_error:
             return cloud_fk_error
@@ -423,8 +503,10 @@ async def sync_push(
     processed = 0
     audit_records: list[dict[str, Any]] = []
 
+    cache = await _prefetch_fks(data.operations, current_user, db)
+
     for op in data.operations:
-        error = await _process_operation(op, current_user, db)
+        error = await _process_operation(op, current_user, db, cache)
         if error:
             errors.append(error)
             continue
