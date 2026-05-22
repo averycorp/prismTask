@@ -4,7 +4,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -270,18 +270,15 @@ async def batch_suggestions(
                 continue
 
     # Reject
-    for sid in body.reject:
+    if body.reject:
         result = await db.execute(
-            select(SuggestedTask).where(
-                SuggestedTask.id == sid,
+            update(SuggestedTask).where(
+                SuggestedTask.id.in_(body.reject),
                 SuggestedTask.user_id == current_user.id,
                 SuggestedTask.status == SuggestionStatus.PENDING,
-            )
+            ).values(status=SuggestionStatus.REJECTED)
         )
-        suggestion = result.scalar_one_or_none()
-        if suggestion:
-            suggestion.status = SuggestionStatus.REJECTED
-            rejected_count += 1
+        rejected_count += result.rowcount
 
     await db.flush()
 
