@@ -2,11 +2,23 @@ import pytest
 import time
 import json
 from httpx import AsyncClient
-from tests.test_templates import goal_and_project
+
+@pytest.fixture
+async def my_goal_and_project(client: AsyncClient, auth_headers: dict):
+    goal_resp = await client.post(
+        "/api/v1/goals", json={"title": "Template Goal"}, headers=auth_headers
+    )
+    goal_id = goal_resp.json()["id"]
+    project_resp = await client.post(
+        f"/api/v1/goals/{goal_id}/projects",
+        json={"name": "Template Project"},
+        headers=auth_headers,
+    )
+    return goal_id, project_resp.json()["id"]
 
 @pytest.mark.asyncio
-async def test_benchmark_use_template(client: AsyncClient, auth_headers: dict, goal_and_project):
-    _, project_id = goal_and_project
+async def test_benchmark_use_template(client: AsyncClient, auth_headers: dict, my_goal_and_project):
+    _, project_id = my_goal_and_project
     # Create 50 tags
     tag_ids = []
     for i in range(50):
@@ -39,6 +51,6 @@ async def test_benchmark_use_template(client: AsyncClient, auth_headers: dict, g
     end_time = time.perf_counter()
 
     avg_time = (end_time - start_time) / iterations * 1000
-    print(f"\n--- BENCHMARK RESULTS ---")
+    print("\n--- BENCHMARK RESULTS ---")
     print(f"Average time per template use (50 tags): {avg_time:.2f} ms")
-    print(f"-------------------------\n")
+    print("-------------------------\n")
