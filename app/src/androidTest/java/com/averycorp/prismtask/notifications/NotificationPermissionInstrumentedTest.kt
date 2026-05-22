@@ -59,7 +59,6 @@ class NotificationPermissionInstrumentedTest {
         }
     }
 
-
     @Test
     fun notifyOnInvalidChannel_doesNotCrash_onApi33Plus() {
         assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
