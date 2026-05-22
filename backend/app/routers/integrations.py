@@ -270,18 +270,19 @@ async def batch_suggestions(
                 continue
 
     # Reject
-    for sid in body.reject:
+    if body.reject:
+        from sqlalchemy import update
+
         result = await db.execute(
-            select(SuggestedTask).where(
-                SuggestedTask.id == sid,
+            update(SuggestedTask)
+            .where(
+                SuggestedTask.id.in_(body.reject),
                 SuggestedTask.user_id == current_user.id,
                 SuggestedTask.status == SuggestionStatus.PENDING,
             )
+            .values(status=SuggestionStatus.REJECTED)
         )
-        suggestion = result.scalar_one_or_none()
-        if suggestion:
-            suggestion.status = SuggestionStatus.REJECTED
-            rejected_count += 1
+        rejected_count += result.rowcount
 
     await db.flush()
 
