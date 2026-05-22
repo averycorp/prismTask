@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Date
 import javax.inject.Inject
 
@@ -84,8 +85,6 @@ constructor(
     }
 
     fun onEmailSignUp(email: String, password: String) {
-        // TODO(email-verification): call user.sendEmailVerification() and
-        // gate sync until verified once the verification flow lands.
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             val result = authManager.signUpWithEmail(email, password)
@@ -95,6 +94,12 @@ constructor(
                 )
                 return@launch
             }
+            try {
+                result.getOrNull()?.sendEmailVerification()?.await()
+            } catch (e: Exception) {
+                // Ignore failures to send verification email so signup completes
+            }
+            // TODO(email-verification): gate sync until verified once the verification flow lands.
             handlePostAuthDeletionGuard()
         }
     }

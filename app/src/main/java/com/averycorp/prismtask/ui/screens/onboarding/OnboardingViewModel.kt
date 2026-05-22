@@ -250,15 +250,19 @@ constructor(
     }
 
     fun onEmailSignUp(email: String, password: String) {
-        // TODO(email-verification): call user.sendEmailVerification() and
-        // gate sync until verified once the verification flow lands.
         ifNotPreview {
             viewModelScope.launch {
                 _signInState.value = SignInState.Loading
                 val result = authManager.signUpWithEmail(email, password)
                 result.fold(
                     onSuccess = { user ->
+                        try {
+                            user.sendEmailVerification().await()
+                        } catch (e: Exception) {
+                            // Ignore failures to send verification email so signup completes
+                        }
                         _signInState.value = SignInState.SignedIn(user.email ?: email)
+                        // TODO(email-verification): gate sync until verified once the verification flow lands.
                         syncService.startAutoSync()
                         backendSyncService.startAutoSync()
                         checkExistingUserAndMaybeSkip()
