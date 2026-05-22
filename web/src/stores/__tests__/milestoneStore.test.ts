@@ -59,4 +59,12 @@ describe('useMilestoneStore', () => {
     useMilestoneStore.getState().reset();
     expect(useMilestoneStore.getState().milestones).toEqual([]);
   });
+
+  it('reset can be called multiple times safely', () => {
+    useMilestoneStore.setState({ milestones: [sampleMilestone] });
+    useMilestoneStore.getState().reset();
+    useMilestoneStore.getState().reset();
+    useMilestoneStore.getState().reset();
+    expect(useMilestoneStore.getState().milestones).toEqual([]);
+  });
 });
