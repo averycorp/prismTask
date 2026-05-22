@@ -316,7 +316,7 @@ internal class EntityImporters(
     @Suppress("UNUSED_PARAMETER")
     suspend fun importLeisureLogs(ctx: ImportContext, root: JsonObject) {
         // Leisure Budget v2.0: v1.x leisure_logs format is no longer
-        // imported — the table was dropped in migration 81→82. v2.0
+        // supported — the table was dropped in migration 81→82. v2.0
         // exports use the new leisure_activities / leisure_sessions
         // shape; round-tripping a pre-v82 export is intentionally a
         // no-op (the rows wouldn't translate into the v2.0 model
