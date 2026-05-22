@@ -249,16 +249,16 @@ async def batch_suggestions(
     rejected_count = 0
 
     # Accept
-    for sid in body.accept:
+    if body.accept:
         result = await db.execute(
             select(SuggestedTask).where(
-                SuggestedTask.id == sid,
+                SuggestedTask.id.in_(body.accept),
                 SuggestedTask.user_id == current_user.id,
                 SuggestedTask.status == SuggestionStatus.PENDING,
             )
         )
-        suggestion = result.scalar_one_or_none()
-        if suggestion:
+        suggestions = result.scalars().all()
+        for suggestion in suggestions:
             try:
                 task = await accept_suggestion(db, suggestion, current_user.id)
                 accepted_tasks.append({
@@ -270,16 +270,16 @@ async def batch_suggestions(
                 continue
 
     # Reject
-    for sid in body.reject:
+    if body.reject:
         result = await db.execute(
             select(SuggestedTask).where(
-                SuggestedTask.id == sid,
+                SuggestedTask.id.in_(body.reject),
                 SuggestedTask.user_id == current_user.id,
                 SuggestedTask.status == SuggestionStatus.PENDING,
             )
         )
-        suggestion = result.scalar_one_or_none()
-        if suggestion:
+        suggestions = result.scalars().all()
+        for suggestion in suggestions:
             suggestion.status = SuggestionStatus.REJECTED
             rejected_count += 1
 
