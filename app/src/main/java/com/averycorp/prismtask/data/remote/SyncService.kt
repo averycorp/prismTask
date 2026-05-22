@@ -1317,7 +1317,7 @@ constructor(
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
     // Dispatch across every synced entityType — splitting the `when` is not
     // worth the indirection since each branch is only a DAO lookup + mapper
-    // call. TODO: refactor pushCreate to reduce early return statements.
+    // call.
     private suspend fun pushCreate(meta: SyncMetadataEntity) {
         val collection = userCollection(collectionNameFor(meta.entityType)) ?: return
         // Deterministic doc id for medication_tier_state (parity Batch 5
@@ -1364,9 +1364,17 @@ constructor(
             return
         }
         val docRef = collection.document()
-        val data = when (meta.entityType) {
+        val data = getPayloadForEntity(meta) ?: return
+        docRef.set(data).await()
+        syncMetadataDao.upsert(meta.copy(cloudId = docRef.id, pendingAction = null, lastSyncedAt = System.currentTimeMillis()))
+    }
+
+
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
+    private suspend fun getPayloadForEntity(meta: SyncMetadataEntity): Map<String, Any?>? {
+        return when (meta.entityType) {
             "task" -> {
-                val task = taskDao.getTaskByIdOnce(meta.localId) ?: return
+                val task = taskDao.getTaskByIdOnce(meta.localId) ?: return null
                 val tagIds = tagDao.getTagIdsForTaskOnce(task.id).mapNotNull { syncMetadataDao.getCloudId(it, "tag") }
                 val projectCloudId = task.projectId?.let { syncMetadataDao.getCloudId(it, "project") }
                 val parentTaskCloudId = task.parentTaskId?.let { syncMetadataDao.getCloudId(it, "task") }
@@ -1375,15 +1383,15 @@ constructor(
                 SyncMapper.taskToMap(task, tagIds, projectCloudId, parentTaskCloudId, sourceHabitCloudId, phaseCloudId)
             }
             "project" -> {
-                val project = projectDao.getProjectByIdOnce(meta.localId) ?: return
+                val project = projectDao.getProjectByIdOnce(meta.localId) ?: return null
                 SyncMapper.projectToMap(project)
             }
             "tag" -> {
-                val tag = tagDao.getTagByIdOnce(meta.localId) ?: return
+                val tag = tagDao.getTagByIdOnce(meta.localId) ?: return null
                 SyncMapper.tagToMap(tag)
             }
             "habit" -> {
-                val habit = habitDao.getHabitByIdOnce(meta.localId) ?: return
+                val habit = habitDao.getHabitByIdOnce(meta.localId) ?: return null
                 SyncMapper.habitToMap(habit)
             }
             "habit_completion" -> {
@@ -1396,152 +1404,152 @@ constructor(
                         status = "error",
                         detail = "completion not found for localId=${meta.localId}"
                     )
-                    return
+                    return null
                 }
-                val habitCloudId = syncMetadataDao.getCloudId(completion.habitId, "habit") ?: return
+                val habitCloudId = syncMetadataDao.getCloudId(completion.habitId, "habit") ?: return null
                 SyncMapper.habitCompletionToMap(completion, habitCloudId)
             }
             "habit_log" -> {
                 val logs = habitLogDao.getAllLogsOnce()
-                val log = logs.find { it.id == meta.localId } ?: return
-                val habitCloudId = syncMetadataDao.getCloudId(log.habitId, "habit") ?: return
+                val log = logs.find { it.id == meta.localId } ?: return null
+                val habitCloudId = syncMetadataDao.getCloudId(log.habitId, "habit") ?: return null
                 SyncMapper.habitLogToMap(log, habitCloudId)
             }
             "task_completion" -> {
                 val completion = taskCompletionDao.getAllCompletionsOnce().find { it.id == meta.localId }
-                    ?: return
+                    ?: return null
                 val taskCloudId = completion.taskId?.let { syncMetadataDao.getCloudId(it, "task") }
                 val projectCloudId = completion.projectId?.let { syncMetadataDao.getCloudId(it, "project") }
                 SyncMapper.taskCompletionToMap(completion, taskCloudId, projectCloudId)
             }
             "task_timing" -> {
-                val timing = taskTimingDao.getByIdOnce(meta.localId) ?: return
+                val timing = taskTimingDao.getByIdOnce(meta.localId) ?: return null
                 val taskCloudId = syncMetadataDao.getCloudId(timing.taskId, "task")
                 SyncMapper.taskTimingToMap(timing, taskCloudId)
             }
             "task_template" -> {
-                val template = taskTemplateDao.getTemplateById(meta.localId) ?: return
+                val template = taskTemplateDao.getTemplateById(meta.localId) ?: return null
                 val templateProjectCloudId = template.templateProjectId?.let { syncMetadataDao.getCloudId(it, "project") }
                 SyncMapper.taskTemplateToMap(template, templateProjectCloudId)
             }
             "course" -> {
-                val course = schoolworkDao.getCourseById(meta.localId) ?: return
+                val course = schoolworkDao.getCourseById(meta.localId) ?: return null
                 SyncMapper.courseToMap(course)
             }
             "course_completion" -> {
-                val completion = schoolworkDao.getAllCompletionsOnce().find { it.id == meta.localId } ?: return
-                val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: return
+                val completion = schoolworkDao.getAllCompletionsOnce().find { it.id == meta.localId } ?: return null
+                val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: return null
                 SyncMapper.courseCompletionToMap(completion, courseCloudId)
             }
             "self_care_step" -> {
-                val step = selfCareDao.getAllStepsOnce().find { it.id == meta.localId } ?: return
+                val step = selfCareDao.getAllStepsOnce().find { it.id == meta.localId } ?: return null
                 SyncMapper.selfCareStepToMap(step)
             }
             "self_care_log" -> {
-                val log = selfCareDao.getAllLogsOnce().find { it.id == meta.localId } ?: return
+                val log = selfCareDao.getAllLogsOnce().find { it.id == meta.localId } ?: return null
                 SyncMapper.selfCareLogToMap(log)
             }
             "medication" -> {
-                val med = medicationDao.getByIdOnce(meta.localId) ?: return
+                val med = medicationDao.getByIdOnce(meta.localId) ?: return null
                 val slotCloudIds = medicationSlotDao.getSlotIdsForMedicationOnce(med.id)
                     .mapNotNull { syncMetadataDao.getCloudId(it, "medication_slot") }
                 MedicationSyncMapper.medicationToMap(med, slotCloudIds)
             }
             "medication_dose" -> {
-                val dose = medicationDoseDao.getAllOnce().find { it.id == meta.localId } ?: return
+                val dose = medicationDoseDao.getAllOnce().find { it.id == meta.localId } ?: return null
                 val medCloudId = if (dose.medicationId == null) {
                     null
                 } else {
-                    syncMetadataDao.getCloudId(dose.medicationId, "medication") ?: return
+                    syncMetadataDao.getCloudId(dose.medicationId, "medication") ?: return null
                 }
                 MedicationSyncMapper.medicationDoseToMap(dose, medCloudId)
             }
             "medication_slot" -> {
-                val slot = medicationSlotDao.getByIdOnce(meta.localId) ?: return
+                val slot = medicationSlotDao.getByIdOnce(meta.localId) ?: return null
                 MedicationSyncMapper.medicationSlotToMap(slot)
             }
             "medication_slot_override" -> {
-                val override = medicationSlotOverrideDao.getByIdOnce(meta.localId) ?: return
-                val medCloudId = syncMetadataDao.getCloudId(override.medicationId, "medication") ?: return
-                val slotCloudId = syncMetadataDao.getCloudId(override.slotId, "medication_slot") ?: return
+                val override = medicationSlotOverrideDao.getByIdOnce(meta.localId) ?: return null
+                val medCloudId = syncMetadataDao.getCloudId(override.medicationId, "medication") ?: return null
+                val slotCloudId = syncMetadataDao.getCloudId(override.slotId, "medication_slot") ?: return null
                 MedicationSyncMapper.medicationSlotOverrideToMap(override, medCloudId, slotCloudId)
             }
             "medication_tier_state" -> {
-                val state = medicationTierStateDao.getByIdOnce(meta.localId) ?: return
-                val medCloudId = syncMetadataDao.getCloudId(state.medicationId, "medication") ?: return
-                val slotCloudId = syncMetadataDao.getCloudId(state.slotId, "medication_slot") ?: return
+                val state = medicationTierStateDao.getByIdOnce(meta.localId) ?: return null
+                val medCloudId = syncMetadataDao.getCloudId(state.medicationId, "medication") ?: return null
+                val slotCloudId = syncMetadataDao.getCloudId(state.slotId, "medication_slot") ?: return null
                 MedicationSyncMapper.medicationTierStateToMap(state, medCloudId, slotCloudId)
             }
             "notification_profile" -> {
-                val profile = notificationProfileDao.getById(meta.localId) ?: return
+                val profile = notificationProfileDao.getById(meta.localId) ?: return null
                 SyncMapper.notificationProfileToMap(profile)
             }
             "custom_sound" -> {
-                val sound = customSoundDao.getById(meta.localId) ?: return
+                val sound = customSoundDao.getById(meta.localId) ?: return null
                 SyncMapper.customSoundToMap(sound)
             }
             "saved_filter" -> {
-                val filter = savedFilterDao.getByIdOnce(meta.localId) ?: return
+                val filter = savedFilterDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.savedFilterToMap(filter)
             }
             "nlp_shortcut" -> {
-                val shortcut = nlpShortcutDao.getByIdOnce(meta.localId) ?: return
+                val shortcut = nlpShortcutDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.nlpShortcutToMap(shortcut)
             }
             "habit_template" -> {
-                val template = habitTemplateDao.getById(meta.localId) ?: return
+                val template = habitTemplateDao.getById(meta.localId) ?: return null
                 SyncMapper.habitTemplateToMap(template)
             }
             "project_template" -> {
-                val template = projectTemplateDao.getById(meta.localId) ?: return
+                val template = projectTemplateDao.getById(meta.localId) ?: return null
                 SyncMapper.projectTemplateToMap(template)
             }
             "boundary_rule" -> {
-                val rule = boundaryRuleDao.getByIdOnce(meta.localId) ?: return
+                val rule = boundaryRuleDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.boundaryRuleToMap(rule)
             }
             "automation_rule" -> {
-                val rule = automationRuleDao.getByIdOnce(meta.localId) ?: return
+                val rule = automationRuleDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.automationRuleToMap(rule)
             }
             "check_in_log" -> {
-                val log = checkInLogDao.getByIdOnce(meta.localId) ?: return
+                val log = checkInLogDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.checkInLogToMap(log)
             }
             "mood_energy_log" -> {
-                val log = moodEnergyLogDao.getByIdOnce(meta.localId) ?: return
+                val log = moodEnergyLogDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.moodEnergyLogToMap(log)
             }
             "focus_release_log" -> {
-                val log = focusReleaseLogDao.getByIdOnce(meta.localId) ?: return
+                val log = focusReleaseLogDao.getByIdOnce(meta.localId) ?: return null
                 val taskCloudId = log.taskId?.let { syncMetadataDao.getCloudId(it, "task") }
                 SyncMapper.focusReleaseLogToMap(log, taskCloudId)
             }
             "medication_refill" -> {
-                val refill = medicationRefillDao.getByIdOnce(meta.localId) ?: return
+                val refill = medicationRefillDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.medicationRefillToMap(refill)
             }
             "weekly_review" -> {
-                val review = weeklyReviewDao.getByIdOnce(meta.localId) ?: return
+                val review = weeklyReviewDao.getByIdOnce(meta.localId) ?: return null
                 SyncMapper.weeklyReviewToMap(review)
             }
             // `daily_essential_slot_completion` Firestore push removed
             // in parity Batch 5 PR-9 (decision D-E4). BackendSyncService
             // is authoritative.
             "assignment" -> {
-                val assignment = schoolworkDao.getAssignmentById(meta.localId) ?: return
+                val assignment = schoolworkDao.getAssignmentById(meta.localId) ?: return null
                 val courseCloudId = syncMetadataDao.getCloudId(assignment.courseId, "course")
-                    ?: return // course not yet synced — retry on next pass
+                    ?: return null // course not yet synced — retry on next pass
                 SyncMapper.assignmentToMap(assignment, courseCloudId)
             }
             "attachment" -> {
-                val attachment = attachmentDao.getByIdOnce(meta.localId) ?: return
+                val attachment = attachmentDao.getByIdOnce(meta.localId) ?: return null
                 val taskCloudId = syncMetadataDao.getCloudId(attachment.taskId, "task")
-                    ?: return // parent task not yet synced — retry on next pass
+                    ?: return null // parent task not yet synced — retry on next pass
                 SyncMapper.attachmentToMap(attachment, taskCloudId)
             }
             "study_log" -> {
-                val log = schoolworkDao.getStudyLogByIdOnce(meta.localId) ?: return
+                val log = schoolworkDao.getStudyLogByIdOnce(meta.localId) ?: return null
                 val coursePickCloudId = log.coursePick?.let { syncMetadataDao.getCloudId(it, "course") }
                 val assignmentPickCloudId = log.assignmentPick?.let {
                     syncMetadataDao.getCloudId(it, "assignment")
@@ -1549,231 +1557,48 @@ constructor(
                 SyncMapper.studyLogToMap(log, coursePickCloudId, assignmentPickCloudId)
             }
             "project_phase" -> {
-                val phase = projectPhaseDao.getByIdOnce(meta.localId) ?: return
+                val phase = projectPhaseDao.getByIdOnce(meta.localId) ?: return null
                 val projectCloudId = syncMetadataDao.getCloudId(phase.projectId, "project")
-                    ?: return // parent project not yet synced — retry on next pass
+                    ?: return null // parent project not yet synced — retry on next pass
                 SyncMapper.projectPhaseToMap(phase, projectCloudId)
             }
             "project_risk" -> {
-                val risk = projectRiskDao.getByIdOnce(meta.localId) ?: return
+                val risk = projectRiskDao.getByIdOnce(meta.localId) ?: return null
                 val projectCloudId = syncMetadataDao.getCloudId(risk.projectId, "project")
-                    ?: return
+                    ?: return null
                 SyncMapper.projectRiskToMap(risk, projectCloudId)
             }
             "task_dependency" -> {
-                val dep = taskDependencyDao.getByIdOnce(meta.localId) ?: return
+                val dep = taskDependencyDao.getByIdOnce(meta.localId) ?: return null
                 val blockerCloudId =
-                    syncMetadataDao.getCloudId(dep.blockerTaskId, "task") ?: return
+                    syncMetadataDao.getCloudId(dep.blockerTaskId, "task") ?: return null
                 val blockedCloudId =
-                    syncMetadataDao.getCloudId(dep.blockedTaskId, "task") ?: return
+                    syncMetadataDao.getCloudId(dep.blockedTaskId, "task") ?: return null
                 SyncMapper.taskDependencyToMap(dep, blockerCloudId, blockedCloudId)
             }
             "external_anchor" -> {
-                val anchor = externalAnchorDao.getByIdOnce(meta.localId) ?: return
+                val anchor = externalAnchorDao.getByIdOnce(meta.localId) ?: return null
                 val projectCloudId = syncMetadataDao.getCloudId(anchor.projectId, "project")
-                    ?: return
+                    ?: return null
                 val phaseCloudId = anchor.phaseId?.let {
                     syncMetadataDao.getCloudId(it, "project_phase")
                 }
                 SyncMapper.externalAnchorToMap(anchor, projectCloudId, phaseCloudId)
             }
-            else -> return
+            else -> null
         }
-        docRef.set(data).await()
-        syncMetadataDao.upsert(meta.copy(cloudId = docRef.id, pendingAction = null, lastSyncedAt = System.currentTimeMillis()))
     }
 
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
     // Dispatch across every synced entityType — see pushCreate for the same
-    // trade-off. TODO: refactor pushUpdate to reduce early return statements.
+    // trade-off.
     private suspend fun pushUpdate(meta: SyncMetadataEntity) {
         if (meta.cloudId.isEmpty()) {
             pushCreate(meta)
             return
         }
         val docRef = userCollection(collectionNameFor(meta.entityType))?.document(meta.cloudId) ?: return
-        val data = when (meta.entityType) {
-            "task" -> {
-                val task = taskDao.getTaskByIdOnce(meta.localId) ?: return
-                val tagIds = tagDao.getTagIdsForTaskOnce(task.id).mapNotNull { syncMetadataDao.getCloudId(it, "tag") }
-                val projectCloudId = task.projectId?.let { syncMetadataDao.getCloudId(it, "project") }
-                val parentTaskCloudId = task.parentTaskId?.let { syncMetadataDao.getCloudId(it, "task") }
-                val sourceHabitCloudId = task.sourceHabitId?.let { syncMetadataDao.getCloudId(it, "habit") }
-                val phaseCloudId = task.phaseId?.let { syncMetadataDao.getCloudId(it, "project_phase") }
-                SyncMapper.taskToMap(task, tagIds, projectCloudId, parentTaskCloudId, sourceHabitCloudId, phaseCloudId)
-            }
-            "project" -> {
-                val project = projectDao.getProjectByIdOnce(meta.localId) ?: return
-                SyncMapper.projectToMap(project)
-            }
-            "tag" -> {
-                val tag = tagDao.getTagByIdOnce(meta.localId) ?: return
-                SyncMapper.tagToMap(tag)
-            }
-            "habit" -> {
-                val habit = habitDao.getHabitByIdOnce(meta.localId) ?: return
-                SyncMapper.habitToMap(habit)
-            }
-            "task_template" -> {
-                val template = taskTemplateDao.getTemplateById(meta.localId) ?: return
-                val templateProjectCloudId = template.templateProjectId?.let { syncMetadataDao.getCloudId(it, "project") }
-                SyncMapper.taskTemplateToMap(template, templateProjectCloudId)
-            }
-            "course" -> {
-                val course = schoolworkDao.getCourseById(meta.localId) ?: return
-                SyncMapper.courseToMap(course)
-            }
-            "course_completion" -> {
-                val completion = schoolworkDao.getAllCompletionsOnce().find { it.id == meta.localId } ?: return
-                val courseCloudId = syncMetadataDao.getCloudId(completion.courseId, "course") ?: return
-                SyncMapper.courseCompletionToMap(completion, courseCloudId)
-            }
-            "self_care_step" -> {
-                val step = selfCareDao.getAllStepsOnce().find { it.id == meta.localId } ?: return
-                SyncMapper.selfCareStepToMap(step)
-            }
-            "self_care_log" -> {
-                val log = selfCareDao.getAllLogsOnce().find { it.id == meta.localId } ?: return
-                SyncMapper.selfCareLogToMap(log)
-            }
-            "medication" -> {
-                val med = medicationDao.getByIdOnce(meta.localId) ?: return
-                val slotCloudIds = medicationSlotDao.getSlotIdsForMedicationOnce(med.id)
-                    .mapNotNull { syncMetadataDao.getCloudId(it, "medication_slot") }
-                MedicationSyncMapper.medicationToMap(med, slotCloudIds)
-            }
-            "medication_dose" -> {
-                val dose = medicationDoseDao.getAllOnce().find { it.id == meta.localId } ?: return
-                val medCloudId = if (dose.medicationId == null) {
-                    null
-                } else {
-                    syncMetadataDao.getCloudId(dose.medicationId, "medication") ?: return
-                }
-                MedicationSyncMapper.medicationDoseToMap(dose, medCloudId)
-            }
-            "medication_slot" -> {
-                val slot = medicationSlotDao.getByIdOnce(meta.localId) ?: return
-                MedicationSyncMapper.medicationSlotToMap(slot)
-            }
-            "medication_slot_override" -> {
-                val override = medicationSlotOverrideDao.getByIdOnce(meta.localId) ?: return
-                val medCloudId = syncMetadataDao.getCloudId(override.medicationId, "medication") ?: return
-                val slotCloudId = syncMetadataDao.getCloudId(override.slotId, "medication_slot") ?: return
-                MedicationSyncMapper.medicationSlotOverrideToMap(override, medCloudId, slotCloudId)
-            }
-            "medication_tier_state" -> {
-                val state = medicationTierStateDao.getByIdOnce(meta.localId) ?: return
-                val medCloudId = syncMetadataDao.getCloudId(state.medicationId, "medication") ?: return
-                val slotCloudId = syncMetadataDao.getCloudId(state.slotId, "medication_slot") ?: return
-                MedicationSyncMapper.medicationTierStateToMap(state, medCloudId, slotCloudId)
-            }
-            "notification_profile" -> {
-                val profile = notificationProfileDao.getById(meta.localId) ?: return
-                SyncMapper.notificationProfileToMap(profile)
-            }
-            "custom_sound" -> {
-                val sound = customSoundDao.getById(meta.localId) ?: return
-                SyncMapper.customSoundToMap(sound)
-            }
-            "saved_filter" -> {
-                val filter = savedFilterDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.savedFilterToMap(filter)
-            }
-            "nlp_shortcut" -> {
-                val shortcut = nlpShortcutDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.nlpShortcutToMap(shortcut)
-            }
-            "habit_template" -> {
-                val template = habitTemplateDao.getById(meta.localId) ?: return
-                SyncMapper.habitTemplateToMap(template)
-            }
-            "project_template" -> {
-                val template = projectTemplateDao.getById(meta.localId) ?: return
-                SyncMapper.projectTemplateToMap(template)
-            }
-            "boundary_rule" -> {
-                val rule = boundaryRuleDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.boundaryRuleToMap(rule)
-            }
-            "automation_rule" -> {
-                val rule = automationRuleDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.automationRuleToMap(rule)
-            }
-            "check_in_log" -> {
-                val log = checkInLogDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.checkInLogToMap(log)
-            }
-            "mood_energy_log" -> {
-                val log = moodEnergyLogDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.moodEnergyLogToMap(log)
-            }
-            "focus_release_log" -> {
-                val log = focusReleaseLogDao.getByIdOnce(meta.localId) ?: return
-                val taskCloudId = log.taskId?.let { syncMetadataDao.getCloudId(it, "task") }
-                SyncMapper.focusReleaseLogToMap(log, taskCloudId)
-            }
-            "medication_refill" -> {
-                val refill = medicationRefillDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.medicationRefillToMap(refill)
-            }
-            "weekly_review" -> {
-                val review = weeklyReviewDao.getByIdOnce(meta.localId) ?: return
-                SyncMapper.weeklyReviewToMap(review)
-            }
-            // `daily_essential_slot_completion` Firestore push removed
-            // in parity Batch 5 PR-9 (decision D-E4). BackendSyncService
-            // is authoritative.
-            "assignment" -> {
-                val assignment = schoolworkDao.getAssignmentById(meta.localId) ?: return
-                val courseCloudId = syncMetadataDao.getCloudId(assignment.courseId, "course")
-                    ?: return
-                SyncMapper.assignmentToMap(assignment, courseCloudId)
-            }
-            "attachment" -> {
-                val attachment = attachmentDao.getByIdOnce(meta.localId) ?: return
-                val taskCloudId = syncMetadataDao.getCloudId(attachment.taskId, "task")
-                    ?: return
-                SyncMapper.attachmentToMap(attachment, taskCloudId)
-            }
-            "study_log" -> {
-                val log = schoolworkDao.getStudyLogByIdOnce(meta.localId) ?: return
-                val coursePickCloudId = log.coursePick?.let { syncMetadataDao.getCloudId(it, "course") }
-                val assignmentPickCloudId = log.assignmentPick?.let {
-                    syncMetadataDao.getCloudId(it, "assignment")
-                }
-                SyncMapper.studyLogToMap(log, coursePickCloudId, assignmentPickCloudId)
-            }
-            "project_phase" -> {
-                val phase = projectPhaseDao.getByIdOnce(meta.localId) ?: return
-                val projectCloudId = syncMetadataDao.getCloudId(phase.projectId, "project")
-                    ?: return
-                SyncMapper.projectPhaseToMap(phase, projectCloudId)
-            }
-            "project_risk" -> {
-                val risk = projectRiskDao.getByIdOnce(meta.localId) ?: return
-                val projectCloudId = syncMetadataDao.getCloudId(risk.projectId, "project")
-                    ?: return
-                SyncMapper.projectRiskToMap(risk, projectCloudId)
-            }
-            "task_dependency" -> {
-                val dep = taskDependencyDao.getByIdOnce(meta.localId) ?: return
-                val blockerCloudId =
-                    syncMetadataDao.getCloudId(dep.blockerTaskId, "task") ?: return
-                val blockedCloudId =
-                    syncMetadataDao.getCloudId(dep.blockedTaskId, "task") ?: return
-                SyncMapper.taskDependencyToMap(dep, blockerCloudId, blockedCloudId)
-            }
-            "external_anchor" -> {
-                val anchor = externalAnchorDao.getByIdOnce(meta.localId) ?: return
-                val projectCloudId = syncMetadataDao.getCloudId(anchor.projectId, "project")
-                    ?: return
-                val phaseCloudId = anchor.phaseId?.let {
-                    syncMetadataDao.getCloudId(it, "project_phase")
-                }
-                SyncMapper.externalAnchorToMap(anchor, projectCloudId, phaseCloudId)
-            }
-            else -> return
-        }
+        val data = getPayloadForEntity(meta) ?: return
         // Delete-wins contract: use `docRef.update(...)` rather than `docRef.set(...)`.
         // `set` on a non-existent path silently creates the doc, which would
         // resurrect a row that another device already deleted — exactly the
