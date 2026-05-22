@@ -12,10 +12,12 @@ dev-only trade-off.
 from __future__ import annotations
 
 import base64
+import functools
 import hashlib
 import json
 import logging
 import os
+import secrets
 from typing import Any
 
 try:
@@ -27,6 +29,12 @@ except ImportError:  # pragma: no cover
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@functools.lru_cache(maxsize=1)
+def _get_dev_encryption_key() -> bytes:
+    """Generate a random 32-byte key for development to avoid reusing JWT_SECRET_KEY."""
+    return base64.urlsafe_b64encode(secrets.token_bytes(32))
 
 
 def _load_key() -> bytes:
@@ -46,10 +54,9 @@ def _load_key() -> bytes:
         raise RuntimeError(
             "INTEGRATION_ENCRYPTION_KEY must be set in production"
         )
-    # Dev fallback — derive from JWT secret so repeated starts on the same
-    # machine with the same JWT_SECRET_KEY can decrypt their own writes.
-    digest = hashlib.sha256(settings.get_jwt_secret().encode()).digest()
-    return base64.urlsafe_b64encode(digest)
+    # Dev fallback — generate a random per-process key so the server starts.
+    # Tokens written will be unreadable after a restart.
+    return _get_dev_encryption_key()
 
 
 def _fernet() -> Fernet:
