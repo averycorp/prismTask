@@ -1,6 +1,7 @@
 package com.averycorp.prismtask.ui.screens.medication.components
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
