@@ -8,8 +8,10 @@ import { KeyboardShortcutsModal } from '@/components/shared/KeyboardShortcutsMod
 import { useUIStore } from '@/stores/uiStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import { useTaskStore } from '@/stores/taskStore';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 export function AppShell() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
@@ -74,14 +76,16 @@ export function AppShell() {
 
       {/* Global New Task (from `n` shortcut) */}
       {newTaskOpen && (
-        <TaskEditor
-          mode="create"
-          onClose={() => setNewTaskOpen(false)}
-          onUpdate={() => {
-            useTaskStore.getState().fetchToday();
-            useTaskStore.getState().fetchOverdue();
-          }}
-        />
+        <Suspense fallback={null}>
+          <TaskEditor
+            mode="create"
+            onClose={() => setNewTaskOpen(false)}
+            onUpdate={() => {
+              useTaskStore.getState().fetchToday();
+              useTaskStore.getState().fetchOverdue();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Skip to main content link (screen reader) */}

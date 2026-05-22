@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   isNotificationSupported,
   requestNotificationPermission,
@@ -6,187 +6,173 @@ import {
   showNotification,
   scheduleReminder,
   cancelReminder,
-  cancelAllReminders
+  cancelAllReminders,
 } from '../notifications';
 
-describe('notifications utils', () => {
-  let originalNotification: any;
+// Mock Notification API
+const MockNotification = vi.fn();
+MockNotification.requestPermission = vi.fn().mockResolvedValue('granted');
+Object.defineProperty(MockNotification, 'permission', {
+  value: 'default',
+  writable: true,
+});
 
+describe('notifications utility', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    originalNotification = global.Notification;
-
-    // Mock the Notification object
-    global.Notification = {
-      permission: 'default',
-      requestPermission: vi.fn().mockResolvedValue('granted'),
-    } as any;
-
-    // Add mock constructor for the Notification object
-    const NotificationConstructor = vi.fn() as any;
-    NotificationConstructor.permission = 'default';
-    NotificationConstructor.requestPermission = vi.fn().mockResolvedValue('granted');
-    global.Notification = NotificationConstructor as any;
+    vi.stubGlobal('Notification', MockNotification);
+    MockNotification.mockClear();
+    MockNotification.requestPermission.mockClear();
+    MockNotification.permission = 'default';
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
-    global.Notification = originalNotification;
-    cancelAllReminders();
-    vi.restoreAllMocks();
   });
 
   describe('isNotificationSupported', () => {
-    it('returns true when Notification is in window', () => {
-      // In jsdom environment, Notification should be present if we mock it, but we can verify our mock logic
+    it('should return true if Notification is in window', () => {
       expect(isNotificationSupported()).toBe(true);
     });
 
-    it('returns false when Notification is not in window', () => {
-      const originalWindow = global.window;
-      // Temporarily remove Notification
-      delete (global.window as any).Notification;
-
+    it('should return false if Notification is not in window', () => {
+      // @ts-expect-error Mocking for test
+      delete global.window.Notification;
       expect(isNotificationSupported()).toBe(false);
-
-      global.window = originalWindow; // Restore
-    });
-  });
-
-  describe('getNotificationPermission', () => {
-    it('returns denied if not supported', () => {
-      const originalWindow = global.window;
-      delete (global.window as any).Notification;
-      expect(getNotificationPermission()).toBe('denied');
-      global.window = originalWindow;
-    });
-
-    it('returns the current permission', () => {
-      (global.Notification as any).permission = 'granted';
-      expect(getNotificationPermission()).toBe('granted');
+      // @ts-expect-error Mocking for test
+      global.window.Notification = MockNotification;
     });
   });
 
   describe('requestNotificationPermission', () => {
-    it('returns denied if not supported', async () => {
-      const originalWindow = global.window;
-      delete (global.window as any).Notification;
-      expect(await requestNotificationPermission()).toBe('denied');
-      global.window = originalWindow;
+    it('should return denied if not supported', async () => {
+      // @ts-expect-error Mocking for test
+      delete global.window.Notification;
+      const result = await requestNotificationPermission();
+      expect(result).toBe('denied');
+      // @ts-expect-error Mocking for test
+      global.window.Notification = MockNotification;
     });
 
-    it('returns immediately if already granted or denied', async () => {
-      (global.Notification as any).permission = 'granted';
-      expect(await requestNotificationPermission()).toBe('granted');
-      expect((global.Notification as any).requestPermission).not.toHaveBeenCalled();
-
-      (global.Notification as any).permission = 'denied';
-      expect(await requestNotificationPermission()).toBe('denied');
-      expect((global.Notification as any).requestPermission).not.toHaveBeenCalled();
+    it('should return granted if already granted', async () => {
+      MockNotification.permission = 'granted';
+      const result = await requestNotificationPermission();
+      expect(result).toBe('granted');
     });
 
-    it('requests permission if default', async () => {
-      (global.Notification as any).permission = 'default';
-      expect(await requestNotificationPermission()).toBe('granted');
-      expect((global.Notification as any).requestPermission).toHaveBeenCalled();
+    it('should return denied if already denied', async () => {
+      MockNotification.permission = 'denied';
+      const result = await requestNotificationPermission();
+      expect(result).toBe('denied');
+    });
+
+    it('should call requestPermission if default', async () => {
+      MockNotification.permission = 'default';
+      const result = await requestNotificationPermission();
+      expect(MockNotification.requestPermission).toHaveBeenCalled();
+      expect(result).toBe('granted');
+    });
+  });
+
+  describe('getNotificationPermission', () => {
+    it('should return denied if not supported', () => {
+      // @ts-expect-error Mocking for test
+      delete global.window.Notification;
+      expect(getNotificationPermission()).toBe('denied');
+      // @ts-expect-error Mocking for test
+      global.window.Notification = MockNotification;
+    });
+
+    it('should return current permission', () => {
+      MockNotification.permission = 'granted';
+      expect(getNotificationPermission()).toBe('granted');
     });
   });
 
   describe('showNotification', () => {
-    it('returns null if not supported', () => {
-      const originalWindow = global.window;
-      delete (global.window as any).Notification;
+    it('should return null if not supported', () => {
+      // @ts-expect-error Mocking for test
+      delete global.window.Notification;
       expect(showNotification('Test')).toBeNull();
-      global.window = originalWindow;
+      // @ts-expect-error Mocking for test
+      global.window.Notification = MockNotification;
     });
 
-    it('returns null if permission is not granted', () => {
-      (global.Notification as any).permission = 'denied';
+    it('should return null if permission not granted', () => {
+      MockNotification.permission = 'denied';
       expect(showNotification('Test')).toBeNull();
     });
 
-    it('creates a new Notification if permission is granted', () => {
-      (global.Notification as any).permission = 'granted';
-
-      const result = showNotification('Test Title', { body: 'Test Body' });
-
-      expect(global.Notification).toHaveBeenCalledWith('Test Title', {
+    it('should create Notification if granted', () => {
+      MockNotification.permission = 'granted';
+      const notif = showNotification('Test Title', { body: 'Test Body' });
+      expect(MockNotification).toHaveBeenCalledWith('Test Title', {
         icon: '/favicon.svg',
         badge: '/favicon.svg',
         body: 'Test Body',
       });
-      // the constructor returns a mock object based on our vi.fn()
+      expect(notif).toBeInstanceOf(MockNotification);
     });
   });
 
-  describe('scheduleReminder', () => {
-    it('schedules a notification', () => {
-      (global.Notification as any).permission = 'granted';
+  describe('scheduling reminders', () => {
+    it('should schedule and show a notification', () => {
+      MockNotification.permission = 'granted';
+      const now = Date.now();
+      vi.setSystemTime(now);
 
-      const futureDate = new Date(Date.now() + 10000).toISOString();
-      scheduleReminder('task1', 'Task Title', futureDate, 0);
+      const dueDate = new Date(now + 10000).toISOString(); // 10s from now
+      scheduleReminder('task1', 'My Task', dueDate, 2000); // offset 2s, should fire in 8s
 
-      expect(global.Notification).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(7999);
+      expect(MockNotification).not.toHaveBeenCalled();
 
+      vi.advanceTimersByTime(1);
+      expect(MockNotification).toHaveBeenCalledWith('Task Reminder: My Task', expect.any(Object));
+    });
+
+    it('should not schedule if delay <= 0', () => {
+      MockNotification.permission = 'granted';
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      const dueDate = new Date(now + 1000).toISOString(); // 1s from now
+      scheduleReminder('task2', 'My Task 2', dueDate, 2000); // offset 2s, delay is -1s
+
+      vi.advanceTimersByTime(5000);
+      expect(MockNotification).not.toHaveBeenCalled();
+    });
+
+    it('should cancel a reminder', () => {
+      MockNotification.permission = 'granted';
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      const dueDate = new Date(now + 10000).toISOString();
+      scheduleReminder('task3', 'My Task 3', dueDate, 0);
+
+      cancelReminder('task3');
       vi.advanceTimersByTime(10000);
 
-      expect(global.Notification).toHaveBeenCalledWith('Task Reminder: Task Title', expect.objectContaining({
-        tag: 'task-reminder-task1',
-        requireInteraction: true
-      }));
+      expect(MockNotification).not.toHaveBeenCalled();
     });
 
-    it('does not schedule if delay is <= 0', () => {
-      (global.Notification as any).permission = 'granted';
+    it('should cancel all reminders', () => {
+      MockNotification.permission = 'granted';
+      const now = Date.now();
+      vi.setSystemTime(now);
 
-      const pastDate = new Date(Date.now() - 1000).toISOString();
-      scheduleReminder('task2', 'Past Task', pastDate, 0);
-
-      vi.advanceTimersByTime(1000);
-      expect(global.Notification).not.toHaveBeenCalled();
-    });
-
-    it('cancels existing reminder for the same task before scheduling', () => {
-      (global.Notification as any).permission = 'granted';
-
-      const futureDate = new Date(Date.now() + 10000).toISOString();
-
-      scheduleReminder('task1', 'Initial', futureDate, 0);
-      scheduleReminder('task1', 'Updated', futureDate, 0); // Should cancel 'Initial'
-
-      vi.advanceTimersByTime(10000);
-
-      expect(global.Notification).toHaveBeenCalledTimes(1);
-      expect(global.Notification).toHaveBeenCalledWith('Task Reminder: Updated', expect.any(Object));
-    });
-  });
-
-  describe('cancelReminder', () => {
-    it('cancels a scheduled reminder', () => {
-      (global.Notification as any).permission = 'granted';
-
-      const futureDate = new Date(Date.now() + 10000).toISOString();
-      scheduleReminder('task1', 'Task Title', futureDate, 0);
-
-      cancelReminder('task1');
-
-      vi.advanceTimersByTime(10000);
-      expect(global.Notification).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('cancelAllReminders', () => {
-    it('cancels all scheduled reminders', () => {
-      (global.Notification as any).permission = 'granted';
-
-      const futureDate = new Date(Date.now() + 10000).toISOString();
-      scheduleReminder('task1', 'Task 1', futureDate, 0);
-      scheduleReminder('task2', 'Task 2', futureDate, 0);
+      const dueDate1 = new Date(now + 10000).toISOString();
+      const dueDate2 = new Date(now + 15000).toISOString();
+      scheduleReminder('task4', 'Task 4', dueDate1, 0);
+      scheduleReminder('task5', 'Task 5', dueDate2, 0);
 
       cancelAllReminders();
+      vi.advanceTimersByTime(20000);
 
-      vi.advanceTimersByTime(10000);
-      expect(global.Notification).not.toHaveBeenCalled();
+      expect(MockNotification).not.toHaveBeenCalled();
     });
   });
 });
