@@ -262,9 +262,9 @@ object AutomationJsonAdapter {
                         p.asDouble
                     } else {
                         // Narrow to Int when it fits — production callers
-                        // construct Compare values with Int literals (e.g.
-                        // priority thresholds, weekday ints), and structural
-                        // round-trip equality requires we preserve that.
+                        // provide Int literals (e.g. priority thresholds,
+                        // weekday ints), and structural round-trip
+                        // equality requires we preserve that.
                         // ConditionEvaluator coerces both sides to Double
                         // for numeric ops, so widening at runtime is fine.
                         val l = p.asNumber.toLong()
