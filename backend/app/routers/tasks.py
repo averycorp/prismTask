@@ -522,13 +522,21 @@ async def reorder_tasks(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not items:
+        return {"detail": "Tasks reordered"}
+
+    item_ids = [item.id for item in items]
+    result = await db.execute(
+        select(Task).where(Task.id.in_(item_ids), Task.user_id == current_user.id)
+    )
+    tasks = result.scalars().all()
+    task_map = {task.id: task for task in tasks}
+
     for item in items:
-        result = await db.execute(
-            select(Task).where(Task.id == item.id, Task.user_id == current_user.id)
-        )
-        task = result.scalar_one_or_none()
+        task = task_map.get(item.id)
         if not task:
             raise HTTPException(status_code=404, detail=f"Task {item.id} not found")
         task.sort_order = item.sort_order
+
     await db.flush()
     return {"detail": "Tasks reordered"}
