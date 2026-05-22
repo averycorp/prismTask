@@ -90,3 +90,44 @@ async def test_cascade_delete_goal(client: AsyncClient, auth_headers: dict):
 async def test_get_nonexistent_goal(client: AsyncClient, auth_headers: dict):
     resp = await client.get("/api/v1/goals/99999", headers=auth_headers)
     assert resp.status_code == 404
+
+import pytest
+from httpx import AsyncClient
+
+@pytest.mark.asyncio
+async def test_reorder_goals(client: AsyncClient, auth_headers: dict):
+    goal1_resp = await client.post(
+        "/api/v1/goals", json={"title": "Goal 1", "sort_order": 1}, headers=auth_headers
+    )
+    goal2_resp = await client.post(
+        "/api/v1/goals", json={"title": "Goal 2", "sort_order": 2}, headers=auth_headers
+    )
+
+    assert goal1_resp.status_code == 201
+    assert goal2_resp.status_code == 201
+
+    goal1_id = goal1_resp.json()["id"]
+    goal2_id = goal2_resp.json()["id"]
+
+    reorder_resp = await client.patch(
+        "/api/v1/goals/reorder",
+        json=[
+            {"id": goal1_id, "sort_order": 2},
+            {"id": goal2_id, "sort_order": 1},
+        ],
+        headers=auth_headers,
+    )
+
+    print(reorder_resp.json())
+    assert reorder_resp.status_code == 200
+
+    list_resp = await client.get("/api/v1/goals", headers=auth_headers)
+    assert list_resp.status_code == 200
+
+    goals = list_resp.json()
+
+    for goal in goals:
+        if goal["id"] == goal1_id:
+            assert goal["sort_order"] == 2
+        elif goal["id"] == goal2_id:
+            assert goal["sort_order"] == 1

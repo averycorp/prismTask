@@ -108,3 +108,4 @@ dedup_*.log
 test-results/
 playwright-report/
 venv/
+backend/venv

@@ -73,6 +73,44 @@ async def get_goal(
     return GoalDetailResponse(**resp)
 
 
+@router.patch("/reorder", status_code=status.HTTP_200_OK)
+async def reorder_goals(
+    items: list[dict],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    goal_orders = {}
+    for item in items:
+        goal_id = item.get("id")
+        sort_order = item.get("sort_order")
+        if goal_id is None or sort_order is None:
+            raise HTTPException(
+                status_code=400, detail="Each item must have 'id' and 'sort_order'"
+            )
+        goal_orders[goal_id] = sort_order
+
+    if not goal_orders:
+        return {"detail": "Goals reordered"}
+
+    goal_ids = list(goal_orders.keys())
+    result = await db.execute(
+        select(Goal).where(Goal.id.in_(goal_ids), Goal.user_id == current_user.id)
+    )
+    goals = result.scalars().all()
+
+    if len(goals) != len(goal_ids):
+        found_ids = {g.id for g in goals}
+        missing_ids = set(goal_ids) - found_ids
+        missing_id = next(iter(missing_ids))
+        raise HTTPException(status_code=404, detail=f"Goal {missing_id} not found")
+
+    for goal in goals:
+        goal.sort_order = goal_orders[goal.id]
+
+    await db.flush()
+    return {"detail": "Goals reordered"}
+
+
 @router.patch("/{goal_id}", response_model=GoalResponse)
 async def update_goal(
     goal_id: int,
@@ -111,28 +149,6 @@ async def delete_goal(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     await db.delete(goal)
-
-
-@router.patch("/reorder", status_code=status.HTTP_200_OK)
-async def reorder_goals(
-    items: list[dict],
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    for item in items:
-        goal_id = item.get("id")
-        sort_order = item.get("sort_order")
-        if goal_id is None or sort_order is None:
-            raise HTTPException(status_code=400, detail="Each item must have 'id' and 'sort_order'")
-        result = await db.execute(
-            select(Goal).where(Goal.id == goal_id, Goal.user_id == current_user.id)
-        )
-        goal = result.scalar_one_or_none()
-        if not goal:
-            raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
-        goal.sort_order = sort_order
-    await db.flush()
-    return {"detail": "Goals reordered"}
 
 
 def _goal_response(goal: Goal) -> GoalResponse:
