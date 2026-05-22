@@ -9,7 +9,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.FileInputStream
@@ -124,19 +123,45 @@ class ReminderSchedulerAlarmInstrumentedTest {
         )
     }
 
-    /**
-     * TODO — an integration test that fires the scheduled alarm and asserts
-     * the receiver actually posts a notification requires either
-     * [android.app.AlarmManager.setTime] manipulation (rooted devices
-     * only) or a fake [android.app.PendingIntent] triggered via
-     * [android.content.Context.sendBroadcast]. The broadcast-trigger
-     * variant lives in [ReminderBroadcastInstrumentedTest] so this file
-     * stays scoped to the scheduling half.
-     */
-    @Ignore("Covered separately in ReminderBroadcastInstrumentedTest")
     @Test
-    fun alarmFiresAndPostsNotification() {
-        // Intentionally empty — documentation-only placeholder.
+    fun alarmFiresAndPostsNotification() = runTest {
+        val manager = context.getSystemService(android.app.NotificationManager::class.java)
+
+        // Start from a clean tray
+        androidx.core.app.NotificationManagerCompat.from(context).cancel(testTaskId.toInt())
+
+        // Schedule alarm for a short delay in the future (e.g., 2 seconds)
+        val fireAt = System.currentTimeMillis() + 2000L
+        scheduler.scheduleReminder(
+            taskId = testTaskId,
+            taskTitle = "Alarm Trigger Test",
+            taskDescription = "Integration test",
+            dueDate = fireAt,
+            reminderOffset = 0L
+        )
+
+        // Wait for the alarm to trigger and notification to be posted (polling for up to 10 seconds)
+        val posted = waitUntil(timeoutMs = 10000L) {
+            manager.activeNotifications.any { it.id == testTaskId.toInt() }
+        }
+
+        assertTrue(
+            "Expected alarm to trigger and post notification with id=$testTaskId within 10s; " +
+                "active IDs=${manager.activeNotifications.map { it.id }}",
+            posted
+        )
+
+        // Cleanup
+        androidx.core.app.NotificationManagerCompat.from(context).cancel(testTaskId.toInt())
+    }
+
+    private fun waitUntil(timeoutMs: Long, predicate: () -> Boolean): Boolean {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000L
+        while (System.nanoTime() < deadline) {
+            if (predicate()) return true
+            java.util.concurrent.locks.LockSupport.parkNanos(50_000_000L)
+        }
+        return predicate()
     }
 
     private fun dumpsys(service: String): String {
