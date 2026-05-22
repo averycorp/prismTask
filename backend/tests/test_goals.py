@@ -91,8 +91,6 @@ async def test_get_nonexistent_goal(client: AsyncClient, auth_headers: dict):
     resp = await client.get("/api/v1/goals/99999", headers=auth_headers)
     assert resp.status_code == 404
 
-import pytest
-from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_reorder_goals(client: AsyncClient, auth_headers: dict):

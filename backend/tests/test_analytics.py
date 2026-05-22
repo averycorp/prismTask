@@ -420,8 +420,6 @@ class TestSummary:
 
 # --- Tests for determine_trend ---
 
-from app.services.analytics import determine_trend
-
 def test_determine_trend_less_than_two_elements():
     assert determine_trend([]) == "stable"
     assert determine_trend([{"score": 10}]) == "stable"

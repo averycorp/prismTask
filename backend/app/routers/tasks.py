@@ -281,7 +281,6 @@ async def parse_task(data: ParseRequest, request: Request):
     parse_rate_limiter.check(request)
     try:
         import app.services.nlp_parser
-        parse_task_input = app.services.nlp_parser.parse_task_input
         today = _logical_today(
             datetime.now(),
             sod_hour=data.start_of_day_hour,

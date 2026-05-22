@@ -12,9 +12,8 @@ def test_encrypt_decrypt():
     assert decrypted["hello"] == "world"
 
 def test_invalid_json():
-    from cryptography.fernet import Fernet
     from app.services.integrations.token_crypto import _fernet
     f = _fernet()
     enc = f.encrypt(b"invalid json").decode("utf-8")
-    with pytest.raises(ValueError, match="payload is invalid"):
+    with pytest.raises(ValueError, match="payload has an invalid structure"):
         decrypt_json(enc)
