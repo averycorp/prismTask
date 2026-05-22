@@ -51,7 +51,6 @@ class OAuthTokenPayload(BaseModel):
     model_config = {"extra": "allow"}
 
 
-
 def _load_key() -> bytes:
     raw = settings.INTEGRATION_ENCRYPTION_KEY or os.environ.get(
         "INTEGRATION_ENCRYPTION_KEY", ""
