@@ -45,7 +45,7 @@ steps:
   waitFor: ['web-install']
 
 - id: 'web-e2e'
-  name: 'mcr.microsoft.com/playwright:v1.44.0-jammy'
+  name: 'mcr.microsoft.com/playwright:v1.60.0-jammy'
   dir: 'web'
   entrypoint: 'npx'
   args: ['playwright', 'test']
