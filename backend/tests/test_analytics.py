@@ -389,3 +389,34 @@ class TestSummary:
         assert "habits" in data
         assert "completion_rate_7d" in data["habits"]
         assert "completion_rate_30d" in data["habits"]
+
+from app.services.analytics import determine_trend
+
+def test_determine_trend():
+    # Empty list
+    assert determine_trend([]) == "stable"
+
+    # Single element
+    assert determine_trend([{"score": 50}]) == "stable"
+
+    # Stable trend (diff <= 3)
+    assert determine_trend([{"score": 50}, {"score": 50}]) == "stable"
+    assert determine_trend([{"score": 50}, {"score": 53}]) == "stable"
+    assert determine_trend([{"score": 53}, {"score": 50}]) == "stable"
+
+    # Improving trend (diff > 3)
+    assert determine_trend([{"score": 50}, {"score": 54}]) == "improving"
+    assert determine_trend([{"score": 10}, {"score": 10}, {"score": 20}, {"score": 20}]) == "improving"
+
+    # Declining trend (diff < -3)
+    assert determine_trend([{"score": 54}, {"score": 50}]) == "declining"
+    assert determine_trend([{"score": 80}, {"score": 80}, {"score": 50}, {"score": 50}]) == "declining"
+
+    # Odd number of elements
+    # For [10, 20, 30], mid = 1. first_half = [10], second_half = [20, 30]
+    # first_avg = 10, second_avg = 25. diff = 15 -> improving
+    assert determine_trend([{"score": 10}, {"score": 20}, {"score": 30}]) == "improving"
+
+    # For [30, 20, 10], mid = 1. first_half = [30], second_half = [20, 10]
+    # first_avg = 30, second_avg = 15. diff = -15 -> declining
+    assert determine_trend([{"score": 30}, {"score": 20}, {"score": 10}]) == "declining"
