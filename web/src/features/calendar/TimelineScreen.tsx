@@ -22,8 +22,10 @@ import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { formatTime } from '@/utils/dates';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 const HOUR_HEIGHT = 60; // px per hour
 const START_HOUR = 6; // 6 AM
@@ -586,9 +588,11 @@ export function TimelineScreen() {
         </DragOverlay>
       </DndContext>
 
-      {editorOpen && (
-        <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
+        )}
+      </Suspense>
     </div>
   );
 }

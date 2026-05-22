@@ -34,8 +34,10 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { DueDateLabel } from '@/components/shared/DueDateLabel';
 import { getPriorityColor } from '@/utils/priority';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task, TaskPriority } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 type Quadrant = 'Q1' | 'Q2' | 'Q3' | 'Q4';
 
@@ -690,17 +692,19 @@ export function EisenhowerScreen() {
       </div>
 
       {/* Task Editor */}
-      {editorOpen && (
-        <TaskEditor
-          mode={createQuadrant ? 'create' : 'edit'}
-          onClose={() => {
-            setEditorOpen(false);
-            setSelectedTask(null);
-            setCreateQuadrant(null);
-          }}
-          onUpdate={() => loadData()}
-        />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor
+            mode={createQuadrant ? 'create' : 'edit'}
+            onClose={() => {
+              setEditorOpen(false);
+              setSelectedTask(null);
+              setCreateQuadrant(null);
+            }}
+            onUpdate={() => loadData()}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

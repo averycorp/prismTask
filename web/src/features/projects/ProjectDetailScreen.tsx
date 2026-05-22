@@ -21,8 +21,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 export function ProjectDetailScreen() {
   const { id } = useParams<{ id: string }>();
@@ -293,18 +295,20 @@ export function ProjectDetailScreen() {
       )}
 
       {/* Task Editor */}
-      {editorOpen && (
-        <TaskEditor
-          mode={createMode ? 'create' : 'edit'}
-          defaultProjectId={projectId}
-          onClose={() => {
-            setEditorOpen(false);
-            setSelectedTask(null);
-            setCreateMode(false);
-          }}
-          onUpdate={() => loadData()}
-        />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor
+            mode={createMode ? 'create' : 'edit'}
+            defaultProjectId={projectId}
+            onClose={() => {
+              setEditorOpen(false);
+              setSelectedTask(null);
+              setCreateMode(false);
+            }}
+            onUpdate={() => loadData()}
+          />
+        )}
+      </Suspense>
 
       {/* Edit Project Modal */}
       <Modal

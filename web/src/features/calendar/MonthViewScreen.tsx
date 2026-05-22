@@ -19,8 +19,10 @@ import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { getPriorityColor } from '@/utils/priority';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_LABELS_SHORT = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -394,9 +396,11 @@ export function MonthViewScreen() {
         )}
       </div>
 
-      {editorOpen && (
-        <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
+        )}
+      </Suspense>
     </div>
   );
 }

@@ -44,7 +44,8 @@ import {
   formatAnalogClockTime,
   useAnalogClockState,
 } from '@/components/AnalogClockPicker';
-import { KeyboardShortcutsModal } from '@/components/shared/KeyboardShortcutsModal';
+import { lazy, Suspense } from 'react';
+const KeyboardShortcutsModal = lazy(() => import('@/components/shared/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
 import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
 import { BatchHistorySection } from '@/features/settings/sections/BatchHistorySection';
 import { DashboardSection } from '@/features/settings/sections/DashboardSection';
@@ -1074,10 +1075,14 @@ export function SettingsScreen() {
       />
 
       {/* Keyboard Shortcuts Modal */}
-      <KeyboardShortcutsModal
-        isOpen={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-      />
+      <Suspense fallback={null}>
+        {shortcutsOpen && (
+          <KeyboardShortcutsModal
+            isOpen={shortcutsOpen}
+            onClose={() => setShortcutsOpen(false)}
+          />
+        )}
+      </Suspense>
 
       {/* Pro Upgrade Modal */}
       <ProUpgradeModal

@@ -1,15 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
-import { SearchModal } from '@/components/shared/SearchModal';
-import { KeyboardShortcutsModal } from '@/components/shared/KeyboardShortcutsModal';
 import { useUIStore } from '@/stores/uiStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import { useTaskStore } from '@/stores/taskStore';
+
+const SearchModal = lazy(() => import('@/components/shared/SearchModal').then(m => ({ default: m.SearchModal })));
+const KeyboardShortcutsModal = lazy(() => import('@/components/shared/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 export function AppShell() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
@@ -63,26 +64,32 @@ export function AppShell() {
       {/* Mobile Bottom Nav */}
       {isMobile && <MobileNav />}
 
-      {/* Global Search Modal (from Ctrl+K shortcut) */}
-      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+      <Suspense fallback={null}>
+        {/* Global Search Modal (from Ctrl+K shortcut) */}
+        {searchOpen && (
+          <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+        )}
 
-      {/* Global Keyboard Shortcuts Modal (from ? shortcut) */}
-      <KeyboardShortcutsModal
-        isOpen={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-      />
+        {/* Global Keyboard Shortcuts Modal (from ? shortcut) */}
+        {shortcutsOpen && (
+          <KeyboardShortcutsModal
+            isOpen={shortcutsOpen}
+            onClose={() => setShortcutsOpen(false)}
+          />
+        )}
 
-      {/* Global New Task (from `n` shortcut) */}
-      {newTaskOpen && (
-        <TaskEditor
-          mode="create"
-          onClose={() => setNewTaskOpen(false)}
-          onUpdate={() => {
-            useTaskStore.getState().fetchToday();
-            useTaskStore.getState().fetchOverdue();
-          }}
-        />
-      )}
+        {/* Global New Task (from `n` shortcut) */}
+        {newTaskOpen && (
+          <TaskEditor
+            mode="create"
+            onClose={() => setNewTaskOpen(false)}
+            onUpdate={() => {
+              useTaskStore.getState().fetchToday();
+              useTaskStore.getState().fetchOverdue();
+            }}
+          />
+        )}
+      </Suspense>
 
       {/* Skip to main content link (screen reader) */}
       <a

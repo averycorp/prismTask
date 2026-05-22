@@ -7,9 +7,11 @@ import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { nonArchivedProjects } from '@/utils/projectFilters';
 import { NLPInput } from '@/components/shared/NLPInput';
-import { SearchModal } from '@/components/shared/SearchModal';
 import { Avatar } from '@/components/ui/Avatar';
 import { THEME_ORDER, THEMES } from '@/theme/themes';
+import { lazy, Suspense } from 'react';
+
+const SearchModal = lazy(() => import('@/components/shared/SearchModal').then(m => ({ default: m.SearchModal })));
 
 export function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -208,7 +210,11 @@ export function Header() {
       </header>
 
       {/* Search Modal */}
-      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+      <Suspense fallback={null}>
+        {searchOpen && (
+          <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+        )}
+      </Suspense>
     </>
   );
 }

@@ -26,8 +26,10 @@ import { useCalendarTasks } from '@/hooks/useCalendarTasks';
 import { useTaskStore } from '@/stores/taskStore';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { Button } from '@/components/ui/Button';
-import TaskEditor from '@/features/tasks/TaskEditor';
 import type { Task } from '@/types/task';
+import { lazy, Suspense } from 'react';
+
+const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
 
 // --- Draggable Task Card wrapper ---
 function DraggableTaskCard({
@@ -423,9 +425,11 @@ export function WeekViewScreen() {
           />
         </div>
 
-        {editorOpen && (
-          <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
-        )}
+        <Suspense fallback={null}>
+          {editorOpen && (
+            <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
+          )}
+        </Suspense>
       </div>
     );
   }
@@ -524,9 +528,11 @@ export function WeekViewScreen() {
         </DragOverlay>
       </DndContext>
 
-      {editorOpen && (
-        <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
-      )}
+      <Suspense fallback={null}>
+        {editorOpen && (
+          <TaskEditor onClose={handleEditorClose} onUpdate={refetch} />
+        )}
+      </Suspense>
     </div>
   );
 }
