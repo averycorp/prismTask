@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -142,11 +142,9 @@ async def import_json(
     if mode == "replace":
         # Delete existing data
         for model in [Task, Project, Goal, Tag, Habit]:
-            existing = await db.execute(
-                select(model).where(model.user_id == current_user.id)
+            await db.execute(
+                delete(model).where(model.user_id == current_user.id)
             )
-            for entity in existing.scalars().all():
-                await db.delete(entity)
         await db.flush()
 
     counts = {"tasks": 0, "projects": 0, "tags": 0, "habits": 0}
