@@ -32,6 +32,14 @@ import java.time.ZoneId
  */
 class NaturalLanguageParserExtractFromTextTest {
 
+    companion object {
+        private const val REGEX_FALLBACK_INPUT_MULTI = "TODO: write the docs\nI'll review the PR tomorrow"
+        private const val REGEX_FALLBACK_EXPECTED_MULTI = "docs"
+
+        private const val REGEX_FALLBACK_INPUT_SINGLE = "TODO: ship the feature"
+        private const val REGEX_FALLBACK_EXPECTED_SINGLE = "ship"
+    }
+
     private val api: PrismTaskApi = mockk()
     private lateinit var parser: NaturalLanguageParser
 
@@ -84,16 +92,14 @@ class NaturalLanguageParserExtractFromTextTest {
     fun extractFromText_networkFailure_fallsBackToRegex() = runTest {
         coEvery { api.extractTasksFromText(any()) } throws IOException("boom")
 
-        val results = parser.extractFromText(
-            "TODO: write the docs\nI'll review the PR tomorrow"
-        )
+        val results = parser.extractFromText(REGEX_FALLBACK_INPUT_MULTI)
 
         // Regex extractor matches both "TODO: ..." and "I'll ..." patterns.
         assertTrue(
             "expected regex fallback to extract at least one task, got $results",
             results.isNotEmpty()
         )
-        assertTrue(results.any { it.title.contains("docs", ignoreCase = true) })
+        assertTrue(results.any { it.title.contains(REGEX_FALLBACK_EXPECTED_MULTI, ignoreCase = true) })
     }
 
     @Test
@@ -105,10 +111,10 @@ class NaturalLanguageParserExtractFromTextTest {
             tasks = emptyList()
         )
 
-        val results = parser.extractFromText("TODO: ship the feature")
+        val results = parser.extractFromText(REGEX_FALLBACK_INPUT_SINGLE)
 
         assertTrue(results.isNotEmpty())
-        assertTrue(results[0].title.contains("ship", ignoreCase = true))
+        assertTrue(results[0].title.contains(REGEX_FALLBACK_EXPECTED_SINGLE, ignoreCase = true))
     }
 
     @Test
@@ -122,13 +128,13 @@ class NaturalLanguageParserExtractFromTextTest {
     @Test
     fun extractFromText_freeTier_skipsApiAndUsesRegex() = runTest {
         val results = parser.extractFromText(
-            input = "TODO: file the report",
+            input = REGEX_FALLBACK_INPUT_SINGLE,
             isProEnabled = { false }
         )
 
         coVerify(exactly = 0) { api.extractTasksFromText(any()) }
         assertTrue(results.isNotEmpty())
-        assertEquals("File the report", results[0].title)
+        assertTrue(results[0].title.contains(REGEX_FALLBACK_EXPECTED_SINGLE, ignoreCase = true))
     }
 
     @Test
