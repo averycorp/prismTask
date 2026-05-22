@@ -106,15 +106,21 @@ async def set_task_tags(
 
     # Add new associations
     tags = []
-    for tid in tag_ids:
+    if tag_ids:
+        # Deduplicate tag_ids but preserve ordering if needed, or simply unique them
+        unique_tag_ids = list(set(tag_ids))
         tag_result = await db.execute(
-            select(Tag).where(Tag.id == tid, Tag.user_id == current_user.id)
+            select(Tag).where(Tag.id.in_(unique_tag_ids), Tag.user_id == current_user.id)
         )
-        tag = tag_result.scalar_one_or_none()
-        if not tag:
-            raise HTTPException(status_code=404, detail=f"Tag {tid} not found")
-        db.add(TaskTag(task_id=task_id, tag_id=tid))
-        tags.append(tag)
+        tags = list(tag_result.scalars().all())
+
+        if len(tags) != len(unique_tag_ids):
+            found_ids = {t.id for t in tags}
+            missing_ids = [tid for tid in unique_tag_ids if tid not in found_ids]
+            raise HTTPException(status_code=404, detail=f"Tags not found: {missing_ids}")
+
+        for tag in tags:
+            db.add(TaskTag(task_id=task_id, tag_id=tag.id))
 
     await db.flush()
     return [_tag_response(t) for t in tags]
