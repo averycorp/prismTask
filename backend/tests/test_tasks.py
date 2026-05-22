@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
@@ -167,6 +169,25 @@ async def test_get_task_with_subtasks(client: AsyncClient, auth_headers: dict, g
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("exc_type", [ValueError, RuntimeError])
+async def test_parse_task_validation_error(
+    client: AsyncClient, auth_headers: dict, exc_type
+):
+    from unittest.mock import patch
+    # The router imports the function inline: `from app.services.nlp_parser import parse_task_input`
+    # Therefore, we need to mock the module it's importing from.
+    with patch("app.services.nlp_parser.parse_task_input") as mock_parse:
+        mock_parse.side_effect = exc_type("Simulated parser error")
+        resp = await client.post(
+            "/api/v1/tasks/parse",
+            json={"text": "buy milk", "start_of_day_hour": 4, "start_of_day_minute": 0},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "Simulated parser error"
+
+
+@pytest.mark.asyncio
 async def test_parse_debug_does_not_leak_api_key_length(
     client: AsyncClient, auth_headers: dict
 ):
@@ -179,16 +200,11 @@ async def test_parse_debug_does_not_leak_api_key_length(
     assert "anthropic_installed" in body
 
 @pytest.mark.asyncio
-async def test_parse_task_validation_error(
+async def test_parse_debug_anthropic_not_installed(
     client: AsyncClient, auth_headers: dict
 ):
-    from unittest.mock import patch
-    with patch("app.services.nlp_parser.parse_task_input") as mock_parse:
-        mock_parse.side_effect = ValueError("Invalid input for parsing")
-        resp = await client.post(
-            "/api/v1/tasks/parse",
-            json={"text": "Buy groceries", "start_of_day_hour": 9, "start_of_day_minute": 0},
-            headers=auth_headers,
-        )
-        assert resp.status_code == 422
-        assert resp.json()["detail"] == "Invalid input for parsing"
+    with patch.dict("sys.modules", {"anthropic": None}):
+        resp = await client.get("/api/v1/tasks/parse-debug", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body.get("anthropic_installed") is False

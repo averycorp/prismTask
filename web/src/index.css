@@ -469,7 +469,6 @@ html {
 @media print {
   nav,
   header,
-  .mobile-nav,
   button {
     display: none !important;
   }

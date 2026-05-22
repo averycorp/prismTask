@@ -14,9 +14,10 @@ from app.config import settings
 
 @pytest.fixture
 def scrape_token(monkeypatch):
-    """Set METRICS_SCRAPE_TOKEN for the test, restore afterward."""
+    """Set METRICS_SCRAPE_TOKEN and wildcard METRICS_ALLOWED_IPS for the test."""
     token = "test-scrape-token"
     monkeypatch.setattr(settings, "METRICS_SCRAPE_TOKEN", token)
+    monkeypatch.setattr(settings, "METRICS_ALLOWED_IPS", ["*"])
     return token
 
 
@@ -46,6 +47,24 @@ async def test_metrics_correct_token_returns_prometheus_text(
     # The audit-emit counter must be in the exposition output even at
     # zero, because the Counter is registered at import time.
     assert "audit_emit_failures_total" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_metrics_ip_not_allowed_returns_403(client: AsyncClient, scrape_token, monkeypatch):
+    monkeypatch.setattr(settings, "METRICS_ALLOWED_IPS", ["192.168.1.1"])
+    resp = await client.get(
+        "/metrics", headers={"Authorization": f"Bearer {scrape_token}", "X-Forwarded-For": "10.0.0.1"}
+    )
+    assert resp.status_code == 403, resp.text
+
+
+@pytest.mark.asyncio
+async def test_metrics_ip_allowed_returns_prometheus_text(client: AsyncClient, scrape_token, monkeypatch):
+    monkeypatch.setattr(settings, "METRICS_ALLOWED_IPS", ["10.0.0.1"])
+    resp = await client.get(
+        "/metrics", headers={"Authorization": f"Bearer {scrape_token}", "X-Forwarded-For": "10.0.0.1"}
+    )
+    assert resp.status_code == 200, resp.text
 
 
 @pytest.mark.asyncio
