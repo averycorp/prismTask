@@ -12,6 +12,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { useLeisureStore, type LeisureCategoryRef } from '@/stores/leisureStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useLogicalToday } from '@/utils/useLogicalToday';
 import {
   LEISURE_CATEGORIES,
   LEISURE_CATEGORY_DISPLAY,
@@ -50,6 +51,9 @@ export function LeisurePoolScreen() {
   // Subscribed for re-render so the per-day window recomputes when a
   // cross-device Start-of-Day update lands (see `dayBoundary.ts`).
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  // Reactive day-boundary crossing: todayIso flips when the wall clock
+  // passes startOfDayHour, forcing the useMemos below to recompute.
+  const todayIso = useLogicalToday(startOfDayHour);
 
   // Getters read live store state — depend on the slices they consume so
   // recomputation lands when settings/customCategories/sessions change. The
@@ -63,12 +67,12 @@ export function LeisurePoolScreen() {
   const minutesLogged = useMemo(
     () => getMinutesLoggedToday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getMinutesLoggedToday, sessions, startOfDayHour],
+    [getMinutesLoggedToday, sessions, startOfDayHour, todayIso],
   );
   const minutesByCat = useMemo(
     () => getMinutesByCategoryIdToday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getMinutesByCategoryIdToday, sessions, startOfDayHour],
+    [getMinutesByCategoryIdToday, sessions, startOfDayHour, todayIso],
   );
   const targetMinutes = getTargetMinutesToday();
 

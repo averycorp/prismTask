@@ -44,19 +44,12 @@ steps:
   args: ['run', 'build']
   waitFor: ['web-install']
 
-- id: 'web-e2e-deps'
-  name: 'mcr.microsoft.com/playwright:v1.44.0-jammy'
-  dir: 'web'
-  entrypoint: 'npm'
-  args: ['ci']
-  waitFor: ['-']
-
 - id: 'web-e2e'
   name: 'mcr.microsoft.com/playwright:v1.44.0-jammy'
   dir: 'web'
   entrypoint: 'npx'
   args: ['playwright', 'test']
-  waitFor: ['web-e2e-deps', 'web-build']
+  waitFor: ['web-build']
 
 
 # ==========================================

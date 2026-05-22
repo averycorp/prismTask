@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLeisureStore } from '@/stores/leisureStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useLogicalToday } from '@/utils/useLogicalToday';
 
 /**
  * Web port of `app/.../ui/screens/today/components/TodayLeisureMinimumRow.kt`.
@@ -22,6 +23,10 @@ export function TodayLeisureMinimumRow() {
   // cross-device Start-of-Day update lands (matches Android's
   // `DayBoundary`-driven `LeisureBudgetTracker`).
   const startOfDayHour = useSettingsStore((s) => s.startOfDayHour);
+  // Reactive day-boundary crossing: todayIso flips when the wall clock
+  // passes startOfDayHour, forcing the useMemo below to recompute so
+  // yesterday's leisure minutes don't stick around.
+  const todayIso = useLogicalToday(startOfDayHour);
 
   useEffect(() => {
     // Cheap fan-out: only fetch on mount if we haven't seen any state yet.
@@ -33,7 +38,7 @@ export function TodayLeisureMinimumRow() {
   const minutesLogged = useMemo(
     () => getMinutesLoggedToday(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getMinutesLoggedToday, sessions, startOfDayHour],
+    [getMinutesLoggedToday, sessions, startOfDayHour, todayIso],
   );
   const targetMinutes = getTargetMinutesToday();
 
