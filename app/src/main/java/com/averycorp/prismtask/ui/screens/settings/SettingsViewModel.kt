@@ -60,6 +60,7 @@ import javax.inject.Inject
  * state exposure and simple setters.
  */
 @HiltViewModel
+@Suppress("TooManyFunctions")
 class SettingsViewModel
 @Inject
 constructor(
