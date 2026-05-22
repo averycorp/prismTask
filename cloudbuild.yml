@@ -118,6 +118,8 @@ steps:
   name: 'ghcr.io/cirruslabs/android-sdk:34'
   entrypoint: './gradlew'
   args: ['ktlintCheck', 'detekt', 'lint', 'testDebugUnitTest', '--continue', '--no-daemon']
+  env:
+    - 'GRADLE_OPTS=-Dorg.gradle.jvmargs="-Xmx16g -XX:+UseParallelGC -XX:MaxMetaspaceSize=2g"'
   waitFor: ['-']
 
 # ==========================================
@@ -127,6 +129,8 @@ steps:
   name: 'ghcr.io/cirruslabs/android-sdk:34'
   env:
     - 'USE_FIREBASE_EMULATOR=true'
+    - 'GRADLE_OPTS=-Dorg.gradle.jvmargs="-Xmx16g -XX:+UseParallelGC -XX:MaxMetaspaceSize=2g"'
+
   script: |
     # Install node & firebase-tools
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -

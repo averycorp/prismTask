@@ -65,6 +65,8 @@ steps:
   args: ['assembleRelease', 'bundleRelease', '--no-configuration-cache', '--build-cache', '--parallel', '-x', 'lint', '-x', 'lintVitalRelease', '--no-daemon']
   env:
     - 'KEYSTORE_PATH=release.keystore'
+    - 'GRADLE_OPTS=-Dorg.gradle.jvmargs="-Xmx16g -XX:+UseParallelGC -XX:MaxMetaspaceSize=2g"'
+
 
 - id: 'github-release'
   name: 'ghcr.io/supportpal/github-gh-cli'
