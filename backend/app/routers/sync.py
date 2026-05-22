@@ -456,32 +456,33 @@ async def sync_pull(
             # HabitCompletion doesn't have user_id directly
             continue
 
-        query = select(model)
+        table = model.__table__
+        query = select(table)
+
         if hasattr(model, "user_id"):
-            query = query.where(model.user_id == current_user.id)
+            query = query.where(table.c.user_id == current_user.id)
 
         if since and hasattr(model, "updated_at"):
-            query = query.where(model.updated_at > since)
+            query = query.where(table.c.updated_at > since)
         elif since and hasattr(model, "created_at"):
-            query = query.where(model.created_at > since)
+            query = query.where(table.c.created_at > since)
 
         result = await db.execute(query)
-        for entity in result.scalars().all():
+        for row in result.mappings().all():
             data = {}
-            for col in entity.__table__.columns:
-                val = getattr(entity, col.name)
+            for col_name, val in row.items():
                 if hasattr(val, "value"):
                     val = val.value
                 if hasattr(val, "isoformat"):
                     val = val.isoformat()
-                data[col.name] = val
+                data[col_name] = val
 
-            timestamp = getattr(entity, "updated_at", None) or getattr(entity, "created_at", None)
+            timestamp = row.get("updated_at") or row.get("created_at")
             changes.append(
                 SyncChange(
                     entity_type=entity_type,
                     operation="upsert",
-                    entity_id=entity.id,
+                    entity_id=row["id"],
                     data=data,
                     timestamp=timestamp or datetime.now(timezone.utc),
                 )
