@@ -1,3 +1,4 @@
+import collections
 import logging
 from datetime import date as date_cls, datetime, timezone
 from typing import Any
@@ -86,49 +87,123 @@ STATUS_ENUM_MAP = {
 # Firestore-driven sync identifies rows by client-generated cloud IDs;
 # without this, two devices creating the "same" row produce duplicates.
 WRITABLE_FIELDS: dict[str, frozenset[str]] = {
-    "goal": frozenset({
-        "title", "description", "status", "target_date", "color", "sort_order",
-    }),
-    "project": frozenset({
-        "goal_id", "title", "description", "status", "due_date", "sort_order",
-    }),
-    "task": frozenset({
-        "project_id", "parent_id", "title", "description", "notes", "status",
-        "priority", "due_date", "due_time", "planned_date", "completed_at",
-        "urgency_score", "recurrence_json", "eisenhower_quadrant",
-        "eisenhower_updated_at", "estimated_duration", "actual_duration",
-        "sort_order", "depth",
-    }),
+    "goal": frozenset(
+        {
+            "title",
+            "description",
+            "status",
+            "target_date",
+            "color",
+            "sort_order",
+        }
+    ),
+    "project": frozenset(
+        {
+            "goal_id",
+            "title",
+            "description",
+            "status",
+            "due_date",
+            "sort_order",
+        }
+    ),
+    "task": frozenset(
+        {
+            "project_id",
+            "parent_id",
+            "title",
+            "description",
+            "notes",
+            "status",
+            "priority",
+            "due_date",
+            "due_time",
+            "planned_date",
+            "completed_at",
+            "urgency_score",
+            "recurrence_json",
+            "eisenhower_quadrant",
+            "eisenhower_updated_at",
+            "estimated_duration",
+            "actual_duration",
+            "sort_order",
+            "depth",
+        }
+    ),
     "tag": frozenset({"name", "color"}),
-    "habit": frozenset({
-        "name", "description", "icon", "color", "category", "frequency",
-        "target_count", "active_days_json", "is_active",
-    }),
+    "habit": frozenset(
+        {
+            "name",
+            "description",
+            "icon",
+            "color",
+            "category",
+            "frequency",
+            "target_count",
+            "active_days_json",
+            "is_active",
+        }
+    ),
     "habit_completion": frozenset({"habit_id", "date", "count"}),
-    "daily_essential_slot_completion": frozenset({
-        "date", "slot_key", "med_ids_json", "taken_at",
-    }),
-    "template": frozenset({
-        "name", "description", "icon", "category",
-        "template_title", "template_description", "template_priority",
-        "template_project_id", "template_tags_json",
-        "template_recurrence_json", "template_duration", "template_subtasks_json",
-    }),
-    "medication": frozenset({
-        "cloud_id", "name", "dosage", "notes", "is_active",
-    }),
-    "medication_slot": frozenset({
-        "cloud_id", "slot_key", "ideal_time", "drift_minutes", "is_active",
-    }),
-    "medication_tier_state": frozenset({
-        # Cross-system FK references go by cloud_id — Android/web local
-        # integer ids don't agree with backend integer ids, so the only
-        # safe identifier across systems is the user-generated cloud_id.
-        # Real DB columns (`medication_id`, `slot_id`) are filled by
-        # `_resolve_cloud_fk_for_medication` below.
-        "cloud_id", "medication_cloud_id", "slot_cloud_id",
-        "log_date", "tier", "tier_source", "intended_time", "logged_at",
-    }),
+    "daily_essential_slot_completion": frozenset(
+        {
+            "date",
+            "slot_key",
+            "med_ids_json",
+            "taken_at",
+        }
+    ),
+    "template": frozenset(
+        {
+            "name",
+            "description",
+            "icon",
+            "category",
+            "template_title",
+            "template_description",
+            "template_priority",
+            "template_project_id",
+            "template_tags_json",
+            "template_recurrence_json",
+            "template_duration",
+            "template_subtasks_json",
+        }
+    ),
+    "medication": frozenset(
+        {
+            "cloud_id",
+            "name",
+            "dosage",
+            "notes",
+            "is_active",
+        }
+    ),
+    "medication_slot": frozenset(
+        {
+            "cloud_id",
+            "slot_key",
+            "ideal_time",
+            "drift_minutes",
+            "is_active",
+        }
+    ),
+    "medication_tier_state": frozenset(
+        {
+            # Cross-system FK references go by cloud_id — Android/web local
+            # integer ids don't agree with backend integer ids, so the only
+            # safe identifier across systems is the user-generated cloud_id.
+            # Real DB columns (`medication_id`, `slot_id`) are filled by
+            # `_resolve_cloud_fk_for_medication` below.
+            "cloud_id",
+            "medication_cloud_id",
+            "slot_cloud_id",
+            "log_date",
+            "tier",
+            "tier_source",
+            "intended_time",
+            "logged_at",
+        }
+    ),
 }
 
 # Foreign keys that reference user-scoped entities. Before assigning one of
@@ -174,14 +249,71 @@ def _filter_writable(entity_type: str, data: dict) -> dict:
         if key in allowed:
             filtered[key] = value
         else:
-            logger.info(
-                "sync: dropping disallowed field %s on %s", key, entity_type
-            )
+            logger.info("sync: dropping disallowed field %s on %s", key, entity_type)
     return filtered
 
 
+class FKResolutionCache:
+    def __init__(self) -> None:
+        self.valid_ids: dict[type, set[Any]] = collections.defaultdict(set)
+        self.cloud_id_map: dict[type, dict[str, Any]] = collections.defaultdict(dict)
+
+
+async def _build_fk_cache(
+    operations: list[SyncOperation], user: User, db: AsyncSession
+) -> FKResolutionCache:
+    ids_to_check: dict[type, set[Any]] = collections.defaultdict(set)
+    cloud_ids_to_check: dict[type, set[str]] = collections.defaultdict(set)
+
+    for op in operations:
+        if not op.data:
+            continue
+
+        fks = USER_SCOPED_FKS.get(op.entity_type)
+        if fks:
+            for column, model in fks.items():
+                val = op.data.get(column)
+                if val is not None:
+                    ids_to_check[model].add(val)
+
+        cloud_fks = _MEDICATION_CLOUD_FK_MAP.get(op.entity_type)
+        if cloud_fks:
+            for cloud_key, (model, fk_column) in cloud_fks.items():
+                val = op.data.get(cloud_key)
+                if val is not None:
+                    cloud_ids_to_check[model].add(val)
+
+    fk_cache = FKResolutionCache()
+
+    for model, ids in ids_to_check.items():
+        if not ids:
+            continue
+        query = select(model.id).where(model.id.in_(ids))
+        if hasattr(model, "user_id"):
+            query = query.where(model.user_id == user.id)
+        result = await db.execute(query)
+        fk_cache.valid_ids[model].update(row[0] for row in result.all())
+
+    for model, cloud_ids in cloud_ids_to_check.items():
+        if not cloud_ids:
+            continue
+        query = select(model.id, model.cloud_id).where(model.cloud_id.in_(cloud_ids))
+        if hasattr(model, "user_id"):
+            query = query.where(model.user_id == user.id)
+        result = await db.execute(query)
+        for row in result.all():
+            fk_cache.cloud_id_map[model][row[1]] = row[0]
+            fk_cache.valid_ids[model].add(row[0])
+
+    return fk_cache
+
+
 async def _validate_foreign_keys(
-    entity_type: str, data: dict, user: User, db: AsyncSession
+    entity_type: str,
+    data: dict,
+    user: User,
+    db: AsyncSession,
+    fk_cache: FKResolutionCache,
 ) -> str | None:
     """Ensure any user-scoped FK in ``data`` points to a row owned by ``user``.
 
@@ -194,17 +326,24 @@ async def _validate_foreign_keys(
         value = data.get(column)
         if value is None:
             continue
-        query = select(model.id).where(model.id == value)
-        if hasattr(model, "user_id"):
-            query = query.where(model.user_id == user.id)
-        result = await db.execute(query)
-        if result.scalar_one_or_none() is None:
-            return f"Invalid {column} on {entity_type}: {value} not found"
+
+        if value not in fk_cache.valid_ids[model]:
+            query = select(model.id).where(model.id == value)
+            if hasattr(model, "user_id"):
+                query = query.where(model.user_id == user.id)
+            result = await db.execute(query)
+            if result.scalar_one_or_none() is None:
+                return f"Invalid {column} on {entity_type}: {value} not found"
+            fk_cache.valid_ids[model].add(value)
     return None
 
 
 async def _resolve_cloud_fk_for_medication(
-    entity_type: str, data: dict, user: User, db: AsyncSession
+    entity_type: str,
+    data: dict,
+    user: User,
+    db: AsyncSession,
+    fk_cache: FKResolutionCache,
 ) -> str | None:
     """Resolve every `*_cloud_id` reference in `data` for medication
     tier_state / mark into the corresponding integer FK column.
@@ -221,17 +360,23 @@ async def _resolve_cloud_fk_for_medication(
         cloud_id = data.pop(cloud_key, None)
         if not cloud_id:
             return f"{entity_type}.{cloud_key} is required"
-        query = select(model.id).where(model.cloud_id == cloud_id)
-        if hasattr(model, "user_id"):
-            query = query.where(model.user_id == user.id)
-        result = await db.execute(query)
-        resolved = result.scalar_one_or_none()
-        if resolved is None:
-            return (
-                f"{entity_type}.{cloud_key}={cloud_id} did not resolve "
-                "to a row owned by this user"
-            )
-        data[fk_column] = resolved
+
+        mapped_id = fk_cache.cloud_id_map[model].get(cloud_id)
+        if mapped_id is None:
+            query = select(model.id).where(model.cloud_id == cloud_id)
+            if hasattr(model, "user_id"):
+                query = query.where(model.user_id == user.id)
+            result = await db.execute(query)
+            mapped_id = result.scalar_one_or_none()
+            if mapped_id is None:
+                return (
+                    f"{entity_type}.{cloud_key}={cloud_id} did not resolve "
+                    "to a row owned by this user"
+                )
+            fk_cache.cloud_id_map[model][cloud_id] = mapped_id
+            fk_cache.valid_ids[model].add(mapped_id)
+
+        data[fk_column] = mapped_id
     return None
 
 
@@ -268,9 +413,7 @@ def _parse_date(value: Any) -> date_cls | None:
     return None
 
 
-def _build_audit_record(
-    op: SyncOperation, user: User
-) -> dict[str, Any] | None:
+def _build_audit_record(op: SyncOperation, user: User) -> dict[str, Any] | None:
     """If the op targets an audited entity, return a kwargs dict for
     ``MedicationLogEvent(**...)``. Otherwise return None.
     """
@@ -313,7 +456,8 @@ async def _emit_audit_events(db: AsyncSession, records: list[dict[str, Any]]) ->
             # closed-beta dashboard plots both side-by-side.
             logger.warning(
                 "medication audit emit failed for %s: %s",
-                r.get("entity_cloud_id"), exc,
+                r.get("entity_cloud_id"),
+                exc,
                 extra={
                     "audit_emit_failed": True,
                     "entity_type": entity_type,
@@ -325,7 +469,7 @@ async def _emit_audit_events(db: AsyncSession, records: list[dict[str, Any]]) ->
 
 
 async def _process_operation(
-    op: SyncOperation, user: User, db: AsyncSession
+    op: SyncOperation, user: User, db: AsyncSession, fk_cache: FKResolutionCache
 ) -> str | None:
     model = ENTITY_MAP.get(op.entity_type)
     if not model:
@@ -335,11 +479,13 @@ async def _process_operation(
         if not op.data:
             return "Create operation requires data"
         data = _filter_writable(op.entity_type, dict(op.data))
-        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db)
+        fk_error = await _validate_foreign_keys(
+            op.entity_type, data, user, db, fk_cache
+        )
         if fk_error:
             return fk_error
         cloud_fk_error = await _resolve_cloud_fk_for_medication(
-            op.entity_type, data, user, db
+            op.entity_type, data, user, db, fk_cache
         )
         if cloud_fk_error:
             return cloud_fk_error
@@ -376,11 +522,13 @@ async def _process_operation(
         if not entity:
             return f"{op.entity_type} {op.entity_id} not found"
         data = _filter_writable(op.entity_type, dict(op.data))
-        fk_error = await _validate_foreign_keys(op.entity_type, data, user, db)
+        fk_error = await _validate_foreign_keys(
+            op.entity_type, data, user, db, fk_cache
+        )
         if fk_error:
             return fk_error
         cloud_fk_error = await _resolve_cloud_fk_for_medication(
-            op.entity_type, data, user, db
+            op.entity_type, data, user, db, fk_cache
         )
         if cloud_fk_error:
             return cloud_fk_error
@@ -423,8 +571,10 @@ async def sync_push(
     processed = 0
     audit_records: list[dict[str, Any]] = []
 
+    fk_cache = await _build_fk_cache(data.operations, current_user, db)
+
     for op in data.operations:
-        error = await _process_operation(op, current_user, db)
+        error = await _process_operation(op, current_user, db, fk_cache)
         if error:
             errors.append(error)
             continue
@@ -476,7 +626,9 @@ async def sync_pull(
                     val = val.isoformat()
                 data[col.name] = val
 
-            timestamp = getattr(entity, "updated_at", None) or getattr(entity, "created_at", None)
+            timestamp = getattr(entity, "updated_at", None) or getattr(
+                entity, "created_at", None
+            )
             changes.append(
                 SyncChange(
                     entity_type=entity_type,
@@ -495,8 +647,7 @@ async def sync_pull(
         habit_ids = [r[0] for r in habit_result.all()]
         if habit_ids:
             comp_result = await db.execute(
-                select(HabitCompletion)
-                .where(
+                select(HabitCompletion).where(
                     HabitCompletion.habit_id.in_(habit_ids),
                     HabitCompletion.created_at > since,
                 )
