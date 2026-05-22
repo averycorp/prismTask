@@ -144,23 +144,34 @@ def _fetch_emails_via_api(
     messages = results.get("messages", [])
     emails: list[dict] = []
 
-    for msg_meta in messages:
-        msg = (
-            service.users()
-            .messages()
-            .get(userId="me", id=msg_meta["id"], format="metadata",
-                 metadataHeaders=["Subject", "From", "Date"])
-            .execute()
-        )
+    if not messages:
+        return emails
 
-        headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+    def callback(request_id: str, response: dict, exception: Exception | None) -> None:
+        if exception is not None:
+            logger.warning(f"Error fetching email {request_id}: {exception}")
+            return
+
+        headers = {h["name"]: h["value"] for h in response.get("payload", {}).get("headers", [])}
         emails.append({
-            "email_id": msg_meta["id"],
+            "email_id": response.get("id"),
             "subject": headers.get("Subject", "(no subject)"),
             "from": headers.get("From", ""),
             "date": headers.get("Date", ""),
-            "snippet": msg.get("snippet", "")[:500],
+            "snippet": response.get("snippet", "")[:500],
         })
+
+    batch = service.new_batch_http_request()
+    for msg_meta in messages:
+        batch.add(
+            service.users().messages().get(
+                userId="me", id=msg_meta["id"], format="metadata",
+                metadataHeaders=["Subject", "From", "Date"]
+            ),
+            callback=callback
+        )
+
+    batch.execute()
 
     return emails
 
