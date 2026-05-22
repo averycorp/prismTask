@@ -1,6 +1,5 @@
 import importlib.util
 import os
-import pytest
 import sqlalchemy as sa
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
