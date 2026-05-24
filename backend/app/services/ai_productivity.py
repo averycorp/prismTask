@@ -19,7 +19,7 @@ MODEL_SONNET = "claude-sonnet-4-20250514"
 
 # AI features that use Sonnet for higher-quality output. Everything else runs
 # on Haiku. These are the premium AI features baked into the single Pro tier.
-SONNET_FEATURES = {"weekly_planner", "monthly_review", "chat", "task_extraction"}
+SONNET_FEATURES = {"weekly_planner", "monthly_review", "chat"}
 
 # Per-request override. Populated by the admin-gated
 # ``apply_admin_model_override`` dependency when an admin client sends
