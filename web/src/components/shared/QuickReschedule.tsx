@@ -54,26 +54,34 @@ export function QuickReschedule({
       label: 'Today',
       icon: Sun,
       date: format(today, 'yyyy-MM-dd'),
+      displayDate: today,
     },
     {
       label: 'Tomorrow',
       icon: ArrowRight,
       date: format(addDays(today, 1), 'yyyy-MM-dd'),
+      displayDate: addDays(today, 1),
     },
     {
       label: 'Next Monday',
       icon: CalendarDays,
       date: format(nextMonday(today), 'yyyy-MM-dd'),
+      displayDate: nextMonday(today),
     },
     {
       label: 'Next Week',
       icon: CalendarClock,
       date: format(addDays(today, 7), 'yyyy-MM-dd'),
+      displayDate: addDays(today, 7),
     },
   ];
 
   const style = anchorPoint
-    ? { position: 'fixed' as const, top: anchorPoint.y, left: anchorPoint.x }
+    ? {
+        position: 'fixed' as const,
+        top: Math.min(anchorPoint.y, typeof window !== 'undefined' ? window.innerHeight - 300 : 0),
+        left: Math.min(anchorPoint.x, typeof window !== 'undefined' ? window.innerWidth - 220 : 0),
+      }
     : {};
 
   return (
@@ -97,7 +105,7 @@ export function QuickReschedule({
           <opt.icon className="h-4 w-4 text-[var(--color-text-secondary)]" />
           {opt.label}
           <span className="ml-auto text-xs text-[var(--color-text-secondary)]">
-            {format(new Date(opt.date), 'MMM d')}
+            {format(opt.displayDate, 'MMM d')}
           </span>
         </button>
       ))}
