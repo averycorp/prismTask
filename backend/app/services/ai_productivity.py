@@ -19,7 +19,7 @@ MODEL_SONNET = "claude-sonnet-4-20250514"
 
 # AI features that use Sonnet for higher-quality output. Everything else runs
 # on Haiku. These are the premium AI features baked into the single Pro tier.
-SONNET_FEATURES = {"weekly_planner", "monthly_review", "chat"}
+SONNET_FEATURES = {"weekly_planner", "monthly_review", "chat", "task_extraction"}
 
 # Per-request override. Populated by the admin-gated
 # ``apply_admin_model_override`` dependency when an admin client sends
@@ -964,6 +964,8 @@ Text:
 ---
 {text}
 ---
+
+Your task is to do a THOROUGH and EXHAUSTIVE reading of the text. Find EVERY single actionable item, including minor follow-ups, explicit requests, and implied tasks. Do not miss any action items.
 
 For each action item, return: title (imperative, Title case, under 12 words), suggested_due_date (ISO or null), suggested_priority (0-4), suggested_project (one-word or null), confidence (0-1).
 
