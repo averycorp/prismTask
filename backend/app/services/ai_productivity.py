@@ -987,9 +987,21 @@ Return an empty array if absolutely no tasks are found."""
     last_error_ex = None
     for attempt in range(2):
         try:
-            message = client.messages.create(model=model, max_tokens=2048, messages=[{"role": "user", "content": prompt}])
+            message = client.messages.create(model=model, max_tokens=4096, messages=[{"role": "user", "content": prompt}])
             content = message.content[0].text
-            result = _parse_ai_json(content)
+            try:
+                result = _parse_ai_json(content)
+            except json.JSONDecodeError as e:
+                if message.stop_reason == "max_tokens":
+                    # Salvage truncated JSON array by finding the last complete object
+                    last_brace = content.rfind("}")
+                    if last_brace != -1:
+                        salvaged = content[:last_brace+1] + "]"
+                        result = _parse_ai_json(salvaged)
+                    else:
+                        raise e
+                else:
+                    raise e
             if not isinstance(result, list):
                 raise ValueError("Expected a JSON array")
             return result
