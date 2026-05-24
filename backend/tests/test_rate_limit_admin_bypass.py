@@ -165,6 +165,12 @@ async def test_daily_briefing_admin_bypasses_ip_rate_limit(
     ), patch(
         "app.routers.ai.fetch_recently_completed_tasks",
         new=AsyncMock(return_value=[]),
+    ), patch(
+        # Habits also live in Firestore now; the endpoint calls
+        # fetch_active_habits before the empty short-circuit, so it must be
+        # stubbed too or the call hits real Firestore (no creds in CI → 500).
+        "app.services.firestore_state.fetch_active_habits",
+        new=AsyncMock(return_value=[]),
     ):
         for _ in range(5):
             resp = await client.post(
