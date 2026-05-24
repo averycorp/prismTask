@@ -451,6 +451,12 @@ export async function getAllTasks(uid: string): Promise<Task[]> {
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
 }
 
+export async function getActiveTasks(uid: string): Promise<Task[]> {
+  const q = query(tasksCol(uid), where('isCompleted', '==', false));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
+}
+
 /**
  * Fetches only the tasks that might be relevant for a given weekly review window.
  * By using three separate ranged queries for completedAt, dueDate, and plannedDate

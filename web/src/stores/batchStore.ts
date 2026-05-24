@@ -192,7 +192,7 @@ async function resolveMedicationCandidates(
 
 async function buildUserContext(uid: string): Promise<BatchUserContext> {
   const [tasks, habits, projects, medications] = await Promise.all([
-    firestoreTasks.getAllTasks(uid),
+    firestoreTasks.getActiveTasks(uid),
     firestoreHabits.getHabits(uid),
     firestoreProjects.getProjects(uid),
     firestoreMedications.getMedications(uid).catch(() => []),
@@ -207,6 +207,7 @@ async function buildUserContext(uid: string): Promise<BatchUserContext> {
     timezone,
     tasks: tasks
       .filter((t) => (!t.id || t.id.length > 0) && t.status !== 'done')
+      .sort((a, b) => a.sort_order - b.sort_order)
       .slice(0, 200) // cap to match backend bounds and keep payload small
       .map((t) => ({
         id: t.id,
@@ -303,6 +304,7 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
       medicationCandidates: {},
       strippedMutations: [],
       parseError: null,
+      isParsing: false,
     }),
 
   parsePendingCommand: async () => {
@@ -419,6 +421,7 @@ export const useBatchStore = create<BatchStoreState>((set, get) => ({
       medicationCandidates: {},
       strippedMutations: [],
       parseError: null,
+      isParsing: false,
     }),
 
   hydrate: async (uid) => {
