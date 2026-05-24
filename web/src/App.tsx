@@ -13,12 +13,23 @@ import { PrismThemeProvider } from '@/theme/PrismThemeProvider';
 import { useHabitStore } from '@/stores/habitStore';
 import { useTaskStore } from '@/stores/taskStore';
 
+// Expose stores + router on `window` for E2E tests / manual debugging.
+declare global {
+  interface Window {
+    useAuthStore: typeof useAuthStore;
+    useOnboardingStore: typeof useOnboardingStore;
+    useHabitStore: typeof useHabitStore;
+    useTaskStore: typeof useTaskStore;
+    router: typeof router;
+  }
+}
+
 if (typeof window !== 'undefined') {
-  (window as any).useAuthStore = useAuthStore;
-  (window as any).useOnboardingStore = useOnboardingStore;
-  (window as any).useHabitStore = useHabitStore;
-  (window as any).useTaskStore = useTaskStore;
-  (window as any).router = router;
+  window.useAuthStore = useAuthStore;
+  window.useOnboardingStore = useOnboardingStore;
+  window.useHabitStore = useHabitStore;
+  window.useTaskStore = useTaskStore;
+  window.router = router;
 }
 
 export default function App() {
