@@ -225,8 +225,8 @@ fun TodayScreen(
     val allTodayDone = remember(overdueTasks, todayTasks, plannedTasks, completedToday, allHabitsCompleted) {
         overdueTasks.isEmpty() && todayTasks.isEmpty() && plannedTasks.isEmpty() && completedToday.isNotEmpty() && allHabitsCompleted
     }
-    val nothingToday = remember(overdueTasks, todayTasks, plannedTasks, completedToday) {
-        overdueTasks.isEmpty() && todayTasks.isEmpty() && plannedTasks.isEmpty() && completedToday.isEmpty()
+    val nothingToday = remember(overdueTasks, todayTasks, plannedTasks, completedToday, habitTotalCount) {
+        overdueTasks.isEmpty() && todayTasks.isEmpty() && plannedTasks.isEmpty() && completedToday.isEmpty() && habitTotalCount == 0
     }
 
     var editorSheetTaskId by remember { mutableStateOf<Long?>(null) }
