@@ -205,7 +205,7 @@ export default function TaskEditor({
       setMaxRevisions('');
       setRecurrenceType('');
       setRecurrenceInterval(1);
-      setRecurrenceDaysOfWeek([]);
+      setRecurrenceDaysOfWeek((prev) => (prev.length === 0 ? prev : []));
       setRecurrenceAfterCompletion(false);
       setRecurrenceEndMode('never');
       setRecurrenceEndAfter(10);
@@ -245,9 +245,16 @@ export default function TaskEditor({
         const rule = JSON.parse(task.recurrence_json);
         setRecurrenceType(rule.type || '');
         setRecurrenceInterval(rule.interval || 1);
-        setRecurrenceDaysOfWeek(
-          Array.isArray(rule.days_of_week) ? rule.days_of_week : [],
-        );
+        const nextDays = Array.isArray(rule.days_of_week) ? rule.days_of_week : [];
+        setRecurrenceDaysOfWeek((prev) => {
+          if (
+            prev.length === nextDays.length &&
+            prev.every((val, index) => val === nextDays[index])
+          ) {
+            return prev;
+          }
+          return nextDays;
+        });
         setRecurrenceAfterCompletion(!!rule.after_completion);
         if (rule.end_date) {
           setRecurrenceEndMode('on');
@@ -264,7 +271,7 @@ export default function TaskEditor({
     } else {
       setRecurrenceType('');
       setRecurrenceInterval(1);
-      setRecurrenceDaysOfWeek([]);
+      setRecurrenceDaysOfWeek((prev) => (prev.length === 0 ? prev : []));
       setRecurrenceAfterCompletion(false);
       setRecurrenceEndMode('never');
       setRecurrenceEndAfter(10);
