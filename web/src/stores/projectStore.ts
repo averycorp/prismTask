@@ -3,6 +3,7 @@ import type { Project, ProjectCreate, ProjectUpdate, ProjectDetail } from '@/typ
 import type { Goal, GoalCreate, GoalUpdate, GoalDetail } from '@/types/goal';
 import { goalsApi } from '@/api/goals';
 import * as firestoreProjects from '@/api/firestore/projects';
+import * as firestoreTasks from '@/api/firestore/tasks';
 import type { Unsubscribe } from 'firebase/firestore';
 
 interface ProjectState {
@@ -28,6 +29,7 @@ interface ProjectState {
   archiveProject: (projectId: string) => Promise<Project>;
   reopenProject: (projectId: string) => Promise<Project>;
   deleteProject: (projectId: string) => Promise<void>;
+  cascadeProjectDates: (projectId: string, shiftDays: number) => Promise<void>;
 
   // Real-time
   subscribeToProjects: (uid: string) => Unsubscribe;
@@ -166,6 +168,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
       selectedProject:
         state.selectedProject?.id === projectId ? null : state.selectedProject,
     }));
+  },
+
+  cascadeProjectDates: async (projectId, shiftDays) => {
+    const uid = getUid();
+    await firestoreTasks.cascadeProjectDates(uid, projectId, shiftDays);
   },
 
   subscribeToProjects: (uid: string) => {

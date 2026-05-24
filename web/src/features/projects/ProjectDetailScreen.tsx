@@ -8,6 +8,7 @@ import {
   Trash2,
   CheckSquare,
   Map as MapIcon,
+  CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProjectStore } from '@/stores/projectStore';
@@ -36,6 +37,7 @@ export function ProjectDetailScreen() {
     fetchProject,
     updateProject,
     deleteProject,
+    cascadeProjectDates,
   } = useProjectStore();
 
   const {
@@ -52,6 +54,9 @@ export function ProjectDetailScreen() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cascadeOpen, setCascadeOpen] = useState(false);
+  const [cascadeDays, setCascadeDays] = useState('1');
+  const [cascading, setCascading] = useState(false);
 
   // Edit form
   const [editTitle, setEditTitle] = useState('');
@@ -180,6 +185,25 @@ export function ProjectDetailScreen() {
     }
   };
 
+  const handleCascadeDates = async () => {
+    const shiftDays = parseInt(cascadeDays, 10);
+    if (isNaN(shiftDays) || shiftDays === 0) {
+      toast.error('Please enter a valid non-zero number of days');
+      return;
+    }
+    setCascading(true);
+    try {
+      await cascadeProjectDates(projectId, shiftDays);
+      toast.success('Dates cascaded successfully');
+      setCascadeOpen(false);
+      loadData();
+    } catch {
+      toast.error('Failed to cascade dates');
+    } finally {
+      setCascading(false);
+    }
+  };
+
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.status === 'done').length;
   if (loading) {
@@ -226,6 +250,14 @@ export function ProjectDetailScreen() {
               >
                 <MapIcon className="h-4 w-4" />
                 Roadmap
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCascadeOpen(true)}
+              >
+                <CalendarDays className="h-4 w-4" />
+                Cascade Dates
               </Button>
               <Button
                 variant="secondary"
@@ -374,6 +406,43 @@ export function ProjectDetailScreen() {
               <option value="on_hold">On Hold</option>
               <option value="archived">Archived</option>
             </select>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Cascade Dates Modal */}
+      <Modal
+        isOpen={cascadeOpen}
+        onClose={() => setCascadeOpen(false)}
+        title="Cascade Due Dates"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCascadeOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCascadeDates} disabled={cascading}>
+              {cascading ? 'Cascading...' : 'Shift Dates'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Shift all task due dates and planned dates in this project by a specific number of days.
+            Use a negative number to shift dates earlier.
+          </p>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">
+              Days to Shift
+            </label>
+            <input
+              type="number"
+              value={cascadeDays}
+              onChange={(e) => setCascadeDays(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
+              placeholder="e.g. 3 or -2"
+            />
           </div>
         </div>
       </Modal>

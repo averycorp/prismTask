@@ -8,7 +8,7 @@ import { aiApi } from '@/api/ai';
 describe('aiApi.extractFromText', () => {
   beforeEach(() => postMock.mockReset());
 
-  it('POSTs the request body to /ai/tasks/extract-from-text and unwraps .data', async () => {
+  it('POSTs the request body to /ai/parse-text and unwraps .data', async () => {
     postMock.mockResolvedValueOnce({
       data: {
         tasks: [
@@ -26,7 +26,7 @@ describe('aiApi.extractFromText', () => {
       text: 'Don’t forget to review the PR before Friday.',
       source: 'web',
     });
-    expect(postMock).toHaveBeenCalledWith('/ai/tasks/extract-from-text', {
+    expect(postMock).toHaveBeenCalledWith('/ai/parse-text', {
       text: 'Don’t forget to review the PR before Friday.',
       source: 'web',
     });
@@ -37,7 +37,7 @@ describe('aiApi.extractFromText', () => {
   it('accepts requests without a source field', async () => {
     postMock.mockResolvedValueOnce({ data: { tasks: [] } });
     await aiApi.extractFromText({ text: 'hi' });
-    expect(postMock).toHaveBeenCalledWith('/ai/tasks/extract-from-text', {
+    expect(postMock).toHaveBeenCalledWith('/ai/parse-text', {
       text: 'hi',
     });
   });

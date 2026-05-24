@@ -13,6 +13,7 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
+import { addDays, format } from 'date-fns';
 import { firestore } from '@/lib/firebase';
 import { lwwUpdate } from './lww';
 import type { CognitiveLoad, LifeCategory, Task, TaskMode, TaskStatus } from '@/types/task';
@@ -551,6 +552,46 @@ export async function getSubtasks(uid: string, parentTaskId: string): Promise<Ta
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
+}
+
+export async function cascadeProjectDates(
+  uid: string,
+  projectId: string,
+  shiftDays: number,
+): Promise<void> {
+  if (shiftDays === 0) return;
+
+  const tasks = await getTasksByProject(uid, projectId);
+
+  const updates = tasks.map(async (t) => {
+    const patch: Record<string, unknown> = {};
+    let changed = false;
+
+    if (t.due_date) {
+      const parsed = new Date(t.due_date + 'T00:00:00');
+      const shifted = addDays(parsed, shiftDays);
+      patch.due_date = format(shifted, 'yyyy-MM-dd');
+      
+      // Preserve due_time by writing it back alongside the new date
+      if (t.due_time) {
+        patch.due_time = t.due_time;
+      }
+      changed = true;
+    }
+
+    if (t.planned_date) {
+      const parsed = new Date(t.planned_date + 'T00:00:00');
+      const shifted = addDays(parsed, shiftDays);
+      patch.planned_date = format(shifted, 'yyyy-MM-dd');
+      changed = true;
+    }
+
+    if (changed) {
+      return updateTask(uid, t.id, patch);
+    }
+  });
+
+  await Promise.all(updates);
 }
 
 // ── Real-time listener ───────────────────────────────────────
