@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { format, parseISO, isToday, isBefore, startOfDay } from 'date-fns';
 import type { Task } from '@/types/task';
-import { tasksApi } from '@/api/tasks';
+import * as firestoreTasks from '@/api/firestore/tasks';
+import { getFirebaseUid } from '@/stores/firebaseUid';
 
 /**
  * Groups tasks by ISO date string for calendar views.
  * Overdue tasks are included in today's bucket.
+ *
+ * Tasks are read from Firestore — the source of truth for the web client.
+ * (The FastAPI `/tasks/*` endpoints query a separate Postgres store that
+ * the web app does not write to, which is why the calendar rendered empty
+ * despite the user having dated tasks — bug B-05.)
  */
 export function useCalendarTasks(startDate: Date, endDate: Date) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -19,19 +25,8 @@ export function useCalendarTasks(startDate: Date, endDate: Date) {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch today, overdue, and upcoming tasks to cover the date range
-      const [todayTasks, overdueTasks, upcomingTasks] = await Promise.all([
-        tasksApi.getToday(),
-        tasksApi.getOverdue(),
-        tasksApi.getUpcoming(90), // Fetch up to 90 days ahead
-      ]);
-
-      // Merge and deduplicate by id
-      const allMap = new Map<string, Task>();
-      [...todayTasks, ...overdueTasks, ...upcomingTasks].forEach((t) => {
-        allMap.set(t.id, t);
-      });
-      setTasks(Array.from(allMap.values()));
+      const all = await firestoreTasks.getAllTasks(getFirebaseUid());
+      setTasks(all);
     } catch (e) {
       setError((e as Error).message);
     } finally {

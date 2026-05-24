@@ -9,9 +9,7 @@ import { nonArchivedProjects } from '@/utils/projectFilters';
 import { SearchModal } from '@/components/shared/SearchModal';
 import { Avatar } from '@/components/ui/Avatar';
 import { THEME_ORDER, THEMES } from '@/theme/themes';
-import { lazy, Suspense } from 'react';
-
-const NLPInput = lazy(() => import('@/components/shared/NLPInput').then(m => ({ default: m.NLPInput })));
+import { NLPInput } from '@/components/shared/NLPInput';
 
 export function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -45,22 +43,18 @@ export function Header() {
       priority?: number;
       project_suggestion?: string;
     }) => {
-      // Find a matching project or use the first one. Skip archived
-      // projects when picking a default landing spot so quick-add via the
-      // header never silently routes a new task into an archived bucket
-      // (Android parity).
+      // Quick-add tasks default to NO project (Inbox). We only assign a
+      // project when the parse surfaced an explicit suggestion that matches
+      // an existing non-archived project — never silently route an untyped
+      // task into an arbitrary (e.g. first-in-list) project. Users opt into
+      // categorization explicitly via the Auto-Categorize button.
       const candidates = nonArchivedProjects(projects);
-      let targetProjectId = candidates[0]?.id;
+      let targetProjectId = '';
       if (data.project_suggestion) {
         const match = candidates.find((p) =>
           p.title.toLowerCase().includes(data.project_suggestion!.toLowerCase()),
         );
         if (match) targetProjectId = match.id;
-      }
-
-      if (!targetProjectId) {
-        toast.error('No project available. Create a project first.');
-        return;
       }
 
       try {
@@ -99,15 +93,15 @@ export function Header() {
         className="flex h-14 items-center gap-4 border-b border-[var(--color-border)] bg-[var(--color-bg-primary)] px-4"
         role="banner"
       >
-        {/* NLP Quick Add Bar */}
-        <Suspense fallback={<div className="flex-1" />}>
-          <NLPInput onTaskCreate={handleTaskCreate} />
-        </Suspense>
+        {/* NLP Quick Add Bar — rendered eagerly (not lazy) so the always-on
+            top-bar input is present in the DOM on every route, even while a
+            heavy route chunk is still downloading (bug B-09). */}
+        <NLPInput onTaskCreate={handleTaskCreate} />
 
         {/* Search Button */}
         <button
           onClick={() => setSearchOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-text-primary)]"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-text-primary)]"
           aria-label="Search tasks (Ctrl+K)"
         >
           <Search className="h-4 w-4" aria-hidden="true" />
@@ -118,7 +112,7 @@ export function Header() {
         </button>
 
         {/* Theme picker — one menu over the four named themes. */}
-        <div className="relative" ref={themeMenuRef}>
+        <div className="relative shrink-0" ref={themeMenuRef}>
           <button
             onClick={() => setThemeMenuOpen((v) => !v)}
             className="rounded-md border border-[var(--color-border)] p-1.5 text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
@@ -171,7 +165,7 @@ export function Header() {
         </div>
 
         {/* User Menu */}
-        <div className="relative" ref={menuRef}>
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             aria-label="User menu"

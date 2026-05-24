@@ -285,8 +285,12 @@ export function WeeklyReviewScreen() {
       )}
 
       {uiState.kind === 'loading' && (
-        <div className="flex h-40 items-center justify-center">
+        <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
           <Spinner size="lg" />
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Generating your weekly review with AI — this can take around 15
+            seconds…
+          </p>
         </div>
       )}
 

@@ -20,13 +20,17 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { CalendarNav } from './CalendarNav';
 import { CalendarTaskCard } from './CalendarTaskCard';
+import { CalendarHabitChips } from './CalendarHabitChips';
+import { weekOffsetFromMonday } from './calendarDay';
 import { QuickCreateInput } from './QuickCreateInput';
 import { useDateNavigation } from '@/hooks/useDateNavigation';
 import { useCalendarTasks } from '@/hooks/useCalendarTasks';
+import { useCalendarHabits } from '@/hooks/useCalendarHabits';
 import { useTaskStore } from '@/stores/taskStore';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { Button } from '@/components/ui/Button';
 import type { Task } from '@/types/task';
+import type { Habit } from '@/types/habit';
 import { lazy, Suspense } from 'react';
 
 const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
@@ -61,6 +65,7 @@ function DraggableTaskCard({
 function DayColumn({
   date,
   tasks,
+  habits,
   isHighlighted,
   onTaskClick,
   onQuickCreate,
@@ -70,6 +75,7 @@ function DayColumn({
 }: {
   date: Date;
   tasks: Task[];
+  habits: Habit[];
   isHighlighted: boolean;
   onTaskClick: (task: Task) => void;
   onQuickCreate: (date: string) => void;
@@ -129,6 +135,7 @@ function DayColumn({
 
       {/* Task cards */}
       <div className="flex flex-1 flex-col gap-1 p-1.5" data-column-area>
+        <CalendarHabitChips habits={habits} />
         {tasks.map((task) => (
           <DraggableTaskCard key={task.id} task={task} onClick={onTaskClick} />
         ))}
@@ -150,6 +157,7 @@ function DayColumn({
 function MobileDayView({
   date,
   tasks,
+  habits,
   onTaskClick,
   onQuickCreate,
   quickCreateDate,
@@ -160,6 +168,7 @@ function MobileDayView({
 }: {
   date: Date;
   tasks: Task[];
+  habits: Habit[];
   onTaskClick: (task: Task) => void;
   onQuickCreate: (date: string) => void;
   quickCreateDate: string | null;
@@ -197,7 +206,9 @@ function MobileDayView({
 
       {/* Tasks */}
       <div className="flex flex-col gap-2 p-4">
-        {tasks.length === 0 && !quickCreateDate && (
+        <CalendarHabitChips habits={habits} />
+
+        {tasks.length === 0 && habits.length === 0 && !quickCreateDate && (
           <button
             onClick={() => onQuickCreate(dateStr)}
             className="rounded-lg border border-dashed border-[var(--color-border)] py-8 text-center text-sm text-[var(--color-text-secondary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
@@ -239,15 +250,24 @@ export function WeekViewScreen() {
     dateRange.start,
     dateRange.end,
   );
+  const { getHabitsForDate, fetchHabits } = useCalendarHabits();
   const { updateTask, setSelectedTask } = useTaskStore();
 
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
 
+  useEffect(() => {
+    fetchHabits();
+  }, [fetchHabits]);
+
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
-  const [mobileDayOffset, setMobileDayOffset] = useState(0);
+  // Default the mobile single-day card to *today* within the current week
+  // (Mon=0 … Sun=6), not the start of the week (bug B-11).
+  const [mobileDayOffset, setMobileDayOffset] = useState(() =>
+    weekOffsetFromMonday(new Date()),
+  );
 
   // Generate week days (Mon-Sun)
   const weekDays = Array.from({ length: 7 }, (_, i) =>
@@ -347,6 +367,7 @@ export function WeekViewScreen() {
       mobileDayOffset,
     );
     const mobileTasks = getTasksForDate(mobileDate);
+    const mobileHabits = getHabitsForDate(mobileDate);
 
     return (
       <div className="mx-auto max-w-6xl">
@@ -411,6 +432,7 @@ export function WeekViewScreen() {
           <MobileDayView
             date={mobileDate}
             tasks={mobileTasks}
+            habits={mobileHabits}
             onTaskClick={handleTaskClick}
             onQuickCreate={handleQuickCreate}
             quickCreateDate={quickCreateDate}
@@ -482,6 +504,7 @@ export function WeekViewScreen() {
                 key={format(day, 'yyyy-MM-dd')}
                 date={day}
                 tasks={getTasksForDate(day)}
+                habits={getHabitsForDate(day)}
                 isHighlighted={isToday(day)}
                 onTaskClick={handleTaskClick}
                 onQuickCreate={handleQuickCreate}
@@ -503,6 +526,7 @@ export function WeekViewScreen() {
                 <DayColumn
                   date={day}
                   tasks={getTasksForDate(day)}
+                  habits={getHabitsForDate(day)}
                   isHighlighted={isToday(day)}
                   onTaskClick={handleTaskClick}
                   onQuickCreate={handleQuickCreate}

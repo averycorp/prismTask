@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  filterTasksByQuery,
   groupResults,
   normalizeQuery,
   searchAll,
+  searchRoutes,
   type SearchTypeFilter,
 } from '../searchFilters';
 import type { Task } from '@/types/task';
@@ -208,5 +210,56 @@ describe('groupResults', () => {
     ]);
     expect(grouped).toHaveLength(1);
     expect(grouped[0]?.type).toBe('task');
+  });
+});
+
+describe('filterTasksByQuery (B-01 / B-02 client-side task search)', () => {
+  const tasks = [
+    makeTask({ id: 'a', title: 'Read Khan Academy chapter 3' }),
+    makeTask({ id: 'b', title: 'Buy groceries', description: 'milk and eggs' }),
+    makeTask({ id: 'c', title: 'QA TEST single test task' }),
+  ];
+
+  it('returns matching tasks by title substring', () => {
+    const results = filterTasksByQuery(tasks, 'Khan');
+    expect(results.map((t) => t.id)).toEqual(['a']);
+  });
+
+  it('matches case-insensitively and on description', () => {
+    expect(filterTasksByQuery(tasks, 'EGGS').map((t) => t.id)).toEqual(['b']);
+  });
+
+  it('finds a substring of a multi-word title (e.g. "single")', () => {
+    expect(filterTasksByQuery(tasks, 'single').map((t) => t.id)).toEqual(['c']);
+  });
+
+  it('finds a freshly-created task once it is in the list (no reload)', () => {
+    const created = makeTask({ id: 'new', title: 'Brand New Task 12345' });
+    const next = [...tasks, created];
+    expect(filterTasksByQuery(next, 'Brand New').map((t) => t.id)).toEqual(['new']);
+  });
+
+  it('returns an empty array for a blank query', () => {
+    expect(filterTasksByQuery(tasks, '   ')).toEqual([]);
+  });
+
+  it('returns an empty array when nothing matches', () => {
+    expect(filterTasksByQuery(tasks, 'zzzznomatch')).toEqual([]);
+  });
+});
+
+describe('searchRoutes (⌘K navigation matches)', () => {
+  it('matches a nav label by name', () => {
+    const results = searchRoutes('Settings');
+    expect(results.map((r) => r.to)).toContain('/settings');
+  });
+
+  it('matches via keyword aliases', () => {
+    const results = searchRoutes('assistant');
+    expect(results.map((r) => r.to)).toContain('/chat');
+  });
+
+  it('returns nothing for a blank query', () => {
+    expect(searchRoutes('')).toEqual([]);
   });
 });

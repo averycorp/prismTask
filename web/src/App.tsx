@@ -97,6 +97,10 @@ export default function App() {
         <RouterProvider router={router} />
         <Toaster
           position="bottom-right"
+          // On mobile the fixed bottom tab bar (~64px) sits at the bottom of
+          // the viewport; lift toasts above it so they don't overlap the nav
+          // (bug B-13). Desktop has no bottom nav, so its offset is unchanged.
+          mobileOffset={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)' }}
           toastOptions={{
             style: {
               background: 'var(--color-bg-card)',

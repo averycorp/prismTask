@@ -8,11 +8,13 @@ import {
   isToday,
   isSameDay,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Repeat, X } from 'lucide-react';
 import { CalendarNav } from './CalendarNav';
+import { CalendarHabitChips } from './CalendarHabitChips';
 import { QuickCreateInput } from './QuickCreateInput';
 import { useDateNavigation } from '@/hooks/useDateNavigation';
 import { useCalendarTasks } from '@/hooks/useCalendarTasks';
+import { useCalendarHabits } from '@/hooks/useCalendarHabits';
 import { useTaskStore } from '@/stores/taskStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +22,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { PRIORITY_CONFIG } from '@/utils/priority';
 import { getPriorityColor } from '@/utils/priority';
 import type { Task } from '@/types/task';
+import type { Habit } from '@/types/habit';
 import { lazy, Suspense } from 'react';
 
 const TaskEditor = lazy(() => import('@/features/tasks/TaskEditor'));
@@ -56,6 +59,7 @@ function TaskDensityDots({
 function DayDetailPanel({
   date,
   tasks,
+  habits,
   onTaskClick,
   onClose,
   onComplete,
@@ -67,6 +71,7 @@ function DayDetailPanel({
 }: {
   date: Date;
   tasks: Task[];
+  habits: Habit[];
   onTaskClick: (task: Task) => void;
   onClose: () => void;
   onComplete: (taskId: string) => void;
@@ -97,6 +102,13 @@ function DayDetailPanel({
         </button>
       </div>
 
+      {/* Habits scheduled this day */}
+      {habits.length > 0 && (
+        <div className="mb-2">
+          <CalendarHabitChips habits={habits} />
+        </div>
+      )}
+
       {/* Task list */}
       <div className="flex flex-col gap-1">
         {tasks.map((task) => {
@@ -112,6 +124,7 @@ function DayDetailPanel({
                   checked ? onComplete(task.id) : onUncomplete(task.id)
                 }
                 priorityColor={getPriorityColor(task.priority)}
+                ariaLabel={`Mark ${task.title} ${isDone ? 'incomplete' : 'complete'}`}
               />
               <button
                 type="button"
@@ -165,8 +178,13 @@ export function MonthViewScreen() {
 
   const { getTasksForDate, refetch } =
     useCalendarTasks(calendarStart, calendarEnd);
+  const { getHabitsForDate, fetchHabits } = useCalendarHabits();
   const { setSelectedTask, completeTask, uncompleteTask } =
     useTaskStore();
+
+  useEffect(() => {
+    fetchHabits();
+  }, [fetchHabits]);
 
   const isMobile = useIsMobile();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -332,6 +350,7 @@ export function MonthViewScreen() {
                   const isSelected =
                     selectedDay !== null && isSameDay(day, selectedDay);
                   const tasks = getTasksForDate(day);
+                  const habitCount = getHabitsForDate(day).length;
                   const dateStr = format(day, 'yyyy-MM-dd');
 
                   return (
@@ -366,6 +385,17 @@ export function MonthViewScreen() {
                           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
                         </span>
                       )}
+
+                      {/* Habit marker */}
+                      {habitCount > 0 && (
+                        <span
+                          className="mt-0.5 flex items-center gap-0.5 text-[10px] text-[var(--color-text-secondary)]"
+                          title={`${habitCount} ${habitCount === 1 ? 'habit' : 'habits'}`}
+                        >
+                          <Repeat className="h-2.5 w-2.5" aria-hidden="true" />
+                          {!isMobile && habitCount}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -380,6 +410,7 @@ export function MonthViewScreen() {
             <DayDetailPanel
               date={selectedDay}
               tasks={getTasksForDate(selectedDay)}
+              habits={getHabitsForDate(selectedDay)}
               onTaskClick={handleTaskClick}
               onClose={() => setSelectedDay(null)}
               onComplete={handleComplete}

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { MAX_TASK_TITLE_LENGTH, clampTitle } from '@/utils/taskTitle';
 
 /**
  * Editable task-confirm payload — what we hand back via [onSave] when the
@@ -75,7 +76,7 @@ export function TaskConfirmModal({ initial, onSave, onCancel }: TaskConfirmModal
       .map((t) => t.trim().replace(/^#/, ''))
       .filter((t) => t.length > 0);
     onSave({
-      title: title.trim() || initial.title,
+      title: clampTitle(title.trim() || initial.title),
       due_date: dueDate || null,
       due_time: dueTime || null,
       priority: priority > 0 ? priority : null,
@@ -114,16 +115,29 @@ export function TaskConfirmModal({ initial, onSave, onCancel }: TaskConfirmModal
 
         <div className="flex flex-col gap-3">
           <div>
-            <label
-              htmlFor={titleId}
-              className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]"
-            >
-              Title
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label
+                htmlFor={titleId}
+                className="block text-xs font-medium text-[var(--color-text-secondary)]"
+              >
+                Title
+              </label>
+              <span
+                className={`text-xs tabular-nums ${
+                  title.length >= MAX_TASK_TITLE_LENGTH
+                    ? 'font-medium text-[var(--color-danger,#dc2626)]'
+                    : 'text-[var(--color-text-secondary)]'
+                }`}
+                aria-live="polite"
+              >
+                {title.length}/{MAX_TASK_TITLE_LENGTH}
+              </span>
+            </div>
             <input
               ref={titleRef}
               id={titleId}
               type="text"
+              maxLength={MAX_TASK_TITLE_LENGTH}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {

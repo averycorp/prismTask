@@ -163,9 +163,14 @@ export const aiApi = {
       .then((r) => r.data);
   },
 
-  dailyBriefing(data: DailyBriefingRequest = {}): Promise<DailyBriefingResponse> {
+  dailyBriefing(
+    data: DailyBriefingRequest = {},
+    opts: { suppressErrorToast?: boolean } = {},
+  ): Promise<DailyBriefingResponse> {
     return apiClient
-      .post('/ai/daily-briefing', data)
+      .post('/ai/daily-briefing', data, {
+        suppressErrorToast: opts.suppressErrorToast,
+      })
       .then((r) => r.data);
   },
 

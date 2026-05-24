@@ -86,6 +86,6 @@ describe('analyticsApi.habitCorrelations', () => {
       data: { correlations: [], top_insight: '', recommendation: '' },
     });
     await analyticsApi.habitCorrelations();
-    expect(getMock).toHaveBeenCalledWith('/analytics/habit-correlations');
+    expect(getMock).toHaveBeenCalledWith('/analytics/habit-correlations', {});
   });
 });

@@ -20,16 +20,18 @@ describe('aiApi.dailyBriefing', () => {
       },
     });
     const res = await aiApi.dailyBriefing();
-    expect(postMock).toHaveBeenCalledWith('/ai/daily-briefing', {});
+    expect(postMock).toHaveBeenCalledWith('/ai/daily-briefing', {}, {});
     expect(res.day_type).toBe('light');
   });
 
   it('forwards the date param when provided', async () => {
     postMock.mockResolvedValueOnce({ data: {} });
     await aiApi.dailyBriefing({ date: '2026-04-23' });
-    expect(postMock).toHaveBeenCalledWith('/ai/daily-briefing', {
-      date: '2026-04-23',
-    });
+    expect(postMock).toHaveBeenCalledWith(
+      '/ai/daily-briefing',
+      { date: '2026-04-23' },
+      {},
+    );
   });
 });
 
