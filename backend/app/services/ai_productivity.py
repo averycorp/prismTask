@@ -972,6 +972,7 @@ Use a BROAD interpretation of what constitutes a task. This includes:
 - Things to review, research, or think about
 - Explicit action items and follow-ups
 - Deadlines or milestones that require preparation
+- If the text contains source code (like .jsx, .ts, etc.), extract ALL TODOs, FIXMEs, BUG notes, and refactoring or implementation comments.
 
 For each task, return: title (imperative, Title case, under 12 words), suggested_due_date (ISO or null), suggested_priority (0-4), suggested_project (one-word or null), confidence (0-1).
 
