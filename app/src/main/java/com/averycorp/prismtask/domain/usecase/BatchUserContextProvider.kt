@@ -53,7 +53,8 @@ constructor(
         val tasksWithTags = taskDao.getTasksWithTags().first()
 
         val tasks = tasksWithTags
-            .filter { it.task.archivedAt == null }
+            .filter { it.task.archivedAt == null && !it.task.isCompleted }
+            .take(200) // cap to match backend bounds and keep payload small
             .map { tw ->
                 val task = tw.task
                 BatchTaskContext(
@@ -68,15 +69,18 @@ constructor(
                     projectName = task.projectId?.let { projectIdToName[it] },
                     tags = tw.tags.map { it.name },
                     lifeCategory = task.lifeCategory,
-                    isCompleted = task.isCompleted
+                    isCompleted = false
                 )
             }
 
-        val habits = habitDao.getAllHabitsOnce().map { h ->
+        val habits = habitDao.getAllHabitsOnce()
+            .filter { !it.isArchived }
+            .take(100)
+            .map { h ->
             BatchHabitContext(
                 id = h.id.toString(),
                 name = h.name,
-                isArchived = h.isArchived
+                isArchived = false
             )
         }
 
