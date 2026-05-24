@@ -203,6 +203,13 @@ export default function TaskEditor({
       setGoodEnoughMinutes('');
       setMaxRevisionsOverrideEnabled(false);
       setMaxRevisions('');
+      setRecurrenceType('');
+      setRecurrenceInterval(1);
+      setRecurrenceDaysOfWeek([]);
+      setRecurrenceAfterCompletion(false);
+      setRecurrenceEndMode('never');
+      setRecurrenceEndAfter(10);
+      setRecurrenceEndDate('');
       return;
     }
     if (!task) return;
@@ -254,6 +261,14 @@ export default function TaskEditor({
       } catch {
         // ignore parse errors
       }
+    } else {
+      setRecurrenceType('');
+      setRecurrenceInterval(1);
+      setRecurrenceDaysOfWeek([]);
+      setRecurrenceAfterCompletion(false);
+      setRecurrenceEndMode('never');
+      setRecurrenceEndAfter(10);
+      setRecurrenceEndDate('');
     }
   }, [task, isCreate, defaultProjectId]);
 
