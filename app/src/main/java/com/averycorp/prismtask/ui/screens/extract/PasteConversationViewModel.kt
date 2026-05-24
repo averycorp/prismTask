@@ -57,8 +57,26 @@ constructor(
     private val _targetProjectId = MutableStateFlow<Long?>(null)
     val targetProjectId: StateFlow<Long?> = _targetProjectId.asStateFlow()
 
-    fun onTargetProjectChange(projectId: Long?) {
+    private val _targetProjectIsNone = MutableStateFlow(false)
+    val targetProjectIsNone: StateFlow<Boolean> = _targetProjectIsNone.asStateFlow()
+
+    fun onTargetProjectChange(projectId: Long?, isNone: Boolean = false) {
         _targetProjectId.value = projectId
+        _targetProjectIsNone.value = isNone
+    }
+
+    fun onTargetProjectNew(name: String) {
+        viewModelScope.launch {
+            val id = projectRepository.addProject(
+                name = name,
+                description = null,
+                status = ProjectStatus.ACTIVE,
+                startDate = null,
+                endDate = null,
+                themeColorKey = null
+            )
+            onTargetProjectChange(id)
+        }
     }
 
     fun onInputChange(text: String) {
@@ -114,8 +132,8 @@ constructor(
                 }
                 val resolved = parsedTaskResolver.resolve(parsed)
                 val newTagIds = resolved.unmatchedTags.map { tagRepository.addTag(name = it) }
-                val projectId = _targetProjectId.value ?: (resolved.projectId
-                    ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) })
+                val projectId = if (_targetProjectIsNone.value) null else (_targetProjectId.value ?: (resolved.projectId
+                    ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) }))
                 val recurrenceJson = resolved.recurrenceRule?.let { RecurrenceConverter.toJson(it) }
                 val taskId = taskRepository.addTask(
                     title = resolved.title,

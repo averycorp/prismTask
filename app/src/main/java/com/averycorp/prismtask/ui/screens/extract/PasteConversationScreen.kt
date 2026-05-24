@@ -53,6 +53,9 @@ fun PasteConversationScreen(
     val createdCount by viewModel.createdCount.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val targetProjectId by viewModel.targetProjectId.collectAsStateWithLifecycle()
+    val targetProjectIsNone by viewModel.targetProjectIsNone.collectAsStateWithLifecycle()
+
+    var showCreateProjectDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
@@ -141,8 +144,12 @@ fun PasteConversationScreen(
                 )
                 ProjectDropdown(
                     selectedProjectId = targetProjectId,
+                    isNone = targetProjectIsNone,
                     projects = projects,
-                    onSelect = viewModel::onTargetProjectChange
+                    onSelectAuto = { viewModel.onTargetProjectChange(null, isNone = false) },
+                    onSelectNone = { viewModel.onTargetProjectChange(null, isNone = true) },
+                    onSelectProject = { viewModel.onTargetProjectChange(it, isNone = false) },
+                    onCreateNew = { showCreateProjectDialog = true }
                 )
 
                 Button(
@@ -155,6 +162,38 @@ fun PasteConversationScreen(
                 }
             }
         }
+    }
+
+    if (showCreateProjectDialog) {
+        var newProjectName by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCreateProjectDialog = false },
+            title = { Text("New Project") },
+            text = {
+                OutlinedTextField(
+                    value = newProjectName,
+                    onValueChange = { newProjectName = it },
+                    label = { Text("Project Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        if (newProjectName.isNotBlank()) {
+                            viewModel.onTargetProjectNew(newProjectName.trim())
+                            showCreateProjectDialog = false
+                        }
+                    }
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showCreateProjectDialog = false }
+                ) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -197,15 +236,25 @@ private fun CandidateRow(
 @Composable
 private fun ProjectDropdown(
     selectedProjectId: Long?,
+    isNone: Boolean,
     projects: List<com.averycorp.prismtask.data.local.entity.ProjectEntity>,
-    onSelect: (Long?) -> Unit
+    onSelectAuto: () -> Unit,
+    onSelectNone: () -> Unit,
+    onSelectProject: (Long) -> Unit,
+    onCreateNew: () -> Unit
 ) {
     var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val selectedProject = projects.find { it.id == selectedProjectId }
+    
+    val displayText = when {
+        isNone -> "No project"
+        selectedProject != null -> "${selectedProject.icon} ${selectedProject.name}"
+        else -> "Auto-detect from text"
+    }
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         androidx.compose.material3.OutlinedTextField(
-            value = selectedProject?.name ?: "Auto-detect from text",
+            value = displayText,
             onValueChange = {},
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
@@ -217,19 +266,35 @@ private fun ProjectDropdown(
             DropdownMenuItem(
                 text = { Text("Auto-detect from text") },
                 onClick = {
-                    onSelect(null)
+                    onSelectAuto()
                     expanded = false
                 }
             )
+            DropdownMenuItem(
+                text = { Text("No project") },
+                onClick = {
+                    onSelectNone()
+                    expanded = false
+                }
+            )
+            androidx.compose.material3.HorizontalDivider()
             projects.forEach { project ->
                 DropdownMenuItem(
                     text = { Text("${project.icon} ${project.name}") },
                     onClick = {
-                        onSelect(project.id)
+                        onSelectProject(project.id)
                         expanded = false
                     }
                 )
             }
+            androidx.compose.material3.HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("+ Create new project...") },
+                onClick = {
+                    onCreateNew()
+                    expanded = false
+                }
+            )
         }
     }
 }

@@ -65,7 +65,8 @@ export function ConversationExtractScreen() {
   const [creating, setCreating] = useState(false);
   const [response, setResponse] = useState<ExtractFromTextResponse | null>(null);
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
-  const [targetProjectId, setTargetProjectId] = useState<string | 'auto'>('auto');
+  const [targetProjectId, setTargetProjectId] = useState<string | 'auto' | 'none' | 'new'>('auto');
+  const [newProjectName, setNewProjectName] = useState('');
 
   const candidates = useMemo(
     () => response?.tasks ?? [],
@@ -133,12 +134,32 @@ export function ConversationExtractScreen() {
 
     setCreating(true);
     try {
+      let createdProjectId: string | null = null;
+      if (targetProjectId === 'new' && newProjectName.trim()) {
+        try {
+          const { createProject } = await import('@/api/firestore/projects');
+          const proj = await createProject(uid, { title: newProjectName.trim() });
+          createdProjectId = proj.id;
+        } catch (e) {
+          toast.error('Failed to create new project');
+          setCreating(false);
+          return;
+        }
+      }
+
       let createdCount = 0;
       for (const cand of selected) {
-        const projectId = targetProjectId === 'auto'
-          ? resolveProjectId(cand.suggested_project, projects)
-          : targetProjectId;
-        if (!projectId) continue; // no project available — skip silently
+        let projectId: string | null = null;
+        if (targetProjectId === 'auto') {
+          projectId = resolveProjectId(cand.suggested_project, projects);
+        } else if (targetProjectId === 'new') {
+          projectId = createdProjectId;
+        } else if (targetProjectId !== 'none') {
+          projectId = targetProjectId;
+        }
+        
+        // If they chose 'auto' and no project was found, it might be null.
+        // If they chose 'none', it is intentionally null.
         try {
           await firestoreTasks.createTask(uid, {
             title: cand.title,
@@ -279,10 +300,11 @@ export function ConversationExtractScreen() {
             </label>
             <select
               value={targetProjectId}
-              onChange={(e) => setTargetProjectId(e.target.value)}
+              onChange={(e) => setTargetProjectId(e.target.value as any)}
               className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
             >
               <option value="auto">Auto-detect from text</option>
+              <option value="none">No project</option>
               {projects
                 .filter((p) => p.status !== 'archived')
                 .map((p) => (
@@ -290,7 +312,20 @@ export function ConversationExtractScreen() {
                     {p.title}
                   </option>
                 ))}
+              <option value="new">+ Create new project...</option>
             </select>
+            {targetProjectId === 'new' && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  placeholder="New project name"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  autoFocus
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
+                />
+              </div>
+            )}
           </div>
 
           <div className="mt-2 flex justify-end gap-2">

@@ -5,7 +5,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: ReactNode;
   children: ReactNode;
   className?: string;
 }
@@ -54,7 +54,7 @@ export function Drawer({ isOpen, onClose, title, children, className = '' }: Dra
         } ${className}`}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={typeof title === 'string' ? title : 'Drawer'}
       >
         {/* Header */}
         {title && (
