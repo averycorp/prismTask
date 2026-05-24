@@ -1,0 +1,171 @@
+steps:
+# ==========================================
+# WEB CI
+# ==========================================
+- id: 'web-install'
+  name: 'node:20'
+  dir: 'web'
+  entrypoint: 'npm'
+  args: ['install']
+  waitFor: ['-']
+
+- id: 'web-lint'
+  name: 'node:20'
+  dir: 'web'
+  entrypoint: 'npm'
+  args: ['run', 'lint']
+  waitFor: ['web-install']
+
+- id: 'web-test-shard-1'
+  name: 'node:20'
+  dir: 'web'
+  entrypoint: 'npm'
+  args: ['run', 'test:run', '--', '--shard=1/3']
+  waitFor: ['web-install']
+
+- id: 'web-test-shard-2'
+  name: 'node:20'
+  dir: 'web'
+  entrypoint: 'npm'
+  args: ['run', 'test:run', '--', '--shard=2/3']
+  waitFor: ['web-install']
+
+- id: 'web-test-shard-3'
+  name: 'node:20'
+  dir: 'web'
+  entrypoint: 'npm'
+  args: ['run', 'test:run', '--', '--shard=3/3']
+  waitFor: ['web-install']
+
+- id: 'web-build'
+  name: 'node:20'
+  dir: 'web'
+  entrypoint: 'npm'
+  args: ['run', 'build']
+  waitFor: ['web-install']
+
+- id: 'web-e2e'
+  name: 'mcr.microsoft.com/playwright:v1.60.0-jammy'
+  dir: 'web'
+  entrypoint: 'npx'
+  args: ['playwright', 'test']
+  waitFor: ['web-build']
+
+
+# ==========================================
+# BACKEND CI
+# ==========================================
+# 1. Start Postgres in a detached container
+- id: 'start-postgres'
+  name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'run'
+    - '-d'
+    - '--name=postgres'
+    - '--network=cloudbuild'
+    - '-e'
+    - 'POSTGRES_USER=postgres'
+    - '-e'
+    - 'POSTGRES_PASSWORD=postgres'
+    - '-e'
+    - 'POSTGRES_DB=averytask_test'
+    - 'postgres:16'
+  waitFor: ['-']
+
+# 2. Wait for Postgres to be ready
+- id: 'wait-for-postgres'
+  name: 'gcr.io/cloud-builders/docker'
+  script: |
+    for attempt in $(seq 1 30); do
+      if docker exec postgres pg_isready -U postgres -d averytask_test >/dev/null 2>&1; then
+        echo "Postgres ready after ${attempt}s"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "Postgres did not become ready within 30s"
+    docker logs postgres || true
+    exit 1
+  waitFor: ['start-postgres']
+
+- id: 'backend-lint'
+  name: 'python:3.11'
+  dir: 'backend'
+  script: |
+    pip install ruff
+    ruff check app/ tests/
+  waitFor: ['-']
+
+- id: 'backend-test'
+  name: 'python:3.11'
+  dir: 'backend'
+  env:
+    - 'DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/averytask_test'
+    - 'JWT_SECRET_KEY=test-secret-key'
+    - 'ENVIRONMENT=dev'
+    - 'ANTHROPIC_API_KEY=test-key'
+  script: |
+    pip install -r requirements.txt
+    alembic upgrade head
+    pytest tests/ -x --tb=short -q --junitxml=junit.xml
+  waitFor: ['wait-for-postgres']
+
+
+# ==========================================
+# ANDROID CI
+# ==========================================
+- id: 'android-checks'
+  name: 'ghcr.io/cirruslabs/android-sdk:34'
+  entrypoint: './gradlew'
+  args: ['ktlintCheck', 'detekt', 'lint', 'testDebugUnitTest', '--continue', '--no-daemon']
+  env:
+    - 'GRADLE_OPTS=-Dorg.gradle.jvmargs="-Xmx16g -XX:+UseParallelGC -XX:MaxMetaspaceSize=2g"'
+  waitFor: ['-']
+
+# ==========================================
+# ANDROID INTEGRATION CI
+# ==========================================
+- id: 'android-integration-tests'
+  name: 'ghcr.io/cirruslabs/android-sdk:34'
+  env:
+    - 'USE_FIREBASE_EMULATOR=true'
+    - 'GRADLE_OPTS=-Dorg.gradle.jvmargs="-Xmx16g -XX:+UseParallelGC -XX:MaxMetaspaceSize=2g"'
+
+  script: |
+    #!/bin/bash
+    set -e
+    # Install node & firebase-tools
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+    npm install -g firebase-tools@15
+
+    # Start Firebase emulator
+    firebase emulators:start --only firestore,auth --project demo-prismtask &
+    
+    echo "Waiting for emulator ports to open..."
+    TIMEOUT=60
+    for port in 8080 9099; do
+      WAIT=0
+      until (echo > /dev/tcp/127.0.0.1/$port) 2>/dev/null; do
+        sleep 1
+        WAIT=$((WAIT+1))
+        if [ "$WAIT" -gt "$TIMEOUT" ]; then
+          echo "Timeout waiting for port $port"
+          exit 1
+        fi
+      done
+    done
+    echo "Firebase emulators ready (firestore=8080, auth=9099)"
+
+    # NOTE: Running an Android AVD inside a standard Cloud Build docker container
+    # is usually impossible or extremely slow without nested virtualization (KVM).
+    # Assuming this runner has KVM or is a custom worker pool.
+    
+    # Run the tests
+    ./gradlew connectedDebugAndroidTest --no-daemon --continue
+  waitFor: ['android-checks']
+
+timeout: '3600s'
+options:
+  machineType: 'E2_HIGHCPU_32'
+  logging: 'CLOUD_LOGGING_ONLY'

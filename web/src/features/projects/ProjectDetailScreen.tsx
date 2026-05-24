@@ -280,7 +280,17 @@ export function ProjectDetailScreen() {
       ) : (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
           {tasks
-            .sort((a, b) => a.priority - b.priority)
+            .sort((a, b) => {
+              if (a.due_date && b.due_date) {
+                const cmp = a.due_date.localeCompare(b.due_date);
+                if (cmp !== 0) return cmp;
+              } else if (a.due_date) {
+                return -1;
+              } else if (b.due_date) {
+                return 1;
+              }
+              return (b.urgency_score ?? 0) - (a.urgency_score ?? 0);
+            })
             .map((task) => (
               <TaskRow
                 key={task.id}

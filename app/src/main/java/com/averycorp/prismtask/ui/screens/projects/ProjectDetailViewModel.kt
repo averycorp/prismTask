@@ -14,6 +14,7 @@ import com.averycorp.prismtask.domain.usecase.ProjectBurndownComputer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +44,7 @@ constructor(
     private val projectRepository: ProjectRepository,
     private val taskRepository: TaskRepository,
     private val projectBurndownComputer: ProjectBurndownComputer,
+    private val taskBehaviorPreferences: com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     val projectId: Long = savedStateHandle.get<Long>("projectId") ?: -1L
@@ -54,16 +56,38 @@ constructor(
         .observeProject(projectId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    private val _urgencyWeights = MutableStateFlow(com.averycorp.prismtask.data.preferences.UrgencyWeights())
+
+    init {
+        viewModelScope.launch {
+            try {
+                taskBehaviorPreferences.getUrgencyWeights().collect { weights ->
+                    _urgencyWeights.value = weights
+                }
+            } catch (e: Exception) {
+                Log.e("ProjectDetailVM", "Failed to load urgency weights", e)
+            }
+        }
+    }
+
     /** Top-level tasks linked to this project (subtasks are hidden from the detail list). */
-    val tasks: StateFlow<List<TaskEntity>> = detail
-        .flatMapLatest { d ->
+    val tasks: StateFlow<List<TaskEntity>> = combine(
+        detail.flatMapLatest { d ->
             if (d == null) {
-                flowOf(emptyList())
+                flowOf(emptyList<TaskEntity>())
             } else {
                 taskRepository.getTasksByProject(d.project.id)
             }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        },
+        _urgencyWeights
+    ) { taskList, weights ->
+        taskList.sortedWith(
+            compareBy<TaskEntity> { it.dueDate ?: Long.MAX_VALUE }
+                .thenByDescending { task ->
+                    com.averycorp.prismtask.domain.usecase.UrgencyScorer.calculateScore(task, weights = weights)
+                }
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * Burndown projection for the project, refreshed whenever the
