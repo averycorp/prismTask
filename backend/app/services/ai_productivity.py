@@ -958,23 +958,29 @@ def extract_tasks_from_text(text: str, source: str | None = None, tier: str = "F
 
     client = _get_client()
     source_label = f" (source: {source})" if source else ""
-    prompt = f"""You are an assistant that extracts action items from conversation text{source_label}.
+    prompt = f"""You are an assistant that extracts tasks and action items from conversation or document text{source_label}.
 
 Text:
 ---
 {text}
 ---
 
-Your task is to do a THOROUGH and EXHAUSTIVE reading of the text. Find EVERY single actionable item, including minor follow-ups, explicit requests, and implied tasks. Do not miss any action items.
+Your task is to do a THOROUGH and EXHAUSTIVE reading of the text. Find EVERY single task, request, reading assignment, or actionable item, no matter how minor. 
+Use a BROAD interpretation of what constitutes a task. This includes:
+- Readings to complete
+- Implied tasks or soft requests
+- Things to review, research, or think about
+- Explicit action items and follow-ups
+- Deadlines or milestones that require preparation
 
-For each action item, return: title (imperative, Title case, under 12 words), suggested_due_date (ISO or null), suggested_priority (0-4), suggested_project (one-word or null), confidence (0-1).
+For each task, return: title (imperative, Title case, under 12 words), suggested_due_date (ISO or null), suggested_priority (0-4), suggested_project (one-word or null), confidence (0-1).
 
-Only extract clear action items. Ignore general discussion.
+Ignore purely general discussion, but err on the side of extracting anything that could be interpreted as work or an assignment.
 
 Respond ONLY with valid JSON:
-[{{"title": "Send the design mocks to Alice", "suggested_due_date": null, "suggested_priority": 2, "suggested_project": null, "confidence": 0.9}}]
+[{{"title": "Read Chapter 4 of the Textbook", "suggested_due_date": null, "suggested_priority": 2, "suggested_project": null, "confidence": 0.9}}]
 
-Return an empty array if no action items are found."""
+Return an empty array if absolutely no tasks are found."""
 
     model = get_model("task_extraction")
     last_error_ex = None
