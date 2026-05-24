@@ -578,7 +578,7 @@ User's data:
 - Completed yesterday: {completed_json}
 
 Generate a morning briefing with:
-1. A one-line motivational greeting based on their workload (light/moderate/heavy day)
+1. A one-line motivational greeting based on their combined workload (you MUST take both tasks AND habits into account when determining if it is a light, moderate, or heavy day)
 2. "Top 3 Priorities" with brief reasoning
 3. "Heads Up" any overdue items or potential scheduling conflicts
 4. "Suggested Task Order" all today's tasks ranked in recommended execution order
