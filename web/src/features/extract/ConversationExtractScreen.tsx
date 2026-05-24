@@ -9,6 +9,7 @@ import {
   Loader2,
   Sparkles,
   TriangleAlert,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { aiApi } from '@/api/ai';
@@ -178,12 +179,36 @@ export function ConversationExtractScreen() {
       </header>
 
       <section className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
-        <label
-          htmlFor="extract-text"
-          className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]"
-        >
-          Paste text
-        </label>
+        <div className="mb-2 flex items-center justify-between">
+          <label
+            htmlFor="extract-text"
+            className="block text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]"
+          >
+            Paste text
+          </label>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)] transition hover:opacity-80">
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+            Upload .jsx / .json
+            <input
+              type="file"
+              accept=".jsx,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const content = ev.target?.result;
+                  if (typeof content === 'string') {
+                    setText(content);
+                  }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
         <textarea
           id="extract-text"
           value={text}
