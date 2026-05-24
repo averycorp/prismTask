@@ -206,7 +206,8 @@ async function buildUserContext(uid: string): Promise<BatchUserContext> {
     today,
     timezone,
     tasks: tasks
-      .filter((t) => !t.id || t.id.length > 0) // belt-and-suspenders
+      .filter((t) => (!t.id || t.id.length > 0) && t.status !== 'done')
+      .slice(0, 200) // cap to match backend bounds and keep payload small
       .map((t) => ({
         id: t.id,
         title: t.title,
@@ -217,12 +218,15 @@ async function buildUserContext(uid: string): Promise<BatchUserContext> {
         project_name: t.project_id ? projectNameById.get(t.project_id) || null : null,
         tags: [],
         life_category: null,
-        is_completed: t.status === 'done',
+        is_completed: false,
       })),
-    habits: habits.map((h) => ({
+    habits: habits
+      .filter((h) => h.is_active)
+      .slice(0, 100)
+      .map((h) => ({
       id: h.id,
       name: h.name,
-      is_archived: !h.is_active,
+      is_archived: false,
     })),
     projects: projects.map((p) => ({
       id: p.id,
