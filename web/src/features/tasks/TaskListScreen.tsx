@@ -154,8 +154,8 @@ export function TaskListScreen() {
   );
 
   // Fetch all data
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent?: boolean) => {
+    if (!silent) setLoading(true);
     try {
       await fetchAllProjects();
       await fetchTags();
@@ -166,7 +166,7 @@ export function TaskListScreen() {
     } catch {
       toast.error('Failed to load tasks');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [fetchAllProjects, fetchTags]);
 
@@ -1053,7 +1053,7 @@ export function TaskListScreen() {
               setSelectedTask(null);
               setCreateMode(false);
             }}
-            onUpdate={() => loadData()}
+            onUpdate={() => loadData(true)}
           />
         )}
       </Suspense>
