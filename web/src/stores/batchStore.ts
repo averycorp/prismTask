@@ -192,7 +192,7 @@ async function resolveMedicationCandidates(
 
 async function buildUserContext(uid: string): Promise<BatchUserContext> {
   const [tasks, habits, projects, medications] = await Promise.all([
-    firestoreTasks.getActiveTasks(uid),
+    firestoreTasks.getRecentTasksForBatch(uid),
     firestoreHabits.getHabits(uid),
     firestoreProjects.getProjects(uid),
     firestoreMedications.getMedications(uid).catch(() => []),

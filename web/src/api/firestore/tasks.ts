@@ -451,8 +451,12 @@ export async function getAllTasks(uid: string): Promise<Task[]> {
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
 }
 
-export async function getActiveTasks(uid: string): Promise<Task[]> {
-  const q = query(tasksCol(uid), where('isCompleted', '==', false));
+export async function getRecentTasksForBatch(uid: string): Promise<Task[]> {
+  // Avoid stalling by limiting to the most recently updated 1000 tasks.
+  // We cannot use where('isCompleted', '==', false) because legacy tasks might
+  // be missing the isCompleted field, which would cause them to be dropped
+  // and confuse the AI (leading to 500 errors from validation failures).
+  const q = query(tasksCol(uid), orderBy('updatedAt', 'desc'), limit(1000));
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToTask(d.id, d.data(), uid));
 }
