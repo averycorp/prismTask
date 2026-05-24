@@ -316,6 +316,9 @@ export default function TaskEditor({
     } else {
       recurrenceJson = '';
     }
+    if (recurrenceJson === (task.recurrence_json || '')) {
+      return;
+    }
     autoSave({ recurrence_json: recurrenceJson });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
