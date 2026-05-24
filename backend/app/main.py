@@ -27,7 +27,12 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=not _has_wildcard,  # credentials require explicit origins
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-PrismTask-AI-Features",
+        "X-PrismTask-Admin-Model-Override",
+    ],
 )
 
 app.include_router(ai.router, prefix="/api/v1")

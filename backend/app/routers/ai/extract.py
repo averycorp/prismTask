@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.post("/parse-text", response_model=ExtractFromTextResponse)
 @router.post("/tasks/extract-from-text", response_model=ExtractFromTextResponse)
 async def extract_from_text(
     data: ExtractFromTextRequest,

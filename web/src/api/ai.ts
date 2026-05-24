@@ -179,7 +179,7 @@ export const aiApi = {
     data: ExtractFromTextRequest,
   ): Promise<ExtractFromTextResponse> {
     return apiClient
-      .post('/ai/tasks/extract-from-text', data)
+      .post('/ai/parse-text', data)
       .then((r) => r.data);
   },
 
