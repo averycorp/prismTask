@@ -95,6 +95,7 @@ export const TaskRow = memo(function TaskRow({
 
   return (
     <div
+      data-testid="task-row"
       className={`group relative flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:bg-[var(--color-bg-secondary)] ${
         selected ? 'bg-[var(--color-accent)]/5 border-[var(--color-accent)]/20' : ''
       } ${isBlocked ? 'opacity-40' : ''} ${className}`}

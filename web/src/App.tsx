@@ -10,6 +10,16 @@ import { useFirestoreSync } from '@/hooks/useFirestoreSync';
 import { ErrorBoundary, ErrorBoundaryFallback } from '@/components/shared/ErrorBoundary';
 import { OfflineBanner } from '@/components/shared/OfflineBanner';
 import { PrismThemeProvider } from '@/theme/PrismThemeProvider';
+import { useHabitStore } from '@/stores/habitStore';
+import { useTaskStore } from '@/stores/taskStore';
+
+if (typeof window !== 'undefined') {
+  (window as any).useAuthStore = useAuthStore;
+  (window as any).useOnboardingStore = useOnboardingStore;
+  (window as any).useHabitStore = useHabitStore;
+  (window as any).useTaskStore = useTaskStore;
+  (window as any).router = router;
+}
 
 export default function App() {
   const hydrateFromStorage = useAuthStore((s) => s.hydrateFromStorage);

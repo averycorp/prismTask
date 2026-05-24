@@ -781,7 +781,7 @@ function RecurrenceDialog({
   onTypeChange: (v: string) => void;
   recurrenceInterval: number;
   onIntervalChange: (n: number) => void;
-  recurrenceDaysOfWeek: number[];
+  recurrenceDaysOfWeek?: number[] | null;
   onDaysOfWeekChange: (days: number[]) => void;
   recurrenceAfterCompletion: boolean;
   onAfterCompletionChange: (v: boolean) => void;
@@ -793,6 +793,8 @@ function RecurrenceDialog({
   onEndDateChange: (v: string) => void;
   onClose: () => void;
 }) {
+  const days = Array.isArray(recurrenceDaysOfWeek) ? recurrenceDaysOfWeek : [];
+
   return (
     <Modal isOpen onClose={onClose} title="Set Recurrence" size="md">
       <div className="flex flex-col gap-4">
@@ -858,7 +860,7 @@ function RecurrenceDialog({
                 </label>
                 <div className="flex flex-wrap gap-1">
                   {WEEKDAYS.map(({ idx, label }) => {
-                    const selected = recurrenceDaysOfWeek.includes(idx);
+                    const selected = days.includes(idx);
                     return (
                       <button
                         key={idx}
@@ -866,8 +868,8 @@ function RecurrenceDialog({
                         onClick={() =>
                           onDaysOfWeekChange(
                             selected
-                              ? recurrenceDaysOfWeek.filter((d) => d !== idx)
-                              : [...recurrenceDaysOfWeek, idx],
+                              ? days.filter((d) => d !== idx)
+                              : [...days, idx],
                           )
                         }
                         className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
@@ -1203,15 +1205,16 @@ function fromDatetimeLocalValue(v: string): number | null {
 function summarizeRecurrence(
   type: string,
   interval: number,
-  daysOfWeek: number[],
+  daysOfWeek?: number[] | null,
 ): string {
-  const i = Math.max(1, interval);
+  const i = Math.max(1, Number(interval) || 1);
+  const days = Array.isArray(daysOfWeek) ? daysOfWeek : [];
   switch (type) {
     case 'daily':
       return i === 1 ? 'Every Day' : `Every ${i} Days`;
     case 'weekly': {
       const base = i === 1 ? 'Every Week' : `Every ${i} Weeks`;
-      if (daysOfWeek.length === 0) return base;
+      if (days.length === 0) return base;
       const labels = [
         'Sun',
         'Mon',
@@ -1221,7 +1224,7 @@ function summarizeRecurrence(
         'Fri',
         'Sat',
       ];
-      const list = [...daysOfWeek]
+      const list = [...days]
         .sort()
         .map((d) => labels[d])
         .filter(Boolean)
