@@ -104,7 +104,7 @@ class ConversationTaskExtractor(
     }
 
     companion object {
-        const val MAX_INPUT_SIZE = 10_000
+        const val MAX_INPUT_SIZE = 100_000
         const val MAX_TITLE_LENGTH = 120
     }
 }

@@ -400,7 +400,7 @@ class WeeklyReviewResponse(BaseModel):
 
 
 class ExtractFromTextRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=10_000)
+    text: str = Field(min_length=1, max_length=100_000)
     source: Optional[str] = None
 
 

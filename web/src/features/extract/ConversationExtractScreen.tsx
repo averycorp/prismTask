@@ -26,7 +26,7 @@ import type {
   ExtractedTaskCandidate,
 } from '@/types/extract';
 
-const MAX_TEXT_LENGTH = 10_000;
+const MAX_TEXT_LENGTH = 100_000;
 
 const PRIORITY_LABELS: Record<number, string> = {
   1: 'Urgent',

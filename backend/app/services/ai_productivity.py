@@ -953,8 +953,8 @@ def extract_tasks_from_text(text: str, source: str | None = None, tier: str = "F
     """Extract structured task candidates from pasted conversation text."""
     if not text or not text.strip():
         return []
-    if len(text) > 10_000:
-        text = text[:10_000]
+    if len(text) > 100_000:
+        text = text[:100_000]
 
     client = _get_client()
     source_label = f" (source: {source})" if source else ""
