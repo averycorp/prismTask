@@ -86,6 +86,8 @@ export function TodayScreen() {
   // to the store with stable Zustand selectors.
   const fetchHabits = useHabitStore((s) => s.fetchHabits);
   const getTodayProgress = useHabitStore((s) => s.getTodayProgress);
+  // Subscribe to completions so progress updates when a habit is checked off
+  useHabitStore((s) => s.completions);
 
   // Rest-Day primitive (`docs/REST_DAY.md`). When today is marked as a
   // rest day we replace the dense task list with a soft takeover banner;

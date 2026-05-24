@@ -77,6 +77,8 @@ function frequencyLabel(
 export function HabitsSection() {
   const navigate = useNavigate();
   const habits = useHabitStore((s) => s.habits);
+  // Subscribe to completions to trigger re-renders when habits are checked off
+  useHabitStore((s) => s.completions);
   const toggleCompletion = useHabitStore((s) => s.toggleCompletion);
   const isTodayCompleted = useHabitStore((s) => s.isTodayCompleted);
   const getTodayCount = useHabitStore((s) => s.getTodayCount);
