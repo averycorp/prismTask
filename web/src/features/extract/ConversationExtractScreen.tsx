@@ -140,7 +140,7 @@ export function ConversationExtractScreen() {
           const { createProject } = await import('@/api/firestore/projects');
           const proj = await createProject(uid, { title: newProjectName.trim() });
           createdProjectId = proj.id;
-        } catch (e) {
+        } catch {
           toast.error('Failed to create new project');
           setCreating(false);
           return;
@@ -163,7 +163,7 @@ export function ConversationExtractScreen() {
         try {
           await firestoreTasks.createTask(uid, {
             title: cand.title,
-            project_id: projectId,
+            project_id: projectId || undefined,
             due_date: cand.suggested_due_date ?? null,
             priority: androidToWebPriority(cand.suggested_priority),
           });
@@ -300,7 +300,7 @@ export function ConversationExtractScreen() {
             </label>
             <select
               value={targetProjectId}
-              onChange={(e) => setTargetProjectId(e.target.value as any)}
+              onChange={(e) => setTargetProjectId(e.target.value)}
               className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
             >
               <option value="auto">Auto-detect from text</option>

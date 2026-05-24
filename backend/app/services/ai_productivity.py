@@ -981,13 +981,15 @@ Ignore purely general discussion, but err on the side of extracting anything tha
 Respond ONLY with valid JSON:
 [{{"title": "Read Chapter 4 of the Textbook", "suggested_due_date": null, "suggested_priority": 2, "suggested_project": null, "confidence": 0.9}}]
 
-Return an empty array if absolutely no tasks are found."""
+Return an empty array if absolutely no tasks are found.
+
+CRITICAL: Do NOT stop early. You MUST process the entire document from start to finish. Extract ALL tasks without summarizing, grouping, or omitting any."""
 
     model = get_model("task_extraction")
     last_error_ex = None
     for attempt in range(2):
         try:
-            message = client.messages.create(model=model, max_tokens=4096, messages=[{"role": "user", "content": prompt}])
+            message = client.messages.create(model=model, max_tokens=8192, messages=[{"role": "user", "content": prompt}])
             content = message.content[0].text
             try:
                 result = _parse_ai_json(content)

@@ -55,6 +55,13 @@ interface TaskEditorProps {
   }) => void;
 }
 
+console.log('Drawer', typeof Drawer);
+console.log('Tabs', typeof Tabs);
+console.log('ConfirmDialog', typeof ConfirmDialog);
+console.log('DetailsTab', typeof DetailsTab);
+console.log('ScheduleTab', typeof ScheduleTab);
+console.log('OrganizeTab', typeof OrganizeTab);
+
 const TABS = [
   { key: 'details', label: 'Details', icon: <FileText className="h-4 w-4" /> },
   {
@@ -790,8 +797,10 @@ export default function TaskEditor({
             )}
 
             {activeTab === 'schedule' && (
-              <ScheduleTab
-                isCreate={isCreate}
+              <>
+                {console.log('ScheduleTab inside TaskEditor is:', typeof ScheduleTab)}
+                <ScheduleTab
+                  isCreate={isCreate}
                 taskId={task?.id ?? null}
                 dueDate={dueDate}
                 onDueDateChange={handleDueDateChange}
@@ -818,6 +827,7 @@ export default function TaskEditor({
                 duration={duration}
                 onDurationChange={handleDurationChange}
               />
+              </>
             )}
 
             {activeTab === 'organize' && (
