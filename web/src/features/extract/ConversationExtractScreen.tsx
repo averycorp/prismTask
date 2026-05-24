@@ -65,6 +65,7 @@ export function ConversationExtractScreen() {
   const [creating, setCreating] = useState(false);
   const [response, setResponse] = useState<ExtractFromTextResponse | null>(null);
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
+  const [targetProjectId, setTargetProjectId] = useState<string | 'auto'>('auto');
 
   const candidates = useMemo(
     () => response?.tasks ?? [],
@@ -134,7 +135,9 @@ export function ConversationExtractScreen() {
     try {
       let createdCount = 0;
       for (const cand of selected) {
-        const projectId = resolveProjectId(cand.suggested_project, projects);
+        const projectId = targetProjectId === 'auto'
+          ? resolveProjectId(cand.suggested_project, projects)
+          : targetProjectId;
         if (!projectId) continue; // no project available — skip silently
         try {
           await firestoreTasks.createTask(uid, {
@@ -270,7 +273,27 @@ export function ConversationExtractScreen() {
             ))}
           </ul>
 
-          <div className="mt-6 flex justify-end gap-2">
+          <div className="mt-6 mb-4">
+            <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-secondary)]">
+              Save to project
+            </label>
+            <select
+              value={targetProjectId}
+              onChange={(e) => setTargetProjectId(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
+            >
+              <option value="auto">Auto-detect from text</option>
+              {projects
+                .filter((p) => p.status !== 'archived')
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="mt-2 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setResponse(null)}>
               Discard
             </Button>

@@ -338,10 +338,12 @@ export function TodayScreen() {
   const progressPct =
     totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
 
+  const hasIncompleteHabits = habitProgress.total > habitProgress.completed;
   const isEmpty =
     activeOverdue.length === 0 &&
     activeToday.length === 0 &&
-    activeUpcoming.length === 0;
+    activeUpcoming.length === 0 &&
+    !hasIncompleteHabits;
 
   if (loading) {
     return (

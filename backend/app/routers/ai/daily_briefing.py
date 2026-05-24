@@ -53,13 +53,10 @@ async def daily_briefing(
     today_tasks = [t.to_briefing_dict() for t in filter_due_on(incomplete_tasks, target_date)]
     planned_tasks = [t.to_briefing_dict() for t in filter_planned_on(incomplete_tasks, target_date)]
 
-    # Habits still live in Postgres — unchanged by this migration.
-    habits_query = select(Habit).where(
-        Habit.user_id == current_user.id,
-        Habit.is_active.is_(True),
-    )
-    habits_result = await db.execute(habits_query)
-    habits = [{"name": h.name, "frequency": h.frequency.value} for h in habits_result.scalars().all()]
+    # Habits now live in Firestore alongside tasks.
+    from app.services.firestore_state import fetch_active_habits
+    active_habit_dtos = await fetch_active_habits(uid)
+    habits = [{"name": h.name, "frequency": h.frequency_period} for h in active_habit_dtos]
 
     # Recently completed (last 24h) comes from Firestore too now. The query
     # is equality + range across two fields, which requires the composite

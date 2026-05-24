@@ -75,6 +75,7 @@ class HabitDTO(BaseModel):
     habit_id: str
     name: str
     category: Optional[str] = None
+    frequency_period: str = "daily"
     target_count: int = 1
     is_active: bool = True
 
@@ -85,6 +86,7 @@ def _doc_to_habit(doc) -> HabitDTO:
         habit_id=str(doc.id),
         name=str(data.get("name") or ""),
         category=data.get("category"),
+        frequency_period=str(data.get("frequencyPeriod") or "daily"),
         target_count=int(data.get("targetFrequency") or 1),
         is_active=not bool(data.get("isArchived")),
     )

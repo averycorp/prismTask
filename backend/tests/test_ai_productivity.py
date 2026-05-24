@@ -929,6 +929,9 @@ class TestNewAIEndpoints:
         ), patch(
             "app.routers.ai.fetch_recently_completed_tasks",
             new=AsyncMock(side_effect=FailedPrecondition("The query requires an index.")),
+        ), patch(
+            "app.services.firestore_state.fetch_active_habits",
+            new=AsyncMock(return_value=[]),
         ):
             resp = await client.post(
                 "/api/v1/ai/daily-briefing",
@@ -948,6 +951,9 @@ class TestNewAIEndpoints:
             new=AsyncMock(return_value=[]),
         ), patch(
             "app.routers.ai.fetch_recently_completed_tasks",
+            new=AsyncMock(return_value=[]),
+        ), patch(
+            "app.services.firestore_state.fetch_active_habits",
             new=AsyncMock(return_value=[]),
         ):
             # First call should succeed (empty briefing)

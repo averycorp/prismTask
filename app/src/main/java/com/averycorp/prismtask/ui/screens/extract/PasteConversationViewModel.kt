@@ -13,10 +13,14 @@ import com.averycorp.prismtask.domain.usecase.ParsedTaskResolver
 import com.averycorp.prismtask.domain.usecase.ProFeatureGate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.averycorp.prismtask.data.local.entity.ProjectEntity
+import com.averycorp.prismtask.domain.model.ProjectStatus
 
 /**
  * ViewModel for the Paste Conversation screen (v1.4.0 V9).
@@ -46,6 +50,16 @@ constructor(
 
     private val _createdCount = MutableStateFlow<Int?>(null)
     val createdCount: StateFlow<Int?> = _createdCount.asStateFlow()
+
+    val projects: StateFlow<List<ProjectEntity>> = projectRepository.observeProjects(ProjectStatus.ACTIVE)
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private val _targetProjectId = MutableStateFlow<Long?>(null)
+    val targetProjectId: StateFlow<Long?> = _targetProjectId.asStateFlow()
+
+    fun onTargetProjectChange(projectId: Long?) {
+        _targetProjectId.value = projectId
+    }
 
     fun onInputChange(text: String) {
         _input.value = text
@@ -100,8 +114,8 @@ constructor(
                 }
                 val resolved = parsedTaskResolver.resolve(parsed)
                 val newTagIds = resolved.unmatchedTags.map { tagRepository.addTag(name = it) }
-                val projectId = resolved.projectId
-                    ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) }
+                val projectId = _targetProjectId.value ?: (resolved.projectId
+                    ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) })
                 val recurrenceJson = resolved.recurrenceRule?.let { RecurrenceConverter.toJson(it) }
                 val taskId = taskRepository.addTask(
                     title = resolved.title,

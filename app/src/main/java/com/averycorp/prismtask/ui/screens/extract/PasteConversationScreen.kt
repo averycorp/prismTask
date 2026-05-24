@@ -24,9 +24,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +51,8 @@ fun PasteConversationScreen(
     val input by viewModel.input.collectAsStateWithLifecycle()
     val candidates by viewModel.candidates.collectAsStateWithLifecycle()
     val createdCount by viewModel.createdCount.collectAsStateWithLifecycle()
+    val projects by viewModel.projects.collectAsStateWithLifecycle()
+    val targetProjectId by viewModel.targetProjectId.collectAsStateWithLifecycle()
 
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
@@ -123,6 +131,20 @@ fun PasteConversationScreen(
                         onTitleChange = { viewModel.editTitle(index, it) }
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Save to project",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+                ProjectDropdown(
+                    selectedProjectId = targetProjectId,
+                    projects = projects,
+                    onSelect = viewModel::onTargetProjectChange
+                )
+
                 Button(
                     onClick = { viewModel.createSelected() },
                     enabled = candidates.any { it.selected },
@@ -165,6 +187,47 @@ private fun CandidateRow(
                     text = "Confidence ${(candidate.confidence * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProjectDropdown(
+    selectedProjectId: Long?,
+    projects: List<com.averycorp.prismtask.data.local.entity.ProjectEntity>,
+    onSelect: (Long?) -> Unit
+) {
+    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val selectedProject = projects.find { it.id == selectedProjectId }
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        androidx.compose.material3.OutlinedTextField(
+            value = selectedProject?.name ?: "Auto-detect from text",
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("Auto-detect from text") },
+                onClick = {
+                    onSelect(null)
+                    expanded = false
+                }
+            )
+            projects.forEach { project ->
+                DropdownMenuItem(
+                    text = { Text("${project.icon} ${project.name}") },
+                    onClick = {
+                        onSelect(project.id)
+                        expanded = false
+                    }
                 )
             }
         }
