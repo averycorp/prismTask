@@ -275,9 +275,17 @@ export function TaskListScreen() {
         });
         break;
       case 'urgency':
-        sorted.sort(
-          (a, b) => computeUrgencyScore(b) - computeUrgencyScore(a),
-        );
+        sorted.sort((a, b) => {
+          if (a.due_date && b.due_date) {
+            const cmp = a.due_date.localeCompare(b.due_date);
+            if (cmp !== 0) return cmp;
+          } else if (a.due_date) {
+            return -1;
+          } else if (b.due_date) {
+            return 1;
+          }
+          return computeUrgencyScore(b) - computeUrgencyScore(a);
+        });
         break;
       case 'alphabetical':
         sorted.sort((a, b) => a.title.localeCompare(b.title));

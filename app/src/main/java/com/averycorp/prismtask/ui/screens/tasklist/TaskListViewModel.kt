@@ -1003,10 +1003,13 @@ constructor(
             SortOption.CREATED -> tasks.sortedByDescending { it.createdAt }
             SortOption.URGENCY -> {
                 val aiScores = _aiUrgencyScores.value
-                tasks.sortedByDescending { task ->
-                    aiScores[task.id]
-                        ?: UrgencyScorer.calculateScore(task, weights = _urgencyWeights.value)
-                }
+                tasks.sortedWith(
+                    compareBy<TaskEntity> { it.dueDate ?: Long.MAX_VALUE }
+                        .thenByDescending { task ->
+                            aiScores[task.id]
+                                ?: UrgencyScorer.calculateScore(task, weights = _urgencyWeights.value)
+                        }
+                )
             }
             SortOption.ALPHABETICAL -> tasks.sortedBy { it.title.lowercase() }
             SortOption.CUSTOM -> tasks.sortedWith(
