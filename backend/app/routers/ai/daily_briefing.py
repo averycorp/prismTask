@@ -5,13 +5,12 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from google.api_core.exceptions import FailedPrecondition
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_active_user
 from app.middleware.rate_limit import daily_ai_rate_limiter
-from app.models import Habit, User
+from app.models import User
 from app.schemas.ai import DailyBriefingRequest, DailyBriefingResponse
 from app.services.beta_codes import resolve_effective_tier
 from app.services.firestore_tasks import (
