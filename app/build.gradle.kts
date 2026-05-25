@@ -342,9 +342,9 @@ dependencies {
     // gRPC — Firestore requires gRPC 1.62.2+ for InternalGlobalInterceptors,
     // but google-api-client-android pulls an older version that wins in resolution.
     // Force 1.65.0 to ensure the class exists at runtime.
-    implementation("io.grpc:grpc-api:1.80.0")
-    implementation("io.grpc:grpc-android:1.80.0")
-    implementation("io.grpc:grpc-okhttp:1.80.0")
+    implementation("io.grpc:grpc-api:1.81.0")
+    implementation("io.grpc:grpc-android:1.81.0")
+    implementation("io.grpc:grpc-okhttp:1.81.0")
 
     // Credential Manager (Google Sign-In)
     implementation("androidx.credentials:credentials:1.3.0")
