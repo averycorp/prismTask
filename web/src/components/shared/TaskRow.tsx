@@ -106,6 +106,7 @@ export const TaskRow = memo(function TaskRow({
         <Checkbox
           checked={selected}
           onChange={onToggleSelect}
+          ariaLabel={`Select ${task.title}`}
           className="shrink-0"
         />
       )}
@@ -115,6 +116,7 @@ export const TaskRow = memo(function TaskRow({
         checked={isDone}
         onChange={handleCheckboxChange}
         priorityColor={priorityColor}
+        ariaLabel={`Mark ${task.title} ${isDone ? 'incomplete' : 'complete'}`}
         className="shrink-0"
       />
 
@@ -184,14 +186,14 @@ export const TaskRow = memo(function TaskRow({
 
           {/* Project pill */}
           {showProject && projectName && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
+            <span className="inline-flex max-w-[8rem] items-center gap-1.5 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
               <span
-                className="h-2 w-2 rounded-full"
+                className="h-2 w-2 shrink-0 rounded-full"
                 style={{
                   backgroundColor: projectColor || 'var(--color-accent)',
                 }}
               />
-              {projectName}
+              <span className="truncate">{projectName}</span>
             </span>
           )}
 

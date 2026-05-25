@@ -33,6 +33,68 @@ function matches(value: string | null | undefined, needle: string): boolean {
 }
 
 /**
+ * Client-side task matcher used by the `/tasks` in-page search and the
+ * ⌘K command palette. Both surfaces filter the live (Firestore-backed)
+ * task data already in memory rather than the FastAPI `/search` endpoint,
+ * which queries a separate Postgres store that is not the source of truth
+ * for what the web client displays. Returns an empty array for a blank
+ * query so callers can distinguish "no query" from "no matches".
+ */
+export function filterTasksByQuery(tasks: Task[], query: string): Task[] {
+  const needle = normalizeQuery(query);
+  if (!needle) return [];
+  return tasks.filter(
+    (task) => matches(task.title, needle) || matches(task.description, needle),
+  );
+}
+
+export interface NavRoute {
+  to: string;
+  label: string;
+  /** Extra search terms (synonyms / aliases) that should match this route. */
+  keywords?: string;
+}
+
+/**
+ * Navigation destinations surfaced by the ⌘K command palette so users
+ * can jump to a screen by name (e.g. typing "Settings"). Kept in sync
+ * with `MobileNav`/`Sidebar` route labels.
+ */
+export const NAV_ROUTES: readonly NavRoute[] = [
+  { to: '/', label: 'Today' },
+  { to: '/tasks', label: 'Tasks' },
+  { to: '/projects', label: 'Projects' },
+  { to: '/habits', label: 'Habits' },
+  { to: '/calendar', label: 'Calendar' },
+  { to: '/briefing', label: 'Briefing' },
+  { to: '/chat', label: 'AI Executive Assistant', keywords: 'chat assistant ai' },
+  { to: '/eisenhower', label: 'Eisenhower' },
+  { to: '/planner', label: 'Planner' },
+  { to: '/timeblock', label: 'Time Block' },
+  { to: '/pomodoro', label: 'Pomodoro' },
+  { to: '/weekly-review', label: 'Weekly Review' },
+  { to: '/analytics', label: 'Analytics' },
+  { to: '/mood', label: 'Mood' },
+  { to: '/medication', label: 'Medication' },
+  { to: '/focus', label: 'Focus' },
+  { to: '/search', label: 'Search' },
+  { to: '/tags', label: 'Tags' },
+  { to: '/templates', label: 'Templates' },
+  { to: '/extract', label: 'Extract' },
+  { to: '/archive', label: 'Archive' },
+  { to: '/settings', label: 'Settings' },
+];
+
+/** Match navigation routes by label or alias for the command palette. */
+export function searchRoutes(query: string): NavRoute[] {
+  const needle = normalizeQuery(query);
+  if (!needle) return [];
+  return NAV_ROUTES.filter(
+    (route) => matches(route.label, needle) || matches(route.keywords, needle),
+  );
+}
+
+/**
  * Pure client-side search across the data already synced into Zustand
  * stores. Mirrors the Android `SearchViewModel` shape (tasks + tags +
  * projects), and additionally surfaces habits and task notes per the

@@ -1,5 +1,23 @@
 import { test, expect } from '@playwright/test';
 
+// Minimal shapes for the zustand stores + router that `src/App.tsx`
+// injects onto `window` for E2E control. Typed (rather than `any`) so the
+// harness stays lint-clean; the shapes are intentionally loose because the
+// tests only poke at getState/setState/navigate.
+interface InjectedStore {
+  getState?: () => Record<string, unknown>;
+  setState?: (partial: Record<string, unknown>) => void;
+}
+interface InjectedRouter {
+  navigate: (path: string) => void;
+}
+interface TestWindow {
+  useAuthStore?: InjectedStore;
+  useOnboardingStore?: InjectedStore;
+  useTaskStore?: InjectedStore;
+  router: InjectedRouter;
+}
+
 test.describe('Task Editor Schedule Tab Crash Tests', () => {
   let logs: string[] = [];
   let pageErrors: string[] = [];
@@ -15,12 +33,12 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
     
     // Wait for the initial Firebase Auth check to finish (isLoading === false)
     await page.waitForFunction(() => {
-      const authStore = (window as any).useAuthStore;
+      const authStore = (window as unknown as TestWindow).useAuthStore;
       return authStore && authStore.getState && !authStore.getState().isLoading;
     }, { timeout: 10000 });
 
     await page.evaluate(() => {
-      const authStore = (window as any).useAuthStore;
+      const authStore = (window as unknown as TestWindow).useAuthStore;
       if (authStore && authStore.setState) {
         authStore.setState({
           firebaseUser: { uid: 'user123', email: 'test@example.com', displayName: 'Test User' },
@@ -32,7 +50,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
           fetchUser: async () => {},
         });
       }
-      const onboardingStore = (window as any).useOnboardingStore;
+      const onboardingStore = (window as unknown as TestWindow).useOnboardingStore;
       if (onboardingStore && onboardingStore.setState) {
         onboardingStore.setState({
           status: 'completed',
@@ -50,7 +68,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
 
   test('navigate to schedule tab on new task', async ({ page }) => {
     await page.evaluate(() => {
-      const taskStore = (window as any).useTaskStore;
+      const taskStore = (window as unknown as TestWindow).useTaskStore;
       if (taskStore && taskStore.setState) {
         taskStore.setState({
           tasks: [],
@@ -66,7 +84,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
     });
 
     await page.evaluate(() => {
-      (window as any).router.navigate('/tasks');
+      (window as unknown as TestWindow).router.navigate('/tasks');
     });
     await page.waitForURL('**/tasks', { timeout: 5000 });
     await page.waitForTimeout(1000);
@@ -84,7 +102,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
 
   test('navigate to schedule tab on existing task with no recurrence', async ({ page }) => {
     await page.evaluate(() => {
-      const taskStore = (window as any).useTaskStore;
+      const taskStore = (window as unknown as TestWindow).useTaskStore;
       if (taskStore && taskStore.setState) {
         const mockTask = {
           id: 'task-no-rec',
@@ -102,7 +120,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
           tasks: [mockTask],
           fetchTask: async () => {
             taskStore.setState({ selectedTask: mockTask });
-            return mockTask as any;
+            return mockTask;
           },
           fetchToday: async () => {},
           fetchOverdue: async () => {},
@@ -112,7 +130,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
     });
 
     await page.evaluate(() => {
-      (window as any).router.navigate('/tasks/task-no-rec');
+      (window as unknown as TestWindow).router.navigate('/tasks/task-no-rec');
     });
     await page.waitForURL('**/tasks/task-no-rec', { timeout: 5000 });
     await page.waitForTimeout(1000);
@@ -127,7 +145,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
 
   test('navigate to schedule tab on existing task with malformed recurrence', async ({ page }) => {
     await page.evaluate(() => {
-      const taskStore = (window as any).useTaskStore;
+      const taskStore = (window as unknown as TestWindow).useTaskStore;
       if (taskStore && taskStore.setState) {
         const mockTask = {
           id: 'task-malformed-rec',
@@ -149,7 +167,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
           tasks: [mockTask],
           fetchTask: async () => {
             taskStore.setState({ selectedTask: mockTask });
-            return mockTask as any;
+            return mockTask;
           },
           fetchToday: async () => {},
           fetchOverdue: async () => {},
@@ -159,7 +177,7 @@ test.describe('Task Editor Schedule Tab Crash Tests', () => {
     });
 
     await page.evaluate(() => {
-      (window as any).router.navigate('/tasks/task-malformed-rec');
+      (window as unknown as TestWindow).router.navigate('/tasks/task-malformed-rec');
     });
     await page.waitForURL('**/tasks/task-malformed-rec', { timeout: 5000 });
     await page.waitForTimeout(1000);

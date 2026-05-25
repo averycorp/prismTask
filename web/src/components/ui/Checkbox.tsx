@@ -7,6 +7,13 @@ interface CheckboxProps {
   priorityColor?: string;
   disabled?: boolean;
   label?: string;
+  /**
+   * Accessible name for the control. Required when there is no visible
+   * `label` (the `role="checkbox"` button has no text content of its own,
+   * so without this it is announced as an unlabeled checkbox). Falls back
+   * to `label` when omitted.
+   */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -17,6 +24,7 @@ export function Checkbox({
   priorityColor,
   disabled = false,
   label,
+  ariaLabel,
   className = '',
 }: CheckboxProps) {
   const ringColor = priorityColor || 'var(--color-border)';
@@ -30,6 +38,7 @@ export function Checkbox({
         type="button"
         role="checkbox"
         aria-checked={indeterminate ? 'mixed' : checked}
+        aria-label={ariaLabel ?? label}
         disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
         className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150"

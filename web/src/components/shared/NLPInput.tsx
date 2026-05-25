@@ -12,6 +12,11 @@ import { useProFeature } from '@/hooks/useProFeature';
 import { detectBatchIntent } from '@/utils/batchIntentDetector';
 import { detectMultiCreate } from '@/utils/multiCreateDetector';
 import { parseQuickAdd } from '@/utils/nlp';
+import {
+  MAX_TASK_TITLE_LENGTH,
+  clampTitle,
+  deriveQuickAddTitle,
+} from '@/utils/taskTitle';
 import type { NLPParseResult } from '@/types/api';
 import type { TaskTemplate } from '@/types/template';
 
@@ -238,12 +243,17 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
     setLoading(true);
     try {
       const result = await parseApi.parse({ text });
+      // Preserve the user's literal title (incl. any `<...>` content and
+      // full length) rather than the backend's destructively "cleaned up"
+      // one — see deriveQuickAddTitle (bugs B-03 / B-04). Scheduling fields
+      // still come from the backend parse.
+      const safeTitle = deriveQuickAddTitle(text, result.title);
       // When confirmation is disabled, skip the preview popover and
       // submit straight to the caller. Mirrors Android's
       // `showConfirmation=false` direct-insert path.
       if (!confirmTaskBeforeSave) {
         onTaskCreate?.({
-          title: result.title || text,
+          title: clampTitle(safeTitle),
           due_date: result.due_date ?? undefined,
           priority: result.priority ?? undefined,
           project_suggestion: result.project_suggestion ?? undefined,
@@ -251,9 +261,9 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
         setValue('');
         return;
       }
-      setParseResult(result);
+      setParseResult({ ...result, title: safeTitle });
       setEditedResult({
-        title: result.title,
+        title: safeTitle,
         due_date: result.due_date,
         priority: result.priority,
         project_suggestion: result.project_suggestion,
@@ -329,7 +339,7 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
 
   const handleConfirm = () => {
     onTaskCreate?.({
-      title: (editedResult.title || parseResult?.title) ?? '',
+      title: clampTitle((editedResult.title || parseResult?.title) ?? ''),
       due_date: editedResult.due_date ?? parseResult?.due_date ?? undefined,
       priority: editedResult.priority ?? parseResult?.priority ?? undefined,
       project_suggestion: editedResult.project_suggestion ?? parseResult?.project_suggestion ?? undefined,
@@ -347,7 +357,7 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
   const priorityLabels: Record<number, string> = { 1: 'Urgent', 2: 'High', 3: 'Medium', 4: 'Low' };
 
   return (
-    <div className={`relative flex-1 max-w-2xl ${className}`}>
+    <div className={`relative min-w-0 flex-1 max-w-2xl ${className}`}>
       <form onSubmit={handleSubmit}>
         <div className="relative">
           <Sparkles className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
@@ -423,12 +433,25 @@ export function NLPInput({ onTaskCreate, onTemplateUse, className = '' }: NLPInp
           <div className="flex flex-col gap-3">
             {/* Title */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                Title
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs font-medium text-[var(--color-text-secondary)]">
+                  Title
+                </label>
+                <span
+                  className={`text-xs tabular-nums ${
+                    (editedResult.title || '').length >= MAX_TASK_TITLE_LENGTH
+                      ? 'font-medium text-[var(--color-danger,#dc2626)]'
+                      : 'text-[var(--color-text-secondary)]'
+                  }`}
+                  aria-live="polite"
+                >
+                  {(editedResult.title || '').length}/{MAX_TASK_TITLE_LENGTH}
+                </span>
+              </div>
               <input
                 type="text"
                 value={editedResult.title || ''}
+                maxLength={MAX_TASK_TITLE_LENGTH}
                 onChange={(e) => setEditedResult({ ...editedResult, title: e.target.value })}
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
               />

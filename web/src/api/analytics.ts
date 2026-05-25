@@ -18,24 +18,40 @@ import type {
  * (accept Firestore IDs) or a resolver mapping — out of scope for the
  * initial analytics slice.
  */
+interface ReqOpts {
+  suppressErrorToast?: boolean;
+}
+
 export const analyticsApi = {
   productivityScore(
     params: ProductivityScoreParams = {},
+    opts: ReqOpts = {},
   ): Promise<ProductivityScoreResponse> {
     return apiClient
-      .get('/analytics/productivity-score', { params })
+      .get('/analytics/productivity-score', {
+        params,
+        suppressErrorToast: opts.suppressErrorToast,
+      })
       .then((r) => r.data);
   },
 
   timeTracking(
     params: TimeTrackingParams = {},
+    opts: ReqOpts = {},
   ): Promise<TimeTrackingResponse> {
     return apiClient
-      .get('/analytics/time-tracking', { params })
+      .get('/analytics/time-tracking', {
+        params,
+        suppressErrorToast: opts.suppressErrorToast,
+      })
       .then((r) => r.data);
   },
 
-  habitCorrelations(): Promise<HabitCorrelationResponse> {
-    return apiClient.get('/analytics/habit-correlations').then((r) => r.data);
+  habitCorrelations(opts: ReqOpts = {}): Promise<HabitCorrelationResponse> {
+    return apiClient
+      .get('/analytics/habit-correlations', {
+        suppressErrorToast: opts.suppressErrorToast,
+      })
+      .then((r) => r.data);
   },
 };

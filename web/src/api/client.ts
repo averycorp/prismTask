@@ -1,6 +1,13 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
 
+declare module 'axios' {
+  // Per-request opt-out from the global error-toast interceptor.
+  export interface AxiosRequestConfig {
+    suppressErrorToast?: boolean;
+  }
+}
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   'https://averytask-production.up.railway.app/api/v1';
@@ -134,9 +141,15 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Per-request opt-out: callers issuing best-effort / background requests
+    // (e.g. the briefing auto-generate on mount, analytics widgets that are
+    // expected to be empty) set `suppressErrorToast` so a transient failure
+    // doesn't flash a global error toast. Token-refresh (401) still runs.
+    const suppressToast = Boolean(originalRequest?.suppressErrorToast);
+
     // Network error (no response)
     if (!error.response) {
-      toast.error('Network error. Check your connection.');
+      if (!suppressToast) toast.error('Network error. Check your connection.');
       return Promise.reject(error);
     }
 
@@ -226,7 +239,9 @@ apiClient.interceptors.response.use(
     }
 
     // Handle other HTTP errors with user-facing toasts
-    if (status === 403) {
+    if (suppressToast) {
+      // Caller handles its own error UX — skip the global toast.
+    } else if (status === 403) {
       toast.error("You don't have permission for this action.");
     } else if (status === 429) {
       const retryAfter = error.response.headers?.['retry-after'];

@@ -7,7 +7,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
  * through the mocked applier.
  */
 
-vi.mock('@/api/firestore/tasks', () => ({ getAllTasks: vi.fn(async () => []) }));
+vi.mock('@/api/firestore/tasks', () => ({
+  getAllTasks: vi.fn(async () => []),
+  getRecentTasksForBatch: vi.fn(async () => []),
+}));
 vi.mock('@/api/firestore/habits', () => ({ getHabits: vi.fn(async () => []) }));
 vi.mock('@/api/firestore/projects', () => ({ getProjects: vi.fn(async () => []) }));
 vi.mock('@/api/firestore/medications', () => ({

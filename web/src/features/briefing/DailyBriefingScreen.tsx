@@ -52,17 +52,26 @@ export function DailyBriefingScreen() {
   const [loading, setLoading] = useState(false);
   const [date] = useState(() => format(new Date(), 'yyyy-MM-dd'));
 
-  const generate = async () => {
+  const generate = async (opts: { silent?: boolean } = {}) => {
     if (!isPro) {
       setShowUpgrade(true);
       return;
     }
     setLoading(true);
     try {
-      const response = await aiApi.dailyBriefing({ date });
+      const response = await aiApi.dailyBriefing(
+        { date },
+        { suppressErrorToast: opts.silent },
+      );
       setBriefing(response);
     } catch (e) {
-      toast.error((e as Error).message || 'Failed to generate briefing');
+      // The on-mount auto-generate is best-effort: if it fails (offline,
+      // AI temporarily unavailable, etc.) fall back silently to the
+      // empty state instead of flashing a scary error toast (bug B-06).
+      // An explicit user-triggered generate still surfaces the error.
+      if (!opts.silent) {
+        toast.error((e as Error).message || 'Failed to generate briefing');
+      }
     } finally {
       setLoading(false);
     }
@@ -73,7 +82,7 @@ export function DailyBriefingScreen() {
   useEffect(() => {
     if (isPro && !briefing && !loading) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch effect: auto-generate briefing once on mount for Pro users
-      generate();
+      generate({ silent: true });
     }
     // Intentionally omitting deps: we only want the initial auto-generate,
     // not a re-trigger each time these identities change.
@@ -98,7 +107,7 @@ export function DailyBriefingScreen() {
           </p>
         </div>
         <Button
-          onClick={generate}
+          onClick={() => generate()}
           disabled={loading}
           variant={briefing ? 'secondary' : 'primary'}
         >

@@ -81,4 +81,36 @@ describe('TaskConfirmModal', () => {
     );
     expect(screen.getByRole('button', { name: /save task/i })).toBeDisabled();
   });
+
+  it('renders a <script> title as literal text without executing it (B-04 XSS)', () => {
+    const onSave = vi.fn();
+    const payload = 'QA TEST <script>alert(1)</script>';
+    const { container } = render(
+      <TaskConfirmModal
+        initial={{ ...baseDraft, title: payload }}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    );
+    const titleInput = screen.getByLabelText(/^title$/i) as HTMLInputElement;
+    // The raw payload is preserved as the input's literal value...
+    expect(titleInput.value).toBe(payload);
+    // ...and never parsed into an actual <script> element in the DOM.
+    expect(container.querySelector('script')).toBeNull();
+  });
+
+  it('shows a character counter and caps the title at the max length (B-03)', async () => {
+    const onSave = vi.fn();
+    render(
+      <TaskConfirmModal
+        initial={{ ...baseDraft, title: 'Buy milk' }}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    );
+    // Counter is visible up-front so any length limit is never silent.
+    expect(screen.getByText('8/100')).toBeInTheDocument();
+    const titleInput = screen.getByLabelText(/^title$/i) as HTMLInputElement;
+    expect(titleInput.maxLength).toBe(100);
+  });
 });

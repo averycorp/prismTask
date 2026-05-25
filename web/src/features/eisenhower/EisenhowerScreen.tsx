@@ -556,8 +556,11 @@ export function EisenhowerScreen() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
+      <div className="flex h-64 flex-col items-center justify-center gap-3">
         <Spinner size="lg" />
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          Loading your tasks and sorting them into quadrants…
+        </p>
       </div>
     );
   }

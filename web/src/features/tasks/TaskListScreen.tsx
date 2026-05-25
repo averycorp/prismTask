@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTagStore } from '@/stores/tagStore';
-import { searchApi } from '@/api/search';
+import { filterTasksByQuery } from '@/features/search/searchFilters';
 import * as firestoreTasks from '@/api/firestore/tasks';
 import { getFirebaseUid } from '@/stores/firebaseUid';
 import { TaskRow } from '@/components/shared/TaskRow';
@@ -99,8 +99,6 @@ export function TaskListScreen() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Task[] | null>(null);
-  const [searching, setSearching] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [createMode, setCreateMode] = useState(false);
 
@@ -138,7 +136,6 @@ export function TaskListScreen() {
   // Collapsed project groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const projectMap = useMemo(
     () => new Map(projects.map((p) => [p.id, p])),
     [projects],
@@ -198,29 +195,16 @@ export function TaskListScreen() {
     return () => document.removeEventListener('mousedown', handler);
   }, [sortOpen]);
 
-  // Debounced search
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (!searchQuery.trim()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch reset: clear stale results when search query empties
-      setSearchResults(null);
-      return;
-    }
-    setSearching(true);
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const results = await searchApi.search(searchQuery);
-        setSearchResults(Array.isArray(results) ? results : []);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-    return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    };
-  }, [searchQuery]);
+  // Client-side search over the live (Firestore-backed) task list. The
+  // FastAPI `/search` endpoint queries a separate Postgres store that is
+  // not the source of truth for what the web client displays, so a freshly
+  // created task — or any task visible on screen — would never match.
+  // `null` means "no active query" (show the full list); an array (possibly
+  // empty) means a query is active.
+  const searchResults = useMemo(
+    () => (searchQuery.trim() ? filterTasksByQuery(allTasks, searchQuery) : null),
+    [searchQuery, allTasks],
+  );
 
   // Apply filters
   const filteredTasks = useMemo(() => {
@@ -519,13 +503,7 @@ export function TaskListScreen() {
             placeholder="Search tasks..."
             className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-2 pl-10 pr-4 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
           />
-          {searching && (
-            <Spinner
-              size="sm"
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-            />
-          )}
-          {searchQuery && !searching && (
+          {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"

@@ -1,11 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, FileText, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Search, X, FileText, Loader2, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { searchApi } from '@/api/search';
 import { DueDateLabel } from './DueDateLabel';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { useTaskStore } from '@/stores/taskStore';
+import { getFirebaseUid } from '@/stores/firebaseUid';
+import * as firestoreTasks from '@/api/firestore/tasks';
+import {
+  filterTasksByQuery,
+  searchRoutes,
+  type NavRoute,
+} from '@/features/search/searchFilters';
 import type { Task } from '@/types/task';
 
 interface SearchModalProps {
@@ -13,25 +19,43 @@ interface SearchModalProps {
   onClose: () => void;
 }
 
+type Row =
+  | { kind: 'route'; route: NavRoute }
+  | { kind: 'task'; task: Task };
+
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const navigate = useNavigate();
   const { setSelectedTask } = useTaskStore();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Task[]>([]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Focus input on open
+  // Focus input on open + load the live task list so search has parity
+  // with what the app displays (the Firestore store is the source of
+  // truth; the FastAPI `/search` endpoint is a separate Postgres store).
   useEffect(() => {
-    if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- modal-open reset: clearing buffered query/results when modal toggles open
-      setQuery('');
-      setResults([]);
-      setHighlightIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- modal-open reset: clear buffered query/highlight when modal toggles open
+    setQuery('');
+    setHighlightIndex(0);
+    setTimeout(() => inputRef.current?.focus(), 50);
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const tasks = await firestoreTasks.getAllTasks(getFirebaseUid());
+        if (!cancelled) setAllTasks(tasks);
+      } catch {
+        if (!cancelled) setAllTasks([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   // Escape to close
@@ -56,36 +80,38 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
     };
   }, [isOpen]);
 
-  // Debounced search
+  const routeRows = useMemo<Row[]>(
+    () => searchRoutes(query).map((route) => ({ kind: 'route', route }) as const),
+    [query],
+  );
+  const taskRows = useMemo<Row[]>(
+    () =>
+      filterTasksByQuery(allTasks, query)
+        .slice(0, 50)
+        .map((task) => ({ kind: 'task', task }) as const),
+    [allTasks, query],
+  );
+  const rows = useMemo<Row[]>(
+    () => [...routeRows, ...taskRows],
+    [routeRows, taskRows],
+  );
+
+  // Keep the highlighted row in range as results change.
   useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (!query.trim()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- data-fetch reset: clearing previous async results when query becomes empty
-      setResults([]);
-      return;
-    }
-    setLoading(true);
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const data = await searchApi.search(query);
-        setResults(Array.isArray(data) ? data : []);
-        setHighlightIndex(0);
-      } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-    return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    };
-  }, [query]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp highlight when result set shrinks
+    setHighlightIndex((i) => (rows.length === 0 ? 0 : Math.min(i, rows.length - 1)));
+  }, [rows.length]);
 
   const handleSelect = useCallback(
-    (task: Task) => {
-      setSelectedTask(task);
-      onClose();
-      navigate(`/tasks/${task.id}`);
+    (row: Row) => {
+      if (row.kind === 'task') {
+        setSelectedTask(row.task);
+        onClose();
+        navigate(`/tasks/${row.task.id}`);
+      } else {
+        onClose();
+        navigate(row.route.to);
+      }
     },
     [navigate, onClose, setSelectedTask],
   );
@@ -94,7 +120,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightIndex((i) => Math.min(i + 1, results.length - 1));
+        setHighlightIndex((i) => Math.min(i + 1, rows.length - 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
@@ -102,8 +128,8 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         break;
       case 'Enter':
         e.preventDefault();
-        if (results[highlightIndex]) {
-          handleSelect(results[highlightIndex]);
+        if (rows[highlightIndex]) {
+          handleSelect(rows[highlightIndex]);
         }
         break;
     }
@@ -130,7 +156,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search tasks..."
+            placeholder="Search tasks and pages..."
             className="flex-1 border-none bg-transparent text-sm text-[var(--color-text-primary)] outline-none placeholder-[var(--color-text-secondary)]"
           />
           {loading && <Loader2 className="h-4 w-4 animate-spin text-[var(--color-accent)]" />}
@@ -144,35 +170,52 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
         {/* Results */}
         <div className="max-h-80 overflow-y-auto p-2">
-          {query && results.length === 0 && !loading && (
+          {query && rows.length === 0 && !loading && (
             <div className="px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]">
               No results found for "{query}"
             </div>
           )}
-          {results.map((task, index) => (
-            <button
-              key={task.id}
-              onClick={() => handleSelect(task)}
-              onMouseEnter={() => setHighlightIndex(index)}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                highlightIndex === index
-                  ? 'bg-[var(--color-bg-secondary)]'
-                  : ''
-              }`}
-            >
-              <FileText className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                  {task.title}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <StatusBadge status={task.status} />
-                <PriorityBadge priority={task.priority} iconOnly />
-                <DueDateLabel date={task.due_date} />
-              </div>
-            </button>
-          ))}
+          {rows.map((row, index) => {
+            const key = row.kind === 'task' ? `task-${row.task.id}` : `route-${row.route.to}`;
+            return (
+              <button
+                key={key}
+                onClick={() => handleSelect(row)}
+                onMouseEnter={() => setHighlightIndex(index)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                  highlightIndex === index ? 'bg-[var(--color-bg-secondary)]' : ''
+                }`}
+              >
+                {row.kind === 'task' ? (
+                  <>
+                    <FileText className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                        {row.task.title}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <StatusBadge status={row.task.status} />
+                      <PriorityBadge priority={row.task.priority} iconOnly />
+                      <DueDateLabel date={row.task.due_date} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                        {row.route.label}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[var(--color-bg-secondary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      Page
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Footer hint */}

@@ -26,6 +26,7 @@ worktrees/
 captures/
 
 # React web app
+node_modules/
 web/node_modules/
 web/dist/
 web/dist-ssr/

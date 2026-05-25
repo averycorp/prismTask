@@ -28,6 +28,7 @@ import { format, parseISO, subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { analyticsApi } from '@/api/analytics';
 import { dashboardApi } from '@/api/dashboard';
+import { isExpectedAnalyticsError } from './analyticsErrors';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProjectProgressPanel } from '@/features/analytics/ProjectProgressPanel';
 import { ProUpgradeModal } from '@/components/shared/ProUpgradeModal';
@@ -138,11 +139,15 @@ export function AnalyticsScreen() {
     setLoading(true);
     const params = dateParams;
     try {
+      // suppressErrorToast: these calls own their error UX via the
+      // consolidated message below, so the global interceptor must not
+      // also toast (that produced a double / per-call toast storm).
+      const opts = { suppressErrorToast: true };
       const [sum, score, time, corr] = await Promise.allSettled([
-        dashboardApi.getAnalyticsSummary(),
-        analyticsApi.productivityScore({ period: 'daily', ...params }),
-        analyticsApi.timeTracking({ group_by: groupBy, ...params }),
-        analyticsApi.habitCorrelations(),
+        dashboardApi.getAnalyticsSummary(opts),
+        analyticsApi.productivityScore({ period: 'daily', ...params }, opts),
+        analyticsApi.timeTracking({ group_by: groupBy, ...params }, opts),
+        analyticsApi.habitCorrelations(opts),
       ]);
 
       if (sum.status === 'fulfilled') setSummary(sum.value);
@@ -150,8 +155,13 @@ export function AnalyticsScreen() {
       if (time.status === 'fulfilled') setTimeTracking(time.value);
       if (corr.status === 'fulfilled') setCorrelations(corr.value);
 
+      // Only count genuinely unexpected failures. The AI-backed habit
+      // correlation endpoint is rate-limited to once per day (429) and is
+      // gated behind the AI-features toggle (451); a "not found"/empty
+      // (404) is also expected. None of those mean analytics is broken, so
+      // they must not trigger the persistent "calls failed" toast (B-07).
       const failures = [sum, score, time, corr].filter(
-        (r) => r.status === 'rejected',
+        (r) => r.status === 'rejected' && !isExpectedAnalyticsError(r.reason),
       ).length;
       if (failures > 0) {
         toast.error(

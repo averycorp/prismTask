@@ -14,9 +14,11 @@ import { useDraggable } from '@dnd-kit/core';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { CalendarNav } from './CalendarNav';
+import { CalendarHabitChips } from './CalendarHabitChips';
 import { QuickCreateInput } from './QuickCreateInput';
 import { useDateNavigation } from '@/hooks/useDateNavigation';
 import { useCalendarTasks } from '@/hooks/useCalendarTasks';
+import { useCalendarHabits } from '@/hooks/useCalendarHabits';
 import { useTaskStore } from '@/stores/taskStore';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -288,9 +290,14 @@ export function TimelineScreen() {
     dateRange.start,
     dateRange.end,
   );
+  const { getHabitsForDate, fetchHabits } = useCalendarHabits();
   const { updateTask, setSelectedTask } = useTaskStore();
 
   const timeGridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchHabits();
+  }, [fetchHabits]);
 
   const [quickCreateTime, setQuickCreateTime] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -298,6 +305,7 @@ export function TimelineScreen() {
 
   const dateStr = format(currentDate, 'yyyy-MM-dd');
   const dayTasks = getTasksForDate(currentDate);
+  const dayHabits = getHabitsForDate(currentDate);
 
   // Separate tasks into scheduled (with time) and unscheduled
   const { scheduledTasks, pointEvents, unscheduledTasks } = useMemo(() => {
@@ -451,6 +459,16 @@ export function TimelineScreen() {
           Today
         </Button>
       </div>
+
+      {/* Habits section */}
+      {dayHabits.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+            Habits
+          </h3>
+          <CalendarHabitChips habits={dayHabits} />
+        </div>
+      )}
 
       {/* Unscheduled tasks section */}
       {unscheduledTasks.length > 0 && (
