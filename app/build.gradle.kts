@@ -322,7 +322,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Encrypted storage
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     // Reorderable (drag-to-reorder for LazyColumn)
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
