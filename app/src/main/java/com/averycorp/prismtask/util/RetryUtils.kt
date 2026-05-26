@@ -4,7 +4,6 @@ import android.util.Log
 import kotlinx.coroutines.delay
 import java.io.IOException
 import kotlin.math.min
-import kotlin.math.pow
 
 private const val TAG = "RetryUtils"
 

@@ -3,6 +3,7 @@ package com.averycorp.prismtask.data.remote
 import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Token-bucket rate limiter for AI/backend API calls.
@@ -12,7 +13,7 @@ class RateLimiter(
     private val maxRequestsPerMinute: Int = 20,
     private val maxConcurrent: Int = 3
 ) {
-    private val minuteWindowStart = java.util.concurrent.atomic.AtomicLong(0L)
+    private val minuteWindowStart = AtomicLong(0L)
     private val requestCount = AtomicInteger(0)
     private val activeRequests = AtomicInteger(0)
 
