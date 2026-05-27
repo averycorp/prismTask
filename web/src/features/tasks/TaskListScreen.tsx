@@ -34,6 +34,9 @@ import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { computeUrgencyScore } from '@/utils/urgency';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { readyToResume } from '@/features/dormancy/dormancy';
+import { ReadyToResumeSection } from '@/features/dormancy/ReadyToResumeSection';
 import type { Task, TaskPriority, TaskStatus } from '@/types/task';
 import { lazy, Suspense } from 'react';
 
@@ -344,6 +347,21 @@ export function TaskListScreen() {
     [setSelectedTask],
   );
 
+  // Dormancy Re-Entry: read-only "Ready to Resume" list (web parity is
+  // display-only; the 5-minute session lives on Android).
+  const dormancyThresholdDays = useSettingsStore((s) => s.dormancyThresholdDays);
+  const dormantTasks = useMemo(
+    () => readyToResume(allTasks, dormancyThresholdDays),
+    [allTasks, dormancyThresholdDays],
+  );
+  const handleResumeOpen = useCallback(
+    (taskId: string) => {
+      const task = allTasks.find((t) => t.id === taskId);
+      if (task) handleTaskClick(task);
+    },
+    [allTasks, handleTaskClick],
+  );
+
   const handleNewTask = () => {
     setSelectedTask(null);
     setCreateMode(true);
@@ -490,6 +508,9 @@ export function TaskListScreen() {
           {sortedTasks.length}
         </span>
       </div>
+
+      {/* Dormancy Re-Entry: read-only Ready-to-Resume section */}
+      <ReadyToResumeSection items={dormantTasks} onOpen={handleResumeOpen} />
 
       {/* Toolbar */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

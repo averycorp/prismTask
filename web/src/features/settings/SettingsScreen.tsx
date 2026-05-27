@@ -429,6 +429,29 @@ export function SettingsScreen() {
         </div>
         <div className="mt-4">
           <label className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">
+            Dormancy Threshold
+          </label>
+          <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+            Tasks untouched this long appear in Ready to Resume. Matches
+            Android's global dormancy setting.
+          </p>
+          <input
+            type="number"
+            min={1}
+            max={90}
+            value={settings.dormancyThresholdDays}
+            onChange={(e) =>
+              settings.setSetting(
+                'dormancyThresholdDays',
+                Math.max(1, Math.min(90, parseInt(e.target.value) || 7)),
+              )
+            }
+            className="w-24 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
+          />
+          <span className="ml-2 text-xs text-[var(--color-text-secondary)]">days untouched</span>
+        </div>
+        <div className="mt-4">
+          <label className="mb-1 block text-sm font-medium text-[var(--color-text-primary)]">
             Start of Day
           </label>
           <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
