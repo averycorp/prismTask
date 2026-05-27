@@ -34,6 +34,14 @@ private suspend fun Context.readDayStartHour(): Int =
 private suspend fun Context.readDayStartMinute(): Int =
     taskBehaviorDataStore.data.map { it[DAY_START_MINUTE_KEY] ?: 0 }.first()
 
+private val DORMANCY_THRESHOLD_KEY = intPreferencesKey("dormancy_threshold_days")
+
+/** Dormancy Re-Entry: global dormancy threshold (days) for widget surfaces. */
+private suspend fun Context.readDormancyThreshold(): Int =
+    com.averycorp.prismtask.di.userPrefsDataStore.data
+        .map { (it[DORMANCY_THRESHOLD_KEY] ?: 7).coerceIn(1, 90) }
+        .first()
+
 /** Reads the user's configured accent color hex for use in widgets. */
 suspend fun Context.readAccentColor(): String =
     themePrefsDataStore.data.map { it[ACCENT_COLOR_KEY] ?: "#2563EB" }.first()
@@ -58,7 +66,17 @@ data class TodayWidgetData(
     val totalHabits: Int,
     val completedHabits: Int,
     val habitIcons: List<String>,
-    val productivityScore: Int
+    val productivityScore: Int,
+    /** Dormancy Re-Entry: top dormant recurring tasks for the widget's
+     *  "Ready to Resume" prefix section (empty = section hidden). */
+    val dormantResume: List<WidgetDormantRow> = emptyList()
+)
+
+/** Dormancy Re-Entry: a widget Ready-to-Resume row. */
+data class WidgetDormantRow(
+    val id: Long,
+    val title: String,
+    val daysDormant: Long
 )
 
 data class HabitWidgetData(
@@ -289,6 +307,31 @@ object WidgetDataProvider {
             0
         }
         val taskFetchCap = maxTasks.coerceIn(1, 20)
+        // Dormancy Re-Entry: compute the top dormant recurring tasks for the
+        // widget's Ready-to-Resume prefix (query-time, no background job).
+        val dormancyThreshold = context.readDormancyThreshold()
+        val dormantResume = taskDao.getIncompleteRootTasksOnce()
+            .asSequence()
+            .filter { it.recurrenceRule != null && it.archivedAt == null }
+            .filter {
+                com.averycorp.prismtask.domain.usecase.DormancyCalculator.isDormant(
+                    lastEngagementAt = it.lastEngagementAt,
+                    override = it.dormancyThresholdDaysOverride,
+                    global = dormancyThreshold,
+                    nowMillis = now
+                )
+            }
+            .map {
+                WidgetDormantRow(
+                    id = it.id,
+                    title = it.title,
+                    daysDormant = com.averycorp.prismtask.domain.usecase.DormancyCalculator
+                        .daysDormant(it.lastEngagementAt, now)
+                )
+            }
+            .sortedByDescending { it.daysDormant }
+            .take(3)
+            .toList()
         return TodayWidgetData(
             totalTasks = allTasks.size + completedToday.size,
             completedTasks = completedToday.size,
@@ -296,7 +339,8 @@ object WidgetDataProvider {
             totalHabits = habits.size,
             completedHabits = completedHabits,
             habitIcons = habits.take(6).map { it.icon },
-            productivityScore = productivityScore
+            productivityScore = productivityScore,
+            dormantResume = dormantResume
         )
     }
 

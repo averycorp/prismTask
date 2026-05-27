@@ -71,6 +71,26 @@ class WidgetLaunchActionTest {
     }
 
     @Test
+    fun `ResumeTiny round-trips with its taskId payload`() {
+        val original = WidgetLaunchAction.ResumeTiny(taskId = 77L)
+        val rehydrated = WidgetLaunchAction.deserialize(
+            wireId = original.wireId,
+            taskId = 77L
+        )
+        assertEquals(original, rehydrated)
+        assertEquals("resume_tiny", WidgetLaunchAction.ResumeTiny.WIRE_ID)
+    }
+
+    @Test
+    fun `ResumeTiny without taskId is rejected`() {
+        val rehydrated = WidgetLaunchAction.deserialize(
+            wireId = WidgetLaunchAction.ResumeTiny.WIRE_ID,
+            taskId = null
+        )
+        assertNull(rehydrated)
+    }
+
+    @Test
     fun `unknown wire id deserializes to null instead of crashing`() {
         assertNull(WidgetLaunchAction.deserialize("totally_made_up"))
     }
@@ -83,7 +103,9 @@ class WidgetLaunchActionTest {
     @Test
     fun `wire ids are unique across all subclasses`() {
         val singletonIds = singletonCases.map { it.wireId }
-        val allIds = singletonIds + WidgetLaunchAction.OpenTask.WIRE_ID
+        val allIds = singletonIds +
+            WidgetLaunchAction.OpenTask.WIRE_ID +
+            WidgetLaunchAction.ResumeTiny.WIRE_ID
         assertEquals(
             "wire ids must be unique — duplicates make deserialize ambiguous",
             allIds.size,

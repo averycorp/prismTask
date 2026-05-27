@@ -110,6 +110,10 @@ class MainActivity : ComponentActivity() {
     lateinit var billingManager: BillingManager
 
     @Inject
+    lateinit var resumeTinyCoordinator:
+        com.averycorp.prismtask.ui.screens.pomodoro.ResumeTinyCoordinator
+
+    @Inject
     lateinit var a11yPreferences: com.averycorp.prismtask.data.preferences.A11yPreferences
 
     @Inject
@@ -720,10 +724,16 @@ class MainActivity : ComponentActivity() {
     private fun parseLaunchAction(intent: Intent?): WidgetLaunchAction? {
         if (intent == null) return null
         val taskId = intent.getLongExtra(EXTRA_TASK_ID, -1L).takeIf { it >= 0 }
-        return WidgetLaunchAction.deserialize(
+        val action = WidgetLaunchAction.deserialize(
             wireId = intent.getStringExtra(EXTRA_LAUNCH_ACTION),
             taskId = taskId
         )
+        // Dormancy Re-Entry: arm the pending Resume Tiny request before the nav
+        // graph navigates to the Pomodoro screen, where the VM consumes it.
+        if (action is WidgetLaunchAction.ResumeTiny) {
+            resumeTinyCoordinator.request(action.taskId)
+        }
+        return action
     }
 
     /**

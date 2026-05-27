@@ -461,6 +461,11 @@ fun PrismTaskNavGraph(
                 navController.navigate(
                     PrismTaskRoute.AddEditTask.createRoute(taskId = action.taskId)
                 )
+            // Dormancy Re-Entry: the pending taskId was armed on the
+            // ResumeTinyCoordinator in MainActivity; SmartPomodoroViewModel
+            // observes it and auto-starts the 5-minute session on arrival.
+            is WidgetLaunchAction.ResumeTiny ->
+                navController.navigate(PrismTaskRoute.SmartPomodoro.route)
             // VoiceInput keeps the user on Today and is consumed by
             // [autoStartVoice] above — speech recognition starts inline
             // without a navigate() call.

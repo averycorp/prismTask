@@ -63,6 +63,20 @@ sealed class WidgetLaunchAction {
     }
 
     /**
+     * Dormancy Re-Entry: launch a 5-minute "Resume Tiny" session for [taskId]
+     * straight from a widget's Ready-to-Resume row (the equivalent of the deep
+     * link `?action=resume_tiny&taskId=`, expressed in the existing typed
+     * launch-action contract rather than a raw URI).
+     */
+    data class ResumeTiny(val taskId: Long) : WidgetLaunchAction() {
+        override val wireId: String = WIRE_ID
+
+        companion object {
+            const val WIRE_ID: String = "resume_tiny"
+        }
+    }
+
+    /**
      * Resume the post-onboarding coachmark tour at [stepIndex]. Used by a
      * future tour resume notification / widget; the in-app resume chip
      * doesn't need this since it talks to the controller directly.
@@ -105,6 +119,7 @@ sealed class WidgetLaunchAction {
                 OpenMedication.wireId -> OpenMedication
                 OpenInsights.wireId -> OpenInsights
                 OpenTask.WIRE_ID -> taskId?.let(::OpenTask)
+                ResumeTiny.WIRE_ID -> taskId?.let(::ResumeTiny)
                 else -> OpenTourStep.parseWireId(wireId)
             }
         }
