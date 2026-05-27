@@ -598,6 +598,10 @@ class TaskTemplateRepositoryTest {
 
         override suspend fun markIncomplete(id: Long, now: Long) = unsupported()
 
+        override suspend fun recordEngagement(id: Long, now: Long) = unsupported()
+
+        override suspend fun setReEntryContext(id: Long, context: String?, now: Long) = unsupported()
+
         override fun getTasksWithTags(): Flow<List<TaskWithTags>> = unsupported()
 
         override fun searchTasks(query: String): Flow<List<TaskEntity>> = unsupported()

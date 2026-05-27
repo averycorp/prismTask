@@ -223,6 +223,12 @@ class Task(Base):
     # treats this task as 100 if status == DONE else 0. PrismTask-timeline-
     # class scope, PR-4 (audit P9 option a).
     progress_percent = Column(Integer, nullable=True)
+    # Dormancy Re-Entry (v1.9.x). Canonical store is Firestore/Android; these
+    # columns mirror the task shape for backend parity. NULL last_engagement_at
+    # means never engaged (not dormant).
+    last_engagement_at = Column(DateTime(timezone=True), nullable=True)
+    re_entry_context = Column(String(280), nullable=True)
+    dormancy_threshold_days_override = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc))
 

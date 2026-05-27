@@ -105,6 +105,15 @@ data class FocusStats(
     val totalFocusSeconds: Int = 0
 )
 
+/** Dormancy Re-Entry: target task for the pause-context capture sheet. */
+data class ReEntryPrompt(
+    val taskId: Long,
+    val taskTitle: String
+)
+
+/** Dormancy Re-Entry: fixed duration of a "Resume 5 min" degraded session. */
+const val RESUME_TINY_MINUTES = 5
+
 /**
  * A2 Pomodoro+ AI coaching — UI state for the pre-session coaching modal.
  *
@@ -160,7 +169,8 @@ constructor(
     private val taskBehaviorPreferences: TaskBehaviorPreferences,
     private val aiCoach: PomodoroAICoach,
     private val taskTimingRepository: TaskTimingRepository,
-    private val billingManager: BillingManager
+    private val billingManager: BillingManager,
+    private val resumeTinyCoordinator: ResumeTinyCoordinator
 ) : ViewModel() {
     private val energyAwarePomodoro = EnergyAwarePomodoro()
 
@@ -181,6 +191,55 @@ constructor(
 
     fun dismissPostSessionEnergyPrompt() {
         _showPostSessionEnergyPrompt.value = false
+    }
+
+    /**
+     * Dormancy Re-Entry: pause-context capture prompt. Non-null when the
+     * non-blocking "Where are you stopping?" sheet should be shown for the
+     * named task after a session ends (complete OR abandon). The UI must not
+     * block return navigation — dismissing (back gesture / Skip) just clears
+     * this; only Save writes [TaskEntity.reEntryContext].
+     */
+    private val _reEntryPrompt = MutableStateFlow<ReEntryPrompt?>(null)
+    val reEntryPrompt: StateFlow<ReEntryPrompt?> = _reEntryPrompt
+
+    /**
+     * Records session-end engagement for every task in [sessionIndex] and
+     * arms the pause-context prompt for the session's primary (first) task.
+     * Safe to call with zero elapsed time (immediate abandon) — engagement is
+     * still recorded. The latest call wins for the prompt target.
+     */
+    private fun onSessionEnded(sessionIndex: Int) {
+        val sessionTasks = plan.value?.sessions?.getOrNull(sessionIndex)?.tasks.orEmpty()
+        if (sessionTasks.isEmpty()) return
+        viewModelScope.launch {
+            sessionTasks.forEach { task ->
+                try {
+                    taskRepository.recordEngagement(task.taskId)
+                } catch (e: Exception) {
+                    Log.w("SmartPomodoroVM", "recordEngagement failed", e)
+                }
+            }
+        }
+        val primary = sessionTasks.first()
+        _reEntryPrompt.value = ReEntryPrompt(taskId = primary.taskId, taskTitle = primary.title)
+    }
+
+    /** Save handler for the pause-context sheet. Overwrites prior context; then dismisses. */
+    fun saveReEntryContext(taskId: Long, context: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.setReEntryContext(taskId, context)
+            } catch (e: Exception) {
+                Log.w("SmartPomodoroVM", "setReEntryContext failed", e)
+            }
+        }
+        _reEntryPrompt.value = null
+    }
+
+    /** Skip / back-gesture dismiss. Leaves [TaskEntity.reEntryContext] untouched. */
+    fun dismissReEntryPrompt() {
+        _reEntryPrompt.value = null
     }
 
     fun logPostSessionEnergy(energy: Int) {
@@ -314,6 +373,16 @@ constructor(
                 )
             )
             _energyAwareConfig.value = planned
+        }
+        // Dormancy Re-Entry: honour a pending "Resume 5 min" request handed off
+        // by the Today CTA or the widget deep link.
+        viewModelScope.launch {
+            resumeTinyCoordinator.pendingTaskId.collect { taskId ->
+                if (taskId != null) {
+                    startResumeTinySession(taskId)
+                    resumeTinyCoordinator.consume()
+                }
+            }
         }
         registerTimerReceiver()
     }
@@ -580,12 +649,55 @@ constructor(
         }
     }
 
+    /**
+     * Dormancy Re-Entry: per-session work-duration override in minutes. NULL =
+     * use the planner's `config.sessionLength`. Set to 5 by [startResumeTinySession]
+     * and cleared on any normal session start / reset, so it never mutates the
+     * task's stored `estimatedDuration`.
+     */
+    private var sessionDurationOverrideMinutes: Int? = null
+
     fun startSession() {
+        sessionDurationOverrideMinutes = null
         _screenState.value = PomodoroState.SESSION_ACTIVE
         _currentSessionIndex.value = 0
         // Pre-session coaching runs in parallel; if it fails or is disabled,
         // the timer starts immediately via beginCurrentSessionTimer().
         requestPreSessionCoaching()
+    }
+
+    /**
+     * Dormancy Re-Entry: start a fixed 5-minute degraded "Resume Tiny" session
+     * for a single [taskId], regardless of the task's normal duration. Builds a
+     * one-task, one-session plan, applies the 5-minute duration override, and
+     * starts the timer immediately (no AI pre-session coaching). Does not modify
+     * the task's stored config.
+     */
+    fun startResumeTinySession(taskId: Long) {
+        viewModelScope.launch {
+            val title = taskRepository.getTaskByIdOnce(taskId)?.title ?: "Resume"
+            val tinyPlan = PomodoroPlan(
+                sessions = listOf(
+                    PomodoroSession(
+                        sessionNumber = 1,
+                        tasks = listOf(
+                            SessionTask(taskId, title, RESUME_TINY_MINUTES)
+                        ),
+                        rationale = "A tiny 5-minute restart to ease back in."
+                    )
+                ),
+                totalWorkMinutes = RESUME_TINY_MINUTES,
+                totalBreakMinutes = 0,
+                skippedTasks = emptyList()
+            )
+            sessionDurationOverrideMinutes = RESUME_TINY_MINUTES
+            _completedTaskIds.value = emptySet()
+            _stats.value = FocusStats()
+            _currentSessionIndex.value = 0
+            _planUiState.value = PomodoroPlanUiState.Success(tinyPlan)
+            _screenState.value = PomodoroState.SESSION_ACTIVE
+            beginCurrentSessionTimer()
+        }
     }
 
     /**
@@ -628,7 +740,7 @@ constructor(
     }
 
     private fun beginCurrentSessionTimer() {
-        val durationSeconds = config.value.sessionLength * 60
+        val durationSeconds = (sessionDurationOverrideMinutes ?: config.value.sessionLength) * 60
         // Visible debug output for field troubleshooting. Guarded because
         // Android framework stubs (Log, Toast) throw RuntimeException in
         // plain JVM unit tests that don't pull in Robolectric.
@@ -693,6 +805,9 @@ constructor(
             sessionsCompleted = _currentSessionIndex.value + 1,
             totalFocusSeconds = totalSeconds
         )
+        // Abandon path — record engagement (even at zero elapsed) and offer
+        // the pause-context prompt for the in-progress session's task.
+        onSessionEnded(_currentSessionIndex.value)
         requestSessionRecap()
     }
 
@@ -720,6 +835,7 @@ constructor(
     }
 
     fun resetToPlanning() {
+        sessionDurationOverrideMinutes = null
         PomodoroTimerService.stop(appContext)
         _screenState.value = PomodoroState.PLANNING
         _planUiState.value = PomodoroPlanUiState.Idle
@@ -774,6 +890,8 @@ constructor(
         // Check if there are more sessions
         if (sessionIndex + 1 >= plan.sessions.size) {
             _screenState.value = PomodoroState.COMPLETE
+            // Terminal complete — record engagement and offer pause-context capture.
+            onSessionEnded(sessionIndex)
             requestSessionRecap()
         } else {
             // Start break

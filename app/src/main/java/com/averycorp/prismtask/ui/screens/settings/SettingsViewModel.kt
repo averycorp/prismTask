@@ -424,6 +424,20 @@ constructor(
         viewModelScope.launch { userPreferencesDataStore.setForgivenessPrefs(prefs) }
     }
 
+    /** Global dormancy threshold in days (Dormancy Re-Entry, v1.9.x). */
+    val dormancyThresholdDays: StateFlow<Int> =
+        userPreferencesDataStore.dormancyThresholdDaysFlow
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
+                    .DEFAULT_DORMANCY_THRESHOLD_DAYS
+            )
+
+    fun setDormancyThresholdDays(days: Int) {
+        viewModelScope.launch { userPreferencesDataStore.setDormancyThresholdDays(days) }
+    }
+
     /**
      * F4 Item 3 — Streak-pause snapshot. Holds the user-set pause window
      * (start/end) and the low-energy filter toggle. The actual day

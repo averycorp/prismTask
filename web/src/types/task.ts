@@ -78,6 +78,24 @@ export interface Task {
    * Parity audit § B.8.
    */
   max_revisions_override?: number | null;
+  /**
+   * Dormancy Re-Entry (v1.9.x). Epoch-millis timestamp of the user's last
+   * session-end engagement with this task. `null` / undefined = never engaged
+   * (never-engaged is NOT dormant). Mirrors Android `TaskEntity.last_engagement_at`;
+   * carried through Firestore as `lastEngagementAt`.
+   */
+  last_engagement_at?: number | null;
+  /**
+   * Dormancy Re-Entry: optional one-line "where you stopped" note (≤280 chars).
+   * Mirrors Android `TaskEntity.re_entry_context`; Firestore `reEntryContext`.
+   */
+  re_entry_context?: string | null;
+  /**
+   * Dormancy Re-Entry: per-task override of the global dormancy threshold in
+   * days. `null` / undefined = use the global default. Mirrors Android
+   * `TaskEntity.dormancy_threshold_days_override`; Firestore `dormancyThresholdDaysOverride`.
+   */
+  dormancy_threshold_days_override?: number | null;
 }
 
 export interface TaskCreate {

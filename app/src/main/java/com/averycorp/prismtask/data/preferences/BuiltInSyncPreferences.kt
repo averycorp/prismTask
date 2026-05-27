@@ -40,6 +40,11 @@ constructor(
         private val AUTOMATION_DUP_BACKFILL_DONE =
             booleanPreferencesKey("automation_dup_backfill_done")
 
+        // Dormancy Re-Entry (v1.9.x): one-shot guard for the recurring-task
+        // streak recompute under the new dormancy rule (STREAK_RECOMPUTE_V2).
+        private val STREAK_RECOMPUTE_V2_DONE =
+            booleanPreferencesKey("streak_recompute_v2_done")
+
         // Per-family flags for the v1.4 "new entity" upload loops in
         // [com.averycorp.prismtask.data.remote.SyncService.maybeRunEntityBackfill].
         // Replaces [NEW_ENTITIES_BACKFILL_DONE] as the primary gate, with
@@ -71,6 +76,14 @@ constructor(
 
     suspend fun setBuiltInsReconciled(done: Boolean) {
         context.builtInSyncDataStore.edit { it[BUILT_INS_RECONCILED] = done }
+    }
+
+    /** Dormancy Re-Entry: has the one-shot recurring-task streak recompute run? */
+    suspend fun isStreakRecomputeV2Done(): Boolean =
+        context.builtInSyncDataStore.data.first()[STREAK_RECOMPUTE_V2_DONE] ?: false
+
+    suspend fun setStreakRecomputeV2Done(done: Boolean) {
+        context.builtInSyncDataStore.edit { it[STREAK_RECOMPUTE_V2_DONE] = done }
     }
 
     suspend fun isDriftCleanupDone(): Boolean =

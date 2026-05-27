@@ -80,7 +80,16 @@ fun SmartPomodoroScreen(
     val sessionRecap by viewModel.sessionRecap.collectAsState()
     val showUpgradePrompt by viewModel.showUpgradePrompt.collectAsState()
     val userTier by viewModel.userTier.collectAsState()
+    val reEntryPrompt by viewModel.reEntryPrompt.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    reEntryPrompt?.let { prompt ->
+        ReEntryContextSheet(
+            prompt = prompt,
+            onSave = viewModel::saveReEntryContext,
+            onSkip = viewModel::dismissReEntryPrompt
+        )
+    }
 
     if (showUpgradePrompt) {
         AlertDialog(

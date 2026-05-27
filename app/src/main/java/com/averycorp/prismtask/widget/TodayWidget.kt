@@ -139,6 +139,18 @@ private fun TodayWidgetContent(
                 val sizeTierCap = if (isLarge) 8 else 3
                 val effective = minOf(config.maxTasks, sizeTierCap)
                 val maxTasks = effective.coerceIn(1, 20)
+                // Dormancy Re-Entry: Ready-to-Resume prefix (hidden when empty).
+                if (data.dormantResume.isNotEmpty()) {
+                    Text(
+                        text = "Ready to Resume",
+                        style = WidgetTextStyles.badge(palette.primary)
+                    )
+                    Spacer(modifier = GlanceModifier.height(2.dp))
+                    data.dormantResume.take(if (isLarge) 3 else 1).forEach { row ->
+                        WidgetResumeRow(context, row, palette)
+                        Spacer(modifier = GlanceModifier.height(4.dp))
+                    }
+                }
                 if (data.tasks.isEmpty()) {
                     WidgetEmptyState(
                         emoji = "✅",
@@ -200,6 +212,46 @@ private fun TodayWidgetContent(
                 style = WidgetTextStyles.caption(palette.primary)
             )
         }
+    }
+}
+
+@Composable
+private fun WidgetResumeRow(
+    context: Context,
+    row: WidgetDormantRow,
+    palette: WidgetThemePalette
+) {
+    // Tap → MainActivity with the ResumeTiny launch action; the nav graph
+    // navigates to the Pomodoro screen, which auto-starts the 5-minute session.
+    val resumeIntent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        putExtra(MainActivity.EXTRA_LAUNCH_ACTION, WidgetLaunchAction.ResumeTiny.WIRE_ID)
+        putExtra(MainActivity.EXTRA_TASK_ID, row.id)
+    }
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .cornerRadius(8.dp)
+            .background(palette.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clickable(actionStartActivity(resumeIntent)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Text(
+                text = row.title,
+                maxLines = 1,
+                style = WidgetTextStyles.body(palette.onSurface)
+            )
+            Text(
+                text = "${row.daysDormant}d dormant",
+                style = WidgetTextStyles.caption(palette.onSurfaceVariant)
+            )
+        }
+        Text(
+            text = "Resume 5m →",
+            style = WidgetTextStyles.badgeBold(palette.primary)
+        )
     }
 }
 

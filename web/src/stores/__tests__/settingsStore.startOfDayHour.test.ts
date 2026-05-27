@@ -64,6 +64,13 @@ vi.mock('@/api/firestore/aiPreferences', () => ({
   getAiFeaturesEnabled: vi.fn(),
   setAiFeaturesEnabled: vi.fn(),
 }));
+// Same for the dormancy-threshold Firestore module (imported at store load).
+vi.mock('@/api/firestore/dormancyPreferences', () => ({
+  DEFAULT_DORMANCY_THRESHOLD_DAYS: 7,
+  getDormancyThresholdDays: vi.fn(),
+  setDormancyThresholdDays: vi.fn(),
+  subscribeToDormancyThresholdDays: vi.fn(),
+}));
 vi.mock('@/stores/firebaseUid', () => ({
   getFirebaseUid: getFirebaseUidMock,
   setFirebaseUid: vi.fn(),

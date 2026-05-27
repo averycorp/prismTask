@@ -103,7 +103,11 @@ constructor(
     private val restDayRepository: RestDayRepository,
     private val restDayPreferences: com.averycorp.prismtask.data.preferences.RestDayPreferences,
     private val billingManager: BillingManager,
-    private val balanceContributionsProvider: BalanceContributionsProvider
+    private val balanceContributionsProvider: BalanceContributionsProvider,
+    private val dormancyDismissPreferences:
+        com.averycorp.prismtask.data.preferences.DormancyDismissPreferences,
+    private val resumeTinyCoordinator:
+        com.averycorp.prismtask.ui.screens.pomodoro.ResumeTinyCoordinator
 ) : ViewModel() {
     /**
      * True when the user has marked today (logical, SoD-aware) as a rest
@@ -578,6 +582,47 @@ constructor(
             SharingStarted.WhileSubscribed(5000),
             LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         )
+
+    // ── Dormancy Re-Entry: "Ready to Resume" ──
+
+    /**
+     * Dormant recurring tasks for the "Ready to Resume" section, recomputed at
+     * query time from the incomplete root-task stream, the global dormancy
+     * threshold, and today's per-device dismissals. `localDateFlow` re-emits at
+     * each midnight crossing so dismissals reset automatically. Capped to 5,
+     * longest-dormant first (see [ReadyToResumeProvider]).
+     */
+    val readyToResume: StateFlow<List<com.averycorp.prismtask.domain.usecase.DormantTask>> =
+        combine(
+            taskRepository.getIncompleteRootTasks(),
+            userPreferencesDataStore.dormancyThresholdDaysFlow,
+            dormancyDismissPreferences.dismissedEntriesFlow,
+            localDateFlow.observeIsoString(taskBehaviorPreferences.getStartOfDay())
+        ) { tasks, threshold, dismissEntries, today ->
+            val dismissed = com.averycorp.prismtask.data.preferences
+                .DormancyDismissPreferences.dismissedIdsFor(dismissEntries, today)
+            com.averycorp.prismtask.domain.usecase.ReadyToResumeProvider.resume(
+                tasks = tasks,
+                globalThresholdDays = threshold,
+                dismissedTaskIds = dismissed,
+                nowMillis = System.currentTimeMillis()
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Arm a 5-minute Resume Tiny session; the Pomodoro screen picks it up. */
+    fun requestResumeTiny(taskId: Long) {
+        resumeTinyCoordinator.request(taskId)
+    }
+
+    /** Hide a dormant task from Ready-to-Resume until the next local midnight. */
+    fun dismissDormantForToday(taskId: Long) {
+        viewModelScope.launch {
+            val today = localDateFlow
+                .observeIsoString(taskBehaviorPreferences.getStartOfDay())
+                .first()
+            dormancyDismissPreferences.dismissForToday(taskId, today)
+        }
+    }
 
     val sectionOrder: StateFlow<List<String>> = dashboardPreferences
         .getSectionOrder()

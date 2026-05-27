@@ -75,6 +75,7 @@ class HiltTestRunner : AndroidJUnitRunner() {
         // runDriftCleanup() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
         // runLifeCategoryBackfill() — Intentionally skipped: needs Hilt component instance — belongs in test-base helper, not runner
         // runMedicationMigrationPasses() — Intentionally skipped: one-shot migration passes — migration tests run their own SQL
+        // runStreakRecomputeV2() — Intentionally skipped: one-shot recurring-task streak recompute (computed-on-read, non-destructive); streak tests drive RecurringStreakRecomputer directly
         // startMedicationReschedulers() — Intentionally skipped: would schedule real AlarmManager alarms and start unbounded observer Flows
         // startAutomationEngine() — Intentionally skipped: would boot in-process automation bus collector + per-minute self-rescheduling worker
         super.onStart()

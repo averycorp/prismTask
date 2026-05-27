@@ -180,6 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // values propagate immediately. Best-effort.
     void useSettingsStore.getState().loadAiFeaturesFromFirestore(fbUser.uid);
     void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
+    void useSettingsStore.getState().loadDormancyThresholdFromFirestore(fbUser.uid);
     void useThemeStore.getState().loadFromFirestore(fbUser.uid);
     void useA11yStore.getState().loadFromFirestore(fbUser.uid);
     void useDashboardStore.getState().load(fbUser.uid);
@@ -222,6 +223,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // values propagate on session restore.
         void useSettingsStore.getState().loadAiFeaturesFromFirestore(fbUser.uid);
         void useSettingsStore.getState().loadStartOfDayHourFromFirestore(fbUser.uid);
+        void useSettingsStore.getState().loadDormancyThresholdFromFirestore(fbUser.uid);
         void useThemeStore.getState().loadFromFirestore(fbUser.uid);
         void useA11yStore.getState().loadFromFirestore(fbUser.uid);
         void useDashboardStore.getState().load(fbUser.uid);

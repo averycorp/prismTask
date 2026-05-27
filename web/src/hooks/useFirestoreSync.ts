@@ -112,6 +112,9 @@ export function useFirestoreSync(uid: string | null | undefined): void {
   const subscribeToStartOfDayHour = useSettingsStore(
     (s) => s.subscribeToStartOfDayHour,
   );
+  const subscribeToDormancyThreshold = useSettingsStore(
+    (s) => s.subscribeToDormancyThreshold,
+  );
   const subscribeToDependencies = useTaskDependencyStore(
     (s) => s.subscribeToDependencies,
   );
@@ -331,6 +334,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     safeSubscribe(subscribeToSlotDefs, 'medication-slot-defs');
     safeSubscribe(subscribeToPreferences, 'medication-preferences');
     safeSubscribe(subscribeToStartOfDayHour, 'start-of-day-hour');
+    safeSubscribe(subscribeToDormancyThreshold, 'dormancy-threshold');
     safeSubscribe(subscribeToDependencies, 'task-dependencies');
     safeSubscribe(subscribeToPhases, 'project-phases');
     safeSubscribe(subscribeToRisks, 'project-risks');
@@ -399,6 +403,7 @@ export function useFirestoreSync(uid: string | null | undefined): void {
     subscribeToSlotDefs,
     subscribeToPreferences,
     subscribeToStartOfDayHour,
+    subscribeToDormancyThreshold,
     subscribeToDependencies,
     subscribeToPhases,
     subscribeToRisks,

@@ -12,6 +12,12 @@ import {
   setDayStartHour,
   subscribeToDayStartHour,
 } from '@/api/firestore/taskBehaviorPreferences';
+import {
+  DEFAULT_DORMANCY_THRESHOLD_DAYS,
+  getDormancyThresholdDays,
+  setDormancyThresholdDays,
+  subscribeToDormancyThresholdDays,
+} from '@/api/firestore/dormancyPreferences';
 
 interface SettingsState {
   // Task Defaults
@@ -31,6 +37,11 @@ interface SettingsState {
    *  Synced cross-device via Firestore at
    *  `users/{uid}/prefs/task_behavior_prefs.day_start_hour`. */
   startOfDayHour: number;
+  /** Global dormancy threshold in days (1–90, default 7). A recurring task
+   *  untouched longer than this appears in "Ready to Resume". Synced
+   *  cross-device via Firestore at
+   *  `users/{uid}/prefs/user_prefs.dormancy_threshold_days`. */
+  dormancyThresholdDays: number;
 
   // Calendar
   weekStartsOn: 'sunday' | 'monday';
@@ -82,6 +93,10 @@ interface SettingsState {
    * `useFirestoreSync`.
    */
   subscribeToStartOfDayHour: (uid: string) => Unsubscribe;
+  /** Pull the global dormancy threshold from Firestore on auth-load. */
+  loadDormancyThresholdFromFirestore: (uid: string) => Promise<void>;
+  /** Subscribe to remote dormancy-threshold updates (cross-device). */
+  subscribeToDormancyThreshold: (uid: string) => Unsubscribe;
 }
 
 const STORAGE_KEY = 'prismtask_settings';
@@ -107,6 +122,7 @@ function saveSettings(state: Partial<SettingsState>) {
     showMorningCheckIn,
     upcomingDays,
     startOfDayHour,
+    dormancyThresholdDays,
     weekStartsOn,
     timeFormat,
     showWeekends,
@@ -128,6 +144,7 @@ function saveSettings(state: Partial<SettingsState>) {
       showMorningCheckIn,
       upcomingDays,
       startOfDayHour,
+      dormancyThresholdDays,
       weekStartsOn,
       timeFormat,
       showWeekends,
@@ -149,6 +166,7 @@ const defaults = {
   showMorningCheckIn: true,
   upcomingDays: 7,
   startOfDayHour: DEFAULT_DAY_START_HOUR,
+  dormancyThresholdDays: DEFAULT_DORMANCY_THRESHOLD_DAYS,
   weekStartsOn: 'sunday' as const,
   timeFormat: '12h' as const,
   showWeekends: true,
@@ -211,6 +229,27 @@ async function pushStartOfDayHourToFirestore(hour: number): Promise<void> {
   }
 }
 
+/**
+ * Push the global dormancy threshold to Firestore so Android picks it up on
+ * its next pull. Best-effort fire-and-forget (last-write-wins).
+ */
+async function pushDormancyThresholdToFirestore(days: number): Promise<void> {
+  const [{ getFirebaseUid }] = await Promise.all([
+    import('@/stores/firebaseUid'),
+  ]);
+  let uid: string;
+  try {
+    uid = getFirebaseUid();
+  } catch {
+    return;
+  }
+  try {
+    await setDormancyThresholdDays(uid, days);
+  } catch (e) {
+    console.warn('Failed to sync dormancy threshold to Firestore', e);
+  }
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   ...defaults,
   ...stored,
@@ -235,6 +274,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // optimistic. Parity audit item A.5a.
     if (key === 'startOfDayHour') {
       void pushStartOfDayHourToFirestore(value as number);
+    }
+
+    // Sync the dormancy threshold to Firestore (Dormancy Re-Entry, Checkpoint 6).
+    if (key === 'dormancyThresholdDays') {
+      void pushDormancyThresholdToFirestore(value as number);
     }
   },
 
@@ -274,6 +318,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // pushing again would create an infinite loop.
       set({ startOfDayHour: remote });
       saveSettings({ ...get(), startOfDayHour: remote });
+    }),
+
+  loadDormancyThresholdFromFirestore: async (uid) => {
+    try {
+      const remote = await getDormancyThresholdDays(uid);
+      set({ dormancyThresholdDays: remote });
+      saveSettings({ ...get(), dormancyThresholdDays: remote });
+    } catch (e) {
+      console.warn('Failed to load dormancy threshold from Firestore', e);
+    }
+  },
+
+  subscribeToDormancyThreshold: (uid) =>
+    subscribeToDormancyThresholdDays(uid, (remote) => {
+      set({ dormancyThresholdDays: remote });
+      saveSettings({ ...get(), dormancyThresholdDays: remote });
     }),
 }));
 
