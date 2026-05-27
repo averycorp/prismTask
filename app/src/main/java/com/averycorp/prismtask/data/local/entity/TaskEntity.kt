@@ -159,5 +159,33 @@ data class TaskEntity(
      * Added in v1.8.x as part of the PrismTask-timeline-class scope (PR-1).
      */
     @ColumnInfo(name = "progress_percent")
-    val progressPercent: Int? = null
+    val progressPercent: Int? = null,
+    /**
+     * Last time the user engaged with this task (session complete OR abandon).
+     * NULL means the task has never been engaged — which is NOT the same as
+     * "dormant" (see [com.averycorp.prismtask.domain.usecase.DormancyCalculator]).
+     * Updated at session end via the Pomodoro complete/abandon hooks.
+     *
+     * Added in v1.9.x as part of the Dormancy Re-Entry scope.
+     */
+    @ColumnInfo(name = "last_engagement_at")
+    val lastEngagementAt: Long? = null,
+    /**
+     * Optional one-line "where you stopped" note captured at session end via a
+     * non-blocking bottom sheet. Max 280 chars (enforced at the capture site).
+     * Overwritten on each capture; NULL when the user has never saved one.
+     *
+     * Added in v1.9.x as part of the Dormancy Re-Entry scope.
+     */
+    @ColumnInfo(name = "re_entry_context")
+    val reEntryContext: String? = null,
+    /**
+     * Per-task dormancy-threshold override in days. NULL = use the global
+     * `dormancyThresholdDays` from settings. Effective threshold is
+     * `override ?: global` (see [com.averycorp.prismtask.domain.usecase.DormancyCalculator]).
+     *
+     * Added in v1.9.x as part of the Dormancy Re-Entry scope.
+     */
+    @ColumnInfo(name = "dormancy_threshold_days_override")
+    val dormancyThresholdDaysOverride: Int? = null
 )

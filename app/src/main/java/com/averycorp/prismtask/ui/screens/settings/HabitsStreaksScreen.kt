@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.averycorp.prismtask.ui.screens.settings.sections.CheckInStreakSection
+import com.averycorp.prismtask.ui.screens.settings.sections.DormancySection
 import com.averycorp.prismtask.ui.screens.settings.sections.ForgivenessStreakSection
 import com.averycorp.prismtask.ui.screens.settings.sections.HabitsSection
 import com.averycorp.prismtask.ui.screens.settings.sections.StreakPauseSection
@@ -40,6 +41,7 @@ fun HabitsStreaksScreen(
     val todaySkipAfterCompleteDays by viewModel.todaySkipAfterCompleteDays.collectAsStateWithLifecycle()
     val todaySkipBeforeScheduleDays by viewModel.todaySkipBeforeScheduleDays.collectAsStateWithLifecycle()
     val skipCapPerWeek by viewModel.skipCapPerWeek.collectAsStateWithLifecycle()
+    val dormancyThresholdDays by viewModel.dormancyThresholdDays.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -74,6 +76,11 @@ fun HabitsStreaksScreen(
             ForgivenessStreakSection(
                 prefs = forgivenessPrefs,
                 onPrefsChange = viewModel::setForgivenessPrefs
+            )
+
+            DormancySection(
+                thresholdDays = dormancyThresholdDays,
+                onThresholdChange = viewModel::setDormancyThresholdDays
             )
 
             StreakPauseSection(

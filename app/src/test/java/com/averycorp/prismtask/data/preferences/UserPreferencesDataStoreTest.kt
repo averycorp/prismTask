@@ -49,6 +49,25 @@ class UserPreferencesDataStoreTest {
     }
 
     @Test
+    fun `dormancy threshold defaults to seven`() = runTest {
+        assertEquals(7, prefs.dormancyThresholdDaysFlow.first())
+    }
+
+    @Test
+    fun `dormancy threshold round trips`() = runTest {
+        prefs.setDormancyThresholdDays(21)
+        assertEquals(21, prefs.dormancyThresholdDaysFlow.first())
+    }
+
+    @Test
+    fun `dormancy threshold is clamped to 1 90 range`() = runTest {
+        prefs.setDormancyThresholdDays(0)
+        assertEquals(1, prefs.dormancyThresholdDaysFlow.first())
+        prefs.setDormancyThresholdDays(500)
+        assertEquals(90, prefs.dormancyThresholdDaysFlow.first())
+    }
+
+    @Test
     fun `appearance defaults are compact off borders on radius twelve`() = runTest {
         val a = prefs.appearanceFlow.first()
         assertFalse(a.compactMode)

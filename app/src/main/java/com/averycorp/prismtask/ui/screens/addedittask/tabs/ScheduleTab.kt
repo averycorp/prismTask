@@ -244,6 +244,39 @@ internal fun ScheduleTabContent(viewModel: AddEditTaskViewModel) {
             }
         }
 
+        // ---- Custom Dormancy Threshold (per-task override; empty = global default) ----
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel("Custom Dormancy Threshold")
+            Text(
+                text = "Tasks untouched this long appear in Ready to Resume. " +
+                    "Leave on Default to use your global setting.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val override = viewModel.dormancyThresholdDaysOverride
+            val dormancyPresets = listOf(
+                "7d" to 7,
+                "14d" to 14,
+                "30d" to 30,
+                "60d" to 60,
+                "90d" to 90
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ScheduleChip(
+                    label = "Default",
+                    selected = override == null,
+                    onClick = { viewModel.onDormancyThresholdOverrideChange(null) }
+                )
+                dormancyPresets.forEach { (label, days) ->
+                    ScheduleChip(
+                        label = label,
+                        selected = override == days,
+                        onClick = { viewModel.onDormancyThresholdOverrideChange(days) }
+                    )
+                }
+            }
+        }
+
         // ---- Logged Time section (edit mode only — needs a persisted task to FK against) ----
         if (viewModel.isEditMode) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -241,6 +241,12 @@ class UserPreferencesDataStore(
         // Task card display config (JSON-encoded)
         val KEY_TASK_CARD_DISPLAY = stringPreferencesKey("task_card_display_json")
 
+        // Dormancy Re-Entry (v1.9.x) — global default dormancy threshold in days.
+        val KEY_DORMANCY_THRESHOLD_DAYS = intPreferencesKey("dormancy_threshold_days")
+        const val DEFAULT_DORMANCY_THRESHOLD_DAYS = 7
+        const val MIN_DORMANCY_THRESHOLD_DAYS = 1
+        const val MAX_DORMANCY_THRESHOLD_DAYS = 90
+
         // Forgiveness-first streaks (v1.4.0 V5)
         val KEY_FORGIVENESS_ENABLED = booleanPreferencesKey("forgiveness_enabled")
         val KEY_FORGIVENESS_GRACE_DAYS = intPreferencesKey("forgiveness_grace_days")
@@ -693,6 +699,24 @@ class UserPreferencesDataStore(
 
     suspend fun setChatClearSkipConfirmation(skip: Boolean) {
         dataStore.edit { it[KEY_CHAT_CLEAR_SKIP_CONFIRMATION] = skip }
+    }
+
+    /**
+     * Dormancy Re-Entry (v1.9.x) — global default dormancy threshold in days.
+     * A recurring task untouched longer than this (and past any per-task
+     * override) surfaces in Ready-to-Resume. Coerced to [1, 90]; defaults to 7.
+     * Synced cross-device via [GenericPreferenceSyncService] like other prefs.
+     */
+    val dormancyThresholdDaysFlow: Flow<Int> = dataStore.data.map { prefs ->
+        (prefs[KEY_DORMANCY_THRESHOLD_DAYS] ?: DEFAULT_DORMANCY_THRESHOLD_DAYS)
+            .coerceIn(MIN_DORMANCY_THRESHOLD_DAYS, MAX_DORMANCY_THRESHOLD_DAYS)
+    }
+
+    suspend fun setDormancyThresholdDays(days: Int) {
+        dataStore.edit {
+            it[KEY_DORMANCY_THRESHOLD_DAYS] =
+                days.coerceIn(MIN_DORMANCY_THRESHOLD_DAYS, MAX_DORMANCY_THRESHOLD_DAYS)
+        }
     }
 
     /**

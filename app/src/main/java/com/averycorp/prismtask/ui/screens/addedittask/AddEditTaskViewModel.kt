@@ -21,6 +21,7 @@ import com.averycorp.prismtask.data.local.entity.TaskDependencyEntity
 import com.averycorp.prismtask.data.local.entity.TaskEntity
 import com.averycorp.prismtask.data.preferences.NotificationPreferences
 import com.averycorp.prismtask.data.preferences.TaskBehaviorPreferences
+import com.averycorp.prismtask.data.preferences.UserPreferencesDataStore
 import com.averycorp.prismtask.data.remote.FileExtractionService
 import com.averycorp.prismtask.data.remote.LifeCategoryRemoteClassifier
 import com.averycorp.prismtask.data.repository.AttachmentRepository
@@ -181,6 +182,9 @@ constructor(
         private set
     var estimatedDuration by mutableStateOf<Int?>(null)
         private set
+    /** Per-task dormancy-threshold override in days; null = use global default. */
+    var dormancyThresholdDaysOverride by mutableStateOf<Int?>(null)
+        private set
     var titleError by mutableStateOf(false)
         private set
     var notes by mutableStateOf("")
@@ -332,6 +336,7 @@ constructor(
     private var initialRecurrenceRule: RecurrenceRule? = null
     private var initialReminderOffset: Long? = null
     private var initialEstimatedDuration: Int? = null
+    private var initialDormancyThresholdOverride: Int? = null
     private var initialNotes: String = ""
     private var initialSelectedTagIds: Set<Long> = emptySet()
     private var initialLifeCategory: LifeCategory? = null
@@ -451,6 +456,7 @@ constructor(
         recurrenceRule = null
         reminderOffset = null
         estimatedDuration = null
+        dormancyThresholdDaysOverride = null
         notes = ""
         selectedTagIds = emptySet()
         lifeCategory = null
@@ -489,6 +495,7 @@ constructor(
                         recurrenceRule = task.recurrenceRule?.let { RecurrenceConverter.fromJson(it) }
                         reminderOffset = task.reminderOffset
                         estimatedDuration = task.estimatedDuration
+                        dormancyThresholdDaysOverride = task.dormancyThresholdDaysOverride
                         notes = task.notes.orEmpty()
                         selectedTagIds = tagIds
                         val loadedCategory = LifeCategory.fromStorage(task.lifeCategory)
@@ -547,6 +554,7 @@ constructor(
         initialRecurrenceRule = task.recurrenceRule?.let { RecurrenceConverter.fromJson(it) }
         initialReminderOffset = task.reminderOffset
         initialEstimatedDuration = task.estimatedDuration
+        initialDormancyThresholdOverride = task.dormancyThresholdDaysOverride
         initialNotes = task.notes.orEmpty()
         initialSelectedTagIds = tagIds
         initialLifeCategory = LifeCategory.fromStorage(task.lifeCategory).takeIf {
@@ -571,6 +579,7 @@ constructor(
         initialRecurrenceRule = null
         initialReminderOffset = null
         initialEstimatedDuration = null
+        initialDormancyThresholdOverride = null
         initialNotes = ""
         initialSelectedTagIds = emptySet()
         initialLifeCategory = null
@@ -591,6 +600,7 @@ constructor(
                     recurrenceRule != initialRecurrenceRule ||
                     reminderOffset != initialReminderOffset ||
                     estimatedDuration != initialEstimatedDuration ||
+                    dormancyThresholdDaysOverride != initialDormancyThresholdOverride ||
                     notes != initialNotes ||
                     selectedTagIds != initialSelectedTagIds ||
                     lifeCategory != initialLifeCategory ||
@@ -640,6 +650,13 @@ constructor(
 
     fun onEstimatedDurationChange(value: Int?) {
         estimatedDuration = value
+    }
+
+    fun onDormancyThresholdOverrideChange(value: Int?) {
+        dormancyThresholdDaysOverride = value?.coerceIn(
+            UserPreferencesDataStore.MIN_DORMANCY_THRESHOLD_DAYS,
+            UserPreferencesDataStore.MAX_DORMANCY_THRESHOLD_DAYS
+        )
     }
 
     /**
@@ -1394,6 +1411,7 @@ constructor(
                         reminderOffset = reminderOffset,
                         recurrenceRule = recurrenceJson,
                         estimatedDuration = estimatedDuration,
+                        dormancyThresholdDaysOverride = dormancyThresholdDaysOverride,
                         notes = trimmedNotes,
                         lifeCategory = resolvedLifeCategory,
                         taskMode = resolvedTaskMode,
@@ -1415,7 +1433,8 @@ constructor(
                     cognitiveLoad = resolvedCognitiveLoad,
                     reminderOffset = reminderOffset,
                     recurrenceRule = recurrenceJson,
-                    estimatedDuration = estimatedDuration
+                    estimatedDuration = estimatedDuration,
+                    dormancyThresholdDaysOverride = dormancyThresholdDaysOverride
                 )
             }
 

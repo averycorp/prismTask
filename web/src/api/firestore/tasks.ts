@@ -94,6 +94,16 @@ function docToTask(docId: string, data: DocumentData, uid: string): Task {
       typeof data.maxRevisionsOverride === 'number'
         ? data.maxRevisionsOverride
         : null,
+    // Dormancy Re-Entry (v1.9.x). Android stores last_engagement_at as epoch
+    // millis, re_entry_context as TEXT, and the override as a nullable Int.
+    last_engagement_at:
+      typeof data.lastEngagementAt === 'number' ? data.lastEngagementAt : null,
+    re_entry_context:
+      typeof data.reEntryContext === 'string' ? data.reEntryContext : null,
+    dormancy_threshold_days_override:
+      typeof data.dormancyThresholdDaysOverride === 'number'
+        ? data.dormancyThresholdDaysOverride
+        : null,
   };
 }
 

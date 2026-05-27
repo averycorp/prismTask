@@ -368,7 +368,8 @@ constructor(
         cognitiveLoad: String? = null,
         reminderOffset: Long? = null,
         recurrenceRule: String? = null,
-        estimatedDuration: Int? = null
+        estimatedDuration: Int? = null,
+        dormancyThresholdDaysOverride: Int? = null
     ): Long {
         val now = System.currentTimeMillis()
         val nextSortOrder = if (parentTaskId == null) taskDao.getMaxRootSortOrder() + 1 else 0
@@ -388,6 +389,7 @@ constructor(
                 reminderOffset = reminderOffset,
                 recurrenceRule = recurrenceRule,
                 estimatedDuration = estimatedDuration,
+                dormancyThresholdDaysOverride = dormancyThresholdDaysOverride,
                 createdAt = now,
                 updatedAt = now
             )

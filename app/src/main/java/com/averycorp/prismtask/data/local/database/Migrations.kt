@@ -2680,7 +2680,31 @@ val MIGRATION_84_85 = object : Migration(84, 85) {
     }
 }
 
-const val CURRENT_DB_VERSION = 85
+/**
+ * Dormancy Re-Entry: three additive nullable columns on `tasks`.
+ *
+ * - `last_engagement_at` (epoch millis): when the user last engaged with the
+ *   task via a session end. NULL for never-engaged tasks (never-engaged is NOT
+ *   dormant). Backfill is intentionally skipped — a never-set value reads as
+ *   "no engagement yet" rather than a fabricated timestamp, so historical
+ *   tasks simply don't appear in Ready-to-Resume until first engaged.
+ * - `re_entry_context` (TEXT, ≤280 chars enforced at the capture site): the
+ *   optional "where you stopped" note. NULL = none captured.
+ * - `dormancy_threshold_days_override` (INTEGER): per-task override of the
+ *   global threshold. NULL = inherit global default.
+ *
+ * Rollback: drop the three columns (SQLite ≥3.35 supports DROP COLUMN; Room's
+ * test harness validates the forward path — see DormancyMigrationTest).
+ */
+val MIGRATION_85_86 = object : Migration(85, 86) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN last_engagement_at INTEGER")
+        db.execSQL("ALTER TABLE tasks ADD COLUMN re_entry_context TEXT")
+        db.execSQL("ALTER TABLE tasks ADD COLUMN dormancy_threshold_days_override INTEGER")
+    }
+}
+
+const val CURRENT_DB_VERSION = 86
 
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -2766,5 +2790,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_81_82,
     MIGRATION_82_83,
     MIGRATION_83_84,
-    MIGRATION_84_85
+    MIGRATION_84_85,
+    MIGRATION_85_86
 )
