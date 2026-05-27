@@ -102,7 +102,8 @@ class SmartPomodoroViewModelTest {
         taskBehaviorPreferences,
         aiCoach,
         taskTimingRepository,
-        io.mockk.mockk(relaxed = true)
+        io.mockk.mockk(relaxed = true),
+        ResumeTinyCoordinator()
     )
 
     @Test

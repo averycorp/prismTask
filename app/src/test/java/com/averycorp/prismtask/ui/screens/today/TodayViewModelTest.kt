@@ -199,7 +199,13 @@ class TodayViewModelTest {
             every { it.observe(any(), any(), any(), any()) } returns kotlinx.coroutines.flow.flowOf(
                 com.averycorp.prismtask.domain.usecase.BalanceContributions.EMPTY
             )
-        }
+        },
+        // dormancyDismissPreferences
+        mockk(relaxed = true) {
+            every { dismissedEntriesFlow } returns kotlinx.coroutines.flow.flowOf(emptySet())
+        },
+        // resumeTinyCoordinator
+        com.averycorp.prismtask.ui.screens.pomodoro.ResumeTinyCoordinator()
     )
 
     @Test

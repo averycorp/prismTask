@@ -80,6 +80,7 @@ import com.averycorp.prismtask.ui.screens.today.components.CompletedTaskItem
 import com.averycorp.prismtask.ui.screens.today.components.CompletedTodaySheet
 import com.averycorp.prismtask.ui.screens.today.components.FloatingQuickAddBar
 import com.averycorp.prismtask.ui.screens.today.components.MorningCheckInBanner
+import com.averycorp.prismtask.ui.screens.today.components.ReadyToResumeSection
 import com.averycorp.prismtask.ui.screens.today.components.OverloadBanner
 import com.averycorp.prismtask.ui.screens.today.components.PauseAllNotificationsControl
 import com.averycorp.prismtask.ui.screens.today.components.PauseStatusPill
@@ -122,6 +123,7 @@ fun TodayScreen(
     onOpenLeisure: () -> Unit = { navController.navigate(PrismTaskRoute.Leisure.route) }
 ) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val readyToResume by viewModel.readyToResume.collectAsStateWithLifecycle()
     val overdueTasks by viewModel.overdueTasks.collectAsStateWithLifecycle()
     val todayTasks by viewModel.todayTasks.collectAsStateWithLifecycle()
     val plannedTasks by viewModel.plannedTasks.collectAsStateWithLifecycle()
@@ -381,6 +383,22 @@ fun TodayScreen(
                     // bell-with-slash icon in the header.
                     item(key = "pause_status_pill") {
                         PauseStatusPill()
+                    }
+
+                    // Dormancy Re-Entry: surfaced above the regular task list
+                    // whenever dormant recurring tasks exist. Resume launches a
+                    // 5-minute degraded session via the Pomodoro screen.
+                    if (readyToResume.isNotEmpty()) {
+                        item(key = "ready_to_resume") {
+                            ReadyToResumeSection(
+                                items = readyToResume,
+                                onResume = { taskId ->
+                                    viewModel.requestResumeTiny(taskId)
+                                    navController.navigate(PrismTaskRoute.SmartPomodoro.route)
+                                },
+                                onDismiss = { taskId -> viewModel.dismissDormantForToday(taskId) }
+                            )
+                        }
                     }
 
                     if (nothingToday && !allTodayDone) {
