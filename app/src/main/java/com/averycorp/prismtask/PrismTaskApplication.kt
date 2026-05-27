@@ -77,6 +77,10 @@ class PrismTaskApplication :
     lateinit var medicationMigrationRunner: MedicationMigrationRunner
 
     @Inject
+    lateinit var recurringStreakRecomputeRunner:
+        com.averycorp.prismtask.data.remote.RecurringStreakRecomputeRunner
+
+    @Inject
     lateinit var calendarSyncScheduler: CalendarSyncScheduler
 
     @Inject
@@ -166,6 +170,7 @@ class PrismTaskApplication :
             runDriftCleanup()
             runLifeCategoryBackfill()
             runMedicationMigrationPasses()
+            runStreakRecomputeV2()
             startMedicationReschedulers()
             startAutomationEngine()
         } catch (e: Exception) {
@@ -358,6 +363,17 @@ class PrismTaskApplication :
             medicationMigrationRunner.recordPostV54LaunchIfApplicable()
             medicationMigrationRunner.preserveScheduleIfNeeded()
             medicationMigrationRunner.backfillDosesIfNeeded()
+        }
+    }
+
+    /**
+     * Dormancy Re-Entry: one-shot recurring-task streak recompute under the new
+     * dormancy rule, guarded by the `STREAK_RECOMPUTE_V2` flag. See
+     * [com.averycorp.prismtask.data.remote.RecurringStreakRecomputeRunner].
+     */
+    private fun runStreakRecomputeV2() {
+        appScope.launch {
+            recurringStreakRecomputeRunner.runIfNeeded()
         }
     }
 
