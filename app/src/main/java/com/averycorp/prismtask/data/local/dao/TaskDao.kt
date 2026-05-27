@@ -161,6 +161,16 @@ interface TaskDao {
     @Query("UPDATE tasks SET is_completed = 0, completed_at = NULL, updated_at = :now WHERE id = :id")
     suspend fun markIncomplete(id: Long, now: Long = System.currentTimeMillis())
 
+    // ── Dormancy Re-Entry (v1.9.x) ──
+
+    /** Records a session-end engagement timestamp (complete OR abandon). */
+    @Query("UPDATE tasks SET last_engagement_at = :now, updated_at = :now WHERE id = :id")
+    suspend fun recordEngagement(id: Long, now: Long = System.currentTimeMillis())
+
+    /** Overwrites the pause-time re-entry context note (≤280 chars, validated at the call site). */
+    @Query("UPDATE tasks SET re_entry_context = :context, updated_at = :now WHERE id = :id")
+    suspend fun setReEntryContext(id: Long, context: String?, now: Long = System.currentTimeMillis())
+
     @Transaction
     @Query("SELECT * FROM tasks")
     fun getTasksWithTags(): Flow<List<TaskWithTags>>

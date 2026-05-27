@@ -132,6 +132,65 @@ class TaskRepositoryTest {
         assertEquals("EASY", task.cognitiveLoad)
     }
 
+    // ---------------------------------------------------------------------
+    // Dormancy Re-Entry: engagement recording + pause-context capture
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun recordEngagement_setsLastEngagementAt() = runBlocking {
+        val id = repo.addTask(title = "Resume me")
+        assertNull(taskDao.tasks.single { it.id == id }.lastEngagementAt)
+        repo.recordEngagement(id, now = 1_700_000_000_000L)
+        assertEquals(1_700_000_000_000L, taskDao.tasks.single { it.id == id }.lastEngagementAt)
+    }
+
+    @Test
+    fun recordEngagement_latestCallWins() = runBlocking {
+        val id = repo.addTask(title = "Resume me")
+        repo.recordEngagement(id, now = 1_000L)
+        repo.recordEngagement(id, now = 2_000L)
+        assertEquals(2_000L, taskDao.tasks.single { it.id == id }.lastEngagementAt)
+    }
+
+    @Test
+    fun setReEntryContext_overwritesPriorValue() = runBlocking {
+        val id = repo.addTask(title = "Outline essay")
+        repo.setReEntryContext(id, "stopped at intro")
+        assertEquals("stopped at intro", taskDao.tasks.single { it.id == id }.reEntryContext)
+        repo.setReEntryContext(id, "now at body paragraph 2")
+        assertEquals(
+            "now at body paragraph 2",
+            taskDao.tasks.single { it.id == id }.reEntryContext
+        )
+    }
+
+    @Test
+    fun setReEntryContext_trimsAndCapsAt280Chars() = runBlocking {
+        val id = repo.addTask(title = "Long note")
+        repo.setReEntryContext(id, "  " + "x".repeat(400) + "  ")
+        assertEquals(280, taskDao.tasks.single { it.id == id }.reEntryContext?.length)
+    }
+
+    @Test
+    fun setReEntryContext_blankBecomesNull() = runBlocking {
+        val id = repo.addTask(title = "Blank note")
+        repo.setReEntryContext(id, "real note")
+        repo.setReEntryContext(id, "   ")
+        assertNull(taskDao.tasks.single { it.id == id }.reEntryContext)
+    }
+
+    @Test
+    fun recordEngagement_doesNotTouchReEntryContext() = runBlocking {
+        // Skip path: engagement updates the timestamp but leaves any prior
+        // context note intact (the sheet's Skip button never calls setReEntryContext).
+        val id = repo.addTask(title = "Skip path")
+        repo.setReEntryContext(id, "earlier note")
+        repo.recordEngagement(id, now = 5_000L)
+        val task = taskDao.tasks.single { it.id == id }
+        assertEquals(5_000L, task.lastEngagementAt)
+        assertEquals("earlier note", task.reEntryContext)
+    }
+
     @Test
     fun addTask_preservesExplicitTaskModeAndCognitiveLoad() = runBlocking {
         val id = repo.addTask(
@@ -988,6 +1047,20 @@ class TaskRepositoryTest {
                     completedAt = null,
                     updatedAt = now
                 )
+            }
+        }
+
+        override suspend fun recordEngagement(id: Long, now: Long) {
+            val idx = tasks.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                tasks[idx] = tasks[idx].copy(lastEngagementAt = now, updatedAt = now)
+            }
+        }
+
+        override suspend fun setReEntryContext(id: Long, context: String?, now: Long) {
+            val idx = tasks.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                tasks[idx] = tasks[idx].copy(reEntryContext = context, updatedAt = now)
             }
         }
 

@@ -465,6 +465,30 @@ constructor(
         widgetUpdateManager.updateTaskWidgets()
     }
 
+    /**
+     * Dormancy Re-Entry: records a session-end engagement for [taskId]
+     * (fired on session COMPLETE or ABANDON, including zero-elapsed abandons).
+     * Bumps `last_engagement_at` so the task drops out of Ready-to-Resume and
+     * counts as engagement for the recurring-task streak. Idempotent — the
+     * latest call wins. Mirrors the sync/widget side-effects of [updateTask].
+     */
+    suspend fun recordEngagement(taskId: Long, now: Long = System.currentTimeMillis()) {
+        taskDao.recordEngagement(taskId, now)
+        syncTracker.trackUpdate(taskId, "task")
+        widgetUpdateManager.updateTaskWidgets()
+    }
+
+    /**
+     * Dormancy Re-Entry: overwrites the pause-time "where you stopped" note for
+     * [taskId]. [context] is trimmed and capped at 280 chars; blank becomes null.
+     * Skipping the prompt simply never calls this, leaving the prior value intact.
+     */
+    suspend fun setReEntryContext(taskId: Long, context: String?) {
+        val cleaned = context?.trim()?.take(RE_ENTRY_CONTEXT_MAX_LENGTH)?.ifBlank { null }
+        taskDao.setReEntryContext(taskId, cleaned)
+        syncTracker.trackUpdate(taskId, "task")
+    }
+
     suspend fun planTaskForToday(taskId: Long) {
         val startOfToday = DayBoundary.startOfCurrentDay(0)
         taskDao.setPlanDate(taskId, startOfToday)
@@ -961,6 +985,9 @@ constructor(
     }
 
     companion object {
+        /** Max length of the Dormancy Re-Entry pause-context note. */
+        const val RE_ENTRY_CONTEXT_MAX_LENGTH = 280
+
         fun buildDuplicateEntity(
             original: TaskEntity,
             nextSortOrder: Int,
