@@ -182,6 +182,7 @@ constructor(
         private set
     var estimatedDuration by mutableStateOf<Int?>(null)
         private set
+
     /** Per-task dormancy-threshold override in days; null = use global default. */
     var dormancyThresholdDaysOverride by mutableStateOf<Int?>(null)
         private set
