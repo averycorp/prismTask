@@ -30,12 +30,12 @@ class ReadyToResumeProviderTest {
     @Test
     fun `includes only dormant recurring incomplete unarchived tasks`() {
         val tasks = listOf(
-            task(1),                                   // dormant recurring → in
-            task(2, recurring = false),                // not recurring → out
-            task(3, completed = true),                 // completed → out
-            task(4, archivedAt = now),                 // archived → out
-            task(5, lastEngagementAt = now - oneDay),  // engaged yesterday → not dormant → out
-            task(6, lastEngagementAt = null)           // never engaged → not dormant → out
+            task(1), // dormant recurring → in
+            task(2, recurring = false), // not recurring → out
+            task(3, completed = true), // completed → out
+            task(4, archivedAt = now), // archived → out
+            task(5, lastEngagementAt = now - oneDay), // engaged yesterday → not dormant → out
+            task(6, lastEngagementAt = null) // never engaged → not dormant → out
         )
         val result = ReadyToResumeProvider.resume(tasks, globalThresholdDays = 7, dismissedTaskIds = emptySet(), nowMillis = now)
         assertEquals(listOf(1L), result.map { it.task.id })
