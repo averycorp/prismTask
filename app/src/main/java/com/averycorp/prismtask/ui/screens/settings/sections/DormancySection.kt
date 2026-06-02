@@ -48,8 +48,7 @@ fun DormancySection(
                     )
                 )
             },
-            valueRange = UserPreferencesDataStore.MIN_DORMANCY_THRESHOLD_DAYS.toFloat()..
-                UserPreferencesDataStore.MAX_DORMANCY_THRESHOLD_DAYS.toFloat()
+            valueRange = UserPreferencesDataStore.MIN_DORMANCY_THRESHOLD_DAYS.toFloat()..UserPreferencesDataStore.MAX_DORMANCY_THRESHOLD_DAYS.toFloat()
         )
     }
 
