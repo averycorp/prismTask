@@ -22,7 +22,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "axios": "^1.16.1",
     "date-fns": "^4.2.1",
-    "firebase": "^12.13.0",
+    "firebase": "^12.14.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
