@@ -104,10 +104,8 @@ constructor(
     private val restDayPreferences: com.averycorp.prismtask.data.preferences.RestDayPreferences,
     private val billingManager: BillingManager,
     private val balanceContributionsProvider: BalanceContributionsProvider,
-    private val dormancyDismissPreferences:
-        com.averycorp.prismtask.data.preferences.DormancyDismissPreferences,
-    private val resumeTinyCoordinator:
-        com.averycorp.prismtask.ui.screens.pomodoro.ResumeTinyCoordinator
+    private val dormancyDismissPreferences: com.averycorp.prismtask.data.preferences.DormancyDismissPreferences,
+    private val resumeTinyCoordinator: com.averycorp.prismtask.ui.screens.pomodoro.ResumeTinyCoordinator
 ) : ViewModel() {
     /**
      * True when the user has marked today (logical, SoD-aware) as a rest
