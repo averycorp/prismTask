@@ -40,7 +40,7 @@ class AppStartupCoordinator @Inject constructor(
     private val sortPreferencesSyncService: SortPreferencesSyncService,
     private val themePreferencesSyncService: ThemePreferencesSyncService,
     private val genericPreferenceSyncService: GenericPreferenceSyncService,
-    private val backendSyncService: BackendSyncService,
+    private val backendSyncService: BackendSyncService
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 

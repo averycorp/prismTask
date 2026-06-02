@@ -3,9 +3,11 @@ package com.averycorp.prismtask.ui.screens.extract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.averycorp.prismtask.data.local.converter.RecurrenceConverter
+import com.averycorp.prismtask.data.local.entity.ProjectEntity
 import com.averycorp.prismtask.data.repository.ProjectRepository
 import com.averycorp.prismtask.data.repository.TagRepository
 import com.averycorp.prismtask.data.repository.TaskRepository
+import com.averycorp.prismtask.domain.model.ProjectStatus
 import com.averycorp.prismtask.domain.usecase.ConversationTaskExtractor
 import com.averycorp.prismtask.domain.usecase.ExtractedTask
 import com.averycorp.prismtask.domain.usecase.NaturalLanguageParser
@@ -19,8 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import com.averycorp.prismtask.data.local.entity.ProjectEntity
-import com.averycorp.prismtask.domain.model.ProjectStatus
 
 /**
  * ViewModel for the Paste Conversation screen (v1.4.0 V9).
@@ -132,8 +132,16 @@ constructor(
                 }
                 val resolved = parsedTaskResolver.resolve(parsed)
                 val newTagIds = resolved.unmatchedTags.map { tagRepository.addTag(name = it) }
-                val projectId = if (_targetProjectIsNone.value) null else (_targetProjectId.value ?: (resolved.projectId
-                    ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) }))
+                val projectId = if (_targetProjectIsNone.value) {
+                    null
+                } else {
+                    (
+                        _targetProjectId.value ?: (
+                            resolved.projectId
+                                ?: resolved.unmatchedProject?.let { projectRepository.addProject(name = it) }
+                            )
+                        )
+                }
                 val recurrenceJson = resolved.recurrenceRule?.let { RecurrenceConverter.toJson(it) }
                 val taskId = taskRepository.addTask(
                     title = resolved.title,
