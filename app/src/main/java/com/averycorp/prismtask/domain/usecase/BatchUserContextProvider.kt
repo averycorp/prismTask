@@ -77,12 +77,12 @@ constructor(
             .filter { !it.isArchived }
             .take(100)
             .map { h ->
-            BatchHabitContext(
-                id = h.id.toString(),
-                name = h.name,
-                isArchived = false
-            )
-        }
+                BatchHabitContext(
+                    id = h.id.toString(),
+                    name = h.name,
+                    isArchived = false
+                )
+            }
 
         val projects = projectDao.getAllProjects().first().map { p ->
             BatchProjectContext(
